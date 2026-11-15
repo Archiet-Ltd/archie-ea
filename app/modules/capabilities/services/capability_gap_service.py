@@ -22,8 +22,8 @@ from typing import Any, Dict, List, Optional, Tuple
 
 logger = logging.getLogger(__name__)
 
-from sqlalchemy import or_
-from sqlalchemy.orm import joinedload
+from sqlalchemy import and_, cast, or_
+from sqlalchemy.dialects.postgresql import JSONB
 
 from app import db
 from app.datetime_helpers import utcnow
@@ -32,14 +32,14 @@ from app.models import (
     ArchiMateElement,
     ArchiMateRelationship,
     BusinessCapability,
-    ComplianceGap,
-    ComplianceRequirement,
-    QualityAttribute,
+    Gap,
 )
 from app.models.application_portfolio import ApplicationComponent
 from app.services.archimate.implementation_migration_service import ImplementationMigrationService
 from app.services.compliance.compliance_inheritance_service import ComplianceInheritanceService
+from app.services.archimate_backbone import ensure_archimate_element
 from app.services.decorators import transactional
+from app.services.gap_register_service import create_gap
 from app.services.llm_service import LLMService
 
 
@@ -400,25 +400,26 @@ class CapabilityGapAnalysisService:
         gaps_created = 0
         for app_val in compliance_results.get("application_validations", []):
             for gap_dict in app_val.get("gaps", []):
-                # Identify if this gap already exists for this app and requirement
-                existing = ComplianceGap.query.filter_by(
-                    compliance_requirement_id=gap_dict["requirement_id"], status="open"
-                ).first()
-
-                if not existing:
-                    new_gap = ComplianceGap(
-                        gap_type="missing_requirement",
-                        title=f"Compliance Gap: {gap_dict['requirement_title']}",
-                        description=(
-                            f"Application '{app_val['application_name']}' does not satisfy requirement "
-                            f"'{gap_dict['requirement_title']}' inherited from Capability '{cap.name}'."
-                        ),
-                        compliance_requirement_id=gap_dict["requirement_id"],
-                        risk_level=gap_dict["severity"] or "medium",
-                        status="open",
-                        identified_at=utcnow(),
-                    )
-                    db.session.add(new_gap)
+                # Create gap in the one gap register (replaces ComplianceGap)
+                # create_gap handles duplicate refusal based on name+org
+                _gap, created = create_gap(
+                    organization_id=cap.organization_id,
+                    name=f"Compliance Gap: {gap_dict['requirement_title']}",
+                    description=(
+                        f"Application '{app_val['application_name']}' does not satisfy requirement "
+                        f"'{gap_dict['requirement_title']}' inherited from Capability '{cap.name}'."
+                    ),
+                    gap_type="compliance",
+                    priority=gap_dict["severity"] or "medium",
+                    severity=gap_dict["severity"] or "medium",
+                    resolution_status="identified",
+                    current_state_ref=f"Requirement: {gap_dict['requirement_title']}",
+                    target_state_ref=f"Application: {app_val['application_name']}",
+                    generation_source="capability_gap_service",
+                    auto_generated=True,
+                    source_capability_id=cap.id,
+                )
+                if created:
                     gaps_created += 1
 
         db.session.commit()
@@ -756,7 +757,8 @@ class CapabilityGapAnalysisService:
             from app.modules.architecture_assistant.property_service import PropertyService
             PropertyService().merge_element_properties(gap_element, properties, source="capability_gap")
 
-        self._ensure_compliance_relationships(gap_element, related_compliance_gaps)
+        for gap in related_compliance_gaps:
+            self._ensure_compliance_relationships(gap, gap_element)
         return gap_element
 
     def _build_gap_identity(self, gap_info: Dict) -> Tuple[str, str]:
@@ -787,7 +789,7 @@ class CapabilityGapAnalysisService:
         self,
         gap_info: Dict,
         existing_properties: Dict,
-        related_compliance_gaps: List[ComplianceGap],
+        related_compliance_gaps: List["Gap"],
         current_plateau_id: Optional[int],
         target_plateau_id: Optional[int],
     ) -> Dict:
@@ -896,6 +898,7 @@ class CapabilityGapAnalysisService:
                     source_id=capability_element.id,
                     target_id=gap_element.id,
                     architecture_id=gap_element.architecture_id,
+                    organization_id=gap_element.organization_id,
                 )
             )
 
@@ -928,12 +931,14 @@ class CapabilityGapAnalysisService:
         self, source_id: int, target_id: int, architecture_id: int, rel_type: str
     ) -> None:
         if not self._relationship_exists(source_id, target_id, architecture_id, rel_type):
+            source = db.session.get(ArchiMateElement, source_id)
             db.session.add(
                 ArchiMateRelationship(
                     type=rel_type,
                     source_id=source_id,
                     target_id=target_id,
                     architecture_id=architecture_id,
+                    organization_id=source.organization_id if source is not None else None,
                 )
             )
 
@@ -950,49 +955,53 @@ class CapabilityGapAnalysisService:
             is not None
         )
 
-    def _get_related_compliance_gaps(self, capability_id: Optional[int]) -> List[ComplianceGap]:
+    def _get_related_compliance_gaps(self, capability_id: Optional[int]) -> List[Gap]:
         if not capability_id:
             return []
 
         return (
-            ComplianceGap.query.options(
-                joinedload(ComplianceGap.compliance_requirement),
-                joinedload(ComplianceGap.quality_attribute),
-            )
-            .filter(
+            Gap.query.filter(
+                Gap.gap_type == "compliance",
                 or_(
-                    ComplianceGap.compliance_requirement.has(
-                        ComplianceRequirement.applies_to_capability_id == capability_id
+                    Gap.source_capability_id == capability_id,
+                    and_(
+                        Gap.source_table == "compliance_requirement",
+                        cast(Gap.gap_sub_types, JSONB).contains({"applies_to_capability_id": capability_id}),
                     ),
-                    ComplianceGap.quality_attribute.has(
-                        QualityAttribute.applies_to_capability_id == capability_id
-                    ),
-                )
+                ),
             )
             .all()
         )
 
     def _ensure_compliance_relationships(
-        self, gap_element: ArchiMateElement, compliance_gaps: List[ComplianceGap]
+        self, gap: Gap, gap_element: ArchiMateElement
     ) -> None:
-        for compliance_gap in compliance_gaps:
-            sources: List[int] = []
+        """Ensure Archimate relationships for a compliance gap from the gap register."""
+        sources: List[int] = []
 
-            requirement = compliance_gap.compliance_requirement
-            if requirement and requirement.archimate_element_id:
-                sources.append(requirement.archimate_element_id)
+        # The new Gap model tracks source capability via source_capability_id and source_table
+        # source_capability_id is a capability id, not an element id: join the
+        # capability's own ArchiMate element.
+        if gap.source_capability_id:
+            capability = db.session.get(BusinessCapability, gap.source_capability_id)
+            capability_element = (
+                ensure_archimate_element(capability) if capability is not None else None
+            )
+            if capability_element is not None:
+                sources.append(capability_element.id)
 
-            quality_attr = compliance_gap.quality_attribute
-            if quality_attr and quality_attr.archimate_element_id:
-                sources.append(quality_attr.archimate_element_id)
+        # Check gap_sub_types for additional source info
+        gap_sub_types = gap.gap_sub_types or {}
+        if gap_sub_types.get("archimate_element_id"):
+            sources.append(gap_sub_types["archimate_element_id"])
 
-            for source_id in sources:
-                self._ensure_relationship(
-                    source_id=source_id,
-                    target_id=gap_element.id,
-                    architecture_id=gap_element.architecture_id,
-                    rel_type="association",
-                )
+        for source_id in sources:
+            self._ensure_relationship(
+                source_id=source_id,
+                target_id=gap_element.id,
+                architecture_id=gap_element.architecture_id,
+                rel_type="association",
+            )
 
     # ========================================================================
     # Work Package Generation

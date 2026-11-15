@@ -83,6 +83,21 @@ def test_picker_offers_existing_elements_of_the_boxes_types_first(db_session, ma
             ms.add_entry(canvas, "customer_segments", element_id=goal.id)
 
 
+def test_a_stakeholder_can_sit_in_customer_segments_and_a_goal_cannot(db_session, make_org, tenant_ctx):
+    org = make_org("bmc-stakeholder")
+    canvas = _canvas(db_session, org)
+    person = ArchiMateElement(name="Scale-up CTO", type="Stakeholder", layer="motivation", organization_id=org.id)
+    goal = ArchiMateElement(name="Grow", type="Goal", layer="motivation", organization_id=org.id)
+    db_session.add_all([person, goal])
+    db_session.flush()
+    with tenant_ctx(org.id):
+        assert [e.name for e in ms.candidates(canvas, "customer_segments")] == ["Scale-up CTO"]
+        ms.add_entry(canvas, "customer_segments", element_id=person.id)
+        assert [e.name for e in ms.entries(canvas, "customer_segments")] == ["Scale-up CTO"]
+        with pytest.raises(ms.CanvasError):
+            ms.add_entry(canvas, "customer_segments", element_id=goal.id)
+
+
 def test_an_element_has_one_box(db_session, make_org, tenant_ctx):
     org = make_org("bmc-onebox")
     canvas = _canvas(db_session, org)

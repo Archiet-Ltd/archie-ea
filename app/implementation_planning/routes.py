@@ -21,6 +21,7 @@ from flask import abort, current_app, flash, jsonify, redirect, render_template,
 from flask_login import current_user, login_required
 from sqlalchemy import or_
 
+from app.core.auth.permissions import can
 from .. import db  # dead-code-ok
 from ..models.implementation_migration import (
     Deliverable,
@@ -371,6 +372,12 @@ def create_work_package():
     """
     Create a new work package (the one writer: work_package_service).
     """
+    if not can(current_user, "create", "work_package"):
+        if request.is_json:
+            return jsonify({"success": False, "error": "Your role may read work packages but not change them. Administrators and architects may create, edit and delete work packages."}), 403
+        flash("Your role may read work packages but not change them. Administrators and architects may create, edit and delete work packages.", "error")
+        return redirect(url_for("implementation_planning.work_packages_list"))
+
     if request.method == "POST":
         try:
             data = request.get_json() if request.is_json else request.form.to_dict()
@@ -438,6 +445,12 @@ def edit_work_package(work_package_id):
     if work_package is None:
         abort(404)
 
+    if not can(current_user, "edit", "work_package"):
+        if request.is_json:
+            return jsonify({"error": "Your role may read work packages but not change them. Administrators and architects may create, edit and delete work packages."}), 403
+        flash("Your role may read work packages but not change them. Administrators and architects may create, edit and delete work packages.", "error")
+        return redirect(url_for("implementation_planning.work_packages_list"))
+
     if request.method == "POST":
         try:
             data = request.get_json() if request.is_json else request.form.to_dict()
@@ -490,6 +503,12 @@ def edit_work_package(work_package_id):
 @login_required
 def add_work_package_dependency(work_package_id):
     """Record that this work package depends on another (form or JSON)."""
+    if not can(current_user, "edit", "work_package"):
+        if request.is_json:
+            return jsonify({"error": "Your role may read work packages but not change them. Administrators and architects may create, edit and delete work packages."}), 403
+        flash("Your role may read work packages but not change them. Administrators and architects may create, edit and delete work packages.", "error")
+        return redirect(url_for("implementation_planning.edit_work_package", work_package_id=work_package_id))
+
     data = request.get_json(silent=True) if request.is_json else request.form.to_dict()
     data = data or {}
     try:
@@ -526,6 +545,12 @@ def add_work_package_dependency(work_package_id):
 )
 @login_required
 def remove_work_package_dependency(work_package_id, dependency_id):
+    if not can(current_user, "edit", "work_package"):
+        if request.is_json:
+            return jsonify({"error": "Your role may read work packages but not change them. Administrators and architects may create, edit and delete work packages."}), 403
+        flash("Your role may read work packages but not change them. Administrators and architects may create, edit and delete work packages.", "error")
+        return redirect(url_for("implementation_planning.edit_work_package", work_package_id=work_package_id))
+
     try:
         work_package_service.remove_dependency(
             work_package_id, dependency_id, organization_id=_org_id()
@@ -550,6 +575,12 @@ def delete_work_package(work_package_id):
     """
     Delete a work package.
     """
+    if not can(current_user, "delete", "work_package"):
+        if request.is_json:
+            return jsonify({"error": "Your role may read work packages but not change them. Administrators and architects may create, edit and delete work packages."}), 403
+        flash("Your role may read work packages but not change them. Administrators and architects may create, edit and delete work packages.", "error")
+        return redirect(url_for("implementation_planning.work_packages_list"))
+
     try:
         work_package_service.delete_work_package(work_package_id, organization_id=_org_id())
         db.session.commit()
@@ -623,7 +654,9 @@ def api_work_packages():
         if limit:
             query = query.limit(limit)
         work_packages = query.all()
-        return jsonify({"work_packages": work_package_service.to_dicts(work_packages)})
+        from app.services.cost_visibility import withhold_reply
+
+        return jsonify(withhold_reply({"work_packages": work_package_service.to_dicts(work_packages)}))
     except Exception:
         return jsonify({"error": "An internal error occurred"}), 500
 
@@ -671,7 +704,9 @@ def api_work_package_detail(work_package_id):
     work_package = work_package_service.get_work_package(work_package_id, _org_id())
     if work_package is None:
         return jsonify({"error": "Work package not found"}), 404
-    return jsonify(work_package_service.to_dict(work_package))
+    from app.services.cost_visibility import withhold_reply
+
+    return jsonify(withhold_reply(work_package_service.to_dict(work_package)))
 
 
 @implementation_planning.route("/api/work-packages", methods=["POST"])
@@ -680,6 +715,9 @@ def api_create_work_package():
     """
     API endpoint to create a new work package.
     """
+    if not can(current_user, "create", "work_package"):
+        return jsonify({"error": "Your role may read work packages but not change them. Administrators and architects may create, edit and delete work packages."}), 403
+
     try:
         data = request.get_json(silent=True) or {}
         if not (data.get("name") or "").strip():
@@ -716,6 +754,9 @@ def api_update_work_package(work_package_id):
     """
     API endpoint to update a work package.
     """
+    if not can(current_user, "edit", "work_package"):
+        return jsonify({"error": "Your role may read work packages but not change them. Administrators and architects may create, edit and delete work packages."}), 403
+
     try:
         data = request.get_json(silent=True) or {}
         work_package = work_package_service.update_work_package(
@@ -725,7 +766,9 @@ def api_update_work_package(work_package_id):
             **_fields_from(data, partial=True),
         )
         db.session.commit()
-        return jsonify({"success": True, "work_package": work_package_service.to_dict(work_package)})
+        from app.services.cost_visibility import withhold_reply
+
+        return jsonify({"success": True, "work_package": withhold_reply(work_package_service.to_dict(work_package))})
 
     except work_package_service.WorkPackageNotFound:
         db.session.rollback()
@@ -746,6 +789,9 @@ def api_delete_work_package(work_package_id):
     """
     API endpoint to delete a work package.
     """
+    if not can(current_user, "delete", "work_package"):
+        return jsonify({"error": "Your role may read work packages but not change them. Administrators and architects may create, edit and delete work packages."}), 403
+
     try:
         work_package_service.delete_work_package(work_package_id, organization_id=_org_id())
         db.session.commit()
@@ -1024,6 +1070,9 @@ def api_create_deliverable():
     """
     API endpoint to create a new deliverable.
     """
+    if not can(current_user, "create", "work_package"):
+        return jsonify({"error": "Your role may read work packages but not change them. Administrators and architects may create, edit and delete work packages."}), 403
+
     try:
         data = request.get_json()
 
@@ -1345,7 +1394,9 @@ def generate_report():
                 report_data["summary"]["gaps_by_priority"].get(priority, 0) + 1
             )
 
-        return jsonify({"success": True, "report": report_data})
+        from app.services.cost_visibility import withhold_reply
+
+        return jsonify({"success": True, "report": withhold_reply(report_data)})
 
     except Exception:
         current_app.logger.exception("Error generating implementation planning report")

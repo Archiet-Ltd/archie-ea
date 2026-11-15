@@ -1880,9 +1880,9 @@ class ToolExecutor:
         )
         base = ""
         try:
-            from flask import current_app
+            from app.services.origin import canonical_origin
 
-            base = (current_app.config.get("PUBLIC_BASE_URL") or "").rstrip("/")
+            base = canonical_origin()
         except Exception:
             base = ""
         for node in result["nodes"]:

@@ -13,7 +13,9 @@ from flask import (
     request,
     url_for,
 )
-from flask_login import login_required
+from flask_login import current_user, login_required
+
+from app.core.auth.permissions import can
 
 from app.models.implementation_migration import Gap, GAP_KIND_PLATEAU_TRANSITION
 from app.modules.interface_register.routes.register_routes import (
@@ -167,6 +169,8 @@ def attach_work_package(gap_id):
     guard = _guard()
     if guard:
         return guard
+    if not can(current_user, "create", "work_package"):
+        return render_plain_error(403)
 
     initiative_id = request.form.get("initiative_id", type=int)
     try:

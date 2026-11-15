@@ -88,6 +88,16 @@ def test_a_chosen_canvas_is_created_and_filled_from_the_model(client, login_as, 
     assert _boxes(canvases["Lean Canvas"])["customer_segments"] == ["Small retailers"]
 
 
+def test_sign_up_puts_actors_and_stakeholders_in_customer_segments_not_key_partners(client, login_as, two):
+    _element(two["one"], "BusinessActor", "business", "Aardvark supplier")
+    _element(two["one"], "Stakeholder", "motivation", "Scale-up CTO")
+    _choose(client, login_as, two["one_owner"], ["business_model_canvas"], [])
+    (canvas,) = _canvases(two["one"])
+    boxes = _boxes(canvas)
+    assert set(boxes["customer_segments"]) == {"Aardvark supplier", "Scale-up CTO"}
+    assert boxes["key_partners"] == []
+
+
 def test_a_canvas_with_nothing_in_the_model_is_created_empty_and_says_so(client, login_as, two):
     _choose(client, login_as, two["one_owner"], ["okr"], [])
     (okr,) = _canvases(two["one"])

@@ -31,6 +31,7 @@ from flask import (
     url_for,
 )
 from flask_login import current_user, login_required  # dead-code-ok
+from app.core.auth.permissions import can
 from app.middleware.tenant_context import current_org_id
 from app.modules.genome.services.roadmap_links import redirect_to_roadmap
 from sqlalchemy import case, or_  # dead-code-ok
@@ -494,6 +495,10 @@ def work_packages():
     """
     org_id = current_organization_id()
     if request.method == "POST":
+        single = bool(request.args.getlist("delete")) and not request.form.getlist("ids")
+        if not can(current_user, "delete" if single else "bulk_delete", "work_package"):
+            flash("Your role may not delete these work packages. Administrators may delete several at once; architects may delete one at a time.", "error")
+            return redirect(url_for("enterprise.work_packages"))
         ids = request.form.getlist("ids") or request.args.getlist("delete")
         deleted = 0
         for raw_id in ids:
@@ -669,7 +674,12 @@ def api_work_packages_gantt():
                 "milestones": _milestones_for(wp),
             })
 
-        return jsonify({"work_packages": items, "total": len(items)})
+        from app.services.cost_visibility import costs_visible, withhold_costs
+
+        reply = {"work_packages": items, "total": len(items)}
+        if not costs_visible(current_user):
+            reply = withhold_costs(reply)
+        return jsonify(reply)
     except Exception:
         logger.exception("Failed to build Gantt work-package feed")
         return jsonify({"error": "Failed to load work packages"}), 500
@@ -752,6 +762,8 @@ def _audit_wp(action, wp_id, name, status=None, severity=AuditEventSeverity.MEDI
 @login_required
 def api_create_work_package():
     """Create a new work package in the one store. PROD-008"""
+    if not can(current_user, "create", "work_package"):
+        return api_error("Your role may read work packages but not create them. Administrators and architects may create, edit and delete work packages.", "FORBIDDEN", 403)
     data = request.get_json(force=True) or {}
 
     if not data.get("name", "").strip():
@@ -778,6 +790,8 @@ def api_create_work_package():
 @login_required
 def api_update_work_package(wp_id):
     """Update a work package. PROD-008"""
+    if not can(current_user, "edit", "work_package"):
+        return api_error("Your role may read work packages but not update them. Administrators and architects may create, edit and delete work packages.", "FORBIDDEN", 403)
     data = request.get_json(force=True) or {}
 
     try:
@@ -801,6 +815,8 @@ def api_update_work_package(wp_id):
 @login_required
 def api_bulk_delete_work_packages():
     """Bulk delete work packages (this organisation's own only)."""
+    if not can(current_user, "bulk_delete", "work_package"):
+        return api_error("Your role may read work packages but not delete them. Only administrators may delete several work packages at once.", "FORBIDDEN", 403)
     data = request.get_json() or {}
     ids = data.get("ids", [])
     if not ids or not isinstance(ids, list):
@@ -829,6 +845,8 @@ def api_delete_work_package(wp_id):
     delete at all -- only the bulk path existed. Mirrors the bulk handler:
     another organisation's id is answered as a missing one, and the deletion
     is audit-logged with the same SOC2 flag."""
+    if not can(current_user, "delete", "work_package"):
+        return api_error("Your role may read work packages but not delete them. Administrators and architects may create, edit and delete work packages.", "FORBIDDEN", 403)
     org_id = current_organization_id()
     wp = work_package_service.get_work_package(wp_id, org_id)
     if wp is None:
