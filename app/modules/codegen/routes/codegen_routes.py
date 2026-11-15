@@ -591,9 +591,10 @@ def get_genome(solution_id):
 @require_csrf
 def enrich_uml(solution_id):
     """Phase 1: Start async UML generation from ArchiMate elements."""
-    from app.core.auth.permissions import is_read_only_member
-    if is_read_only_member(current_user):
-        return jsonify({"error": "Your role can read but not change this organisation's records."}), 403
+    from app._bootstrap.write_access import refuse_read_only
+    refusal = refuse_read_only()
+    if refusal is not None:
+        return refusal
 
     solution = Solution.query.get_or_404(solution_id)
     if not _check_access(solution):

@@ -1155,7 +1155,7 @@ entries:
       Do not write a second answer from Permission.GENERAL, a role name or a persona.
     must_not_create:
       - id: second-write-answer
-        regex: 'def\s+(may_write|user_can_write|can_write_model)\s*\('
+        regex: 'def\s+_*(may_write|user_can_write|can_write_model)\s*\('
         reason: one rule answers whether a person may change the model
     known_exceptions:
       - path: app/modules/ai_chat/tools/executor.py

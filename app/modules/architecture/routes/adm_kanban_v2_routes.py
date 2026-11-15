@@ -127,7 +127,6 @@ def create_task():
     Body: { "title": str, "phase": str, "priority": str, "card_type": str, "description": str }
     Returns: { "success": True, "card": {...} }
     """
-    from app.core.auth.permissions import is_read_only_member
     from app.models.adm_kanban import ADMPhase, KanbanBoard, KanbanCard
 
     data = request.get_json() or {}
@@ -135,8 +134,10 @@ def create_task():
     if not title:
         return jsonify({"success": False, "error": "Title is required"}), 400
 
-    if is_read_only_member(current_user):
-        return jsonify({"success": False, "error": "Your role can read but not change this organisation's records."}), 403
+    from app._bootstrap.write_access import refuse_read_only
+    refusal = refuse_read_only()
+    if refusal is not None:
+        return refusal
 
     phase_code = (data.get("phase") or "A").strip().upper()
     priority = data.get("priority", "medium")
@@ -241,10 +242,11 @@ def move_card(card_ref):
     card_ref format: "{type}:{id}" e.g. "solution:42"
     Body: { "to_column": "review" }
     """
-    from app.core.auth.permissions import is_read_only_member
 
-    if is_read_only_member(current_user):
-        return jsonify({"success": False, "error": "Your role can read but not change this organisation's records."}), 403
+    from app._bootstrap.write_access import refuse_read_only
+    refusal = refuse_read_only()
+    if refusal is not None:
+        return refusal
 
     if ":" not in card_ref:
         return (
@@ -423,10 +425,11 @@ def update_task(card_ref):
     Body: { "title"?, "description"?, "priority"?, "phase"? }
     Returns: { "success": True, "card": {...} }
     """
-    from app.core.auth.permissions import is_read_only_member
 
-    if is_read_only_member(current_user):
-        return jsonify({"success": False, "error": "Your role can read but not change this organisation's records."}), 403
+    from app._bootstrap.write_access import refuse_read_only
+    refusal = refuse_read_only()
+    if refusal is not None:
+        return refusal
 
     if ":" not in card_ref:
         return jsonify({"success": False, "error": "Invalid card reference"}), 400
@@ -538,10 +541,11 @@ def delete_task(card_ref):
     card_ref format: "task:{id}"
     Returns: { "success": True, "deleted_id": "task:42" }
     """
-    from app.core.auth.permissions import is_read_only_member
 
-    if is_read_only_member(current_user):
-        return jsonify({"success": False, "error": "Your role can read but not change this organisation's records."}), 403
+    from app._bootstrap.write_access import refuse_read_only
+    refusal = refuse_read_only()
+    if refusal is not None:
+        return refusal
 
     if ":" not in card_ref:
         return jsonify({"success": False, "error": "Invalid card reference"}), 400
@@ -576,14 +580,15 @@ def push_to_gantt(card_ref):
     Body (JSON): { target_start_date: "YYYY-MM-DD", target_end_date: "YYYY-MM-DD" }
     Returns: { success: True, work_package_id: int, gantt_url: str }
     """
-    from app.core.auth.permissions import is_read_only_member
     from app.models.adm_kanban import KanbanCard
     from app.services import work_package_service
     from app.utils.tenant import current_organization_id
     from datetime import datetime
 
-    if is_read_only_member(current_user):
-        return jsonify({"success": False, "error": "Your role can read but not change this organisation's records."}), 403
+    from app._bootstrap.write_access import refuse_read_only
+    refusal = refuse_read_only()
+    if refusal is not None:
+        return refusal
 
     if not card_ref.startswith("task:"):
         return jsonify({"success": False, "error": "Invalid card ref"}), 400
@@ -704,13 +709,15 @@ def complete_deliverable(deliverable_id):
     Body: { "complete": bool }
     Returns: { "success": true, "deliverable": {...} }
     """
-    from app.core.auth.permissions import is_read_only_member, may_write
+    from app.core.auth.permissions import may_write
     from app.services.adm_deliverable_service import set_complete
 
     # Ticking a deliverable records progress on the architecture: a person who may change the
     # model, or the persona that edits it. A viewer never writes, whatever their persona.
-    if is_read_only_member(current_user):
-        return jsonify({"success": False, "error": "Your role can read the checklist but not change it."}), 403
+    from app._bootstrap.write_access import refuse_read_only
+    refusal = refuse_read_only()
+    if refusal is not None:
+        return refusal
     if not (may_write(current_user) or can_change_model(current_user)):
         return jsonify({"success": False, "error": "Your role can read the checklist but not change it."}), 403
     data = request.get_json() or {}
@@ -741,7 +748,6 @@ def link_board_requirement(requirement_id):
     Body: { "solution_id": int | null }
     Returns: { "success": true, "requirement": {...} }
     """
-    from app.core.auth.permissions import is_read_only_member
     from app.modules.capabilities.routes.enterprise_api_routes import (
         _may_change_requirements,
         _may_override_solution_owner,
@@ -749,11 +755,10 @@ def link_board_requirement(requirement_id):
     from app.models.solution_models import Solution
     from app.services.adm_requirement_service import link_requirement
 
-    if is_read_only_member(current_user):
-        return jsonify({
-            "success": False,
-            "error": "Your role can read requirements but not change them. Ask an architect or an administrator.",
-        }), 403
+    from app._bootstrap.write_access import refuse_read_only
+    refusal = refuse_read_only()
+    if refusal is not None:
+        return refusal
     if not _may_change_requirements("edit"):
         return jsonify({
             "success": False,
