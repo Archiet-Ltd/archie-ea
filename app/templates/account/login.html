@@ -42,12 +42,7 @@
         </div>
 
         <div class="relative max-w-md">
-            <h2 class="text-[2rem] font-bold leading-tight text-foreground">
-                The company brain <br>for your business.
-            </h2>
-            <p class="mt-4 text-[0.95rem] leading-relaxed text-muted-foreground">
-                A living digital twin of your business, with the company brain's enterprise intelligence answering what you ask it. Built for founders, leadership teams and architects.
-            </p>
+            {% with heading_tag='h2', heading_class='text-[2rem] font-bold leading-tight text-foreground', body_class='mt-4 text-[0.95rem] leading-relaxed text-muted-foreground' %}{% include 'account/_promise.html' %}{% endwith %}
         </div>
 
         <div class="relative flex flex-wrap gap-2">
