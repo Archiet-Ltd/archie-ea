@@ -18,19 +18,29 @@ from app.services import result_footer_service as footer
 
 MAX_NODES = 2000
 
-LAYERS = ("strategy", "business", "application", "technology", "physical", "motivation", "implementation", "other")
+# The layer set is the one count_layers counts: Physical's four types are Technology's, and a type no layer holds
+# is "other" (count_layers calls that row "composite").
+LAYERS = ("strategy", "motivation", "business", "application", "technology", "implementation", "other")
 LAYER_LABELS = {
-    "strategy": "Strategy", "business": "Business", "application": "Application", "technology": "Technology",
-    "physical": "Physical", "motivation": "Motivation", "implementation": "Implementation and migration",
-    "other": "Other",
+    "strategy": "Strategy", "motivation": "Motivation", "business": "Business", "application": "Application",
+    "technology": "Technology", "implementation": "Implementation and migration", "other": "Other",
 }
 # The model pages are laid out under these layers; a layer they hold no pages for opens under Business.
 _PAGE_LAYERS = frozenset(LAYERS) - {"other"}
 
 
-def layer_key(raw: Optional[str]) -> str:
-    key = (raw or "").strip().lower()
-    return key if key in LAYERS else "other"
+def layer_key(stored_layer: Optional[str], element_type: Optional[str]) -> str:
+    """The layer an element is drawn in, by the same rule count_layers reads: the layer it is stored in."""
+    from app.services import archimate_viewpoint_service as counting
+
+    layer = counting.element_layer(stored_layer, element_type)
+    return "other" if layer == counting.COMPOSITE_LAYER else layer
+
+
+def _counting_layer(key: str) -> str:
+    from app.services.archimate_viewpoint_service import COMPOSITE_LAYER
+
+    return COMPOSITE_LAYER if key == "other" else key
 
 
 def element_href(element_id: int, layer: str, element_type: Optional[str]) -> str:
@@ -55,23 +65,42 @@ def origin_sentence(source_kind: Optional[str], source_label: Optional[str], sou
 
 
 def layer_counts() -> List[Dict[str, Any]]:
-    """One row per layer: its key, label and the count of the organisation's elements, and the kinds in it."""
-    from app.models.archimate_core import ArchiMateElement as E
+    """One row per layer: its key, label and the count of the organisation's model elements, and the kinds in it.
 
-    rows = db.session.execute(
-        db.select(E.layer, E.type, db.func.count(E.id)).group_by(E.layer, E.type)
-    ).all()
-    per_layer: Dict[str, Dict[str, int]] = {}
-    for layer, kind, n in rows:
-        per_layer.setdefault(layer_key(layer), {})
-        label = kind or "Unspecified"
-        per_layer[layer_key(layer)][label] = per_layer[layer_key(layer)].get(label, 0) + n
+    The counts come from count_layers: ``count`` is the ``model`` figure (the elements the map draws), ``total`` the
+    figure on the architecture dashboard's tab and the Composer's layer card, and ``not_drawn`` the records the
+    layer lists that the map does not draw, so drawn plus not drawn is the dashboard's figure on every layer."""
+    from app.models.archimate_core import ArchiMateElement
+    from app.services import archimate_viewpoint_service as counting
+    from app.utils.tenant_sql import current_org_id
+
+    org_id = current_org_id()
+    rows = {row["layer"]: row for row in counting.count_layers(org_id)}
+
+    # The kinds breakdown only: how many of each type sit in each layer. The counts are count_layers'.
+    type_column = db.func.coalesce(ArchiMateElement.type, "Unspecified")
+    stored = counting._stored_layer_column()
+    kinds_query = (
+        db.select(stored, type_column, db.func.count(ArchiMateElement.id))
+        .group_by(stored, type_column)
+        .where(ArchiMateElement.organization_id == org_id)
+    )
+    kinds_by_layer = {key: {} for key in LAYERS}
+    for stored_layer, type_name, n in db.session.execute(kinds_query).all():
+        layer = counting.element_layer(stored_layer, type_name)
+        key = "other" if layer == counting.COMPOSITE_LAYER else layer
+        if key in kinds_by_layer:
+            kinds_by_layer[key][type_name] = kinds_by_layer[key].get(type_name, 0) + n
+
     out = []
     for key in LAYERS:
-        kinds = per_layer.get(key, {})
+        row = rows[_counting_layer(key)]
+        drawn = row["model"]
+        total = row["count"]  # None when the register could not be counted: not known, never the drawn figure
+        kinds = sorted(kinds_by_layer[key].items(), key=lambda kv: (-kv[1], kv[0]))
         out.append({
-            "layer": key, "label": LAYER_LABELS[key], "count": sum(kinds.values()),
-            "kinds": [{"type": t, "count": c} for t, c in sorted(kinds.items(), key=lambda kv: (-kv[1], kv[0]))],
+            "layer": key, "label": LAYER_LABELS[key], "count": drawn, "total": total, "not_drawn": None if total is None else total - drawn,
+            "kinds": [{"type": t, "count": c} for t, c in kinds],
         })
     return out
 
@@ -86,28 +115,28 @@ def build_model_map(layer: Optional[str] = None) -> Dict[str, Any]:
 
     counts = layer_counts()
     total = sum(c["count"] for c in counts)
-    wanted = layer_key(layer) if layer else None
-    base = {"counts": counts, "total": total, "layer": wanted, "max_nodes": MAX_NODES}
+    store_total = None if any(c["total"] is None for c in counts) else sum(c["total"] for c in counts)
+    wanted = layer if layer in LAYERS else None
+    base = {"counts": counts, "total": total, "store_total": store_total, "layer": wanted, "max_nodes": MAX_NODES}
 
     if wanted is None and total > MAX_NODES:
         nodes = [{"id": "layer:" + c["layer"], "name": c["label"], "layer": c["layer"], "count": c["count"],
                   "cluster": True} for c in counts if c["count"]]
         return {**base, "mode": "clusters", "nodes": nodes, "edges": [], "truncated": False, "shown": total}
 
-    query = db.select(E.id, E.name, E.type, E.layer, E.source_kind, E.source_label, E.source_ref,
-                      E.source_recorded_at, E.recorded_at).order_by(E.id)
-    if wanted is not None:
-        if wanted == "other":
-            query = query.where(db.or_(E.layer.is_(None), db.func.lower(E.layer).notin_(LAYERS[:-1])))
-        else:
-            query = query.where(db.func.lower(E.layer) == wanted)
-    rows = db.session.execute(query.limit(MAX_NODES + 1)).all()
+    from app.services import archimate_viewpoint_service as counting
+    from app.utils.tenant_sql import current_org_id
+
+    query = counting.layer_model_query(_counting_layer(wanted), current_org_id()) if wanted else E.query
+    query = query.with_entities(E.id, E.name, E.type, E.layer, E.source_kind, E.source_label, E.source_ref,
+                                E.source_recorded_at, E.recorded_at).order_by(E.id)
+    rows = query.limit(MAX_NODES + 1).all()
     truncated = len(rows) > MAX_NODES
     rows = rows[:MAX_NODES]
 
     nodes = []
     for r in rows:
-        key = layer_key(r.layer)
+        key = layer_key(r.layer, r.type)
         when = r.source_recorded_at or r.recorded_at
         nodes.append({
             "id": r.id, "name": r.name or "Element %d" % r.id, "type": r.type or "Element", "layer": key,

@@ -149,7 +149,10 @@ def _csrf_guard():
             and getattr(g, "auth_mode", None) != "bearer"):
         response = jsonify({"error": "invalid_token"})
         response.status_code = 401
-        response.headers["WWW-Authenticate"] = 'Bearer realm="entelim", error="invalid_token"'
+        response.headers["WWW-Authenticate"] = (
+            'Bearer realm="entelim", error="invalid_token", '
+            f'resource_metadata="{canonical_origin()}/.well-known/oauth-protected-resource/mcp"'
+        )
         return response
     if not current_app.config.get("WTF_CSRF_ENABLED", True):
         return None
@@ -201,8 +204,18 @@ def mcp_endpoint():
     except Exception:
         return jsonify(_jsonrpc_error(None, JSONRPC_PARSE_ERROR, "Parse error")), 400
 
+    if not isinstance(body, dict):
+        return jsonify(_jsonrpc_error(None, JSONRPC_PARSE_ERROR, "Parse error")), 400
+
     req_id = body.get("id")
     method = body.get("method", "")
+
+    # A notification gets no JSON-RPC reply: the transport answers 202 with no body.
+    if isinstance(method, str) and method.startswith("notifications/"):
+        return "", 202
+
+    if method == "ping":
+        return jsonify(_jsonrpc_result(req_id, {}))
 
     # Handle MCP lifecycle methods
     if method == "initialize":
@@ -211,9 +224,6 @@ def mcp_endpoint():
             "capabilities": {"tools": {}},
             "serverInfo": {"name": "entelim", "version": "1.0.0"},
         }))
-
-    if method == "notifications/initialized":
-        return jsonify(_jsonrpc_result(req_id, {}))
 
     if method == "tools/list":
         if not current_user.is_authenticated:
@@ -229,13 +239,13 @@ def mcp_endpoint():
         catalogue_name = resolve_connector_tool(tool_name)
         if catalogue_name is None:
             return jsonify(_jsonrpc_error(req_id, JSONRPC_METHOD_NOT_FOUND,
-                                          f"Tool not found: {tool_name}")), 404
+                                          f"Tool not found: {tool_name}"))
 
         if not tool_released(catalogue_name):
             return jsonify(_jsonrpc_error(
                 req_id, JSONRPC_METHOD_NOT_FOUND,
                 f"{tool_name} is not available yet. It is in early access.",
-            )), 404
+            ))
 
         # Authenticated via Bearer token by the request_loader in
         # app.modules.oauth_provider.identity, resolved the first time
@@ -313,7 +323,7 @@ def mcp_endpoint():
 
     # Unknown method
     return jsonify(_jsonrpc_error(req_id, JSONRPC_METHOD_NOT_FOUND,
-                                  f"Method not found: {method}")), 404
+                                  f"Method not found: {method}"))
 
 
 @mcp_bp.route("", methods=["GET"])
