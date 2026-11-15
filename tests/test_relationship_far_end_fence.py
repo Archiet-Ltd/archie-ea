@@ -70,7 +70,7 @@ def _cross_sae(db_session, org_a, element_a, solution_b, role="primary"):
 
 
 # Regex patterns for checking rendered rows (from probe_test.py)
-CELL = re.compile(r"<td class=\"px-6 py-3 text-foreground\">\s*([^<]*?)\s*</td>")
+CELL = re.compile(r"<td[^>]*>\s*([^<]*?)\s*(?:<|$)", re.M)
 ROW = re.compile(r"id=\"relationship-(\d+)\"")
 
 
