@@ -28,6 +28,17 @@ logger = logging.getLogger(__name__)
 # more specific rules come first: "what came from GitHub" and "what we run"
 # are both checked before the broad "no owner" and "what breaks" rules so a
 # question that mentions both lands on the one it is really asking.
+# The canvas box a phrase asks about (None: the canvas as a whole), in the order they are tried.
+_CANVAS_PHRASES = (
+    ("customer segment", "customer_segments"), ("our segments", "customer_segments"),
+    ("early adopter", "early_adopters"), ("value proposition", "value_propositions"),
+    ("revenue stream", "revenue_streams"), ("key partner", "key_partners"), ("our partners", "key_partners"),
+    ("key activit", "key_activities"), ("key resource", "key_resources"), ("cost structure", "cost_structure"),
+    ("customer relationship", "customer_relationships"), ("our channels", "channels"),
+    ("on our canvas", None), ("business model canvas", None), ("lean canvas", None),
+)
+
+
 _KEYWORD_RULES = [
     # UC-S2-04: what came from the GitHub connector.
     (
@@ -100,6 +111,16 @@ _KEYWORD_RULES = [
         "risk_cost",
         {},
     ),
+    # The top risks of the register, by score. Checked after the cost rule so "what do our top risks cost"
+    # stays a cost question, and before the impact rules.
+    (
+        (
+            "top risks", "biggest risks", "highest risks", "greatest risks", "key risks", "main risks",
+            "worst risks", "most serious risks", "top risk", "risks to reaching", "risks to achieving",
+        ),
+        "top_risks",
+        {},
+    ),
     # UC-S2-01: what breaks if X fails (impact).
     (
         (
@@ -121,6 +142,13 @@ _KEYWORD_RULES = [
         "business_continuity_criticality",
         {"criticality": "Critical"},
     ),
+    # What a canvas lists in one box (customer segments, key partners, value propositions...). Last, so the
+    # impact and inventory questions keep their own entries; the box is the first phrase below that matches.
+    (
+        tuple(phrase for phrase, _box in _CANVAS_PHRASES),
+        "canvas_box_entries",
+        {},
+    ),
 ]
 
 
@@ -141,13 +169,98 @@ def _profile_topic(lowered: str) -> str:
     return "overview"
 
 
-def _keyword_match(question: str) -> Optional[Dict[str, Any]]:
+# "Which capabilities does <application> support?" and its everyday variants. The
+# application is the phrase the question names; the entry resolves it.
+_CAPABILITY_OF_PATTERNS = [
+    re.compile(r"\b(?:which|what)\s+(?:business\s+|enterprise\s+)?capabilit(?:y|ies)\s+(?:does|do|did)\s+(?:the\s+|our\s+)?(.+?)\s+(?:support|supports|cover|covers|provide|provides|enable|enables|deliver|delivers)\b", re.I),
+    re.compile(r"\b(?:which|what)\s+(?:business\s+|enterprise\s+)?capabilit(?:y|ies)\s+(?:is|are)\s+(?:the\s+|our\s+)?(.+?)\s+(?:mapped|linked|assigned)\s+to\b", re.I),
+    re.compile(r"\b(?:list|show)\s+(?:me\s+)?(?:the\s+)?capabilit(?:y|ies)\s+(?:that\s+|which\s+)?(?:the\s+|our\s+)?(.+?)\s+(?:supports?|covers?|is mapped to|is linked to)\b", re.I),
+]
+
+
+def _is_application_of(name: str, organization_id: int) -> bool:
+    """Whether *name* is, folded for case and spacing, the whole name of an application of the organisation."""
+    from app.models.application_portfolio import ApplicationComponent
+    from app.utils.duplicate_guard import find_duplicate_by_name
+
+    return find_duplicate_by_name(ApplicationComponent, name, organization_id=organization_id) is not None
+
+
+def _extract_application_for_capabilities(question: str, organization_id: Optional[int] = None) -> Optional[str]:
+    """The application a 'which capabilities does X support' question names, or None.
+
+    With an organisation, a phrase is taken as the application only when it is the exact
+    name of one of that organisation's applications; any other phrase ("we", "our
+    applications") is not an application and the question goes on to the model.
+    """
+    text = (question or "").strip().rstrip("?.! ")
+    for pattern in _CAPABILITY_OF_PATTERNS:
+        found = pattern.search(text)
+        if found:
+            name = found.group(1).strip().strip("'\"")
+            if name.lower().endswith("'s"):
+                name = name[:-2]
+            if name and organization_id is not None and not _is_application_of(name, organization_id):
+                return None
+            return name or None
+    return None
+
+
+_INSTRUCTION_LEAD = re.compile(
+    r"^\W*(?:please\s+)?(?:run|search|simulate|model|answer|suppose|assume|imagine|consider|pretend|act)\b", re.I)
+_QUESTION_WORD = re.compile(r"\b(?:what|which|who|when|where|how|why)\b", re.I)
+_MOST_WORDS = 24
+
+
+def asks_one_thing(question: str) -> bool:
+    """True for a short, plain question that asks a single thing.
+
+    A catalogue entry or a one-element card answers one thing. A longer message, an
+    instruction ("run a scenario ...", "search the model and ..."), or one that asks
+    three or more things is not that question even when it contains the entry's
+    words, and goes on to be answered as asked, every part of it.
+    """
+    text = (question or "").strip()
+    return not (
+        len(text.split()) > _MOST_WORDS
+        or _INSTRUCTION_LEAD.search(text)
+        or re.search(r"\bscenario\b", text, re.I)
+        or len(_QUESTION_WORD.findall(text)) >= 3
+    )
+
+
+def _top_count(lowered: str) -> int:
+    """How many risks a "top five risks" question asks for (five when it gives no number)."""
+    found = re.search(r"\btop\s+(\d+|one|two|three|four|five|six|seven|eight|nine|ten)\b", lowered)
+    if not found:
+        return 5
+    word = found.group(1)
+    return int(word) if word.isdigit() else {"one": 1, "two": 2, "three": 3, "four": 4, "five": 5, "six": 6,
+                                             "seven": 7, "eight": 8, "nine": 9, "ten": 10}[word]
+
+
+def _keyword_match(question: str, organization_id: Optional[int] = None) -> Optional[Dict[str, Any]]:
     lowered = question.lower()
+    if not asks_one_thing(question):
+        return None
+    application = _extract_application_for_capabilities(question, organization_id)
+    if application:
+        return {"entry_id": "capabilities_of_application", "params": {"service": application},
+                "confidence": 0.9, "method": "keyword"}
     for keywords, entry_id, params in _KEYWORD_RULES:
         if any(kw in lowered for kw in keywords):
+            if entry_id != "risk_cost" and re.search(r"\brisks?\b", lowered):
+                # A question about risks is not a list of applications or a blast radius.
+                return None
             resolved = dict(params)
             if entry_id == "company_profile":
                 resolved["topic"] = _profile_topic(lowered)
+            if entry_id == "canvas_box_entries":
+                box = next((box for phrase, box in _CANVAS_PHRASES if phrase in lowered), None)
+                if box:
+                    resolved["box"] = box
+            if entry_id == "top_risks":
+                resolved["limit"] = _top_count(lowered)
             if entry_id == "risk_cost":
                 risk = _extract_risk(question)
                 if risk:
@@ -261,7 +374,7 @@ def _model_configured() -> bool:
         return False
 
 
-def _llm_match(question: str) -> Optional[Dict[str, Any]]:
+def _llm_match(question: str, time_limit: Optional[float] = None) -> Optional[Dict[str, Any]]:
     """Ask the gated model gateway which catalogue entry fits, if any."""
     from app.modules.ai_chat.services.llm_service_impl import LLMService
 
@@ -276,7 +389,7 @@ def _llm_match(question: str) -> Optional[Dict[str, Any]]:
         f"Catalogue:\n{entries_desc}\n\nQuestion: {question!r}"
     )
     try:
-        raw = LLMService.generate_from_prompt(prompt, expected_schema="json")
+        raw = LLMService.generate_from_prompt(prompt, expected_schema="json", time_limit=time_limit)
         parsed = json.loads(raw)
     except Exception:
         logger.warning("nl_query_interpreter: model gateway call failed", exc_info=True)
@@ -288,17 +401,20 @@ def _llm_match(question: str) -> Optional[Dict[str, Any]]:
     return {"entry_id": entry_id, "params": parsed.get("params") or {}, "confidence": 0.7, "method": "model"}
 
 
-def interpret(question: str) -> Dict[str, Any]:
+def interpret(question: str, organization_id: Optional[int] = None, time_limit: Optional[float] = None) -> Dict[str, Any]:
     """Interpret one plain-language question.
 
     Returns ``{"entry_id": str|None, "params": dict, "confidence": float,
     "method": "keyword"|"model"|"none", "title": str|None}`` — the
     interpretation banner shows ``title``/``params`` before running
     anything, and the caller re-runs with corrected params on request.
+
+    ``time_limit`` (seconds) bounds the one lookup that asks the model: a single attempt that gives up
+    at the limit, after which the question maps to nothing. Without it the lookup is unbounded as before.
     """
-    match = _keyword_match(question)
-    if match is None and _model_configured():
-        match = _llm_match(question)
+    match = _keyword_match(question, organization_id)
+    if match is None and asks_one_thing(question) and _model_configured():
+        match = _llm_match(question, time_limit)
     if match is None:
         return {"entry_id": None, "params": {}, "confidence": 0.0, "method": "none", "title": None}
     entry = CATALOGUE[match["entry_id"]]
@@ -351,6 +467,13 @@ def evaluation_set() -> List[Dict[str, Any]]:
         {"question": "Which records cite a GitHub commit as their origin?", "expected_entry_id": "github_sourced_records"},
         {"question": "What came into the catalogue from the GitHub integration?", "expected_entry_id": "github_sourced_records"},
         {"question": "List the GitHub-sourced applications and their repositories.", "expected_entry_id": "github_sourced_records"},
+        # What a canvas lists in a box.
+        {"question": "Who are our customer segments?", "expected_entry_id": "canvas_box_entries"},
+        {"question": "Who are our key partners?", "expected_entry_id": "canvas_box_entries"},
+        {"question": "What are our value propositions?", "expected_entry_id": "canvas_box_entries"},
+        {"question": "What are our revenue streams?", "expected_entry_id": "canvas_box_entries"},
+        {"question": "Who are our early adopters?", "expected_entry_id": "canvas_box_entries"},
+        {"question": "What is on our business model canvas?", "expected_entry_id": "canvas_box_entries"},
         # Outside the catalogue — must map to nothing, never a guessed answer.
         {"question": "what's the weather today", "expected_entry_id": None},
         {"question": "how many users do we have", "expected_entry_id": None},

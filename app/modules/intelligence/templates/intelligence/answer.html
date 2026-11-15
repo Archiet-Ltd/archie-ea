@@ -95,7 +95,7 @@
                 <dt class="text-muted-foreground">Confidence</dt>
                 <dd class="text-foreground" data-answer-basis>
                     {% if answer.confidence_basis == 'lowest_derived_row' %}{{ answer.confidence_percent }}% (the lowest of the worked-out connections)
-                    {% elif answer.confidence_basis == 'drawn_facts_only' %}None is estimated. {% set sources = answer | connection_sources %}{{ (sources.sentence[:1] | upper ~ sources.sentence[1:]) if sources.sentence else 'All were recorded' }}.
+                    {% elif answer.confidence_basis == 'drawn_facts_only' %}Nothing is estimated. {% set sources = answer | connection_sources %}{{ (sources.sentence[:1] | upper ~ sources.sentence[1:]) if sources.sentence else 'All were recorded' }}.
                     {% else %}Not applicable: there are no rows.{% endif %}
                 </dd>
             </div>

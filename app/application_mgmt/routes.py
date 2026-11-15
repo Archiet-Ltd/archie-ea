@@ -16,6 +16,7 @@ import logging
 import re
 from datetime import datetime  # dead-code-ok
 from app.models.archimate_element_types import is_application_kind
+from app.services.cost_visibility import SHARE_FIGURE_KEYS
 
 # Define the logger
 logger = logging.getLogger(__name__)
@@ -1915,61 +1916,10 @@ def render_application_detail(id, form_values=None, form_errors=None, status=200
     capabilities = []
     capability_mappings = []
     try:
-        from app.models.application_capability import ApplicationCapabilityMapping
-        # tenant-scoping-ok: filtered by application_component_id == id below,
-        # and app_obj (id) is an org-scoped ApplicationComponent load.
-        cap_pairs = (
-            db.session.query(ApplicationCapabilityMapping, BusinessCapability)
-            .join(
-                BusinessCapability,
-                ApplicationCapabilityMapping.business_capability_id == BusinessCapability.id,
-            )
-            .filter(ApplicationCapabilityMapping.application_component_id == id)
-            .all()
-        )
-        capabilities = [cap for _, cap in cap_pairs]
-        capability_mappings = cap_pairs  # Keep (mapping, cap) pairs for table
+        from app.services.application_capabilities import application_capability_links
 
-        # DEF-003 follow-up (3 Sep 2026): the "Map Capability" modal's create
-        # handler (application_capability_mapping_create,
-        # detail_layer_routes.py) writes UnifiedApplicationCapabilityMapping —
-        # the canonical store per ADR-0008 — but this display only ever read
-        # the legacy ApplicationCapabilityMapping table above. A capability
-        # mapped through the modal therefore persisted correctly (confirmed
-        # in the DB) yet never appeared here: silent, not a crash. Rather than
-        # migrate the legacy rows into the unified table (a locked, checksum-
-        # verified data operation matching project_capabilities.py's rigor
-        # that this fix does not attempt), the display unions both sources,
-        # de-duplicated by the underlying BusinessCapability identity so an
-        # already-legacy-linked capability cannot render twice.
-        from app.models.unified_application_capability_mapping import (
-            UnifiedApplicationCapabilityMapping,
-        )
-        from app.models.unified_capability import UnifiedCapability
-
-        legacy_capability_ids = {cap.id for cap in capabilities}
-        unified_pairs = (
-            db.session.query(UnifiedApplicationCapabilityMapping, UnifiedCapability)
-            .join(
-                UnifiedCapability,
-                UnifiedApplicationCapabilityMapping.unified_capability_id == UnifiedCapability.id,
-            )
-            .filter(
-                UnifiedApplicationCapabilityMapping.application_component_id == id,
-                UnifiedCapability.source_table == "business_capability",
-            )
-            .all()
-        )
-        for u_mapping, u_cap in unified_pairs:
-            try:
-                source_bc_id = int(u_cap.source_id)
-            except (TypeError, ValueError):
-                continue
-            if source_bc_id in legacy_capability_ids:
-                continue
-            legacy_capability_ids.add(source_bc_id)
-            capability_mappings.append((u_mapping, u_cap))
-            capabilities.append(u_cap)
+        capability_mappings = application_capability_links(app_obj.id, app_obj.organization_id)
+        capabilities = [cap for _, cap in capability_mappings]
     except Exception:
         logger.exception("Could not load capability mappings for application %s", app_obj.id)
         db.session.rollback()
@@ -2213,6 +2163,8 @@ def render_application_detail(id, form_values=None, form_errors=None, status=200
     if capability_mappings:
         cap_table["columns"] = ["Capability", "Category", "Support", "Coverage", "Maturity", "Strategic", "Compliance"]
         cap_rows = []
+        from app.utils.recorded_figures import coverage_text
+
         for mapping, cap in capability_mappings:
             # DEF-003 follow-up: `mapping` is either an ApplicationCapabilityMapping
             # (legacy) or a UnifiedApplicationCapabilityMapping (canonical, from the
@@ -2236,7 +2188,7 @@ def render_application_detail(id, form_values=None, form_errors=None, status=200
                 "detail_url": None,
                 "category": cap.category or "",
                 "support_level": support.replace("_", " ").title() if support else "",
-                "coverage": f"{coverage_pct}%" if coverage_pct is not None else "",
+                "coverage": coverage_text(coverage_pct),
                 "maturity": f"L{maturity}" if maturity is not None else "",
                 "strategic": "Yes" if is_strategic else "No",
                 "compliance": compliance.replace("_", " ").title() if compliance else "\u2014",
@@ -2364,6 +2316,24 @@ def render_application_detail(id, form_values=None, form_errors=None, status=200
     technology_cost_shares = technology_cost.shares_for_application(
         app_obj.organization_id, app_obj.id)
 
+    # What an application read from a connector still needs; a repository nobody has promoted is not one.
+    from app.connectors.github import unpromoted_import_ids
+    from app.connectors.github_gaps import application_gaps
+
+    imported_gaps = application_gaps(
+        app_obj.organization_id, [app_obj],
+        skip_ids=unpromoted_import_ids(app_obj.organization_id, [app_obj.id]),
+    ).get(app_obj.id)
+
+    owner_source, owner_reason = None, None
+    if imported_gaps:
+        owner_gap = next((x for x in imported_gaps["gaps"] if x["key"] == "owner"), None)
+        owner_reason = owner_gap.get("note") if owner_gap else None
+    if owner_rows:
+        from app.connectors.github_gaps import owner_source_note
+
+        owner_source = owner_source_note(app_obj, owner_rows)
+
     # The one cost rule decides here; the page only prints what it is given.
     from app.services.cost_visibility import COSTS_WITHHELD, costs_visible, withhold_costs
 
@@ -2371,10 +2341,13 @@ def render_application_detail(id, form_values=None, form_errors=None, status=200
     if costs_withheld:
         cost_breakdown = withhold_costs(cost_breakdown, keys=tuple(cost_breakdown))
         technology_cost_shares = withhold_costs(
-            technology_cost_shares, keys=("total", "share", "currency"))
+            technology_cost_shares, keys=SHARE_FIGURE_KEYS)
 
     technology_linked_count = 0
     completeness_notes = {}
+    from app.services.application_fact_sheet import completeness_steps, detail_tab
+
+    completeness_step_rows = completeness_steps(app_obj, app_obj.completeness_gaps, tab=detail_tab(request.args.get("tab")))
     try:
         from app.services.application_fact_sheet import linked_notes
         from app.services.application_model_links import linked_technology
@@ -2388,6 +2361,7 @@ def render_application_detail(id, form_values=None, form_errors=None, status=200
     return render_template(
         "applications/dashboard.html",
         app=app_obj,
+        imported_gaps=imported_gaps,
         form_values=form_values or {},
         form_errors=form_errors or {},
         status_options=status_options,
@@ -2396,6 +2370,8 @@ def render_application_detail(id, form_values=None, form_errors=None, status=200
         linked_requirements=linked_requirements,
         requirement_options=requirement_options,
         owner_rows=owner_rows,
+        owner_source=owner_source,
+        owner_reason=owner_reason,
         owner_assign_url=owner_assign_url,
         # Not yet computed for this view. Pass None (never 0.0) so the template
         # renders an em dash instead of asserting a measured score of zero —
@@ -2426,6 +2402,7 @@ def render_application_detail(id, form_values=None, form_errors=None, status=200
         vendors_tab_count=vendors_tab_count,
         technology_linked_count=technology_linked_count,
         completeness_notes=completeness_notes,
+        completeness_steps=completeness_step_rows,
         vendor_form_config=vendor_form_config,
         metric_cards=metric_cards,
         dashboard_config=dashboard_config,

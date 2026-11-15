@@ -395,7 +395,7 @@
     /* The network half of a turn, separated from _submitTurn so the error
        card's Retry can run it again without echoing the user's message into
        the transcript a second time. */
-    async function _deliverTurn(message, timestamp) {
+    async function _deliverTurn(message, timestamp, retry, failedTurnId) {
         // Show loading indicator
         const loadingId = 'loading-' + Date.now();
         const loadingDiv = document.createElement('div');
@@ -412,15 +412,21 @@
                     <div class="w-2 h-2 bg-primary rounded-full animate-bounce" style="animation-delay: 150ms"></div>
                     <div class="w-2 h-2 bg-primary rounded-full animate-bounce" style="animation-delay: 300ms"></div>
                 </div>
-                <span class="text-muted-foreground">Thinking...</span>
+                <span class="text-muted-foreground" role="status" data-testid="chat-waiting-note">Thinking...</span>
             </div>
         `;
         messagesContainer.appendChild(loadingDiv);
         messagesContainer.scrollTop = messagesContainer.scrollHeight;
         lucide.createIcons();
+        // After ten seconds say what is happening, in plain words.
+        setTimeout(function () {
+            const note = document.querySelector('#' + loadingId + ' [data-testid="chat-waiting-note"]');
+            if (note) note.textContent = 'Still working: asking the AI. This usually takes under a minute.';
+        }, 10000);
 
         // A question that names something in the organisation's records is answered
         // from those records, as cited cards, before any model is asked.
+        const _sentAt = performance.now();
         try {
             const estate = await ArchieChat.transport.askEstate(message, { elementId: _askedElement.get(message) });
             if (estate.found) {
@@ -436,14 +442,18 @@
                 return;
             }
         } catch (_estateErr) {
-            { const _l = document.getElementById(loadingId); if (_l) _l.remove(); }
-            appendError('The assistant could not answer just now. Your question is saved; try again in a moment.', () => _retryTurn(message, timestamp));
-            return;
+            /* The records lookup is an extra step before the AI, not the answer. When it fails the question
+               goes on to the AI exactly as if the lookup had found nothing; the turn does not end here. */
         }
 
         const startTime = performance.now();
-        // Shared payload. thread_id keeps multi-turn chats in one conversation.
-        const _payload = JSON.stringify({
+        // A Retry says only that it is one: the server reads what the failed turn recorded from its own
+        // record and leaves those changes alone.
+        const _isRetry = !!retry;
+        // thread_id keeps multi-turn chats in one conversation. waited_seconds is read when each request is
+        // built, so the plain request that follows a dropped stream carries the time already spent and does
+        // not start a second minute.
+        const _buildPayload = () => JSON.stringify({
             message: message,
             domain: state.currentDomain,
             element_id: selectedElementIdInput.value || null,
@@ -451,7 +461,13 @@
             persona: state.currentPersona || null,
             model: document.getElementById('model-selector')?.value || null,
             thread_id: window.__threadId || null,
+            // Since the send: the stored-answer lookup, and any stream that dropped, took part of the minute.
+            waited_seconds: (performance.now() - _sentAt) / 1000,
+            retry: _isRetry,
+            // The turn that failed, so the server reads back only that turn's own changes.
+            failed_turn_id: _isRetry ? (failedTurnId || null) : null,
         });
+        const _payload = _buildPayload();
 
         // Stream the reply token-by-token (like ChatGPT). If streaming can't be
         // established, fall through to the non-streaming request below.
@@ -480,7 +496,7 @@
                    compounding the wait. */
                 const _l = document.getElementById(loadingId);
                 if (_l) _l.remove();
-                appendError(_streamErr.message, () => _retryTurn(message, timestamp));
+                appendFailure('timeout', () => _retryTurn(message, timestamp));
                 return;
             }
             if (_streamErr && _streamErr.isConfigFault) {
@@ -505,8 +521,13 @@
         }
 
         try {
-            const response = await ArchieChat.transport.sendMessage(_payload);
+            const response = await ArchieChat.transport.sendMessage(_buildPayload());
 
+            if (response.status === 401 || response.redirected) {
+                { const _l = document.getElementById(loadingId); if (_l) _l.remove(); }
+                appendFailure('signed_out', null);
+                return;
+            }
             const data = await response.json();
             // Remember the conversation this turn was saved to, and refresh the
             // history rail so a brand-new chat appears immediately.
@@ -591,18 +612,10 @@
                     // in context, which the banner and a toast both lack.
                     errorMessage = configFaultSentence();
                     appendError(errorMessage || fullError, null, { adminLink: true });
-                } else if (data.error_type === 'credit_exhausted') {
-                    // Credit exhausted: show the server's message (which names who can fix it)
-                    // and do NOT offer Retry — retrying won't restore credit.
-                    Platform.toast.error(fullError);
-                    appendError(errorMessage || fullError, null);
-                } else if (data.error_type === 'rate_limit') {
-                    // Rate limit: show the server's message and offer Retry
-                    Platform.toast.error(fullError);
-                    appendError(errorMessage || fullError, () => _retryTurn(message, timestamp));
                 } else {
                     Platform.toast.error(fullError);
-                    appendError('The assistant could not answer just now. Your question is saved; try again in a moment.', () => _retryTurn(message, timestamp));
+                    const _code = data.reason_code || failureCodeForStatus(response.status, data.error_type);
+                    appendFailure(_code, failureRetryable(_code) ? () => _retryTurn(message, timestamp, data.turn_id) : null, recordedNote(data.pending_approvals));
                 }
             } else {
                 // Add AI response to history
@@ -653,7 +666,7 @@
 
         } catch (error) {
             { const _l = document.getElementById(loadingId); if (_l) _l.remove(); }
-            appendError('The assistant could not answer just now. Your question is saved; try again in a moment.', () => _retryTurn(message, timestamp));
+            appendFailure(error && error.reasonCode, () => _retryTurn(message, timestamp));
         }
     }
 
@@ -687,20 +700,47 @@
         }
     }
 
-    /* The sentence for a missing AI provider, written for the reader: an
-       administrator is told where to fix it (the settings link follows, from
-       appendError), a member is told who can. The server's own text names an
-       internal feature key and is not shown. */
+    /* The sentence for a missing AI provider is the server's, the one the page was given: a state has one
+       sentence. An administrator gets the settings link after it (from appendError). */
     function configFaultSentence() {
-        return window.chatIsAdmin
-            ? 'The assistant is not set up yet. Add an AI provider in Settings to start getting answers.'
-            : 'The assistant is not set up yet. Ask an administrator of your organisation to add an AI provider.';
+        return window.chatNotSetUpSentence || '';
     }
 
-    function _retryTurn(message, timestamp) {
-        _setSendingUI(true);
-        _deliverTurn(message, timestamp).finally(() => _setSendingUI(false));
+    /* What a failed turn already recorded and nobody has applied yet, in plain words for the failure card.
+       Each change is named by the plain sentence the server writes from the approval's own label table; Retry does not record it again. */
+    function recordedNote(pending) {
+        const list = (pending || []).map(a => String(a.plain || String(a.tool || '').replace(/_/g, ' '))
+            .replace(/\.$/, '')).filter(Boolean);
+        return list.length
+            ? ' Recorded, not applied yet, and not recorded again on Retry: ' + list.join('; ') + '.'
+            : '';
     }
+
+    /* The words for why a turn could not be answered. The sentences are the server's table
+       (failure_messages.py), handed to the page once; the browser only picks one by its code. */
+    function failureTable() { return window.chatFailureTable || { reasons: {}, no_retry: [], saved: [] }; }
+    function failureSentence(code) { return code ? (failureTable().reasons[code] || '') : ''; }
+    function failureRetryable(code) { return failureTable().no_retry.indexOf(code) === -1; }
+    function failureCodeForStatus(status, errorType) {
+        if (status === 401) return 'signed_out';
+        if (status === 403) return 'role_not_allowed';
+        if (status === 413) return 'too_large';
+        if (status === 408 || status === 504 || errorType === 'timeout') return 'timeout';
+        if (status === 502 || status === 503 || errorType === 'connection' || errorType === 'auth') return 'provider_unreachable';
+        return 'unknown';
+    }
+    /* A failure card that names the reason and, unless asking again cannot help, carries Retry. */
+    function appendFailure(code, onRetry, note) {
+        const text = failureSentence(code) || failureSentence('unknown');
+        return appendError(text + (note || ''), failureRetryable(code) ? onRetry : null);
+    }
+
+    function _retryTurn(message, timestamp, failedTurnId) {
+        _setSendingUI(true);
+        _deliverTurn(message, timestamp, true, failedTurnId).finally(() => _setSendingUI(false));
+    }
+    /* A reopened chat's failure card asks again from outside this module. */
+    ArchieChat.retryTurn = function (message) { _retryTurn(message, new Date().toISOString()); };
 
     // Stream an AI reply via SSE. Renders tokens live into a bubble; returns true
     // when it rendered a reply (caller then stops), throws/returns false to let
@@ -755,10 +795,18 @@
                 },
                 onDone: async (result) => {
                     dropLoading();
-                    if (result.retryable) {
-                        /* Every model failed: one plain sentence with Retry, not an answer card. */
+                    if ((result.error && !result.paused) || result.retryable) {
                         dropBubble();
-                        appendError(result.text, () => _retryTurn(JSON.parse(payload).message, timestamp));
+                        /* A failed turn is a failure card with Retry, not a bubble in the assistant's voice. */
+                        let _msg = '';
+                        try { _msg = JSON.parse(payload).message; } catch (_) { /* swallow-ok: the payload is built here from JSON.stringify; if it cannot be read the failure card still shows, without a Retry that re-asks */ }
+                        const _made = (result.actions || []).filter(a => a.mutates);
+                        const _madeNote = _made.length
+                            ? ' Already done, and not repeated on Retry: ' + _made.map(a => a.message || a.tool).join('; ') + '.'
+                            : '';
+                        appendError((failureSentence(result.reasonCode) || result.text || 'The assistant is busy right now. Wait a minute, then press Retry.') + _madeNote + recordedNote(result.pendingApprovals),
+                            _msg && !result.notSetUp && failureRetryable(result.reasonCode) ? () => _retryTurn(_msg, timestamp, result.turnId) : null,
+                            result.notSetUp ? { adminLink: true } : { ownKeyLink: true });
                         return;
                     }
                     if (!wrap) wrap = beginStreamedMessage();
@@ -1440,7 +1488,17 @@ Would you like me to provide more details about the extracted elements or help y
          had already switched, so the next message continued a thread the user
          could not see. A guard that can be false for a module this file depends
          on is not a safety net, it is the bug. */
+      var savedFailures = ((window.chatFailureTable || {}).saved) || [];
+      var lastAsked = '';
       msgs.forEach(function (m) {
+        if (m.role === 'user') lastAsked = m.content;
+        /* A turn that ended in a failure was saved as the assistant's reply. It reads as the failure
+           it was, and its Retry asks the question above it again. */
+        if (m.role === 'assistant' && savedFailures.indexOf(String(m.content || '').trim()) !== -1) {
+          var asked = lastAsked;
+          render.appendError(m.content, asked ? function () { window.ArchieChat.retryTurn(asked); } : null);
+          return;
+        }
         render.appendMessage(
           m.role === 'assistant' ? 'ai' : m.role,
           m.content,

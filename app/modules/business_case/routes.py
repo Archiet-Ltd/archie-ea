@@ -21,6 +21,7 @@ from app.models.business_capabilities import BusinessCapability
 from app.models.solution_models import Solution
 from app.models.strategic import StrategicInitiative
 from app.utils.api_response import error_response, not_found_response, success_response
+from app.services.cost_visibility import withhold_reply
 
 from . import service
 
@@ -37,13 +38,24 @@ def _link_options():
     return capabilities, initiatives, solutions
 
 
+def _refuse_money():
+    """The answer to a withheld person who tries to write a money field: nothing is saved."""
+    from app.services.cost_visibility import COSTS_WITHHELD
+
+    return error_response(COSTS_WITHHELD, code="FORBIDDEN", status_code=403)
+
+
 @business_case_bp.route("/")
 @login_required
 def index():
     """List all Business Cases for the current tenant."""
+    from app.services.cost_visibility import COSTS_WITHHELD, costs_visible
+
     business_cases = service.list_business_cases()
     return render_template(
         "business_case/index.html",
+        costs_withheld=not costs_visible(current_user),
+        costs_withheld_sentence=COSTS_WITHHELD,
         business_cases=business_cases,
         statuses=BUSINESS_CASE_STATUSES,
     )
@@ -83,11 +95,14 @@ def detail(business_case_id):
     canvas_zones = CANVAS_TEMPLATES["business_case"]["zones"]
 
     from app.services.composer_export_formats import resolve_canvas_saved_diagram_id
+    from app.services.cost_visibility import COSTS_WITHHELD, costs_visible
 
     saved_diagram_id = resolve_canvas_saved_diagram_id(business_case, "business_case")
 
     return render_template(
         "business_case/detail.html",
+        costs_withheld=not costs_visible(current_user),
+        costs_withheld_sentence=COSTS_WITHHELD,
         business_case=business_case,
         statuses=BUSINESS_CASE_STATUSES,
         capabilities=capabilities,
@@ -160,7 +175,7 @@ def update(business_case_id):
     except ValueError as exc:
         return error_response(str(exc), code="VALIDATION_ERROR", status_code=400)
 
-    return success_response(business_case.to_dict())
+    return success_response(withhold_reply(business_case.to_dict()))
 
 
 @business_case_bp.route("/<int:business_case_id>/delete", methods=["POST"])
@@ -201,12 +216,17 @@ def save_field(business_case_id):
     if not field_name:
         return error_response("Missing 'field' field", code="VALIDATION_ERROR", status_code=400)
 
+    from app.services.cost_visibility import BUSINESS_CASE_MONEY_KEYS, costs_visible
+
+    if field_name in BUSINESS_CASE_MONEY_KEYS and not costs_visible(current_user):
+        return _refuse_money()
+
     try:
         business_case = service.save_field(business_case, field_name, value)
     except ValueError as exc:
         return error_response(str(exc), code="VALIDATION_ERROR", status_code=400)
 
-    return success_response(business_case.to_dict())
+    return success_response(withhold_reply(business_case.to_dict()))
 
 
 @business_case_bp.route("/<int:business_case_id>/pull-financials", methods=["POST"])
@@ -218,6 +238,11 @@ def pull_financials(business_case_id):
     business_case = service.get_business_case_or_none(business_case_id)
     if business_case is None:
         return not_found_response("Business Case")
+
+    from app.services.cost_visibility import costs_visible
+
+    if not costs_visible(current_user):
+        return _refuse_money()
 
     report = service.refresh_financials_from_links(business_case)
     return success_response({"business_case": business_case.to_dict(), "aggregation": report})
@@ -246,7 +271,7 @@ def api_detail(business_case_id):
     case = service.get_business_case_or_none(business_case_id)
     if case is None:
         return not_found_response("Business Case")
-    return success_response(case.to_dict())
+    return success_response(withhold_reply(case.to_dict()))
 
 
 # Import AI section-draft route — adds POST /api/<id>/ai-draft-section to this

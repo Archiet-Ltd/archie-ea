@@ -33,6 +33,15 @@ def test_demo_company_scores_vary_across_the_matrix(app, db_session, tenant_ctx)
     assert any(r["objective_count"] for r in rows)
     assert all(r["capability_domain"] for r in rows), [r["capability_name"] for r in rows if not r["capability_domain"]]
     assert any(r["investment_need"]["estimated_cost"] for r in rows)
-    # a capability nobody rated is not scored, rather than scored 5
+    # a capability nobody rated is scored from the facts the model holds and says so; one with
+    # no such fact is not scored, rather than scored 5
     unrated = [r for r in rows if r["strategic_importance"] is None]
-    assert unrated and all(r["investment_priority_score"] is None for r in unrated)
+    assert unrated
+    for r in unrated:
+        if r["strategic_basis"] == "derived":
+            assert r["strategic_score"] is not None and r["strategic_derivation"]["sentence"].startswith("Derived from")
+            assert r["strategic_derivation"]["facts"], r["capability_name"]
+        else:
+            assert r["strategic_basis"] is None
+            assert r["investment_priority_score"] is None and r["strategic_step"]["text"], r["capability_name"]
+    assert any(r["strategic_basis"] == "derived" for r in unrated)

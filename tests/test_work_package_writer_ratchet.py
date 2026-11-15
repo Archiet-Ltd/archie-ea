@@ -55,7 +55,6 @@ ALLOWED_RETIRED_CONSTRUCTORS = {
     "app/services/ea_workflow_engine.py": 1,
     "app/services/enterprise_workflow_orchestrator.py": 4,
     "app/services/jira_connector_service.py": 1,
-    "app/services/roadmap_builder_service.py": 1,
     "app/services/roadmap_sync.py": 4,
     "app/services/solution_archimate_sync_service.py": 1,
 }

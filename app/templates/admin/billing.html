@@ -1,12 +1,14 @@
 {# design-block: settings #}
 {% extends 'layouts/admin_base.html' %}
-{% block title %}Billing & plan{% endblock %}
+{% block title %}Plan and billing{% endblock %}
 {% from 'components/page_header.html' import page_header %}
 {% from 'components/card.html' import card, card_header, card_title, card_description, card_content, card_footer %}
 {% from 'components/badge.html' import badge %}
 {% from 'components/button.html' import button %}
 {% from 'components/alert.html' import alert %}
+{% from 'components/fact_list.html' import fact_list %}
 {% from 'components/input.html' import input %}
+{% from 'components/select.html' import native_select %}
 {% from 'components/form_field.html' import form_group %}
 {% from 'components/dialog.html' import dialog %}
 {% from 'components/empty_state.html' import empty_state %}
@@ -15,9 +17,9 @@
 {% block content %}
 <div class="space-y-6" data-testid="billing-page">
     {{ page_header(
-        title='Billing & plan',
+        title='Plan and billing',
         description=('Your organisation\'s plan, its limits, payment and invoices.' if payment_ready else 'Your organisation\'s plan and its limits.'),
-        breadcrumbs=[{'label': 'Admin', 'href': url_for('admin.index')}, {'label': 'Billing'}]
+        breadcrumbs=[{'label': 'Admin', 'href': url_for('admin.index')}, {'label': 'Plan and billing'}]
     ) }}
 
     {% if error %}
@@ -46,6 +48,9 @@
             {% call card(class='min-w-0') %}{% call card_content(class='p-4') %}
                 <p class="text-xs text-muted-foreground font-medium uppercase tracking-wide mb-1">Plan</p>
                 <p class="text-sm font-semibold" data-testid="billing-current-plan">{{ plan.name }}</p>
+                {% if education %}
+                <p class="text-xs text-muted-foreground mt-1" data-testid="billing-education">{{ education.text }}</p>
+                {% endif %}
                 {% if subscription.billing_interval %}
                 <p class="text-xs text-muted-foreground mt-1">Billed {{ 'annually' if subscription.billing_interval == 'year' else 'monthly' }}</p>
                 {% endif %}
@@ -53,13 +58,14 @@
             {% call card(class='min-w-0') %}{% call card_content(class='p-4') %}
                 <p class="text-xs text-muted-foreground font-medium uppercase tracking-wide mb-1">Status</p>
                 <p class="text-sm font-semibold
-                    {%- if plan.key == 'free' %}text-foreground
+                    {%- if plan.key in ('free', 'education') %}text-foreground
                     {%- elif status_val == 'active' %}text-success-emphasis
                     {%- elif status_val == 'past_due' %}text-warning-emphasis
                     {%- elif status_val == 'cancelled' %}text-destructive-emphasis
                     {%- else %}text-foreground{% endif %}">
-                    {%- if plan.key == 'free' %}Free plan
+                    {%- if plan.key in ('free', 'education') %}Free plan
                     {%- elif status_val == 'past_due' %}Payment overdue
+                    {%- elif status_val == 'trialing' and credit and credit.state == 'active' %}Free for 90 days
                     {%- elif status_val == 'trialing' %}Trial
                     {%- else %}{{ status_val | title }}{% endif %}
                 </p>
@@ -83,6 +89,18 @@
                 <p class="text-xs text-muted-foreground mt-1">{{ renewal.note }}</p>
                 {% endif %}
             {% endcall %}{% endcall %}
+        </div>
+
+        <div class="mt-4" data-testid="billing-ai-usage">
+            {% call(f) fact_list(items=[
+                {'label': 'AI questions this month', 'key': 'ai-used'},
+                {'label': 'AI allowance', 'key': 'ai-allowance'},
+                {'label': 'AI answers from', 'key': 'ai-provider'}], testid='billing-ai-facts') %}
+                {%- if f.key == 'ai-used' %}{{ ai.used }}
+                {%- elif f.key == 'ai-allowance' %}{% if ai.limit is none %}No limit on your plan{% else %}{{ ai.limit }} a month{% endif %}
+                {%- else %}{% if ai.provider %}Your own {{ ai.provider }} key. {{ ai.provider }} bills your organisation for the questions.{% else %}The built-in AI. Add your own key in <a href="{{ url_for('admin.api_settings') }}" class="text-primary underline">AI settings</a>.{% endif %}
+                {%- endif %}
+            {% endcall %}
         </div>
 
         {% if limits.limit_reached %}
@@ -116,6 +134,40 @@
         {% endif %}
     {% endcall %}
 
+    {# ---- The 90 days of Startup, free ---- #}
+    {% if credit and credit.state == 'ended' %}
+    <div data-testid="startup-credit-ended">
+        {% call alert('warning', link_href=url_for('billing.billing_index', plan='startup', interval=selected_interval) ~ '#checkout', link_text='Buy Startup') %}Your 90 days of Startup ended on {{ credit.ends_on.strftime('%d %b %Y').lstrip('0') }}. Buy Startup to add people again. Everyone who was here keeps access.{% endcall %} {# ui-contract-ok: the alert macro, not a native dialog #}
+    </div>
+    {% endif %}
+    {% if credit and credit.state == 'available' %}
+    <div id="startup-credit" class="max-w-2xl">
+    {% call card() %}
+        {% call card_header() %}
+            {% call card_title(class='text-base') %}90 days of Startup, free{% endcall %}
+            {% call card_description() %}For companies founded in the last 36 months that have raised up to USD 1M. Ten people for 90 days. You can buy Startup at any time.{% endcall %}
+        {% endcall %}
+        {% call card_content() %}
+        <form method="post" action="{{ url_for('billing.billing_startup_credit') }}" class="grid grid-cols-1 gap-4" data-testid="startup-credit-form">
+            {{ input(type='hidden', name='csrf_token', value=csrf_token()) }}
+            {% call form_group(id='credit_website', label='Company website', required=true, class='space-y-2', help_text='Its domain must match your work email\'s domain.') %}
+                {{ input(id='credit_website', name='website', type='url', required=true, value=(credit_declared.website or credit_website or ''), attrs_dict={'maxlength': 255, 'autocomplete': 'url'}) }}
+            {% endcall %}
+            {% call form_group(id='credit_founded', label='Month the company was founded', required=true, class='space-y-2') %}
+                {{ input(id='credit_founded', name='founded', type='month', required=true, value=(credit_declared.founded or '')) }}
+            {% endcall %}
+            {% call form_group(id='credit_raised', label='Money raised so far', required=true, class='space-y-2') %}
+                {% call native_select(id='credit_raised', name='raised', class='w-full') %}
+                    {% for key, label in credit_raised_answers.items() %}<option value="{{ key }}"{% if credit_declared.raised == key %} selected{% endif %}>{{ label }}</option>{% endfor %}
+                {% endcall %}
+            {% endcall %}
+            <div>{{ button(text='Start 90 days free', type='submit', testid='startup-credit-submit') }}</div>
+        </form>
+        {% endcall %}
+    {% endcall %}
+    </div>
+    {% endif %}
+
     {# ---- Plans ---- #}
     <section id="plans" aria-labelledby="plans-heading" class="space-y-4">
         <h2 id="plans-heading" class="text-lg font-semibold text-foreground">Plans</h2>
@@ -143,7 +195,10 @@
                         {% elif p.user_limit is not none %}Limit: {{ p.user_limit }} people
                         {% else %}No limit on people{% endif %}
                     </p>
-                    {% if p.purchasable and not is_current %}
+                    {% if p.purchasable and is_current and credit and credit.state == 'active' %}
+                        {{ button(text='Buy ' ~ p.name, href=url_for('billing.billing_index', plan=p.key, interval=selected_interval) ~ '#checkout', variant='outline', class='w-full', testid='plan-choose-' ~ p.key) }}
+                        <p class="text-xs text-muted-foreground">Buying now starts billing today.</p>
+                    {% elif p.purchasable and not is_current %}
                         {{ button(text='Choose ' ~ p.name, href=url_for('billing.billing_index', plan=p.key, interval=selected_interval) ~ '#checkout', variant='outline', class='w-full', testid='plan-choose-' ~ p.key) }}
                     {% elif p.purchasable and is_current and p.per_seat %}
                         {{ button(text='Change seats', href=url_for('billing.billing_index', plan=p.key, interval=subscription.billing_interval or selected_interval) ~ '#checkout', variant='outline', class='w-full', testid='plan-choose-' ~ p.key) }}

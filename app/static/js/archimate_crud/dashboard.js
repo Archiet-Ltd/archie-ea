@@ -8,6 +8,12 @@ document.addEventListener('alpine:init', function() {
             elements: [],
             pagination: { page: 1, pages: 0, per_page: 25, total: null, has_next: false, has_prev: false },
             loading: false,
+            // The first list request has not finished, or the layer on screen is not the layer last loaded:
+            // the figures that come from the list are being fetched, not missing.
+            elementsLoaded: false,
+            loadedLayer: null,
+            // The layer counts sweep has not answered yet: a layer count not known by then is being fetched.
+            countsLoaded: false,
             loadError: null,   // referenced by x-show/x-text in the template; must exist to avoid Alpine ReferenceError
             searchQuery: '',
             typeFilter: '',
@@ -248,6 +254,7 @@ document.addEventListener('alpine:init', function() {
             },
 
             get relationshipHint() {
+                if (this.elementsPending) return 'Loading';
                 let metrics = this.relationshipMetrics;
                 if (!metrics.known) return 'Relationship data unavailable on this page';
                 return metrics.connected + ' of ' + metrics.known + ' measured on this page';
@@ -262,6 +269,7 @@ document.addEventListener('alpine:init', function() {
             },
 
             get documentationHint() {
+                if (this.elementsPending) return 'Loading';
                 if (!this.pageCount) return 'No page denominator available';
                 let documented = this.elements.filter(function(el) {
                     return !!(el.description && el.description.trim());
@@ -313,6 +321,10 @@ document.addEventListener('alpine:init', function() {
                     : null;
             },
 
+            get elementsPending() {
+                return !this.elementsLoaded || (this.loading && this.loadedLayer !== this.activeTab);
+            },
+
             get layerTotalKnown() {
                 return typeof this.layerTotal === 'number';
             },
@@ -334,7 +346,13 @@ document.addEventListener('alpine:init', function() {
                 return typeof count === 'number' ? count : 0;
             },
 
+            // The layer's count is not known yet and the answers that carry it are still being fetched.
+            get layerCountPending() {
+                return !this.layerCountKnown && (!this.countsLoaded || this.elementsPending);
+            },
+
             get layerCountLabel() {
+                if (this.layerCountPending) return 'loading layer total';
                 if (!this.layerCountKnown) return 'layer total unavailable';
                 let n = this.layerCount;
                 let text = n + (n === 1 ? ' element' : ' elements') + ' in this layer';
@@ -358,6 +376,7 @@ document.addEventListener('alpine:init', function() {
             },
 
             get listTotalLabel() {
+                if (this.elementsPending) return 'Loading';
                 if (!this.layerTotalKnown) return '\u2014 total';
                 if (this.listNarrowed && this.layerCountKnown) return this.layerTotal + ' of ' + this.layerCount + ' match';
                 return this.layerTotal + ' total';
@@ -613,6 +632,7 @@ document.addEventListener('alpine:init', function() {
                             ? data.pagination.total
                             : null;
                     }
+                    this.loadedLayer = this.activeTab;
                 } catch (err) {
                     // The template already renders an error state + Retry button on
                     // `loadError` (dashboard.html); nothing ever set it until now.
@@ -625,6 +645,7 @@ document.addEventListener('alpine:init', function() {
                     if (window.Platform && Platform.toast) Platform.toast.error(this.loadError);
                 } finally {
                     this.loading = false;
+                    this.elementsLoaded = true;
                     this.$nextTick(function() { if (typeof lucide !== 'undefined') lucide.createIcons(); });
                 }
             },
@@ -705,6 +726,8 @@ document.addEventListener('alpine:init', function() {
                         uncounted.push(layerKey);
                     }
                 }
+
+                self.countsLoaded = true;
 
                 // One toast for the whole sweep — six per-layer toasts would be worse
                 // than the failure they report.

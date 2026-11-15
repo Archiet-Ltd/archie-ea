@@ -37,8 +37,22 @@ def _link_expired(title, message, action_label, action_href):
     ), 410
 
 
+def _education_url(user):
+    """The eligibility page for a person whose confirmed address is at a listed university or
+    college, when the address was confirmed from a mailed link; otherwise None."""
+    from app.services import academic_domains
+
+    if "education.eligibility" not in current_app.view_functions or academic_domains.match(user.email) is None:
+        return None
+    return url_for("education.eligibility")
+
+
 def _after_confirmation_url(user):
-    """Where a newly confirmed person goes: an owner lands on inviting the team."""
+    """Where a newly confirmed person goes: a university or college address lands on Education,
+    an owner on inviting the team."""
+    education = _education_url(user)
+    if education:
+        return education
     if "account.welcome" in current_app.view_functions and getattr(user, "is_org_admin", False):
         return url_for("account.welcome")
     return url_for("dashboard.overview")
@@ -51,7 +65,7 @@ def register_view():
         return redirect("/pricing")
     if chosen is not None and current_user.is_authenticated:
         # Already has an account and is signed in: straight to that plan.
-        return redirect(buy_intent.target_url(*chosen))
+        return redirect(buy_intent.target_url(*chosen, offer=buy_intent.requested_offer()))
     form = RegistrationForm()
     if request.method == "GET":
         # A visitor reaching the sign-up form, not a retry after a failed
@@ -98,7 +112,7 @@ def register_view():
         )
         if chosen is not None:
             # Usable at once: sign in and go straight to that plan's checkout.
-            return redirect(url_for("account.login", plan=chosen[0], interval=chosen[1]))
+            return redirect(url_for("account.login", plan=chosen[0], interval=chosen[1], offer=buy_intent.requested_offer()))
         if "account.welcome" in current_app.view_functions:
             # Signed in at once: the second step of sign-up.
             return redirect(url_for("account.welcome"))
@@ -111,7 +125,7 @@ def _register_page(form, chosen):
     form.form_issued.data = signup_guard.issue_form_token()
     return render_template(
         "account/register.html", form=form, step=1,
-        signin_args={"plan": chosen[0], "interval": chosen[1]} if chosen else {},
+        signin_args={"plan": chosen[0], "interval": chosen[1], "offer": buy_intent.requested_offer()} if chosen else {},
         turnstile_site_key=current_app.config["TURNSTILE_SITE_KEY"] if signup_guard.turnstile_enabled() else None,
     )
 
@@ -227,7 +241,8 @@ def confirm_view(token):
         return redirect(_after_confirmation_url(user))
     flash(message + " Sign in to continue.", "form-success")
     # The chosen plan stays in the session; signing in lands on its checkout.
-    return redirect(url_for("account.login"))
+    education = _education_url(user)
+    return redirect(url_for("account.login", next=education) if education else url_for("account.login"))
 
 
 def _invitation_gone():

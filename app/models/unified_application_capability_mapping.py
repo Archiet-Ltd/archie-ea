@@ -45,7 +45,7 @@ class UnifiedApplicationCapabilityMapping(db.Model):
 
     # Mapping characteristics
     support_level = Column(db.String(20), default="partial")  # full, partial, minimal
-    coverage_percentage = Column(db.Integer, default=0)  # 0 - 100% coverage
+    coverage_percentage = Column(db.Integer)  # 0 - 100% coverage; empty when nobody entered one
     support_quality = Column(db.Integer, default=3)  # 1 - 5 quality of support
 
     # Maturity and strategic flags

@@ -233,8 +233,11 @@ def test_worked_out_links_name_their_origin_once(page, live_server, two_organisa
     """Each link behind a worked-out connection reads 'Imported from <file>' or 'Drawn by <person>', never 'Drawn by Imported from'."""
     ours = two_organisations["ours"]
     row = _open_row(page, live_server, ours, "mainframe", "portal", "derived")
+    # The origins sit under "How this was worked out"; a person opens it to read them.
+    row.locator("[data-why-toggle]").click()
     links = row.locator("[data-why-link]")
     expect(links).to_have_count(2)
+    expect(links.nth(0)).to_be_visible()
     first = re.sub(r"\s+", " ", links.nth(0).inner_text())
     second = re.sub(r"\s+", " ", links.nth(1).inner_text())
     assert "Imported from estate.xml" in first

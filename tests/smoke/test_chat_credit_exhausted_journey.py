@@ -20,19 +20,19 @@ SIZES = [("1440", {"width": 1440, "height": 900}), ("390", {"width": 390, "heigh
 CREDIT_BALANCE_FAILURES = {
     "openai-credit-exhausted": (
         402,
-        {"error": "The AI service's credit has run out. Your organisation administrator (or Entelim support for the platform's key) can restore it.", "error_type": "credit_exhausted"},
+        {"error": "The AI service's credit has run out. Your organisation administrator (or Entelim support for the platform's key) can restore it.", "reason_code": "credit_exhausted", "error_type": "credit_exhausted"},
     ),
     "anthropic-credit-balance": (
         402,
-        {"error": "The AI service's credit has run out. Your organisation administrator (or Entelim support for the platform's key) can restore it.", "error_type": "credit_exhausted"},
+        {"error": "The AI service's credit has run out. Your organisation administrator (or Entelim support for the platform's key) can restore it.", "reason_code": "credit_exhausted", "error_type": "credit_exhausted"},
     ),
     "openrouter-quota-exceeded": (
         402,
-        {"error": "The AI service's credit has run out. Your organisation administrator (or Entelim support for the platform's key) can restore it.", "error_type": "credit_exhausted"},
+        {"error": "The AI service's credit has run out. Your organisation administrator (or Entelim support for the platform's key) can restore it.", "reason_code": "credit_exhausted", "error_type": "credit_exhausted"},
     ),
     "billing-error": (
         402,
-        {"error": "The AI service's credit has run out. Your organisation administrator (or Entelim support for the platform's key) can restore it.", "error_type": "credit_exhausted"},
+        {"error": "The AI service's credit has run out. Your organisation administrator (or Entelim support for the platform's key) can restore it.", "reason_code": "credit_exhausted", "error_type": "credit_exhausted"},
     ),
 }
 
@@ -40,15 +40,15 @@ CREDIT_BALANCE_FAILURES = {
 RATE_LIMIT_FAILURES = {
     "openai-rate-limit": (
         429,
-        {"error": "AI service rate limit exceeded. Please wait a moment and try again.", "error_type": "rate_limit"},
+        {"error": "The AI service is busy right now (rate limit reached). Wait a moment, then press Retry.", "reason_code": "rate_limited", "error_type": "rate_limit"},
     ),
     "anthropic-rate-limit": (
         429,
-        {"error": "AI service rate limit exceeded. Please wait a moment and try again.", "error_type": "rate_limit"},
+        {"error": "The AI service is busy right now (rate limit reached). Wait a moment, then press Retry.", "reason_code": "rate_limited", "error_type": "rate_limit"},
     ),
     "openrouter-free-daily-limit": (
         429,
-        {"error": "AI service rate limit exceeded. Please wait a moment and try again.", "error_type": "rate_limit"},
+        {"error": "The AI service is busy right now (rate limit reached). Wait a moment, then press Retry.", "reason_code": "rate_limited", "error_type": "rate_limit"},
     ),
 }
 

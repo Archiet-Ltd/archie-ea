@@ -223,7 +223,7 @@ class ApplicationComponent(TenantMixin, db.Model, OptimisticLockMixin):
     # Strategic alignment
     strategic_importance = Column(db.String(20))  # critical, high, medium, low
     business_value = Column(db.String(20))  # high, medium, low
-    competitive_advantage = Column(db.Boolean, default=False)
+    competitive_advantage = Column(db.Boolean, nullable=True)  # None: not recorded, True: yes, False: no
     differentiation_level = Column(db.String(20))  # core, differentiating, commodity
 
     # Technology stack

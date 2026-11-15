@@ -9,6 +9,7 @@ from datetime import date, datetime
 from decimal import Decimal
 
 from app.modules.architecture.services.gap_archimate_service import PRIORITY_SEVERITY_MAP, apply_rating_rule
+from app.services.cost_visibility import SHARE_FIGURE_KEYS
 from app.services.gap_register_service import effective_severity
 
 from flask import (
@@ -29,6 +30,7 @@ from sqlalchemy import or_
 from app import db
 from app.core.auth.decorators import admit_model_changers
 from app.decorators import require_roles
+from app.services.cost_visibility import COSTS_WITHHELD, costs_visible, is_money_key, withhold_costs
 from app.utils.tenant_users import escape_like_literal
 from . import archimate_crud, element_page, product_page
 from .services.ai_generation_service import AIGenerationService
@@ -620,9 +622,11 @@ def _element_owner_remove_urls(element, element_type, organization_id, owner_row
 @login_required
 def process_element_set_owner(element_id):
     """Record the first owner of a process that so far exists only as an element."""
-    from app.core.auth.permissions import can
+    from app.core.auth.permissions import can, is_read_only_member
 
     org_id = g.current_org_id
+    if is_read_only_member(current_user):
+        return jsonify({"message": "Your role can read but not change this organisation's records."}), 403
     if not (can(current_user, "assign", "owner") or can(current_user, "edit", "application")):
         return jsonify({"message": "You cannot assign owners"}), 403
     element = ArchiMateElement.query.filter_by(
@@ -641,10 +645,12 @@ def process_element_set_owner(element_id):
 @login_required
 def process_set_owner(process_id):
     """Record an owner for a business process (a new primary replaces the old)."""
-    from app.core.auth.permissions import can
+    from app.core.auth.permissions import can, is_read_only_member
     from app.services.element_ownership_service import set_element_owner
 
     org_id = g.current_org_id
+    if is_read_only_member(current_user):
+        return jsonify({"message": "Your role can read but not change this organisation's records."}), 403
     if not (can(current_user, "assign", "owner") or can(current_user, "edit", "application")):
         return jsonify({"message": "You cannot assign owners"}), 403
     data = request.get_json(silent=True) or {}
@@ -673,10 +679,12 @@ def process_set_owner(process_id):
 @login_required
 def process_delete_owner(process_id, owner_id):
     """Clear one owner of a business process."""
-    from app.core.auth.permissions import can
+    from app.core.auth.permissions import can, is_read_only_member
     from app.models.application_owner import ApplicationOwner
 
     org_id = g.current_org_id
+    if is_read_only_member(current_user):
+        return jsonify({"message": "Your role can read but not change this organisation's records."}), 403
     if not (can(current_user, "assign", "owner") or can(current_user, "edit", "application")):
         return jsonify({"message": "You cannot assign owners"}), 403
     record = ApplicationOwner.query.filter_by(
@@ -695,10 +703,12 @@ def process_delete_owner(process_id, owner_id):
 @login_required
 def gap_set_owner(gap_id):
     """Record an owner for a gap (a new primary replaces the old)."""
-    from app.core.auth.permissions import can
+    from app.core.auth.permissions import can, is_read_only_member
     from app.services.element_ownership_service import set_element_owner
 
     org_id = g.current_org_id
+    if is_read_only_member(current_user):
+        return jsonify({"message": "Your role can read but not change this organisation's records."}), 403
     if not (can(current_user, "assign", "owner") or can(current_user, "edit", "application")):
         return jsonify({"message": "You cannot assign owners"}), 403
     data = request.get_json(silent=True) or {}
@@ -724,10 +734,12 @@ def gap_set_owner(gap_id):
 @login_required
 def gap_delete_owner(gap_id, owner_id):
     """Clear one owner of a gap."""
-    from app.core.auth.permissions import can
+    from app.core.auth.permissions import can, is_read_only_member
     from app.models.application_owner import ApplicationOwner
 
     org_id = g.current_org_id
+    if is_read_only_member(current_user):
+        return jsonify({"message": "Your role can read but not change this organisation's records."}), 403
     if not (can(current_user, "assign", "owner") or can(current_user, "edit", "application")):
         return jsonify({"message": "You cannot assign owners"}), 403
     record = ApplicationOwner.query.filter_by(
@@ -824,7 +836,8 @@ def _get_display_fields(element, model_class, element_type=None):
         else:
             value = _plain_value(value)
 
-        fields.append({"label": label, "value": str(value), "technical": col_name in _TECHNICAL_FIELDS})
+        fields.append({"label": label, "value": str(value), "technical": col_name in _TECHNICAL_FIELDS,
+                       "money": is_money_key(col_name)})
 
     return fields
 
@@ -898,6 +911,24 @@ def api_field_configs():
     resp.cache_control.max_age = 3600
     resp.cache_control.private = True
     return resp
+
+
+def _layer_architecture_query(layer, query_types=None):
+    """The ``archimate_elements`` rows of one layer, restricted to ``query_types`` when given.
+
+    The one query the layer list and the layer tab count both read, so the
+    number on a tab is the number of rows listed under it. Matches every
+    spelling of the layer. With no types given, every element of the layer
+    is read whatever its stored type, as the model map counts it; a type
+    filter narrows the list only. The model carries no archived or deleted
+    state, so every row counts.
+    """
+    query = ArchiMateElement.query.filter(
+        db.func.lower(ArchiMateElement.layer).in_([a.lower() for a in LAYER_ALIASES.get(layer, [layer])]),
+    )
+    if query_types is not None:
+        query = query.filter(ArchiMateElement.type.in_(query_types))
+    return query
 
 
 @archimate_crud.route("/api/capability-choices")
@@ -980,10 +1011,7 @@ def _layer_count_parts(layer):
     # the size of that layer while its own tiles summed to the real total, and
     # the layer's elements were invisible in the UI. Match every spelling.
     try:
-        _aliases = [a.lower() for a in LAYER_ALIASES.get(layer, [layer])]
-        ae_count = ArchiMateElement.query.filter(
-            db.func.lower(ArchiMateElement.layer).in_(_aliases),
-        ).count()
+        ae_count = _layer_architecture_query(layer).count()
     except Exception as e:
         current_app.logger.warning(f"_count_layer_elements: archimate_elements count failed for {layer}: {e}")
         return None
@@ -1199,13 +1227,7 @@ def api_layer_elements(layer):
             # catalogue page keeps rendering the layer as empty.
             # With no type asked for, every element of the layer is listed, whatever its stored type: the
             # layer's count has no type filter, and a list narrower than its own count read as a second number.
-            ae_q = ArchiMateElement.query.filter(
-                db.func.lower(ArchiMateElement.layer).in_(
-                    [a.lower() for a in LAYER_ALIASES.get(layer, [layer])]
-                ),
-            )
-            if type_filter:
-                ae_q = ae_q.filter(ArchiMateElement.type.in_(query_types))
+            ae_q = _layer_architecture_query(layer, query_types if type_filter else None)
             if search:
                 safe_s = escape_like_literal(search)
                 ae_q = ae_q.filter(
@@ -1727,6 +1749,10 @@ def detail_element(layer, element_type, element_id):
 
     # Auto-discover displayable fields from the model
     all_fields = _get_display_fields(element, model_class, element_type)
+    costs_shown = costs_visible(current_user)
+    if not costs_shown:
+        # A person the one cost rule withholds from reads no amount on any element page.
+        all_fields = [f for f in all_fields if not f.get("money")]
     display_fields = [f for f in all_fields if not f["technical"]]
     display_fields[:0] = _capability_fact(element, element_type)
     # These two are the element's own dates; the owner's assignment date is
@@ -1806,6 +1832,8 @@ def detail_element(layer, element_type, element_id):
         )
 
     product = _product_page(element, element_type, ae_id)
+    if product is not None and not costs_shown:
+        product["cost"] = {"withheld": True}
 
     return render_template(
         "archimate_crud/detail.html",
@@ -1835,7 +1863,8 @@ def detail_element(layer, element_type, element_id):
         source_facts=source_facts,
         live_connectors=live_connectors,
         connectors_url=connectors_url,
-        technology_cost=_technology_cost_panel(ae_id),
+        technology_cost=_technology_cost_panel(ae_id, costs_shown),
+        costs_withheld_sentence=COSTS_WITHHELD,
         layer_config=LAYER_CONFIG,
         registered_types=list(MODEL_REGISTRY),
     )
@@ -1978,7 +2007,10 @@ def export_product(product_id):
         product_ae, org_id=org_id, href_for=_element_href, owner_for=_owner_names_for, plain_name=_plain_name,
         user=current_user, add_url=None, export_url=None,
         status_words=_plain_label)
-    response = jsonify(product_page.export_payload(product_ae, page))
+    payload = product_page.export_payload(product_ae, page)
+    if not costs_visible(current_user):
+        payload["cost"] = {"withheld": COSTS_WITHHELD}
+    response = jsonify(payload)
     response.headers["Content-Disposition"] = "attachment; filename=product_%d.json" % product_id
     return response
 
@@ -2015,7 +2047,7 @@ def _utc_stamp(value) -> str:
     return f"{moment:%d %b %Y %H:%M} UTC"
 
 
-def _technology_cost_panel(ae_id):
+def _technology_cost_panel(ae_id, costs_shown=True):
     """The cost panel for a node or system software, or None for any other element."""
     from app.modules.architecture.services.application_technology_links import is_technology_element
     from app.services import technology_cost
@@ -2024,9 +2056,18 @@ def _technology_cost_panel(ae_id):
     element = ArchiMateElement.query.filter_by(id=ae_id).first() if ae_id else None
     if element is None or org_id is None or not is_technology_element(element):
         return None
+    allocation = technology_cost.allocation(org_id, element.id)
+    if not costs_shown:
+        # The applications this technology runs stay; every amount and share is left out.
+        allocation = withhold_costs(
+            dict(allocation, facts=[], total=None, missing=[], share_range=None,
+                 applications=[dict(a, share=None) for a in allocation["applications"]]),
+            keys=SHARE_FIGURE_KEYS,
+        )
     return {
+        "withheld": not costs_shown,
         "element_id": element.id,
-        "allocation": technology_cost.allocation(org_id, element.id),
+        "allocation": allocation,
         "categories": technology_cost.CATEGORIES,
         "category_labels": dict(technology_cost.CATEGORIES),
         "rule": technology_cost.RULE,
@@ -2694,6 +2735,10 @@ def export_elements(layer, element_type):
             elem_dict = _element_to_dict(elem)
             data.append(elem_dict)
 
+        if not costs_visible(current_user):
+            # A person the one cost rule withholds from receives no amount in any column of the export.
+            data = withhold_costs(data)
+
         response = jsonify(data)
         response.headers["Content-Disposition"] = (
             f"attachment; filename={element_type}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
@@ -2794,42 +2839,82 @@ def api_element_detail(element_id):
     # is already in the session identity map (Query.get would skip it).
     element = ArchiMateElement.query.filter_by(id=element_id).first_or_404()
 
+    org_id = getattr(element, "organization_id", None)
+
+    # Outgoing relationships: fence on target element's organisation
+    outgoing_rels = ArchiMateRelationship.query.filter_by(source_id=element_id).limit(50).all()
+    from app.modules.intelligence.services.query_service import filter_relationships_by_org
+    outgoing_rels = filter_relationships_by_org(outgoing_rels, org_id, direction="outgoing")
+
     outgoing = []
-    for rel in ArchiMateRelationship.query.filter_by(source_id=element_id).limit(50).all():
-        target = ArchiMateElement.query.get(rel.target_id)
-        outgoing.append({
-            "id": rel.id,
-            "type": rel.type or "",
-            "target_id": rel.target_id,
-            "target_name": target.name if target else f"#{rel.target_id}",
-            "target_type": target.type if target else "",
-            "target_layer": target.layer if target else "",
-        })
+    if outgoing_rels:
+        target_ids = [rel.target_id for rel in outgoing_rels]
+        targets = {
+            e.id: e for e in ArchiMateElement.query.filter(ArchiMateElement.id.in_(target_ids)).all()
+        }
+        for rel in outgoing_rels:
+            target = targets.get(rel.target_id)
+            if target is None:
+                continue
+            outgoing.append({
+                "id": rel.id,
+                "type": rel.type or "",
+                "target_id": rel.target_id,
+                "target_name": target.name,
+                "target_type": target.type,
+                "target_layer": target.layer,
+            })
+
+    # Incoming relationships: fence on source element's organisation
+    incoming_rels = ArchiMateRelationship.query.filter_by(target_id=element_id).limit(50).all()
+    incoming_rels = filter_relationships_by_org(incoming_rels, org_id, direction="incoming")
 
     incoming = []
-    for rel in ArchiMateRelationship.query.filter_by(target_id=element_id).limit(50).all():
-        source = ArchiMateElement.query.get(rel.source_id)
-        incoming.append({
-            "id": rel.id,
-            "type": rel.type or "",
-            "source_id": rel.source_id,
-            "source_name": source.name if source else f"#{rel.source_id}",
-            "source_type": source.type if source else "",
-            "source_layer": source.layer if source else "",
-        })
+    if incoming_rels:
+        source_ids = [rel.source_id for rel in incoming_rels]
+        sources = {
+            e.id: e for e in ArchiMateElement.query.filter(ArchiMateElement.id.in_(source_ids)).all()
+        }
+        for rel in incoming_rels:
+            source = sources.get(rel.source_id)
+            if source is None:
+                continue
+            incoming.append({
+                "id": rel.id,
+                "type": rel.type or "",
+                "source_id": rel.source_id,
+                "source_name": source.name,
+                "source_type": source.type,
+                "source_layer": source.layer,
+            })
 
+    # Solutions list: fence on solution's organisation (a solution from another organisation is left out)
     solutions = []
     try:
         from app.models.solution_archimate_element import SolutionArchiMateElement
         from app.models.solution_models import Solution
-        for sae in SolutionArchiMateElement.query.filter_by(element_id=element_id).limit(20).all():
-            sol = Solution.query.get(sae.solution_id) if sae.solution_id else None
-            solutions.append({
-                "solution_id": sae.solution_id,
-                "solution_name": sol.name if sol else f"Solution #{sae.solution_id}",
-                "element_role": sae.element_role or "",
-                "created_at": sae.created_at.isoformat() if sae.created_at else None,
-            })
+        sae_rows = SolutionArchiMateElement.query.filter_by(element_id=element_id).limit(20).all()
+        if sae_rows:
+            solution_ids = [sae.solution_id for sae in sae_rows if sae.solution_id]
+            solutions_map = {
+                s.id: s for s in Solution.query.filter(Solution.id.in_(solution_ids)).all()
+            }
+            for sae in sae_rows:
+                if not sae.solution_id:
+                    continue
+                sol = solutions_map.get(sae.solution_id)
+                # Fence: only show solutions belonging to the same organisation as the element.
+                # If sol is None, the tenant isolation listener filtered it out (cross-org solution).
+                if sol is None:
+                    continue
+                if org_id is not None and getattr(sol, "organization_id", None) != org_id:
+                    continue
+                solutions.append({
+                    "solution_id": sae.solution_id,
+                    "solution_name": sol.name,
+                    "element_role": sae.element_role or "",
+                    "created_at": sae.created_at.isoformat() if sae.created_at else None,
+                })
     except Exception as e:
         current_app.logger.warning(f"Could not load solution linkages for element {element_id}: {e}")
 
@@ -2842,6 +2927,7 @@ def api_element_detail(element_id):
         current_app.logger.warning(f"Could not read profile for element {element_id}: {e}")
 
     return jsonify({
+        "success": True,
         "id": element.id,
         "name": element.name,
         "type": element.type,
@@ -3278,8 +3364,17 @@ def _form_text(value):
 
 
 def _get_element_relationships(element, element_id):
-    """Get all relationships for an element"""
+    """Get all relationships for an element, scoped to the element's own organisation.
+
+    A relationship row may cross the organisation boundary (its own organization_id
+    is the caller's org while the far element belongs to another). The far element
+    is loaded by id and organisation, so an edge into another organisation lists
+    nothing.
+    """
+    from app.modules.intelligence.services.query_service import filter_relationships_by_org
+
     relationships = []
+    org_id = getattr(element, "organization_id", None)
 
     # Resolve the archimate_element_id to use for relationship lookup
     ae_id = None
@@ -3290,13 +3385,20 @@ def _get_element_relationships(element, element_id):
 
     # Get ArchiMate relationships
     if ae_id:  # model-safety-ok: polymorphic ArchiMate elements
-        # Outgoing relationships
+        # Outgoing relationships — only to elements in this organisation
         outgoing = ArchiMateRelationship.query.filter_by(
             source_id=ae_id
         ).all()
-        for rel in outgoing:
-            target_element = ArchiMateElement.query.get(rel.target_id)
-            if target_element:
+        outgoing = filter_relationships_by_org(outgoing, org_id, direction="outgoing")
+        if outgoing:
+            target_ids = [rel.target_id for rel in outgoing]
+            targets = {
+                e.id: e for e in ArchiMateElement.query.filter(ArchiMateElement.id.in_(target_ids)).all()
+            }
+            for rel in outgoing:
+                target_element = targets.get(rel.target_id)
+                if target_element is None:
+                    continue
                 relationships.append(
                     {
                         "type": rel.type,
@@ -3310,13 +3412,20 @@ def _get_element_relationships(element, element_id):
                     }
                 )
 
-        # Incoming relationships
+        # Incoming relationships — only from elements in this organisation
         incoming = ArchiMateRelationship.query.filter_by(
             target_id=ae_id
         ).all()
-        for rel in incoming:
-            source_element = ArchiMateElement.query.get(rel.source_id)
-            if source_element:
+        incoming = filter_relationships_by_org(incoming, org_id, direction="incoming")
+        if incoming:
+            source_ids = [rel.source_id for rel in incoming]
+            sources = {
+                e.id: e for e in ArchiMateElement.query.filter(ArchiMateElement.id.in_(source_ids)).all()
+            }
+            for rel in incoming:
+                source_element = sources.get(rel.source_id)
+                if source_element is None:
+                    continue
                 relationships.append(
                     {
                         "type": rel.type,

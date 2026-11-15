@@ -16,6 +16,8 @@ declined by the server in the same turn.
 from app.modules.ai_chat.tools.executor import ToolCall
 import json
 import logging
+import threading
+import time
 from typing import Callable, Optional
 from app.modules.ai_chat.services.ai_hallucination_detector import (
     Grounding,
@@ -27,7 +29,12 @@ from app.modules.intelligence.services.answer_envelope import (
     classify_estate_question,
 )
 from app.utils.tracing import traced
-from app.modules.ai_chat.services.failure_messages import AI_CREDIT_EXHAUSTED
+from app.modules.ai_chat.services.failure_messages import (
+    AI_CREDIT_EXHAUSTED,
+    FEATURE_INTROS,
+    failure_sentence,
+    reason_code_for_text,
+)
 from app.modules.ai_chat.services.llm_service_impl import _CALLER, _PROVIDER_LABELS
 
 logger = logging.getLogger(__name__)
@@ -59,6 +66,12 @@ Solution state: get_solution_summary, get_completeness_score, update_solution_fi
                 update_solution_phase, search_archimate_elements, find_applications,
                 query_capability_gaps
 Portfolio: update_application_status (checked and reviewed before it is applied)
+Application details (description, version, category, business domain, technology stack, deployment
+status, owners): there is no tool for these. The person types "set <application>'s <field> to <value>"
+(for example: set Acme Ledger's description to Runs the monthly billing) and the chat shows the change for
+them to save. Tell them that; never send them to the application form to do it.
+Which capabilities an application supports: call get_application_capabilities with the application's
+name, whatever the person's wording; it reads the same mapping the application's page shows.
 Blueprint: generate_blueprint_narrative (checked and reviewed before it is applied)
 
 HOW TO OPERATE:
@@ -356,6 +369,93 @@ def build_provider_chain(first_provider: str, first_model: str, pin_first: bool 
     return chain
 
 
+class _ProviderRead:
+    """One provider read handed to the helper thread: when its first chunk came, whether it was given up on."""
+
+    def __init__(self):
+        self.first = threading.Event()
+        self.done = threading.Event()
+        self.abandoned = False
+        self.result = None
+        self.error = None
+
+    def chunk(self) -> None:
+        """Called for every parsed chunk: marks the first token and stops a read that was given up on."""
+        if self.abandoned:
+            raise TimeoutError("the turn's time budget is spent")
+        self.first.set()
+
+
+def _quietly(fn: Callable) -> None:
+    try:
+        fn()
+    except Exception:  # swallow-ok: closing a connection already given up on; nothing waits on it
+        pass
+
+
+def read_before(work: Callable, deadline: float, closer: Optional[Callable] = None):
+    """Run ``work(read)`` on a helper thread and return its result, or raise TimeoutError by ``deadline``
+    (a time.monotonic() value): no first token (``read.first``) within PROVIDER_FIRST_TOKEN_SECONDS, or no
+    end by the deadline, abandons the read (``closer`` is called, its later output is dropped). The one
+    wall clock for every provider read, whatever bytes arrive; the request context is copied in and the read
+    uses its own database session."""
+    import contextvars
+
+    from app.modules.ai_chat.services import model_defaults
+
+    read = _ProviderRead()
+    context = contextvars.copy_context()
+
+    from flask import current_app, g, has_app_context
+
+    app = current_app._get_current_object() if has_app_context() else None
+    organization_id = getattr(g, "current_org_id", None) if app is not None else None
+
+    def own_session():
+        # The helper has its own app context, so its own database session: a session is not safe to share
+        # between threads, and the request's may be closed by the time an abandoned read ends. What the
+        # read logs (the provider call's interaction record) is committed here, so the log stays complete.
+        from app import db
+
+        with app.app_context():
+            if organization_id is not None:
+                g.current_org_id = organization_id
+            try:
+                result = work(read)
+                db.session.commit()
+                return result
+            except BaseException:
+                db.session.rollback()
+                raise
+            finally:
+                db.session.remove()
+
+    def target():
+        try:
+            read.result = context.run(own_session if app is not None else (lambda: work(read)))
+        except BaseException as exc:  # handed to the waiting thread
+            read.error = exc
+        finally:
+            read.first.set()
+            read.done.set()
+
+    threading.Thread(target=target, daemon=True, name="provider-read").start()
+    first_limit = max(0.0, min(float(model_defaults.PROVIDER_FIRST_TOKEN_SECONDS), deadline - time.monotonic()))
+    reason = None
+    if not read.first.wait(first_limit):
+        reason = "no first token within %.0f seconds" % first_limit
+    elif not read.done.wait(max(0.0, deadline - time.monotonic())):
+        reason = "the turn's time budget is spent"
+    if reason is not None:
+        read.abandoned = True
+        if closer is not None:
+            _quietly(closer)
+        raise TimeoutError(reason)
+    if read.error is not None:
+        raise read.error
+    return read.result
+
+
 class AgentRunner:
     """
     Orchestrates the LLM tool-use loop for a single user turn.
@@ -394,6 +494,9 @@ class AgentRunner:
         # to run() identifies the specific turn within that session.
         self.chat_session_id = chat_session_id
         self._turn_id: Optional[str] = None
+        # When this turn must stop (time.monotonic()); set by run().
+        self._turn_deadline: Optional[float] = None
+        self._recorded: list = []
         # What this turn may state: tool results, the context handed to the
         # model, the conversation so far and the user's own words. The citation
         # gate in _finalize refuses an answer that states a fact about the
@@ -416,6 +519,12 @@ class AgentRunner:
         self._verdicts: dict = {}
         self._drafter = None
         self._review_budget = None
+        # What ran in this turn: the lookups, and the text they and the context returned. The reply's
+        # words about searching, and which facts came from the conversation, are read from these.
+        self._lookups: list = []
+        self._question = ""
+        self._evidence_chunks: list = []
+        self._earlier_user: list = []
 
     GATE_MODES = ("log", "enforce", "off")
 
@@ -613,6 +722,16 @@ class AgentRunner:
             self._collect_answer_sources(result, sources)
             return
         entity_type = self._TOOL_ENTITY.get(tool_name)
+        if tool_name == "get_application_capabilities":
+            # Each capability is cited to its own fact sheet, as the keyword answer cites it.
+            for row in (result.get("result") if isinstance(result, dict) and result.get("success") else None) or []:
+                key = ("capability", row.get("id"))
+                if row.get("id") is None or not row.get("name") or len(sources) >= self.MAX_SOURCES:
+                    continue
+                if any((s["type"], s["id"]) == key for s in sources):
+                    continue
+                sources.append({"type": "capability", "id": row["id"], "name": row["name"], "url": row.get("url")})
+            return
         if not entity_type or not isinstance(result, dict) or not result.get("success"):
             return
         rows = result.get("result")
@@ -753,9 +872,25 @@ class AgentRunner:
         requested_model: Optional[str] = None,
         stream_mode: bool = False,
         history: Optional[list] = None,
+        waited_seconds: float = 0.0,
+        already_done: Optional[list] = None,
+        retry: bool = False,
+        failed_turn_id: Optional[str] = None,
     ) -> dict:
         """
         Execute the full ReAct loop for one user message.
+
+        `already_done` is the changes an earlier try of this same question made before it stopped, as
+        [{"tool": str, "arguments": dict}, ...]; a retry does not make the same change a second time.
+
+        `retry` marks a question asked again after a failed turn. The changes that turn recorded are then
+        read from the approval record (never from the browser) for the one turn that failed, named by
+        `failed_turn_id` (the `turn_id` that turn returned): the model is told each one's real state, a
+        change asking for the same target and fields is not recorded a second time, and the ones still
+        waiting are returned in `pending_approvals` so the failure card can name them.
+
+        `waited_seconds` is what the person has already waited since sending (the stored-answer lookup
+        ran first); the turn's budget is the rest of CHAT_TURN_BUDGET_SECONDS less CHAT_TURN_MARGIN_SECONDS, never under 10 seconds.
 
         `history` is the prior turns of this conversation as
         [{"role": "user"|"assistant", "content": str}, ...], oldest first.
@@ -780,7 +915,31 @@ class AgentRunner:
         # conversation). Any approval queued during this call to run() carries
         # this id so it can be traced back to the specific run that raised it.
         import uuid as _uuid
-        self._turn_id = str(_uuid.uuid4())
+        from app.modules.ai_chat.services import model_defaults
+
+        # A Retry is the same question asked again: it continues the turn that failed, so a change it records
+        # and the ones it carries forward are all found by a further Retry. The id only ever narrows the
+        # signed-in person's own rows.
+        self._turn_id = (failed_turn_id.strip()[:64] if retry and isinstance(failed_turn_id, str)
+                         and failed_turn_id.strip() else str(_uuid.uuid4()))
+        self._recorded = []
+        if retry:
+            from app.modules.ai_chat.services.ai_chat_approval_service import AIChatApprovalService
+
+            self._recorded = AIChatApprovalService(self.user_id).recorded_changes(
+                [self.chat_session_id, "chat_user_%s" % self.user_id], failed_turn_id
+            )
+        # Changes a caller in this process says an earlier try already made are matched the same way.
+        self._recorded += [
+            {"approval_id": None, "tool": item["tool"], "arguments": item.get("arguments") or {}, "summary": "",
+             "applied": True}
+            for item in (already_done or [])
+            if isinstance(item, dict) and isinstance(item.get("tool"), str)
+        ]
+        _budget = float(model_defaults.CHAT_TURN_BUDGET_SECONDS) - float(model_defaults.CHAT_TURN_MARGIN_SECONDS)
+        self._turn_deadline = time.monotonic() + max(
+            min(10.0, _budget), _budget - max(0.0, float(waited_seconds or 0.0))
+        )
 
         # A run may make at most this many review and revision calls, across every change it queues.
         from app.modules.ai_chat.services.change_review import ReviewBudget
@@ -814,6 +973,13 @@ class AgentRunner:
                 logger.warning("AgentRunner: question name lookup failed", exc_info=True)
         self._nudged = False
         self._gate_cache = None
+        self._lookups = []
+        self._question = user_message if isinstance(user_message, str) else ""
+        self._evidence_chunks = [system_prompt]
+        self._earlier_user = [
+            str(e.get("content")) for e in (history or [])
+            if isinstance(e, dict) and e.get("role") == "user" and e.get("content")
+        ]
 
         # Get provider, model, and first available API key
         try:
@@ -913,9 +1079,21 @@ class AgentRunner:
         executor = ToolExecutor(self.user_id, persona=persona)
         actions_taken = []
         required_actions = []
-        pending_approvals = []
+        # Changes a failed turn recorded and nobody has applied yet: they stay in the answer so the person
+        # is told they are there, whatever else this try does.
+        pending_approvals = [
+            {
+                "approval_id": c["approval_id"], "tool": c["tool"], "arguments": c["arguments"],
+                "summary": c["summary"], "plain": self._approval_plain(c["tool"], c["arguments"]),
+            }
+            for c in self._recorded if not c["applied"]
+        ]
         # Records the read tools actually returned this turn, for citation.
         sources = []
+        # A question that names business facts is searched before the reply may say anything is missing.
+        found_text = self._look_up_business_facts(user_message, sources)
+        if found_text:
+            messages[-1] = {"role": "user", "content": user_message + found_text}
 
         chain_pos = 0
         credit_only = True  # every refusal so far was a spent balance
@@ -924,6 +1102,16 @@ class AgentRunner:
             self._held_tokens = []
             llm_resp = None
             while llm_resp is None:
+                if self._budget_left() <= 0:
+                    logger.warning("AgentRunner: turn budget spent before %s/%s answered", provider, model)
+                    return self._finalize(
+                        self._stopped(
+                            "LLM call failed: the turn's time budget is spent", True,
+                            actions_taken, required_actions, pending_approvals, sources,
+                        ),
+                        user_message=user_message, domain=domain, context=context,
+                        persona=persona, model_used=model,
+                    )
                 try:
                     llm_resp = self._call_llm(
                         provider, model, api_key, system_prompt, messages, tool_schemas,
@@ -952,7 +1140,10 @@ class AgentRunner:
                             continue
                         return self._finalize(
                             # Only when every key and provider ran out does the person read the credit sentence.
-                            self._fallback(f"LLM call failed: {e}", busy=not credit_only),
+                            self._stopped(
+                                f"LLM call failed: {e}", not credit_only,
+                                actions_taken, required_actions, pending_approvals, sources,
+                            ),
                             user_message=user_message, domain=domain, context=context,
                             persona=persona, model_used=model,
                         )
@@ -962,7 +1153,10 @@ class AgentRunner:
                     )
                     logger.debug("AgentRunner LLM call failed (iteration %d)", iteration, exc_info=True)
                     return self._finalize(
-                        self._fallback(f"LLM call failed: {e}"),
+                        self._stopped(
+                            f"LLM call failed: {e}", False,
+                            actions_taken, required_actions, pending_approvals, sources,
+                        ),
                         user_message=user_message, domain=domain, context=context,
                         persona=persona, model_used=model,
                     )
@@ -1000,7 +1194,11 @@ class AgentRunner:
                     gate_passes = True
                 # An answer that read the genome is shown only after its
                 # citation post-check, drawn by the server (see _finalize).
-                self._release_held_tokens(gate_passes and not self._grounding.genome_slices)
+                # A reply whose words about searching or sources are corrected is not streamed as the
+                # model wrote it: the person reads the corrected reply the done event carries.
+                self._release_held_tokens(
+                    gate_passes and not self._grounding.genome_slices and self._honest_text(final_text) == final_text
+                )
                 return self._finalize(
                     {
                         "response": llm_resp.get("text", ""),
@@ -1033,7 +1231,19 @@ class AgentRunner:
                 )
                 schema = TOOL_SCHEMA_BY_NAME.get(tc.name, {})
 
-                if tc.name not in offered_tools:
+                if tc.name in offered_tools and tc.name in _MUTATING_TOOLS and self._recorded_match(tc):
+                    # An earlier try recorded this change for this conversation: it is not recorded again.
+                    recorded = self._recorded_match(tc)
+                    result = {
+                        "success": True,
+                        "applied": recorded["applied"],
+                        "message": (
+                            "This change was already made before the retry; it was not made again."
+                            if recorded["applied"]
+                            else "This change is recorded and not applied yet; it was not recorded again."
+                        ),
+                    }
+                elif tc.name not in offered_tools:
                     # Tool selection is the server's: only a tool offered on the
                     # chat surface can run, whatever text (a pasted document, a
                     # retrieved excerpt, an earlier tool result) names another.
@@ -1062,6 +1272,7 @@ class AgentRunner:
                         "tool": tc.name,
                         "arguments": tc.arguments,
                         "summary": verdict.get("summary") or self._approval_summary(tc),
+                        "plain": self._approval_plain(tc.name, tc.arguments),
                         "state": verdict.get("state"),
                         "message": verdict.get("message"),
                         "reasons": verdict.get("reasons") or [],
@@ -1080,6 +1291,7 @@ class AgentRunner:
                     # Auto-execute
                     self._emit({"type": "tool_start", "tool": tc.name, "args": tc.arguments})
                     result = executor.execute(tc)
+                    self._note_lookup(tc.name, result, tc.arguments)
                     self._collect_sources(tc.name, result, sources)
                     self._grounding.add_tool_result(
                         result, mutates=tc.name in _MUTATING_TOOLS
@@ -1284,6 +1496,40 @@ class AgentRunner:
     # LLM call (tool-enabled)                                             #
     # ------------------------------------------------------------------ #
 
+    def _budget_left(self) -> Optional[float]:
+        """Seconds left of this turn's budget, or None when no turn is running."""
+        if self._turn_deadline is None:
+            return None
+        return self._turn_deadline - time.monotonic()
+
+    def _call_timeout(self) -> float:
+        """How long one provider call may wait: the first-token limit, or what is left of the turn."""
+        from app.modules.ai_chat.services import model_defaults
+
+        left = self._budget_left()
+        limit = float(model_defaults.PROVIDER_FIRST_TOKEN_SECONDS)
+        return limit if left is None else max(0.5, min(limit, left))
+
+    def _check_budget(self) -> None:
+        """Stop a call that is still receiving when the turn's budget is spent."""
+        left = self._budget_left()
+        if left is not None and left <= 0:
+            raise TimeoutError("the turn's time budget is spent")
+
+    def _read_within_turn(self, work: Callable, closer: Optional[Callable] = None):
+        """Run one provider read so that it ends by the turn's wall clock, whatever bytes arrive.
+
+        A client timeout is a gap between bytes, and a provider that keeps sending comment lines, or goes
+        silent after one token, restarts it. So the read runs on a helper thread and this thread waits for
+        it: no first token within PROVIDER_FIRST_TOKEN_SECONDS, or no end by the turn's deadline, abandons the
+        read (its connection is closed, its later output is dropped) and raises a timeout, which the one
+        provider chain treats like any refused call. ``work`` receives a handle whose ``chunk()`` it calls
+        for every parsed chunk. With no turn running there is no deadline and ``work`` runs on this thread.
+        """
+        if self._budget_left() is None:
+            return work(_ProviderRead())
+        return read_before(work, self._turn_deadline, closer)
+
     def _call_llm(
         self,
         provider: str,
@@ -1377,22 +1623,25 @@ class AgentRunner:
         from app.modules.ai_chat.services.llm_service_impl import LLMService
 
         LLMService._guard_provider_call("anthropic", model, prompt=system_prompt)
-        client = anthropic.Anthropic(api_key=api_key, timeout=90.0)
+        client = anthropic.Anthropic(api_key=api_key, timeout=self._call_timeout(), max_retries=0)
         max_tokens = 8192 if "sonnet" in model or "opus" in model else 4096
 
-        response = client.messages.create(
-            model=model,
-            max_tokens=max_tokens,
-            system=[
-                {
-                    "type": "text",
-                    "text": system_prompt,
-                    "cache_control": {"type": "ephemeral"},
-                }
-            ],
-            messages=messages,
-            tools=tools,
-            tool_choice={"type": "auto"},
+        response = self._read_within_turn(
+            lambda read: client.messages.create(
+                model=model,
+                max_tokens=max_tokens,
+                system=[
+                    {
+                        "type": "text",
+                        "text": system_prompt,
+                        "cache_control": {"type": "ephemeral"},
+                    }
+                ],
+                messages=messages,
+                tools=tools,
+                tool_choice={"type": "auto"},
+            ),
+            closer=getattr(client, "close", None),
         )
 
         text = None
@@ -1414,26 +1663,31 @@ class AgentRunner:
         from app.modules.ai_chat.services.llm_service_impl import LLMService
 
         LLMService._guard_provider_call("anthropic", model, prompt=system_prompt)
-        client = anthropic.Anthropic(api_key=api_key, timeout=90.0)
+        client = anthropic.Anthropic(api_key=api_key, timeout=self._call_timeout(), max_retries=0)
         max_tokens = 8192 if "sonnet" in model or "opus" in model else 4096
 
-        with client.messages.stream(
-            model=model,
-            max_tokens=max_tokens,
-            system=[
-                {
-                    "type": "text",
-                    "text": system_prompt,
-                    "cache_control": {"type": "ephemeral"},
-                }
-            ],
-            messages=messages,
-            tools=tools,
-            tool_choice={"type": "auto"},
-        ) as stream:
-            for text in stream.text_stream:
-                self._emit_token(text)
-            final = stream.get_final_message()
+        def read_stream(read):
+            with client.messages.stream(
+                model=model,
+                max_tokens=max_tokens,
+                system=[
+                    {
+                        "type": "text",
+                        "text": system_prompt,
+                        "cache_control": {"type": "ephemeral"},
+                    }
+                ],
+                messages=messages,
+                tools=tools,
+                tool_choice={"type": "auto"},
+            ) as stream:
+                for text in stream.text_stream:
+                    read.chunk()
+                    self._check_budget()
+                    self._emit_token(text)
+                return stream.get_final_message()
+
+        final = self._read_within_turn(read_stream, closer=getattr(client, "close", None))
 
         text = None
         tool_calls = []
@@ -1481,21 +1735,24 @@ class AgentRunner:
         elif not provider and base_url and "integrate.api.nvidia.com" in base_url:
             provider_name = "nvidia"
         LLMService._guard_provider_call(provider_name, model, prompt=system_prompt)
-        client = OpenAI(api_key=api_key, base_url=base_url, timeout=90.0)
+        client = OpenAI(api_key=api_key, base_url=base_url, timeout=self._call_timeout(), max_retries=0)
         full_messages = [{"role": "system", "content": system_prompt}] + messages
 
         # Newer OpenAI models (o1, o3, gpt-5.x) require max_completion_tokens; all other models
         # accept it too (it supersedes the deprecated max_tokens parameter).
         _token_limit = 8192 if ("gpt-4" in model or "gpt-5" in model) else 4096
         sent_model, extra_body = self._deepseek_call(provider_name, model, self._provider_extra_body(provider_name))
-        response = client.chat.completions.create(
-            model=sent_model,
-            messages=full_messages,
-            tools=tools,
-            tool_choice="auto",
-            temperature=0.0,
-            max_completion_tokens=_token_limit,
-            extra_body=extra_body,
+        response = self._read_within_turn(
+            lambda read: client.chat.completions.create(
+                model=sent_model,
+                messages=full_messages,
+                tools=tools,
+                tool_choice="auto",
+                temperature=0.0,
+                max_completion_tokens=_token_limit,
+                extra_body=extra_body,
+            ),
+            closer=getattr(client, "close", None),
         )
 
         msg = response.choices[0].message
@@ -1520,7 +1777,7 @@ class AgentRunner:
         elif not provider and base_url and "integrate.api.nvidia.com" in base_url:
             provider_name = "nvidia"
         LLMService._guard_provider_call(provider_name, model, prompt=system_prompt)
-        client = OpenAI(api_key=api_key, base_url=base_url, timeout=90.0)
+        client = OpenAI(api_key=api_key, base_url=base_url, timeout=self._call_timeout(), max_retries=0)
         full_messages = [{"role": "system", "content": system_prompt}] + messages
 
         text_acc = ""
@@ -1530,43 +1787,49 @@ class AgentRunner:
         # Newer OpenAI models (o1, o3, gpt-5.x) require max_completion_tokens.
         _token_limit = 8192 if ("gpt-4" in model or "gpt-5" in model) else 4096
         sent_model, extra_body = self._deepseek_call(provider_name, model, self._provider_extra_body(provider_name))
-        with client.chat.completions.create(
-            model=sent_model,
-            messages=full_messages,
-            tools=tools,
-            tool_choice="auto",
-            temperature=0.0,
-            max_completion_tokens=_token_limit,
-            stream=True,
-            stream_options={"include_usage": True},
-            extra_body=extra_body,
-        ) as stream:
-            for chunk in stream:
-                if getattr(chunk, "usage", None):
-                    usage = chunk.usage
-                if not chunk.choices:
-                    continue
-                delta = chunk.choices[0].delta
-                if delta.content:
-                    text_acc += delta.content
-                    self._emit_token(delta.content)
-                if delta.tool_calls:
-                    for tc in delta.tool_calls:
-                        # Tool-call output the provider has sent counts toward the spend estimate too.
-                        self._streamed_chars = getattr(self, "_streamed_chars", 0) + len(
-                            (tc.id or "")
-                            + ((tc.function.name or "") if tc.function else "")
-                            + ((tc.function.arguments or "") if tc.function else "")
-                        )
-                        idx = tc.index
-                        if idx not in tool_calls_acc:
-                            tool_calls_acc[idx] = {"id": "", "name": "", "arguments": ""}
-                        if tc.id:
-                            tool_calls_acc[idx]["id"] = tc.id
-                        if tc.function and tc.function.name:
-                            tool_calls_acc[idx]["name"] += tc.function.name
-                        if tc.function and tc.function.arguments:
-                            tool_calls_acc[idx]["arguments"] += tc.function.arguments
+        def read_stream(read):
+            nonlocal text_acc, usage
+            with client.chat.completions.create(
+                model=sent_model,
+                messages=full_messages,
+                tools=tools,
+                tool_choice="auto",
+                temperature=0.0,
+                max_completion_tokens=_token_limit,
+                stream=True,
+                stream_options={"include_usage": True},
+                extra_body=extra_body,
+            ) as stream:
+                for chunk in stream:
+                    read.chunk()
+                    self._check_budget()
+                    if getattr(chunk, "usage", None):
+                        usage = chunk.usage
+                    if not chunk.choices:
+                        continue
+                    delta = chunk.choices[0].delta
+                    if delta.content:
+                        text_acc += delta.content
+                        self._emit_token(delta.content)
+                    if delta.tool_calls:
+                        for tc in delta.tool_calls:
+                            # Tool-call output the provider has sent counts toward the spend estimate too.
+                            self._streamed_chars = getattr(self, "_streamed_chars", 0) + len(
+                                (tc.id or "")
+                                + ((tc.function.name or "") if tc.function else "")
+                                + ((tc.function.arguments or "") if tc.function else "")
+                            )
+                            idx = tc.index
+                            if idx not in tool_calls_acc:
+                                tool_calls_acc[idx] = {"id": "", "name": "", "arguments": ""}
+                            if tc.id:
+                                tool_calls_acc[idx]["id"] = tc.id
+                            if tc.function and tc.function.name:
+                                tool_calls_acc[idx]["name"] += tc.function.name
+                            if tc.function and tc.function.arguments:
+                                tool_calls_acc[idx]["arguments"] += tc.function.arguments
+
+        self._read_within_turn(read_stream, closer=getattr(client, "close", None))
 
         tool_calls = []
         for idx in sorted(tool_calls_acc.keys()):
@@ -1582,6 +1845,70 @@ class AgentRunner:
     # ------------------------------------------------------------------ #
     # Message history management                                          #
     # ------------------------------------------------------------------ #
+
+    def _note_lookup(self, tool_name: str, result: dict, arguments=None, for_question: bool = False) -> None:
+        """Record that a read tool ran, and keep what it returned as evidence for the reply."""
+        from app.modules.ai_chat.services.turn_honesty import record_lookup
+
+        if tool_name in _MUTATING_TOOLS:
+            return
+        self._lookups.append(record_lookup(arguments, result, for_question))
+        self._evidence_chunks.append(json.dumps(result, default=str))
+
+    @staticmethod
+    def _search_model(name: str, limit: int) -> dict:
+        """Elements of the active organisation whose name contains *name*. The route tool of the same
+        name needs a request, which a chat turn's worker thread does not have, so the turn asks the
+        model directly, scoped to the organisation."""
+        from app.extensions import db
+        from app.middleware.tenant_context import current_org_id
+        from app.models import ArchiMateElement
+
+        organization_id = current_org_id()
+        if organization_id is None:
+            return {"success": False, "error": "No organisation is active."}
+        pattern = "%" + name.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%"
+        rows = db.session.execute(
+            db.select(ArchiMateElement.id, ArchiMateElement.name, ArchiMateElement.type, ArchiMateElement.layer)
+            .where(ArchiMateElement.organization_id == organization_id, ArchiMateElement.name.ilike(pattern, escape="\\"))
+            .order_by(ArchiMateElement.name).limit(limit)
+        ).all()
+        return {
+            "success": True,
+            "result": [{"id": r.id, "name": r.name, "type": r.type, "layer": r.layer} for r in rows],
+        }
+
+    def _look_up_business_facts(self, user_message: str, sources: list) -> str:
+        """Search the model for each business fact the question names, as lookups of this
+        turn (they appear in the trail like any other), and return what they found, fenced,
+        to add to the question. Empty when the question names none."""
+        from app.extensions import db
+        from app.modules.ai_chat.services.architect_persona_charters import fence_untrusted
+        from app.modules.ai_chat.services.turn_honesty import RESULTS_PER_LOOKUP, fact_searches
+
+        blocks = []
+        for name in fact_searches(user_message):
+            args = {"query": name, "limit": RESULTS_PER_LOOKUP}
+            self._emit({"type": "tool_start", "tool": "search_elements", "args": args})
+            try:
+                result = self._search_model(name, RESULTS_PER_LOOKUP)
+            except Exception:
+                logger.warning("AgentRunner: business-fact lookup failed", exc_info=True)
+                db.session.rollback()
+                result = {"success": False, "error": "The lookup failed."}
+            self._note_lookup("search_elements", result, args, for_question=True)
+            self._collect_sources("search_elements", result, sources)
+            self._grounding.add_tool_result(result, mutates=False)
+            self._emit({"type": "tool_result", "tool": "search_elements", "result": result})
+            blocks.append(fence_untrusted("LOOKUP search_elements " + name, json.dumps(result, default=str)))
+        if not blocks:
+            return ""
+        return (
+            "\n\nThe platform has already searched the model for the facts this question names. "
+            "Answer every part of the question from these results; name each part they do not "
+            "answer. Say a record is missing only for a part these searches did not find.\n"
+            + "\n".join(blocks)
+        )
 
     @staticmethod
     def _fenced_result(tc_raw: dict, result: dict) -> str:
@@ -1770,12 +2097,22 @@ class AgentRunner:
         "create_application": "create an application",
         "create_vendor": "create a vendor",
         "create_solution": "create a solution",
+        "create_goal": "create a goal",
         "update_application_status": "change an application's status",
         "submit_for_arb_review": "submit a solution for ARB review",
         "generate_blueprint_narrative": "generate blueprint narrative text",
         "delete_capability": "delete a capability",
         "delete_application": "delete an application",
     }
+
+    @classmethod
+    def _approval_plain(cls, tool: str, arguments: dict) -> str:
+        """The change as a person reads it: the tool's label from the table above, then the record's name
+        when the change has one ("Create a goal: Billing"). The summary below keeps the full detail."""
+        label = cls._TOOL_LABELS.get(tool, str(tool).replace("_", " "))
+        name = next((arguments[k] for k in ("name", "title") if isinstance((arguments or {}).get(k), str)), "")
+        sentence = label[:1].upper() + label[1:]
+        return "%s: %s" % (sentence, name.strip()) if name.strip() else sentence
 
     @classmethod
     def _approval_summary(cls, tc: "ToolCall") -> str:
@@ -1821,8 +2158,30 @@ class AgentRunner:
     # Fallbacks                                                           #
     # ------------------------------------------------------------------ #
 
+    def _recorded_match(self, tc: "ToolCall") -> Optional[dict]:
+        """The change an earlier try recorded that this call asks for again, or None."""
+        from app.modules.ai_chat.services.ai_chat_approval_service import AIChatApprovalService
+
+        for change in self._recorded:
+            if AIChatApprovalService.same_change(tc.name, tc.arguments, change["tool"], change["arguments"]):
+                return change
+        return None
+
+    def _stopped(self, reason: str, busy: bool, actions_taken: list, required_actions: list,
+                 pending_approvals: list, sources: list) -> dict:
+        """The result of a turn that stopped without an answer. It still reports every change the turn made,
+        so the person is told what was done and a retry can leave it alone."""
+        result = self._fallback(reason, busy=busy)
+        result["actions_taken"] = list(actions_taken)
+        result["required_actions"] = list(required_actions)
+        result["pending_approvals"] = list(pending_approvals)
+        result["sources"] = list(sources)
+        return result
+
     def _fallback(self, reason: str, busy: bool = False) -> dict:
         reason_l = (reason or "").lower()
+        not_set_up = False
+        reason_code = None
         if "answers are paused" in reason_l:
             from app.modules.ai_chat.services.llm_service_impl import PAUSED_MESSAGE
 
@@ -1830,31 +2189,37 @@ class AgentRunner:
         elif "empty reply" in reason_l:
             msg = "The assistant could not answer this time. Press Retry."
             busy = True
-        elif not busy and classify_provider_error(reason_l) == CREDIT_EXHAUSTED:
-            msg = AI_CREDIT_EXHAUSTED  # waiting cannot restore credit, so no Retry
         elif busy:
             msg = (
                 "The assistant is busy right now. Wait a minute, then press Retry."
             )
+        elif classify_provider_error(reason_l) == CREDIT_EXHAUSTED:
+            reason_code = "credit_exhausted"  # waiting cannot restore credit, so no Retry
+            msg = failure_sentence(reason_code)
+        elif classify_provider_error(reason_l) == RATE_LIMITED:
+            reason_code = "rate_limited"
+            msg = failure_sentence(reason_code)
+            busy = True
         elif any(t in reason_l for t in ("no api key", "not configured", "no provider", "no keys")):
-            msg = (
-                "AI features aren't configured yet — add an API key under "
-                "Admin → AI settings to enable the assistant."
-            )
+            msg = FEATURE_INTROS["chat"]
+            not_set_up = True
         else:
-            msg = (
-                "The AI request couldn't be completed. See the error detail below "
-                "or check Admin → AI settings."
-            )
-        out = {
+            reason_code = reason_code_for_text(reason)
+            msg = failure_sentence(reason_code)
+        result = {
             "response": msg,
             "actions_taken": [],
             "pending_approvals": [],
             "error": reason,
         }
+        if reason_code:
+            result["reason_code"] = reason_code
+        if not_set_up:
+            # The browser shows an administrator the way to the provider settings, and a member nothing.
+            result["not_set_up"] = True
         if busy:
-            out["retryable"] = True  # the chat offers Retry beside this sentence
-        return out
+            result["retryable"] = True  # the chat offers Retry beside this sentence
+        return result
 
     def _record_run(
         self,
@@ -2126,6 +2491,8 @@ class AgentRunner:
         ``answered_by`` names the provider and model that produced the reply,
         read from the entry that answered (``model_used``), never the first one
         tried. A refused or failed turn carries none, so no model is named."""
+        result["turn_id"] = self._turn_id
+        self._apply_honesty_rules(result)
         self._apply_genome_post_check(result, provider_used)
         self._apply_citation_gate(result)
         if (result.get("citation_gate") or {}).get("refused"):
@@ -2149,6 +2516,20 @@ class AgentRunner:
             result["run_record_error"] = record_error
         return result
 
+    def _apply_honesty_rules(self, result: dict) -> None:
+        """The reply's claims about searching and about where a fact came from match what ran."""
+        text = result.get("response")
+        if result.get("error") or result.get("system_generated") or not isinstance(text, str) or not text.strip():
+            return
+        result["response"] = self._honest_text(text)
+
+    def _honest_text(self, text: str) -> str:
+        """*text* with its claims of searching, and its facts from the conversation, made to match what ran."""
+        from app.modules.ai_chat.services.turn_honesty import mark_conversation_facts, remove_unbacked_search_claims
+
+        text = remove_unbacked_search_claims(text, self._lookups, self._question)
+        return mark_conversation_facts(text, self._earlier_user, self._evidence_chunks)
+
     def _text_only_fallback(
         self, message: str, system_prompt: str, provider: str, model: str, api_key: str, LLMService,
         user_message: str = "", domain: str = "general", context: Optional[dict] = None,
@@ -2157,9 +2538,15 @@ class AgentRunner:
         """Run a plain text call (no tools) for unsupported providers."""
         try:
             prompt = system_prompt + "\n\nUser: " + message
-            text, _ = LLMService._call_llm_with_failover(
-                prompt=prompt, model=model, provider=provider
-            )
+            def ask(read):
+                # One plain call has no first token to wait for: only the turn's own end limits it.
+                read.first.set()
+                return LLMService._call_llm_with_failover(
+                    prompt=prompt, model=model, provider=provider,
+                    timeout=self._call_timeout(), deadline=self._turn_deadline,
+                )
+
+            text, _ = self._read_within_turn(ask)
             return self._finalize(
                 {
                     "response": text,
@@ -2174,7 +2561,7 @@ class AgentRunner:
             )
         except Exception as e:
             return self._finalize(
-                self._fallback(str(e)),
+                self._fallback(str(e), busy=isinstance(e, TimeoutError)),
                 user_message=user_message or message,
                 domain=domain,
                 context=context,

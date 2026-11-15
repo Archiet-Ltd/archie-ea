@@ -4,6 +4,7 @@ import logging
 from collections import defaultdict
 
 from flask import render_template
+from flask_login import current_user
 from werkzeug.exceptions import NotFound
 
 from app import db
@@ -517,6 +518,7 @@ def _vendors_impl(
 ):
     """Shared vendor list implementation with filtering, pagination, and stats."""
     from app.models.vendor import application_vendor_products
+    from app.services.cost_visibility import COSTS_WITHHELD, costs_visible
     from sqlalchemy import func
 
     # Limit per_page to reasonable values
@@ -595,7 +597,7 @@ def _vendors_impl(
             v.apqc_process_count = 0
 
     # Calculate statistics in a single aggregate query (3 counts → 1 query)
-    from sqlalchemy import case, and_
+    from sqlalchemy import case
     stats_row = db.session.query(
         db.func.count(VendorOrganization.id).label("total"),
         db.func.count(case(
@@ -633,51 +635,12 @@ def _vendors_impl(
         .all()
     )
 
-    from datetime import datetime, timedelta
-
-    try:
-        now = datetime.utcnow()
-        ninety_days = now + timedelta(days=90)
-
-        # DEF-050, Capgemini dry-run: this summed
-        # VendorOrganization.contract_value_annual / read
-        # VendorOrganization.contract_status/contract_end_date — fields
-        # nothing writes to. The real "Add Contract" flow
-        # (app/modules/procurement) creates a VendorContract row (vendor_id
-        # FK, annual_cost, status, end_date), a completely different table.
-        # So "Portfolio ACV" stayed "—" no matter how many real, active
-        # contracts existed. Sum from VendorContract instead.
-        from app.models.application_portfolio import VendorContract
-        from app.services import vendor_register
-
-        acv_row = db.session.query(
-            db.func.count(
-                db.case(
-                    (
-                        and_(
-                            VendorContract.end_date >= now,
-                            VendorContract.end_date <= ninety_days,
-                        ),
-                        VendorContract.id,
-                    )
-                )
-            ).label("renewals_due"),
-        ).filter(
-            vendor_register.active_condition(),
-            VendorContract.vendor_id.isnot(None),
-        ).one()
-
-        renewals_due = int(acv_row.renewals_due or 0)
-    except Exception:
-        renewals_due = 0
-
     stats = {
         "total": total_vendors,
         "active": active_vendors,
         "strategic": strategic_vendors,
         "total_products": total_products,
         "domain_distribution": {d[0] or "other": d[1] for d in domain_distribution},
-        "renewals_due": renewals_due,
     }
 
     # Populate the Type filter from the vendor types actually stored, so the
@@ -716,6 +679,7 @@ def _vendors_impl(
         db.session.rollback()
         logging.getLogger(__name__).exception("Vendor result footers could not be read")
 
+    costs_withheld = not costs_visible(current_user)
     return render_template(
         "vendors/list.html",
         vendors=vendors,
@@ -735,6 +699,8 @@ def _vendors_impl(
         get_domain_label=get_domain_label,
         get_domain_color_classes=get_domain_color_classes,
         VENDOR_DOMAINS=VENDOR_DOMAINS,
+        costs_withheld=costs_withheld,
+        costs_withheld_sentence=COSTS_WITHHELD,
     )
 
 

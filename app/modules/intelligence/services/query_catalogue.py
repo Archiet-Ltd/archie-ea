@@ -26,7 +26,7 @@ TRUTH_CLASS_SYNCHRONISED = "synchronised"
 # that recompute a value from other rows are "derived". Nothing in this
 # catalogue reads from a sync-mirror table today, so "synchronised" is
 # available for a future entry but unused here — never guessed per row.
-_DRAWN_SOURCE_TABLES = {"application_owners", "application_components", "company_profile"}
+_DRAWN_SOURCE_TABLES = {"application_owners", "application_components", "company_profile", "saved_diagram_elements"}
 
 
 def truth_class_for(source_table: Optional[str]) -> str:
@@ -142,12 +142,34 @@ def _applications_without_owner(organization_id: int, **_: Any) -> Dict[str, Any
     }
 
 
+def _owner_names_by_application(
+    organization_id: int, application_ids: List[int], ownership_types: Optional[tuple] = None,
+) -> Dict[int, List[str]]:
+    """{application id: the names of its recorded owners}, read through the one owner reader
+    (a user, or a person recorded without an account, each named as the record names them; a
+    user with no name is named by email)."""
+    from app.models.application_owner import ApplicationOwner
+
+    if not application_ids:
+        return {}
+    names: Dict[int, List[str]] = {}
+    for application_id, rows in ApplicationOwner.get_display_rows_for_applications(
+        application_ids, organization_id,
+    ).items():
+        for row in rows:
+            if ownership_types and row["ownership_type"] not in ownership_types:
+                continue
+            name = row["user_name"] if row["user_name"] != "\u2014" else row["user_email"]
+            if name:
+                names.setdefault(application_id, []).append(name)
+    return names
+
+
 def _business_continuity_criticality(
     organization_id: int, criticality: str = "Critical", **_: Any
 ) -> Dict[str, Any]:
     """"What would stop the business trading?" — the systems, suppliers
     and owners for a given criticality level."""
-    from app.models.application_owner import ApplicationOwner
     from app.models.application_portfolio import ApplicationComponent
 
     apps = ApplicationComponent.query.filter(
@@ -155,35 +177,7 @@ def _business_continuity_criticality(
         ApplicationComponent.business_criticality == criticality,
     ).all()
 
-    owners_by_app: Dict[int, List[str]] = {}
-    if apps:
-        owner_rows = (
-            db.session.query(ApplicationOwner)
-            .filter(
-                ApplicationOwner.organization_id == organization_id,
-                ApplicationOwner.application_id.in_([a.id for a in apps]),
-            )
-            .all()
-        )
-        if owner_rows:
-            from app.models.user import User
-
-            # Scoped to this organisation explicitly: a row's user_id is
-            # already drawn from an org-filtered ApplicationOwner row, but
-            # the tenant-scoping gate requires the predicate at every query
-            # site, not just transitively through a join.
-            owner_user_ids = {row.user_id for row in owner_rows}
-            users_by_id = {
-                u.id: u
-                for u in User.query.filter(
-                    User.id.in_(owner_user_ids),
-                    User.organization_id == organization_id,
-                ).all()
-            }
-            for row in owner_rows:
-                user = users_by_id.get(row.user_id)
-                name = user.email if user else "not recorded"
-                owners_by_app.setdefault(row.application_id, []).append(name)
+    owners_by_app = _owner_names_by_application(organization_id, [a.id for a in apps])
 
     rows = []
     citations: List[Dict[str, Any]] = []
@@ -337,47 +331,26 @@ def _applications_and_owners(organization_id: int, **_: Any) -> Dict[str, Any]:
     application's recorded total cost of ownership; a missing cost reads as
     "not recorded", never a fabricated zero.
     """
-    from app.models.application_owner import ApplicationOwner
     from app.models.application_portfolio import ApplicationComponent
-    from app.services.element_ownership_service import owner_label
 
+    from app.modules.dashboard.services.overview_figures import _active_applications, left_out_applications
+
+    # The applications in use: the Systems list's own definition (not a copy, not
+    # decommissioned, not an unpromoted import), so the count here is that list's count.
     apps = (
-        ApplicationComponent.query.filter(
-            ApplicationComponent.organization_id == organization_id,
+        db.session.execute(
+            _active_applications()
+            .where(ApplicationComponent.organization_id == organization_id, ApplicationComponent.deleted_at.is_(None))
+            .order_by(ApplicationComponent.name)
         )
-        .order_by(ApplicationComponent.name)
+        .scalars()
         .all()
     )
+    # The Overview's own left-out figure: an unpromoted repository import is not a decommissioned application.
+    decommissioned = left_out_applications(organization_id)["decommissioned"]
 
-    owners_by_app: Dict[int, List[str]] = {}
-    if apps:
-        owner_rows = (
-            db.session.query(ApplicationOwner)
-            .filter(
-                ApplicationOwner.organization_id == organization_id,
-                ApplicationOwner.application_id.in_([a.id for a in apps]),
-                ApplicationOwner.ownership_type.in_(("primary", "business")),
-            )
-            .all()
-        )
-        if owner_rows:
-            from app.models.user import User
-
-            owner_user_ids = {row.user_id for row in owner_rows if row.user_id is not None}
-            users_by_id = {
-                u.id: u
-                for u in User.query.filter(
-                    User.id.in_(owner_user_ids or {-1}),
-                    User.organization_id == organization_id,
-                ).all()
-            }
-            for row in owner_rows:
-                user = users_by_id.get(row.user_id)
-                if user is None:
-                    continue
-                owners_by_app.setdefault(row.application_id, []).append(
-                    owner_label(user.first_name, user.last_name, user.email)
-                )
+    owners_by_app = _owner_names_by_application(
+        organization_id, [a.id for a in apps], ownership_types=("primary", "business"))
 
     rows = []
     citations: List[Dict[str, Any]] = []
@@ -402,9 +375,10 @@ def _applications_and_owners(organization_id: int, **_: Any) -> Dict[str, Any]:
         citations.append(application_citation(app.id, app.name))
 
     return {
-        "answer": "the applications we run, with each one's accountable owner and annual cost",
+        "answer": "the applications in use, with each one's accountable owner and annual cost",
         "rows": rows,
         "total": len(rows),
+        "decommissioned_left_out": decommissioned,
         "citations": citations,
         "reason": None if rows else "no applications are recorded in this organisation",
     }
@@ -788,6 +762,51 @@ def _risk_cost(organization_id: int, risk: Optional[str] = None, **_: Any) -> Di
     return out
 
 
+
+
+def _top_risks(organization_id: int, limit: Any = None, **_: Any) -> Dict[str, Any]:
+    """"What are our top risks?" -- the open risks of the register, highest score first, each with its
+    level, score, owner and what it touches. Read from the one risk register (``risks``) through
+    ``risk_service.ranked_risks``; the order is the recorded score, ties by title, and nothing is
+    invented when the register holds none."""
+    from app.models.risk import RiskStatus
+    from app.services import risk_service
+
+    try:
+        shown = max(1, min(int(limit), 25)) if limit else 5
+    except (TypeError, ValueError):
+        shown = 5
+    rows_all = [r for r in risk_service.ranked_risks(organization_id)["rows"]
+                if r["status"] != RiskStatus.CLOSED.value]
+    rows_all.sort(key=lambda r: (-(r["risk_score"] or 0), (r["title"] or "").lower(), r["risk_id"]))
+    owners = {}
+    if rows_all:
+        from app.models.risk import Risk
+        owners = dict(db.session.execute(
+            db.select(Risk.id, Risk.owner).where(Risk.organization_id == organization_id)).all())
+    rows: List[Dict[str, Any]] = []
+    citations: List[Dict[str, Any]] = []
+    for r in rows_all[:shown]:
+        touches = ", ".join(t["name"] for t in r["touches"][:3]) or "no linked records yet"
+        rows.append({
+            "id": r["risk_id"],
+            "name": r["title"],
+            "source_line": "%s, %s of 25. Owner: %s. Touches: %s." % (
+                (r["risk_level"] or "Level not recorded"), r["risk_score"],
+                owners.get(r["risk_id"]) or "not recorded", touches),
+            "source_table": "risks",
+            "truth_class": truth_class_for("risks"),
+        })
+        citations.append(risk_citation(r["risk_id"], r["title"]))
+    if rows:
+        answer = "the %d highest-scoring open risks in the risk register" % len(rows)
+        reason = "%d open risks are recorded; these score highest" % len(rows_all)
+    else:
+        answer = "the highest-scoring open risks in the risk register"
+        reason = "no open risks are recorded in the risk register yet"
+    return {"answer": answer, "rows": rows, "total": len(rows_all), "citations": citations, "reason": reason}
+
+
 def _risk_url(risk_id: int) -> Optional[str]:
     from flask import has_request_context, url_for
 
@@ -891,6 +910,102 @@ def _what_breaks_if_fails(organization_id: int, service: Optional[str] = None, *
     }
 
 
+def capability_citation(capability_id: int, name: str, source_line: Optional[str] = None) -> Dict[str, Any]:
+    """A citation to a business capability a person can open (its fact sheet)."""
+    citation = {
+        "type": "capability",
+        "id": capability_id,
+        "name": name,
+        "target": f"/enterprise/capabilities/{capability_id}/fact-sheet",
+    }
+    if source_line:
+        citation["source_line"] = source_line
+    return citation
+
+
+def _resolve_application(organization_id: int, name: Optional[str]):
+    """(application, others): the one application of *organization_id* a name
+    names, else ``None`` and the applications it was ambiguous between.
+
+    An exact name (any case) wins; otherwise a name contained in exactly one
+    application's name. Never a guess between several.
+    """
+    from app.models.application_portfolio import ApplicationComponent
+    from app.utils.tenant_users import escape_like_literal
+
+    wanted = " ".join((name or "").split())
+    if not wanted:
+        return None, []
+    base = ApplicationComponent.query.filter(ApplicationComponent.organization_id == organization_id)
+    exact = base.filter(db.func.lower(ApplicationComponent.name) == wanted.lower()).all()
+    if len(exact) == 1:
+        return exact[0], []
+    found = exact or base.filter(ApplicationComponent.name.ilike(f"%{escape_like_literal(wanted)}%", escape="\\")).order_by(ApplicationComponent.name).all()
+    if len(found) == 1:
+        return found[0], []
+    return None, found[:5]
+
+
+def _capabilities_of_application(organization_id: int, service: Optional[str] = None, **_: Any) -> Dict[str, Any]:
+    """"Which capabilities does <application> support?" -- read at question time
+    from the same mapping store, through the same reader, as the application
+    page's Mapped Capabilities, so the two always agree. Each capability is cited
+    to its own fact sheet; an application with none says so and points to where
+    one is mapped."""
+    from app.services.application_capabilities import application_capability_links
+    from app.utils.recorded_figures import coverage_text
+
+    application, others = _resolve_application(organization_id, service)
+    if application is None:
+        if others:
+            return {
+                "answer": f"which capabilities '{service}' supports",
+                "matched": False, "rows": [], "total": 0, "citations": [],
+                "reason": "more than one application is called like '%s': %s" % (
+                    service, ", ".join(a.name for a in others)),
+                "next_step": "Ask again with the full name of one of them.",
+            }
+        return {
+            "answer": f"which capabilities '{service}' supports" if service else "which capabilities an application supports",
+            "service": service, "matched": False, "rows": [], "total": 0, "citations": [],
+            "reason": ("nothing recorded matches '%s'" % service) if service else "no application was named",
+            "next_step": "Ask again with the name of an application in your model.",
+        }
+
+    rows, citations = [], []
+    for mapping, capability in application_capability_links(application.id, organization_id):
+        # A unified capability points at its business capability by source_id.
+        raw_id = capability.source_id if capability.__class__.__name__ == "UnifiedCapability" else capability.id
+        try:
+            capability_id = int(raw_id)
+        except (TypeError, ValueError):
+            continue
+        support = (getattr(mapping, "support_level", None) or "").replace("_", " ").capitalize()
+        coverage = getattr(mapping, "coverage_percentage", None)
+        line = " · ".join(part for part in (
+            f"{support} support" if support else "", f"Coverage: {coverage_text(coverage)}") if part) or None
+        rows.append({
+            "id": capability_id, "name": capability.name, "support_level": support or None,
+            "coverage_percentage": coverage, "source_table": "application_capability_mapping",
+            "truth_class": TRUTH_CLASS_DRAWN,
+        })
+        citations.append(capability_citation(capability_id, capability.name, line))
+
+    result = {
+        "answer": f"the capabilities {application.name} supports",
+        "service": application.name, "application_id": application.id,
+        "rows": rows, "total": len(rows), "citations": citations,
+        "reason": None if rows else f"{application.name} has no capability mapped to it yet",
+    }
+    if not rows:
+        from flask import url_for
+
+        result["next_step"] = "Map a capability to it on its Capabilities tab."
+        result["next_label"] = f"Open {application.name}"
+        result["next_url"] = url_for("unified_applications.application_detail", id=application.id, tab="capabilities")
+    return result
+
+
 # What each plain question about the company asks for: the profile fields that answer it, in the order shown.
 PROFILE_TOPICS = {
     "products": ("What do we sell?", "what the company sells",
@@ -988,6 +1103,102 @@ def _company_profile(organization_id: int, topic: Optional[str] = None, **_: Any
     }
 
 
+# What each plain question about a canvas box asks: the box, in the words a person asks it.
+CANVAS_BOX_QUESTIONS = {
+    "customer_segments": ("Who are our customer segments?", "Customer Segments"),
+    "early_adopters": ("Who are our early adopters?", "Early adopters"),
+    "value_propositions": ("What are our value propositions?", "Value Propositions"),
+    "revenue_streams": ("What are our revenue streams?", "Revenue Streams"),
+    "key_partners": ("Who are our key partners?", "Key Partners"),
+    "key_activities": ("What are our key activities?", "Key Activities"),
+    "key_resources": ("What are our key resources?", "Key Resources"),
+    "cost_structure": ("What is in our cost structure?", "Cost Structure"),
+    "customer_relationships": ("What are our customer relationships?", "Customer Relationships"),
+    "channels": ("What are our channels?", "Channels"),
+}
+
+
+def _canvas_box_entries(organization_id: int, box: Optional[str] = None, show_costs: bool = False,
+                        **_: Any) -> Dict[str, Any]:
+    """"Who are our customer segments? Who are our key partners?" Answered from the canvases themselves: the
+    entries each canvas of the organisation shows in that box, in the order the canvas page shows them, each
+    cited to its element and to the canvas it sits on. Read through the one canvas reader the page and the
+    chat's get_canvas use, so the three never disagree. Cost lines are listed only when ``show_costs`` is
+    true, for a person the cost rule lets read them."""
+    from app.modules.business_model_canvas import model_service
+    from app.services.cost_visibility import COSTS_WITHHELD
+
+    box = box if box in CANVAS_BOX_QUESTIONS else None
+    title, box_title = CANVAS_BOX_QUESTIONS[box] if box else ("What is on our canvas?", "any box")
+    found = model_service.box_across_canvases(organization_id, [box] if box else list(CANVAS_BOX_QUESTIONS))
+
+    rows: List[Dict[str, Any]] = []
+    citations: List[Dict[str, Any]] = []
+    canvases: Dict[int, Dict[str, Any]] = {}
+    left_out = 0
+    costs_withheld = False
+    for item in found:
+        canvas, slice_ = item["canvas"], item["box"]
+        line_start = "%s on %s" % (slice_["title"], canvas["name"])
+        costs = slice_["costs"] or {}
+        if costs.get("lines") and not show_costs:
+            costs_withheld = True
+        # (id, name, kind, source line, source table)
+        listed = [
+            (entry["id"], entry["name"], "element", "%s · %s" % (line_start, entry["type_name"]), "saved_diagram_elements")
+            for entry in slice_["entries"]
+        ] + [
+            (price["element_id"], price["text"], "element", "%s · price" % line_start, price["source_table"])
+            for price in slice_["prices"]
+        ]
+        if show_costs:
+            left_out += costs.get("not_listed") or 0
+            listed += [
+                (line["id"], line["text"], "application",
+                 "%s · %s" % (line_start, "technology share" if line["kind"] == "technology_share" else "cost"),
+                 line["source_table"])
+                for line in costs.get("lines") or []
+            ]
+        if not listed:
+            continue
+        canvases.setdefault(canvas["id"], {"canvas": canvas, "count": 0})["count"] += len(listed)
+        for ident, name, kind, line, table in listed:
+            rows.append({"id": ident, "kind": kind, "name": name, "source_line": line, "source_table": table,
+                         "truth_class": truth_class_for(table)})
+            citations.append({"type": kind, "id": ident, "name": name,
+                              "target": "/api/v1/elements/%d" % ident if kind == "element" else None, "source_line": line})
+    for entry in canvases.values():
+        canvas = entry["canvas"]
+        citations.append({"type": "canvas", "id": canvas["id"], "name": canvas["name"], "target": canvas["url"],
+                          "source_line": "%s · %d listed" % (canvas["type_name"], entry["count"])})
+
+    result: Dict[str, Any] = {
+        "answer": "what the canvases list under %s" % box_title if box else "what the canvases list",
+        "title": title, "box": box, "rows": rows, "total": len(rows) + left_out, "citations": citations,
+        "reason": None if rows else (COSTS_WITHHELD if costs_withheld else "no canvas has an entry in %s yet" % box_title),
+    }
+    if left_out:
+        result["left_out"] = left_out
+        result["answer"] += " (%d cost line%s not listed here, the canvas page lists them)" % (
+            left_out, "" if left_out == 1 else "s")
+    if costs_withheld:
+        result["costs_withheld"] = True
+        result["note"] = COSTS_WITHHELD
+    if not rows and not costs_withheld:
+        from flask import url_for
+
+        own = model_service.organisation_canvas(organization_id)
+        result["next_step"] = ("Open your canvas and add the first entry." if own is not None
+                               else "Make a canvas, then add the first entry.")
+        result["next_label"] = "Open your canvas" if own is not None else "Open the canvases"
+        try:
+            result["next_url"] = (url_for("business_model.detail", canvas_id=own.id) if own is not None
+                                  else url_for("business_model.index"))
+        except RuntimeError:  # outside a request there is no page to point to
+            result["next_url"] = None
+    return result
+
+
 CATALOGUE: Dict[str, CatalogueEntry] = {
     "applications_without_owner": CatalogueEntry(
         id="applications_without_owner",
@@ -1038,12 +1249,33 @@ CATALOGUE: Dict[str, CatalogueEntry] = {
         params=["topic"],
         run=_company_profile,
     ),
+    "top_risks": CatalogueEntry(
+        id="top_risks",
+        title="What are our top risks?",
+        description="The open risks in the risk register with the highest scores, each with its level, owner and what it touches.",
+        params=["limit"],
+        run=_top_risks,
+    ),
     "risk_cost": CatalogueEntry(
         id="risk_cost",
         title="What does a risk cost us?",
         description="The yearly loss worked out for a risk with the Open FAIR method: a most likely figure and a 90 per cent range, with who entered the factors and when.",
         params=["risk"],
         run=_risk_cost,
+    ),
+    "capabilities_of_application": CatalogueEntry(
+        id="capabilities_of_application",
+        title="Which capabilities does an application support?",
+        description="The business capabilities mapped to a named application, read from the same mapping the application page shows, each cited to its fact sheet.",
+        params=["service"],
+        run=_capabilities_of_application,
+    ),
+    "canvas_box_entries": CatalogueEntry(
+        id="canvas_box_entries",
+        title="What is in a box of our canvas?",
+        description="The entries each canvas shows in one box (customer segments, key partners, value propositions and the rest), in the order the canvas page shows them, each cited to its element and its canvas.",
+        params=["box"],
+        run=_canvas_box_entries,
     ),
     "what_breaks_if_fails": CatalogueEntry(
         id="what_breaks_if_fails",

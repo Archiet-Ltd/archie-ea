@@ -627,6 +627,7 @@ class TestRouteWiring:
                 "redirect_url": "https://idp.example.com/authorize?x=1",
                 "state": "state-abc",
                 "nonce": "nonce-abc",
+                "code_verifier": "verifier-abc",
             },
         ):
             resp = client.get("/auth/sso/initiate?email=alice@acme.com")
@@ -642,7 +643,7 @@ class TestRouteWiring:
         org = types.SimpleNamespace(sso_config=types.SimpleNamespace(enabled=True))
         received = {}
 
-        def _handle_callback(config, code, state, redirect_uri, expected_nonce=None):
+        def _handle_callback(config, code, state, redirect_uri, expected_nonce=None, code_verifier=None):
             received["nonce"] = expected_nonce
             return {"email": "alice@acme.com", "sub": "user-1"}
 

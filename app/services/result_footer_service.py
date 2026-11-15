@@ -346,6 +346,55 @@ def application_footer(app, owner_names: Optional[List[str]], now: Optional[date
     return build_footer(facts, now)
 
 
+def ownership_footer(organization_id: Optional[int], owners: Iterable[Dict[str, Any]],
+                     now: Optional[datetime] = None) -> Dict[str, Any]:
+    """Footer for an owner answer: one fact for each element whose ownership record names an owner, linked
+    to the page where that owner is recorded (the application's page for an application, the element in the
+    Composer for any other) and dated by the newest record on it.
+
+    ``owners`` are the owner reader's rows (``element_id`` says where each is recorded, ``since`` the day the
+    record was made). An element that is not in this organisation's model is a missing input, never named.
+    """
+    from app import db
+    from app.models.application_portfolio import ApplicationComponent
+
+    owners = list(owners)
+    ordered: List[int] = []
+    for owner in owners:
+        element_id = owner.get("element_id")
+        if element_id is not None and element_id not in ordered:
+            ordered.append(element_id)
+    known = element_facts(organization_id, ordered)
+    components: Dict[int, int] = {}
+    if ordered and organization_id is not None:
+        components = {
+            row.archimate_element_id: row.id
+            for row in db.session.execute(
+                db.select(ApplicationComponent.id, ApplicationComponent.archimate_element_id).where(
+                    ApplicationComponent.organization_id == organization_id,
+                    ApplicationComponent.archimate_element_id.in_(ordered))
+            ).all()
+        }
+    facts: List[Dict[str, Any]] = []
+    unlisted = False
+    for element_id in ordered:
+        info = known.get(element_id)
+        if info is None:
+            if not unlisted:
+                facts.append(fact(NOT_IN_MODEL, missing=True))
+                unlisted = True
+            continue
+        days = [datetime.strptime(o["since"], "%Y-%m-%d") for o in owners
+                if o.get("element_id") == element_id and o.get("since")]
+        if element_id in components:
+            href = page_link("unified_applications.application_detail", id=components[element_id])
+        else:
+            href = page_link("archimate.composer_page", element=element_id)
+        facts.append(fact("Ownership record: %s" % info["name"], href=href, source_kind="manual",
+                          as_of=max(days) if days else info["as_of"], subject="Ownership record"))
+    return build_footer(facts, now)
+
+
 def systems_facts(organization_id: int, system_ids: List[int], total: Optional[int] = None,
                   more_href: Optional[str] = None) -> List[Dict[str, Any]]:
     """Facts for the first few systems named in a result; the rest are counted, not listed."""
@@ -578,6 +627,25 @@ def roadmap_footer(work_packages: List[Any], total: int, now: Optional[datetime]
     return build_footer(facts, now)
 
 
+_DERIVATION_PAGES = {
+    "application": ("unified_applications.application_fact_sheet", "id"),
+}
+
+
+def _derivation_facts(derivation: Dict[str, Any], default_when: Optional[datetime]) -> List[Dict[str, Any]]:
+    """The facts a derived strategic score rests on: each application, link, value stream or risk, as the
+    team recorded it, with the date it was last recorded."""
+    facts = []
+    for item in derivation["facts"]:
+        endpoint, key = _DERIVATION_PAGES.get(item["kind"], (None, None))
+        when = datetime.fromisoformat(item["as_of"]) if item.get("as_of") else default_when
+        facts.append(fact(item["label"], href=page_link(endpoint, **{key: item["id"]}) if endpoint else None,
+                          source_kind="manual", as_of=when))
+    if derivation.get("more"):
+        facts.append(fact("and %d more" % derivation["more"], source_kind="manual", as_of=default_when))
+    return facts
+
+
 def capability_footers(organization_id: int, scores: List[Dict[str, Any]],
                        now: Optional[datetime] = None) -> Dict[int, Dict[str, Any]]:
     """Footer for each scored capability of the investment matrix: the capability record, the importance and
@@ -604,7 +672,16 @@ def capability_footers(organization_id: int, scores: List[Dict[str, Any]],
         when = row.updated_at or row.created_at
         facts = [fact(s["capability_name"], source_kind="derived" if row.source_table else "manual", as_of=when,
                       subject="Capability")]
-        if row.strategic_importance:
+        derivation = s.get("strategic_derivation") if s.get("strategic_basis") == "derived" else None
+        if derivation:
+            # Nobody rated it, so the score is worked out from the facts below, and the footer says the rating is
+            # missing: that is what keeps its confidence below a recorded rating's.
+            facts.append(fact("Strategic importance: not recorded, so the score is worked out from the model",
+                              missing=True))
+            facts.extend(_derivation_facts(derivation, when))
+            facts.append(fact("Strategic score %d/25 worked out from %s" % (s["strategic_score"], derivation["basis"]),
+                              source_kind="derived", subject="Strategic score", as_of=when))
+        elif row.strategic_importance:
             facts.append(fact("Strategic importance: %s" % row.strategic_importance, source_kind="manual",
                               subject="Importance", as_of=when))
         else:
@@ -651,10 +728,12 @@ def plateau_footer(plateau, now: Optional[datetime] = None) -> Dict[str, Any]:
 
 
 def roadmap_summary_footer(organization_id: int, capability_count: int, domain_count: int,
-                           now: Optional[datetime] = None) -> Dict[str, Any]:
+                           plateau_count: Optional[int] = None, work_package_count: Optional[int] = None,
+                           gap_count: Optional[int] = None, now: Optional[datetime] = None) -> Dict[str, Any]:
     """Footer for the roadmap's headline counts. The capability and domain counts are the ones the cards show
     (passed in, so footer and card cannot disagree); gaps, plateaus and work packages are counted for this
-    organisation. Each is dated by the newest record behind it."""
+    organisation. Each is dated by the newest record behind it. When plateau_count or work_package_count are
+    passed in, they are used directly so the footer and the tiles cannot disagree (one count per figure)."""
     from app import db
     from app.models.implementation_migration import GAP_KIND_PLATEAU_TRANSITION, Gap, Plateau
     from app.services.gap_register_service import count_gaps
@@ -666,25 +745,72 @@ def roadmap_summary_footer(organization_id: int, capability_count: int, domain_c
                     href=page_link(endpoint) if count else None, source_kind="derived", subject=subject,
                     as_of=newest, missing=not count)
 
-    def counted(model, label, subject, endpoint):
-        count, newest = db.session.execute(
-            db.select(db.func.count(model.id), db.func.max(model.updated_at)).where(
-                model.organization_id == organization_id)).one()
+    def counted(model, label, subject, endpoint, count=None):
+        if count is None:
+            count, newest = db.session.execute(
+                db.select(db.func.count(model.id), db.func.max(model.updated_at)).where(
+                    model.organization_id == organization_id)).one()
+        else:
+            newest = db.session.execute(db.select(db.func.max(model.updated_at)).where(
+                model.organization_id == organization_id)).scalar()
         return named(label, count, subject, endpoint, newest)
 
     # Gaps are the register's count (plateau transitions left out), the figure the Recorded gaps card shows.
     gaps_newest = db.session.execute(db.select(db.func.max(Gap.updated_at)).where(
         Gap.organization_id == organization_id, Gap.gap_kind != GAP_KIND_PLATEAU_TRANSITION)).scalar()
-    gap_count_fact = named("Gaps", count_gaps(organization_id), "Gaps", "enterprise.gap_analysis", gaps_newest)
+    gap_count_fact = named("Gaps", count_gaps(organization_id) if gap_count is None else gap_count, "Gaps", "enterprise.gap_analysis", gaps_newest)
     capabilities_newest = db.session.execute(db.select(db.func.max(UnifiedCapability.updated_at))).scalar()
     domains_newest = db.session.execute(db.select(db.func.max(BusinessDomain.updated_at))).scalar()
     return build_footer([
         named("Capabilities", capability_count, "Capabilities", "capability_map.index", capabilities_newest),
         named("Domains", domain_count, "Domains", "capability_map.index", domains_newest),
         gap_count_fact,
-        counted(Plateau, "Plateaus", "Plateaus", "implementation_planning.plateaus_list"),
-        counted(UnifiedWorkPackage, "Work packages", "Work packages", "implementation_planning.work_packages_list"),
+        counted(Plateau, "Plateaus", "Plateaus", "implementation_planning.plateaus_list", count=plateau_count),
+        counted(UnifiedWorkPackage, "Work packages", "Work packages", "implementation_planning.work_packages_list",
+                count=work_package_count),
     ], now)
+
+
+def plateaus_for(organization_id: int):
+    """The one reader of an organisation's plateaus: a query the roadmap's list and its count both use."""
+    from app.models.implementation_migration import Plateau
+
+    return Plateau.query.filter(Plateau.organization_id == organization_id)
+
+
+def roadmap_figures(organization_id: int) -> Dict[str, Any]:
+    """Every figure the roadmap tiles and the evidence line under them show, counted once for this organisation.
+
+    The page and every answer the page redraws from return this one dictionary: the counts and the line's markup
+    built from those same counts, so a tile and the line cannot disagree."""
+    from app.models.unified_capability import UnifiedCapability
+    from app.modules.capabilities.services.capability_health_service import CapabilityHealthService
+    from app.services import work_package_service
+    from app.services.gap_register_service import count_gaps
+
+    capability_count = UnifiedCapability.query.count()
+    domain_count = len(CapabilityHealthService().get_capability_health_metrics()["health_by_domain"]) or None
+    plateau_count = plateaus_for(organization_id).count()
+    work_package_count = work_package_service.query_for(organization_id).count()
+    recorded_gaps = count_gaps(organization_id)
+    from app import db
+    from app.models.implementation_migration import GAP_KIND_PLATEAU_TRANSITION, Gap
+
+    ai_generated = db.session.execute(db.select(db.func.count(Gap.id)).where(
+        Gap.organization_id == organization_id, Gap.gap_kind != GAP_KIND_PLATEAU_TRANSITION,
+        Gap.auto_generated.is_(True))).scalar()
+    footer = roadmap_summary_footer(
+        organization_id, capability_count, domain_count,
+        plateau_count=plateau_count, work_package_count=work_package_count, gap_count=recorded_gaps)
+    return {
+        "capability_count": capability_count,
+        "domain_count": domain_count,
+        "plateau_count": plateau_count,
+        "work_package_count": work_package_count,
+        "recorded_gaps": recorded_gaps,
+        "ai_generated": ai_generated,
+        "footer_html": render_footer(footer),
+    }
 
 
 def connector_repository(element) -> Optional[Dict[str, Any]]:

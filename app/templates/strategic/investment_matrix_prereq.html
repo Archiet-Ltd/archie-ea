@@ -1,19 +1,8 @@
+{# design-block: dashboard #}
 {% extends "layouts/admin_base.html" %}
 {% from 'components/page_header.html' import page_header %}
 
-{% block title %}Investment Prioritization Matrix{% endblock %}
-
-{% block breadcrumb %}
-{% from 'components/breadcrumb_nav.html' import breadcrumb_nav %}
-{{ breadcrumb_nav(items=[
-    {'text': 'Home', 'href': url_for('main.index'), 'icon': 'home'},
-    {'text': 'Strategy Layer', 'href': url_for('archimate_crud.dashboard') + '#strategy'},
-    {'text': 'Strategic Planning', 'href': url_for('enterprise.strategic_planning_dashboard')},
-    {'text': 'Investment Matrix', 'current': true}
-]) }}
-{% endblock %}
-
-{% block content %}
+{% block title %}Investment Prioritization Matrix{% endblock %}{% block content %}
 <div class="space-y-6">
     {{ page_header(
         title='Investment Prioritization Matrix',

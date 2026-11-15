@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import logging
 
-from flask import g, jsonify, request
+from flask import abort, flash, g, jsonify, redirect, request, url_for
 from flask_login import current_user, login_required
 
 from app import db
@@ -23,7 +23,9 @@ from app.models.application_owner import ApplicationOwner
 from app.services.element_ownership_service import (
     CrossOrganisationElementOwner,
     DuplicateElementOwner,
+    owner_label,
     set_element_owner,
+    set_named_person_owner,
 )
 
 from . import unified_applications_bp
@@ -50,6 +52,9 @@ def add_owner(app_id: int):
     """Add an owner to an application (JSON only).
 
     Body: {"user_id": int, "ownership_type": "primary"|"backup"|"technical"|"business"}
+    or, for a person with no account in the workspace,
+    {"person_name": str, "person_email": str (optional), "person_role": str (optional),
+    "ownership_type": ...}, recorded on the same owner record.
     Refuses assignment of a user from another organisation.  Also refuses
     writing to an application that does not belong to the caller.
     """
@@ -72,6 +77,24 @@ def add_owner(app_id: int):
             "success": False,
             "error": f"ownership_type must be one of {ApplicationOwner.OWNERSHIP_TYPES}",
         }), 400
+
+    person_name = " ".join(str(data.get("person_name") or "").split())
+    if person_name and user_id is None:
+        try:
+            owner = set_named_person_owner(
+                app,
+                person_name,
+                ownership_type,
+                organization_id=org_id,
+                email=data.get("person_email"),
+                role=data.get("person_role"),
+                assigned_by=current_user.id,
+                replace=bool(data.get("replace")),
+            )
+        except ValueError as problem:
+            return jsonify({"success": False, "error": str(problem)}), 400
+        db.session.commit()
+        return jsonify({"success": True, "owner": owner.to_dict()}), 201
 
     try:
         owner = set_element_owner(
@@ -99,6 +122,64 @@ def add_owner(app_id: int):
         "success": True,
         "owner": owner.to_dict(),
     }), 201
+
+
+@unified_applications_bp.route("/<int:app_id>/owners/from-commits", methods=["POST"])
+@login_required
+@audit_log("application_owner_from_commits")
+def make_owner_from_commits(app_id: int):
+    """Make one of the people the recent commits point to the primary owner (form post).
+
+    Only a person the connector kept as a candidate for this application, and who is still a
+    user of the caller's organisation, can be chosen; anyone else answers 404 and writes nothing.
+    """
+    from app.connectors.github import commit_provenance
+    from app.connectors.github_gaps import _commit_hint, _fact
+    from app.core.auth.permissions import can
+    from app.models.archimate_core import ArchiMateElement
+    from app.modules.architecture_assistant.property_service import PropertyService
+    from app.services.element_ownership_service import DuplicateElementOwner
+
+    org_id = g.current_org_id
+    app = _verify_app_in_org(app_id, org_id)
+    if app is None:
+        abort(404)
+    if not can(current_user, "edit", "application"):
+        abort(403)
+    element = db.session.get(ArchiMateElement, app.archimate_element_id) if app.archimate_element_id else None
+    if element is None or element.organization_id != org_id:
+        abort(404)
+    current = ApplicationOwner.query.filter_by(
+        application_id=app_id, organization_id=org_id, ownership_type="primary").first()
+    if current is not None:
+        from app.models.user import User
+
+        holder = db.session.get(User, current.user_id)
+        who = owner_label(holder.first_name, holder.last_name, holder.email) if holder else "Someone"
+        flash("This application already has a primary owner, %s. Nothing was changed." % who, "info")
+        return redirect(url_for("unified_applications.application_detail", id=app_id) + "#ownership")
+    candidates = {c["user_id"]: c for c in _commit_hint(element, org_id).get("candidates") or []}
+    user_id = request.form.get("user_id", type=int)
+    if user_id not in candidates:
+        abort(404)
+    try:
+        set_element_owner(
+            element_type="application", element_id=app_id, user_id=user_id, organization_id=org_id,
+            ownership_type="primary", assigned_by=current_user.id, refuse_duplicate=True, commit=False,
+        )
+    except CrossOrganisationElementOwner:
+        abort(404)
+    except DuplicateElementOwner:
+        pass
+    summary = _fact(element, "github_commit_owners")
+    PropertyService().merge_element_properties(
+        element,
+        {"github_owner_source": {"user_id": user_id, "text": commit_provenance(summary, candidates[user_id])}},
+        source="github",
+    )
+    db.session.commit()
+    flash("%s is now the primary owner." % candidates[user_id]["name"], "success")
+    return redirect(url_for("unified_applications.application_detail", id=app_id) + "#ownership")
 
 
 @unified_applications_bp.route("/<int:app_id>/owners/<int:owner_id>", methods=["PUT"])

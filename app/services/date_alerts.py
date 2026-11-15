@@ -37,7 +37,8 @@ def _support_dates(rule: Dict[str, Any], organization_id: int, today: date) -> L
     )
     found: List[Dict[str, Any]] = []
     for row in applications:
-        recipients = sorted({owner["user_id"] for owner in owners.get(row.id, [])})
+        # A person recorded with no account has no user id and is never told.
+        recipients = sorted({owner["user_id"] for owner in owners.get(row.id, []) if owner["user_id"] is not None})
         if not recipients:
             continue
         found.extend(change_rules.alert_for(

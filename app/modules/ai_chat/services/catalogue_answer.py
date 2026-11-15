@@ -13,6 +13,7 @@ import logging
 from typing import Any, Dict, List, Optional, Set, Tuple
 
 from flask import url_for
+from flask_login import current_user
 
 from app.modules.intelligence.services.nl_query_interpreter import asks_for_superlative, interpret
 from app.modules.intelligence.services.query_catalogue import CATALOGUE, run_entry
@@ -27,7 +28,10 @@ NEXT_STEPS = {
     "applications_and_owners": "Add your applications to the portfolio, with an owner and an annual cost for each.",
     "duplicate_tooling_by_capability": "Map each application to the capabilities it covers.",
     "github_sourced_records": "Connect a GitHub repository so its records come into the model.",
+    "top_risks": "Record a risk in the risk register, with its likelihood and impact.",
     "risk_cost": "Open a risk in the register and enter the four Open FAIR factors to work out what it could cost each year.",
+    "capabilities_of_application": "Name an application in your model, or map capabilities to it on its Capabilities tab.",
+    "canvas_box_entries": "Open your canvas and add the first entry to that box.",
     "what_breaks_if_fails": "Name a service that is in your model, or draw how your systems depend on each other.",
 }
 
@@ -70,32 +74,89 @@ def _page_for(citation: Dict[str, Any]) -> Optional[str]:
         return None
     if citation.get("type") == "application":
         return url_for("unified_applications.application_detail", id=ident)
+    if citation.get("type") == "capability":
+        return url_for("enterprise_crud.capability_fact_sheet", capability_id=ident)
     if citation.get("type") == "risk":
         return url_for("risk.risk_page", risk_id=ident)
+    if citation.get("type") == "canvas":
+        return url_for("business_model.detail", canvas_id=ident)
     if citation.get("type") == "element":
         return url_for("archimate.element_impact_graph_page", element_id=ident)
     return None
 
 
-def answer_catalogue_question(message: str, organization_id: int) -> Optional[Dict[str, Any]]:
+def _cost_shown(organization_id: int) -> Tuple[bool, str]:
+    """Whether the signed-in person may read annual cost (the one rule the spend pages and the
+    Overview follow), and the currency the organisation reports it in."""
+    from app.decorators.requires_role import may_see_spend_pages
+
+    if not may_see_spend_pages(current_user):
+        return False, ""
+    from app.services.application_cost_accessor import get_reporting_currency
+
+    return True, get_reporting_currency(organization_id)
+
+
+def _inventory_detail(row: Dict[str, Any], show_cost: bool, currency: str) -> str:
+    """The owner (and, for a person allowed to read cost, the annual cost) beside one application:
+    exactly the columns the sentence above the list names."""
+    detail = "Owner: %s" % (row.get("owner") or "not recorded")
+    if show_cost:
+        cost = row.get("annual_cost")
+        detail += " · Annual cost: %s" % ("%s %s" % (currency, format(float(cost), ",.0f")) if cost is not None else "not recorded")
+    return detail
+
+
+def _inventory_sentence(result: Dict[str, Any], show_cost: bool) -> str:
+    """One sentence for the application list: how many are in use, what it leaves out and what
+    each entry shows. It names a column only when the list below carries it."""
+    total = result.get("total") or 0
+    left_out = result.get("decommissioned_left_out") or 0
+    sentence = "%d application%s in use" % (total, "" if total == 1 else "s")
+    if left_out:
+        sentence += "; %d decommissioned not counted" % left_out
+    sentence += ". Each is listed with its accountable owner%s." % (" and annual cost" if show_cost else "")
+    return sentence
+
+
+def answer_catalogue_question(message: str, organization_id: int, time_limit: Optional[float] = None) -> Optional[Dict[str, Any]]:
     """The catalogue's answer to *message* with each citation as a page link, or
     ``None`` when the question is not one the catalogue answers."""
-    interpretation = interpret(message)
+    interpretation = interpret(message, organization_id, time_limit=time_limit)
     if not _keep(message, interpretation):
         return None
     entry_id = interpretation["entry_id"]
-    result = run_entry(entry_id, organization_id, **interpretation["params"])
-    seen: Set[Tuple[Any, Any]] = set()
+    params = dict(interpretation["params"])
+    if entry_id == "canvas_box_entries":
+        params["show_costs"] = _cost_shown(organization_id)[0]
+    result = run_entry(entry_id, organization_id, **params)
+    seen: Set[Tuple[Any, Any, Any]] = set()
     records: List[Dict[str, Any]] = []
-    rows_by_id = {row.get("id"): row for row in result.get("rows") or [] if isinstance(row, dict)}
+    show_cost, currency = False, ""
+    if entry_id == "applications_and_owners":
+        show_cost, currency = _cost_shown(organization_id)
+    # A row is found by its kind and id (an element and an application can share a number) and, where one
+    # record has several rows, by the source line as well.
+    rows_by_key: Dict[Tuple[Any, Any, Any], Dict[str, Any]] = {}
+    for row in result.get("rows") or []:
+        if isinstance(row, dict):
+            rows_by_key.setdefault((row.get("kind"), row.get("id"), row.get("source_line")), row)
+            rows_by_key.setdefault((row.get("kind"), row.get("id"), None), row)
     for citation in result.get("citations") or []:
         page = _page_for(citation)
-        key = (citation.get("type"), citation.get("id"))
+        # One application can sit on a canvas twice (its own cost and its technology share): both are kept.
+        several = entry_id == "canvas_box_entries" and citation.get("type") == "application"
+        key = (citation.get("type"), citation.get("id"), citation.get("source_line") if several else None)
         if page is None or key in seen:
             continue
         seen.add(key)
         record = {"name": citation.get("name") or "Unnamed record", "kind": citation["type"], "url": page}
-        row = rows_by_id.get(citation.get("id")) or {}
+        row = {} if citation["type"] == "canvas" else (
+            rows_by_key.get((citation["type"], citation.get("id"), citation.get("source_line")))
+            or rows_by_key.get((citation["type"], citation.get("id"), None))
+            or rows_by_key.get((None, citation.get("id"), None))
+            or {}
+        )
         count = row.get("depends_on_count")
         if count:
             record["dependents"] = "%d %s" % (count, "thing depends on it" if count == 1 else "things depend on it")
@@ -103,6 +164,8 @@ def answer_catalogue_question(message: str, organization_id: int) -> Optional[Di
             record["source_line"] = row["source_line"]
         elif citation.get("source_line"):
             record["source_line"] = citation["source_line"]
+        if entry_id == "applications_and_owners" and citation["type"] == "application":
+            record["detail"] = _inventory_detail(row, show_cost, currency)
         if citation["type"] == "page":
             record["external"] = True
         records.append(record)
@@ -119,14 +182,17 @@ def answer_catalogue_question(message: str, organization_id: int) -> Optional[Di
     return {
         "entry_id": entry_id,
         "title": result.get("title") or CATALOGUE[entry_id].title,
-        "summary": result.get("answer"),
+        "summary": " ".join(part for part in (result.get("answer"), result.get("note")) if part) or None,
+        "sentence": _inventory_sentence(result, show_cost) if entry_id == "applications_and_owners" and records else None,
         "total": result.get("total"),
         "reason": result.get("reason"),
         # A finding of "none" (every application is owned) needs no next step.
         "complete": complete,
+        # The person's role withholds the cost lines: the records are not at fault, the reason says so.
+        "costs_withheld": bool(result.get("costs_withheld")) and not records,
         # A name that matched nothing recorded: the records are not at fault.
         "unmatched": result.get("matched") is False,
-        "next_step": (result.get("next_step") or NEXT_STEPS.get(entry_id)) if not records and not complete else None,
+        "next_step": (result.get("next_step") or NEXT_STEPS.get(entry_id)) if not records and not complete and not result.get("costs_withheld") else None,
         "next_url": result.get("next_url") if not records else None,
         "next_label": result.get("next_label") if not records else None,
         "named_not_found": named_not_found,

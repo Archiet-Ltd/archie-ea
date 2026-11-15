@@ -44,6 +44,16 @@ MCP_TESTS = (
     "tests/test_mcp_signin_next_through_sso.py::test_an_administrator_keeps_next_through_the_two_factor_step",
     "tests/test_two_factor_requirement_assistant_authorise.py::test_an_administrator_is_sent_to_set_up_and_told_why_but_a_member_gets_the_page",
     "tests/test_two_factor_requirement_assistant_authorise.py::test_an_administrator_of_an_organisation_that_requires_nothing_keeps_the_week",
+    "tests/test_origin_request.py::test_metadata_on_entelim_tech_names_entelim_tech",
+    "tests/test_origin_request.py::test_metadata_on_entelim_org_names_entelim_org",
+    "tests/test_origin_request.py::test_metadata_on_forged_host_names_canonical",
+    "tests/test_origin_request.py::test_metadata_on_server_ip_names_canonical",
+    "tests/test_origin_request.py::test_the_token_endpoint_accepts_only_listed_addresses_as_the_resource",
+    "tests/test_origin_request.py::test_a_token_for_an_unlisted_address_does_not_open_the_connector",
+    "tests/test_viewer_cannot_write_anywhere.py::test_viewer_can_access_mcp_connector_endpoint",
+    "tests/test_viewer_cannot_write_anywhere.py::test_viewer_can_access_connected_assistants_page",
+    "tests/test_viewer_cannot_write_anywhere.py::test_the_connector_reads_for_every_role_and_hides_every_write_tool",
+    "tests/test_viewer_cannot_write_anywhere.py::test_the_allow_list_names_a_real_route_and_a_true_reason_for_every_entry",
 )
 MARKER = "mcp"
 

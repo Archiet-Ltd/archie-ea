@@ -148,6 +148,7 @@ def application_list():
         owner_names_by_app={},
         footers_by_app={},
         repository_ids=set(),
+        imported_gaps={},
         sort="",
         dir="asc",
         load_error="The application portfolio could not be read.",
@@ -438,6 +439,9 @@ def application_list():
         from app.connectors.github import unpromoted_import_ids
 
         repository_ids = unpromoted_import_ids(g.current_org_id, application_ids)
+        from app.connectors.github_gaps import application_gaps
+
+        imported_gaps = application_gaps(g.current_org_id, pagination.items, skip_ids=repository_ids)
         owner_names_by_app = {}
         for listed in pagination.items:
             if listed.id not in owned_ids:
@@ -617,9 +621,13 @@ def application_list():
             current_app.logger.warning("Run cost could not be read for the applications list", exc_info=True)
             db.session.rollback()
 
+        from app.services.cost_visibility import COSTS_WITHHELD, costs_visible
+
         return render_template(
             "applications/list_simple.html",
             run_cost=run_cost,
+            costs_withheld=not costs_visible(_viewer),
+            costs_withheld_sentence=COSTS_WITHHELD,
             applications=pagination.items,
             chip_remove_urls=chip_remove_urls,
             total_count=total_count,
@@ -659,6 +667,7 @@ def application_list():
             owner_names_by_app=owner_names_by_app,
             footers_by_app=footers_by_app,
             repository_ids=repository_ids,
+            imported_gaps=imported_gaps,
         )
 
     except Exception as exc:

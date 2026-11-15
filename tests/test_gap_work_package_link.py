@@ -264,11 +264,23 @@ def test_work_package_detail_shows_a_dash_for_what_is_missing(db_session, world,
     import re
 
     cell = lambda tid: re.sub(r"\s+", " ", re.search(  # noqa: E731
-        r'data-testid="%s"[^>]*>(.*?)</dd>' % tid, html, re.S).group(1)).strip()
+        r'data-testid="%s"[^>]*>(.*?)</div>\s*</dd>' % tid, html, re.S).group(1)).strip()
     assert cell("wp-progress") == "—"
     # a missing owner is said in words with the way to name one, never a dash
     assert "No owner yet" in cell("wp-owner") and 'data-testid="wp-assign-owner"' in cell("wp-owner")
     assert 'data-testid="wp-no-gaps"' in html
+
+
+def test_work_package_facts_come_from_the_one_fact_list(db_session, world, client, login_as):
+    a = world["a"]
+    wp = _wp(db_session, a, "Fact list package")
+    db_session.commit()
+    login_as(client, world["editor_a"])
+    html = client.get(f"/implementation/work-packages/{wp.id}").get_data(as_text=True)
+    assert 'data-component="fact-list"' in html and 'data-testid="wp-facts"' in html
+    for key in ("capability", "status", "owner", "progress", "dates"):
+        assert 'data-testid="property-%s"' % key in html
+    assert html.count("<dl") == 1
 
 
 def test_a_viewer_sees_the_detail_without_the_link_control(db_session, world, client, login_as):

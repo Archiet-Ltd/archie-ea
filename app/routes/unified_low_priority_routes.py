@@ -24,6 +24,7 @@ from flask import (
 from flask_login import current_user, login_required
 
 from app.decorators import audit_log, require_roles, user_has_any_role
+from app.services.cost_visibility import PIPELINE_FIGURE_KEYS
 from app.modules.genome.services.roadmap_links import redirect_to_roadmap
 from sqlalchemy import or_, text
 
@@ -128,7 +129,13 @@ def architecture_relationships():
     template.
     """
     try:
+        from app.middleware.tenant_context import current_org_id
+        from app.modules.intelligence.services.query_service import filter_relationships_by_org
+
+        org_id = current_org_id()
         rels = ArchiMateRelationship.query.order_by(ArchiMateRelationship.type).all()
+        rels = filter_relationships_by_org(rels, org_id, direction="both")
+
         element_ids = {
             eid for rel in rels for eid in (rel.source_id, rel.target_id) if eid is not None
         }
@@ -367,11 +374,19 @@ def strategic_initiatives():
             else []
         )
 
+        from app.services.cost_visibility import COSTS_WITHHELD, costs_visible, withhold_costs
+
+        withheld = not costs_visible(current_user)
+        if withheld:
+            initiatives_list = withhold_costs(
+                initiatives_list)
         return render_template(
             "strategic/initiatives.html",
             initiatives=initiatives_list,
             health_scores=health_scores_list,
             status_filter=status_filter,
+            costs_withheld=withheld,
+            costs_withheld_sentence=COSTS_WITHHELD,
         )
     except Exception as e:
         db.session.rollback()
@@ -394,8 +409,11 @@ def strategic_initiatives():
 def consolidation_dashboard():
     """Application consolidation dashboard - renders existing consolidation list dashboard"""
     try:
+        from app.services.cost_visibility import COSTS_WITHHELD, costs_visible
+
         dashboard_data = consolidation_service.get_consolidation_dashboard_data()
         statistics = consolidation_service.get_consolidation_statistics()
+        withheld = not costs_visible(current_user)
 
         if dashboard_data.get("success"):
             data = dashboard_data["data"]
@@ -408,6 +426,7 @@ def consolidation_dashboard():
                 if statistics.get("success")
                 else {},
                 savings_forecast=data.get("savings_forecast", {}),
+                costs_withheld=withheld, costs_withheld_sentence=COSTS_WITHHELD,
             )
         else:
             return render_template(
@@ -415,6 +434,7 @@ def consolidation_dashboard():
                 total_applications=ApplicationComponent.query.count(),
                 duplicate_candidates=[],
                 consolidation_opportunities=[],
+                costs_withheld=withheld, costs_withheld_sentence=COSTS_WITHHELD,
             )
     except Exception as e:
         current_app.logger.error(f"Consolidation dashboard error: {str(e)}")
@@ -761,8 +781,10 @@ def api_detect_duplicates():
 def api_consolidation_statistics():
     """API endpoint for consolidation statistics"""
     try:
+        from app.services.cost_visibility import withhold_reply
+
         result = consolidation_service.get_consolidation_statistics()
-        return jsonify(result)
+        return jsonify(withhold_reply(result, keys=PIPELINE_FIGURE_KEYS))
     except Exception as e:
         current_app.logger.error(f"API consolidation statistics error: {str(e)}")
         return jsonify({"success": False, "error": "An internal error occurred"}), 500
@@ -791,22 +813,6 @@ def api_scan_compliance():
             return jsonify(result)
     except Exception as e:
         current_app.logger.error(f"API scan compliance error: {str(e)}")
-        return jsonify({"success": False, "error": "An internal error occurred"}), 500
-
-
-@unified_low_priority_bp.route("/api/policy-monitoring/violations", methods=["GET"])
-@login_required
-def api_get_violations():
-    """API endpoint for policy violations"""
-    try:
-        status_filter = request.args.get("status")
-        severity_filter = request.args.get("severity")
-        result = policy_monitoring_service.get_violations(
-            status_filter=status_filter, severity_filter=severity_filter
-        )
-        return jsonify(result)
-    except Exception as e:
-        current_app.logger.error(f"API get violations error: {str(e)}")
         return jsonify({"success": False, "error": "An internal error occurred"}), 500
 
 
