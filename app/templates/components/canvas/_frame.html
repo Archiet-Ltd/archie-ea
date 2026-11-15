@@ -108,7 +108,9 @@
 {%- endmacro %}
 
 {#- The notes of one box (or sub-area): one note card per entry, or the empty state when there is none.
-    empty says what is missing and what to do; an editable box also offers its add dialog. -#}
+    empty says what is missing and what to do; an editable box also offers its add dialog.
+    data-canvas-empty marks a box with nothing to show; data-canvas-withheld marks a box whose costs are hidden for this role
+    (it carries both, so select withheld to tell the two apart). -#}
 {% macro notes(canvas_id, key, items, title, element='Note', canvas_name='', empty='', add=false, tight=false) -%}
 {% if items %}
 <ul class="flex flex-col gap-2" data-canvas-notes="{{ key }}" data-title="{{ title }}" aria-label="{{ title }} notes">
@@ -192,7 +194,7 @@
   {%- set withheld = boxes.get(b.key ~ ':withheld') -%}
   {{ band(canvas_id, b, m, boxes.get(b.key) or [], add=add, compact=scroll, count=not withheld, suggest=add and boxes.get(b.key ~ ':suggest')) }}
   {% call ui.card_content(class='flex min-h-0 flex-1 flex-col gap-3 py-3' ~ (' overflow-y-auto' if scroll else '')) %}
-    {% if withheld %}<p class="text-sm text-foreground/70" data-canvas-withheld="{{ b.key }}">{{ withheld }}</p>
+    {% if withheld %}<p class="text-sm text-foreground/70" data-canvas-withheld="{{ b.key }}" data-canvas-empty="{{ b.key }}">{{ withheld }}</p>
     {% else %}
     {{ notes(canvas_id, b.key, boxes.get(b.key) or [], b.title, m.element, canvas_name, empty_text(b), add, scroll) }}
     {% endif %}
