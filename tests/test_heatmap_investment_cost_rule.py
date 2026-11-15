@@ -42,7 +42,7 @@ def test_the_reply_holds_no_investment_for_the_architect_and_says_why(client, lo
     reply = client.get(API)
     assert reply.status_code == 200, reply.get_data(as_text=True)[:300]
     data = reply.get_json()["data"]
-    assert data["costs_withheld"] == SENTENCE
+    assert data["costs_withheld"] is True and data["costs_withheld_sentence"] == SENTENCE
     assert "investment_summary" not in data
     assert not any("total_investment" in d for d in data.get("domains", []))
 
@@ -73,4 +73,4 @@ def test_the_page_offers_the_chief_technology_officer_the_investment_view(client
 def test_an_architect_of_another_organisation_is_withheld_from_too(client, login_as, world):
     login_as(client, world["other_architect"])
     data = client.get(API).get_json()["data"]
-    assert data["costs_withheld"] == SENTENCE and "investment_summary" not in data
+    assert data["costs_withheld"] is True and data["costs_withheld_sentence"] == SENTENCE and "investment_summary" not in data
