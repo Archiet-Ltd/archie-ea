@@ -31,6 +31,8 @@ NEXT_STEPS = {
     "top_risks": "Record a risk in the risk register, with its likelihood and impact.",
     "risk_cost": "Open a risk in the register and enter the four Open FAIR factors to work out what it could cost each year.",
     "capabilities_of_application": "Name an application in your model, or map capabilities to it on its Capabilities tab.",
+    "unsupported_capabilities": "Record which application supports a capability on its Capabilities tab, or with Add relationship on an element page.",
+    "applications_of_capability": "Name a capability that is in your model, or record support on an application's Capabilities tab.",
     "canvas_box_entries": "Open your canvas and add the first entry to that box.",
     "what_breaks_if_fails": "Name a service that is in your model, or draw how your systems depend on each other.",
 }

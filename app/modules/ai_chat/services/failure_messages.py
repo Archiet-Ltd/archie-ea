@@ -10,6 +10,13 @@ ASSISTANT_UNAVAILABLE = (
     "Your question is saved; try again in a moment."
 )
 
+# The sentence a person reads when the AI provider reports that the account's
+# credit balance has run out. Retrying cannot fix it, so it names who can.
+AI_CREDIT_EXHAUSTED = (
+    "The AI service's credit has run out. "
+    "Your organisation administrator (or Entelim support for the platform's key) can restore it."
+)
+
 # Why a turn could not be answered, in the words a person reads. The server sends the code
 # (``reason_code``) with a failed turn; the chat page is given this table once and shows the
 # sentence for the code, so a reason has one wording on every path. Each sentence says what to do next.
@@ -22,11 +29,13 @@ FAILURE_REASONS = {
     "signed_out": "You are signed out. Sign in again, then ask again.",
     "role_not_allowed": "Your role does not allow this. Ask your administrator for access.",
     "too_large": "The request was too large. Shorten your question, then press Retry.",
+    "credit_exhausted": AI_CREDIT_EXHAUSTED,
+    "rate_limited": "The AI service is busy right now (rate limit reached). Wait a moment, then press Retry.",
     "unknown": ASSISTANT_UNAVAILABLE,
 }
 
 # Reasons where asking again cannot help until the person or an administrator acts.
-FAILURE_REASONS_WITHOUT_RETRY = ("role_not_allowed",)
+FAILURE_REASONS_WITHOUT_RETRY = ("role_not_allowed", "credit_exhausted")
 
 # Sentences earlier turns saved into a conversation as the assistant's reply. A chat opened again
 # recognises a saved reply that is one of these (or one of FAILURE_REASONS) as a failed turn.

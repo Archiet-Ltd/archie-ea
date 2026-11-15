@@ -576,6 +576,8 @@
                     errorTitle = 'Timeout Error';
                 } else if (data.error_type === 'rate_limit') {
                     errorTitle = 'Rate Limit';
+                } else if (data.error_type === 'credit_exhausted') {
+                    errorTitle = 'Credit Exhausted';
                 } else if (data.error_type === 'model_error') {
                     errorTitle = 'Model Error';
                 } else if (!response.ok) {

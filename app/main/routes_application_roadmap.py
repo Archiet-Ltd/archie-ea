@@ -311,7 +311,9 @@ def update_application_work_package(id, wp_id):
     try:
         data = request.get_json()
 
-        work_package = WorkPackage.query.get_or_404(wp_id)
+        work_package = WorkPackage.query.get(wp_id)
+        if work_package is None:
+            return jsonify({"error": "Work package not found"}), 404
 
         # Verify this work package belongs to the specified application
         if work_package.application_component_id != id:
@@ -427,7 +429,9 @@ def delete_application_work_package(id, wp_id):
     if not can(current_user, "delete", "work_package"):
         return jsonify({"success": False, "error": "Your role may read the roadmap but not change it."}), 403
     try:
-        work_package = WorkPackage.query.get_or_404(wp_id)
+        work_package = WorkPackage.query.get(wp_id)
+        if work_package is None:
+            return jsonify({"error": "Work package not found"}), 404
 
         # Verify this work package belongs to the specified application
         if work_package.application_component_id != id:

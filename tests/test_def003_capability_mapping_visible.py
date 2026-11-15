@@ -106,10 +106,6 @@ def test_mapping_created_only_in_unified_store_is_visible_on_detail_page(
     render in the 'Mapped Capabilities' table."""
     from app.models.application_portfolio import ApplicationComponent
     from app.models.business_capability import BusinessCapability
-    from app.models.unified_application_capability_mapping import (
-        UnifiedApplicationCapabilityMapping,
-    )
-
     user_id, org = _make_user(db_session, make_org, "visible")
 
     app_obj = ApplicationComponent(
@@ -131,15 +127,14 @@ def test_mapping_created_only_in_unified_store_is_visible_on_detail_page(
         db_session, business_cap, org, category="Test Category"
     )
 
-    mapping = UnifiedApplicationCapabilityMapping(
-        unified_capability_id=unified_capability_id,
-        application_component_id=app_obj.id,
-        support_level="primary",
-        coverage_percentage=75,
-        maturity_level=3,
-        is_strategic=True,
+    from app.models.unified_capability import UnifiedCapability
+    from app.services.capability_support import record_capability_support
+
+    record_capability_support(
+        org.id, app_obj.archimate_element_id,
+        db_session.get(UnifiedCapability, unified_capability_id).archimate_element_id,
+        facts={"support_level": "primary", "coverage_percentage": 75, "maturity_level": 3, "is_strategic": True},
     )
-    db_session.add(mapping)
     db_session.commit()
 
     client = app.test_client()
@@ -161,10 +156,6 @@ def test_legacy_and_unified_mappings_for_the_same_capability_do_not_duplicate(
     from app.models.application_capability import ApplicationCapabilityMapping
     from app.models.application_portfolio import ApplicationComponent
     from app.models.business_capability import BusinessCapability
-    from app.models.unified_application_capability_mapping import (
-        UnifiedApplicationCapabilityMapping,
-    )
-
     user_id, org = _make_user(db_session, make_org, "dedup")
 
     app_obj = ApplicationComponent(
@@ -192,12 +183,15 @@ def test_legacy_and_unified_mappings_for_the_same_capability_do_not_duplicate(
 
     unified_capability_id = _unified_capability_id(db_session, business_cap, org)
 
-    unified_mapping = UnifiedApplicationCapabilityMapping(
-        unified_capability_id=unified_capability_id,
-        application_component_id=app_obj.id,
-        support_level="primary",
+    from app.models.unified_capability import UnifiedCapability
+    from app.services.capability_support import record_capability_support
+
+    db_session.flush()
+    record_capability_support(
+        org.id, app_obj.archimate_element_id,
+        db_session.get(UnifiedCapability, unified_capability_id).archimate_element_id,
+        facts={"support_level": "primary"},
     )
-    db_session.add(unified_mapping)
     db_session.commit()
 
     client = app.test_client()
@@ -218,4 +212,6 @@ def test_legacy_and_unified_mappings_for_the_same_capability_do_not_duplicate(
     # exactly once, not once per underlying store.
     heading_idx = html.index("Mapped Capabilities", stat_idx)
     table_html = html[heading_idx:heading_idx + 4000]
-    assert table_html.count("Dually-Mapped Test Capability") == 1, table_html
+    # (The name also sits once in the remove button's confirmation, so count the rows themselves.)
+    assert table_html.count('data-testid="mapped-capability-row"') == 1, table_html
+    assert "Dually-Mapped Test Capability" in table_html

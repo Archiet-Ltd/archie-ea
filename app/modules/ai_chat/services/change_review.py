@@ -26,6 +26,7 @@ from __future__ import annotations
 import json
 import logging
 import re
+import time
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional, Tuple
@@ -521,6 +522,30 @@ def _target_link_capability_to_solution(args: Dict[str, Any], org_id: int) -> Ta
     return target
 
 
+def _target_link_application_to_capability(args: Dict[str, Any], org_id: int) -> Target:
+    from app.services import capability_support as support
+
+    try:
+        application, capability = support.resolve_support_ends(
+            org_id, _clean_name(args, "application_name"), _clean_name(args, "capability_name"))
+        kind = {"realizes": "realization", "serves": "serving"}.get(args.get("how") or "realizes", "realization")
+        from app.services.archimate_validity_service import ArchimateValidityService
+
+        if not ArchimateValidityService().is_valid(application.type or "", capability.type or "", kind):
+            return Target(False, "ArchiMate does not allow %s from %s to %s." % (
+                support.KIND_WORDS[kind], application.name, capability.name))
+        level = support.normalise_level(args.get("support_level") or args.get("coverage_level"))
+    except support.CapabilitySupportRefused as refusal:
+        return Target(False, str(refusal))
+    target = Target(True, label="%s and %s" % (application.name, capability.name), creates=True,
+                    before={"kind": "create", "note": "Nothing existed before; undoing it removes the new link."},
+                    facts={"application": application.name, "capability": capability.name,
+                           "how": support.KIND_WORDS[kind], "support_level": level or "linked"})
+    if support._support_relationships(org_id, application.id, capability.id):
+        target.value_reason = "'%s' is already recorded as supporting '%s'." % (application.name, capability.name)
+    return target
+
+
 def _target_record_capability_maturity(args: Dict[str, Any], org_id: int) -> Target:
     from app.models.business_capabilities import BusinessCapability
 
@@ -570,6 +595,7 @@ _TOOL_TARGETS = {
     "create_archimate_element": _target_create_archimate_element,
     "create_archimate_relationship": _target_create_archimate_relationship,
     "create_solution": _target_create_solution,
+    "link_application_to_capability": _target_link_application_to_capability,
     "link_capability_to_solution": _target_link_capability_to_solution,
     "record_capability_maturity": _target_record_capability_maturity,
     "score_rationalization": _target_score_rationalization,
@@ -902,6 +928,7 @@ def _state(approval: AIChatCRUDApproval) -> Dict[str, Any]:
         "outcome": state.get("outcome"),
         "outcome_reasons": list(state.get("outcome_reasons") or []),
         "waiting_reason": state.get("waiting_reason"),
+        "timings": dict(state.get("timings") or {}),
     }
 
 
@@ -1077,6 +1104,11 @@ def _wait(service, approval: AIChatCRUDApproval, state: Dict[str, Any], why: str
 # --------------------------------------------------------------------------- #
 
 
+def _time_step(state: Dict[str, Any], step: str, started: float) -> None:
+    """Note how long one step took, in seconds, so a slow step shows on the record."""
+    state.setdefault("timings", {})[step] = round(time.monotonic() - started, 2)
+
+
 def settle(
     service, approval: AIChatCRUDApproval, requester, budget: Optional[ReviewBudget] = None,
     approved_by: Optional[int] = None, approver_service=None,
@@ -1106,7 +1138,9 @@ def settle(
         _event(service, approval, "resumed", "Changes by the assistant resumed for this workspace; the change goes on.")
 
     # 2. Deterministic checks. A failed one declines the change with its reason; no model is called.
+    started = time.monotonic()
     checks, target = run_checks(service, approval, requester)
+    _time_step(state, "checks", started)
     state["checks"] = [c.to_dict() for c in checks]
     if not state["rounds"]:
         _event(service, approval, "checked", "; ".join(
@@ -1157,7 +1191,9 @@ def settle(
             if held is not None:
                 return held
             number = len(state["rounds"]) + 1
+            started = time.monotonic()
             reply = _ask(router, choice, build_review_prompt(approval, payload, target, checks, state["rounds"]), budget)
+            _time_step(state, "review %d" % number, started)
             results = parse_review(reply)
             passed = all(r["passed"] for r in results)
             state["rounds"].append({"round": number, "passed": passed, "criteria": results,
@@ -1221,7 +1257,9 @@ def _apply(
     service, approval: AIChatCRUDApproval, state: Dict[str, Any], approved_by: Optional[int] = None
 ) -> Dict[str, Any]:
     approval_id, org_id = approval.id, approval.organization_id
+    started = time.monotonic()
     result = service.approve_and_execute(approval_id, settled_by_review=True, approved_by=approved_by)
+    _time_step(state, "apply", started)
     db.session.expire_all()
     approval = AIChatCRUDApproval.query.filter_by(id=approval_id, organization_id=org_id).first()
     if result.get("success"):

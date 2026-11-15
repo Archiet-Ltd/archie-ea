@@ -1308,6 +1308,24 @@ entries:
       Searched before writing: joint, d3, mermaid, plantuml, cytoscape, dagre, bpmn, UMLModel, SavedDiagram across
       app/. dagre is a layout helper that composer.js and erd.js already use and is not a drawing library.
 
+  - id: layer-counts
+    concept: How many elements each ArchiMate layer holds (the architecture dashboard's tabs and the Composer's layer cards)
+    status: active
+    canonical:
+      path: app/services/archimate_viewpoint_service.py
+      symbols: [count_layers, layer_model_query, layer_criterion, element_layer, LAYER_TYPES]
+    reuse: >
+      count_layers is the one count of every layer, element_layer the one rule and layer_model_query the one
+      reader of a layer's elements: an element counts in the layer it is stored in, whatever its type (Physical
+      is Technology's); one that names no layer is placed by its type through LAYER_TYPES, and a type no layer
+      holds is the composite row. The dashboard's tab counts, its layer lists, the Composer's layer cards and
+      the model map all read them. Do not count a layer with a second query or a second type map, and do not
+      take a tab's count from the list that opens under it.
+    note: >
+      One layer set for the dashboard tabs, the Composer cards and the model map: Strategy, Motivation, Business,
+      Application, Technology (Physical's four types are inside it), Implementation and migration, and the composite
+      row (Other on the map). The model map (app/services/model_map.py) reads count_layers and layer_model_query.
+
   - id: application-model-links
     concept: What the architecture model links to an application (technology, suppliers, every other element), and the
       type spelling those links are read by
@@ -1377,6 +1395,61 @@ entries:
       of the applications that support the capability, then its links to goals, drivers, outcomes or principles,
       then the value streams it serves, then its open risks, and the footer says it was derived. Read the score
       from the service result; do not write a second derivation or a stand-in score for an unrated capability.
+  - id: capability-support
+    concept: An application supporting a capability (the one relationship, its projected facts and the readers of both)
+    status: active
+    canonical:
+      path: app/services/capability_support.py
+      symbols: [record_capability_support, update_support_facts, remove_capability_support, support_rows, capabilities_of_application, applications_of_capability, unsupported_capabilities, support_summary, resolve_support_ends]
+    reuse: >
+      Support is one Realization or Serving relationship from the application's element to the capability's
+      element. Record, change or remove it with record_capability_support, update_support_facts and
+      remove_capability_support; read it with support_rows, capabilities_of_application,
+      applications_of_capability, unsupported_capabilities and support_summary. The projected row is made by the
+      projector inside the module, never by hand. Do not construct a mapping row, a coverage row or a
+      capability-application row anywhere else, and do not write a second reader.
+    must_not_create:
+      - id: unified-mapping-row
+        regex: 'UnifiedApplicationCapabilityMapping\('
+      - id: legacy-mapping-row
+        regex: '\bApplicationCapabilityMapping\('
+      - id: coverage-row
+        regex: '\bApplicationCapabilityCoverage\('
+      - id: capability-application-row
+        regex: '\bUnifiedCapabilityApplicationMapping\('
+    known_exceptions:
+      - path: app/models/unified_application_capability_mapping.py
+        reason: the model's own definition
+      - path: app/models/application_capability.py
+        reason: the model's own definition
+      - path: app/models/business_capabilities.py
+        reason: the coverage model's own definition
+      - path: app/models/capability_to_vendor_mapping.py
+        reason: the capability-application model's own definition
+
+  - id: finance-fact
+    concept: An organisation's cash, monthly outgoings, monthly revenue, funding and paying customers, as dated facts with their source
+    status: active
+    canonical:
+      path: app/services/finance_fact_store.py
+      symbols: [record_fact, supersede_fact, latest, series, derived_figures]
+    reuse: >
+      finance_facts holds the facts and finance_fact_store is the one writer and the one reader. A correction is a
+      new row that replaces the old one; no row is edited. Burn and months of cash are worked out by derived_figures
+      from the latest facts and are never stored. Running cost per application, technology or supplier stays in
+      cost_facts; do not put cash or revenue there, and do not add a runway, burn or revenue column to a model.
+    must_not_create:
+      - id: finance-fact-built-outside-the-store
+        regex: 'FinanceFact\('
+        scope: [app]
+        suffixes: [.py]
+      - id: stored-runway-or-burn-column
+        regex: '^\s*(runway|burn|months_of_cash)\w*\s*=\s*(db\.)?Column\('
+        scope: [app/models]
+        suffixes: [.py]
+    known_exceptions:
+      - path: app/models/finance_fact.py
+        reason: defines the model
 
   - id: canvas-store
     concept: What a framework canvas (Business Model Canvas, Lean Canvas and the rest) shows in each box, and the one writer of a box entry

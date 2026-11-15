@@ -15,8 +15,6 @@ from __future__ import annotations
 
 from typing import Any, Dict, List
 
-from app import db
-
 _COMPLETENESS_FIELDS = [
     ("description", "Description", 1),
     ("business_domain", "Business domain", 2),
@@ -78,25 +76,21 @@ def _maturity(cap: Any) -> Dict[str, Any]:
             "assessed": getattr(cap, "maturity_assessment_date", None)}
 
 
-def _realizing_apps(cap_id: int) -> List[Dict[str, Any]]:
-    """Applications that realise / cover this capability."""
-    from app.models.business_capabilities import (  # noqa: PLC0415
-        ApplicationCapabilityCoverage,
-    )
-    from app.models.application_portfolio import ApplicationComponent  # noqa: PLC0415
-    rows = (db.session.query(ApplicationCapabilityCoverage, ApplicationComponent)
-            .join(ApplicationComponent,
-                  ApplicationCapabilityCoverage.application_component_id == ApplicationComponent.id)
-            .filter(ApplicationCapabilityCoverage.capability_id == cap_id)
-            .limit(60).all())
-    out = []
-    for cov, app in rows:
-        out.append({
-            "id": app.id,
-            "name": getattr(app, "name", None) or f"Application {app.id}",
-            "support_level": getattr(cov, "support_level", None),
-        })
-    return out
+def _realizing_apps(cap: Any) -> List[Dict[str, Any]]:
+    """Applications the one support store records for this capability, in its own organisation."""
+    from app.services.capability_support import applications_of_capability  # noqa: PLC0415
+
+    unified = unified_capability_for(cap)
+    if unified is None or cap.organization_id is None:
+        return []
+    return [{
+        "id": r["application_id"],
+        "name": r["application_name"] or "Application %s" % r["application_id"],
+        "support_level": r["support_level"],
+    } for r in applications_of_capability(cap.organization_id, unified.id)[:60]]
+
+
+realizing_apps = _realizing_apps
 
 
 def _sub_capabilities(cap_id: int) -> List[Dict[str, Any]]:
@@ -134,7 +128,7 @@ def build_capability_fact_sheet(cap: Any) -> Dict[str, Any]:
         "cap": cap,
         "completeness": _completeness(cap),
         "maturity": _maturity(cap),
-        "apps": _realizing_apps(cap.id),
+        "apps": _realizing_apps(cap),
         "children": _sub_capabilities(cap.id),
         "archimate_element_id": getattr(cap, "archimate_element_id", None),
     }

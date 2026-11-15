@@ -14,6 +14,9 @@ from ..models.metrics import ApplicationMetricsSnapshot  # noqa: F401
 import json
 import logging
 import re
+
+from sqlalchemy.exc import ProgrammingError
+from werkzeug.exceptions import NotFound
 from datetime import datetime  # dead-code-ok
 from app.models.archimate_element_types import is_application_kind
 from app.services.cost_visibility import SHARE_FIGURE_KEYS
@@ -21,6 +24,11 @@ from app.services.cost_visibility import SHARE_FIGURE_KEYS
 # Define the logger
 logger = logging.getLogger(__name__)
 
+from app.services.capability_support import (
+    SUPPORT_LEVELS,
+    CapabilitySupportRefused,
+    record_support_for_records,
+)
 from flask import (
     current_app,
     flash,
@@ -814,15 +822,20 @@ def _link_application_to_capabilities(app, capabilities_str):
             # Check if mapping already exists using prefetched set
             if capability.id not in existing_mapping_keys:
                 # Create new mapping
-                mapping = UnifiedApplicationCapabilityMapping(
-                    application_component_id=app.id,
-                    unified_capability_id=capability.id,
-                    support_level="partial",  # Default support level
-                    coverage_percentage=50,  # Default 50% coverage
-                    relationship_type="enables",
-                    notes=f"Auto-linked from import: {cap_name}",
-                )
-                db.session.add(mapping)
+                try:
+                    record_support_for_records(
+                        app.organization_id,
+                        app.id,
+                        capability.id,
+                        facts={
+                            "support_level": "partial",  # Default support level
+                            "coverage_percentage": 50,  # Default 50% coverage
+                            "notes": f"Auto-linked from import: {cap_name}",
+                        },
+                    )
+                except CapabilitySupportRefused:
+                    not_found.append(cap_name)
+                    continue
                 existing_mapping_keys.add(
                     capability.id
                 )  # Update set to prevent duplicates
@@ -1108,7 +1121,7 @@ def validate_archimate_element_creation(
 from sqlalchemy.exc import SQLAlchemyError
 
 # Import statements (moved to proper location)
-from ..models.business_capabilities import BusinessCapability, BusinessFunction
+from ..models.business_capabilities import BusinessFunction
 from ..models.business_layer import (
     BusinessActor,
     BusinessObject,
@@ -1763,10 +1776,16 @@ def _delete_archimate_element(element_id, rel_type="realization"):
             ("values",                               "archimate_element_id"),
         ]
         for table, col in _nullable_refs:
-            db.session.execute(
-                text(f"UPDATE {table} SET {col} = NULL WHERE {col} = :id"),  # noqa: S608
-                {"id": eid},
-            )
+            # A table this installation never created holds nothing that points at the element.
+            try:
+                with db.session.begin_nested():
+                    db.session.execute(
+                        text(f"UPDATE {table} SET {col} = NULL WHERE {col} = :id"),  # noqa: S608
+                        {"id": eid},
+                    )
+            except ProgrammingError as exc:
+                if "does not exist" not in str(exc):
+                    raise
 
         # ------------------------------------------------------------------
         # 6. Finally delete the element itself (CASCADE constraints in DB will
@@ -1780,6 +1799,9 @@ def _delete_archimate_element(element_id, rel_type="realization"):
 
         return jsonify({"success": True})
 
+    except NotFound:
+        db.session.rollback()
+        return jsonify({"success": False, "error": "That element was not found."}), 404
     except Exception as e:
         db.session.rollback()
         current_app.logger.error(f"Error deleting ArchiMate element: {str(e)}")
@@ -1911,8 +1933,8 @@ def render_application_detail(id, form_values=None, form_errors=None, status=200
     app_obj = ApplicationComponent.query.get_or_404(id)
 
     # --- Capabilities ---
-    # Query ApplicationCapabilityMapping (populated by Abacus sync — 410 rows)
-    # NOT UnifiedApplicationCapabilityMapping (empty table, different schema)
+    # What this application supports is one relationship per capability, read through the one
+    # reader (the same one the coverage matrix and the chat read).
     capabilities = []
     capability_mappings = []
     try:
@@ -1925,27 +1947,39 @@ def render_application_detail(id, form_values=None, form_errors=None, status=200
         db.session.rollback()
 
     # --- Capability form config (for "Map Capability" modal) ---
-    existing_cap_ids = {c.id for c in capabilities}
+    # The pick list is the capabilities the coverage page lists, one per capability record.
+    existing_element_ids = {c.archimate_element_id for c in capabilities if c.archimate_element_id}
     capability_options = []
     try:
-        all_caps = BusinessCapability.query.order_by(BusinessCapability.name.asc()).all()
+        from app.models.unified_capability import UnifiedCapability
+
+        all_caps = (
+            UnifiedCapability.query.filter(
+                UnifiedCapability.organization_id == app_obj.organization_id,
+                UnifiedCapability.retired_into_id.is_(None),
+            )
+            .order_by(UnifiedCapability.name.asc())
+            .all()
+        )
         for cap in all_caps:
             capability_options.append({
                 "id": cap.id,
                 "label": f"{cap.name} \u00b7 {cap.category or 'Uncategorized'}",
-                "disabled": cap.id in existing_cap_ids,
+                "disabled": cap.archimate_element_id in existing_element_ids,
             })
     except Exception:
         db.session.rollback()
     capability_form_config = {
         "capability_options": capability_options,
-        "support_levels": [
-            ("primary", "Primary"), ("secondary", "Secondary"),
-            ("partial", "Partial"), ("legacy", "Legacy"),
-            ("planned", "Planned"), ("linked", "Linked"),
-        ],
+        "support_levels": [(level, level.capitalize()) for level in SUPPORT_LEVELS],
+        "support_kinds": [("realization", "Realizes"), ("serving", "Serves")],
         "maturity_levels": [(str(i), f"Level {i}") for i in range(1, 6)],
     }
+    # The dialog's choices as (value, label, disabled) triples.
+    capability_form_config["capability_choices"] = [(o["id"], o["label"], o["disabled"]) for o in capability_options]
+    capability_form_config["kind_choices"] = [(v, label, False) for v, label in capability_form_config["support_kinds"]]
+    capability_form_config["level_choices"] = [(v, label, False) for v, label in capability_form_config["support_levels"]]
+    capability_form_config["maturity_choices"] = [(v, label, False) for v, label in capability_form_config["maturity_levels"]]
 
     # --- Requirements of the frameworks the organisation adopted, linked to this application.
     # One call feeds both the figure at the top and the card that lists them.
@@ -2137,6 +2171,7 @@ def render_application_detail(id, form_values=None, form_errors=None, status=200
             "label": "Mapped Capabilities",
             "value": str(len(capabilities)),
             "delta": "Enterprise capabilities linked to this application",
+            "href": "?tab=capabilities#mapped-capabilities",
             "icon_svg": "",
         },
         {
@@ -2185,6 +2220,12 @@ def render_application_detail(id, form_values=None, form_errors=None, status=200
                 is_strategic = getattr(mapping, "is_strategic", False)
             cap_rows.append({
                 "name": cap.name,
+                "id": mapping.id,
+                "kind_word": getattr(mapping, "kind_word", None),
+                "delete_url": (
+                    url_for("application_mgmt.application_capability_mapping_delete", id=app_obj.id, mapping_id=mapping.id)
+                    if getattr(mapping, "kind", None) else None
+                ),
                 "detail_url": None,
                 "category": cap.category or "",
                 "support_level": support.replace("_", " ").title() if support else "",

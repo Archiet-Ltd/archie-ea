@@ -109,7 +109,7 @@ def test_the_figures_agree_on_every_page_and_with_the_seed(browser, live_server,
         # The model map: the layer's button reads the twenty model elements.
         page.goto(live_server + "/archimate/model-map", wait_until="domcontentloaded")
         layer_button = page.get_by_test_id("model-map-layer-implementation")
-        expect(layer_button).to_contain_text("(20)")
+        expect(layer_button).to_contain_text("(20 of 21)")
         on_map = _number(layer_button.inner_text().split("(")[-1])
         _shot(page, "model-map", viewport, scheme)
 

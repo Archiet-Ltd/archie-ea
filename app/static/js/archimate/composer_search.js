@@ -154,6 +154,7 @@ let ComposerSearch = (function() {
                 self.viewpointLoading = false;
                 self.statusText = self.activeViewpointName + ' — ' + elements.length + ' elements, ' + relationships.length + ' relationships';
                 if (data.omitted_note) self.statusText += ' (' + data.omitted_note + ' of ' + data.store_total + ' in your model)';
+                if (data.register_only_note) self.statusText += ' (' + data.register_only_note + ')';
                 if (data.layer_omitted_note) self.statusText += ' (' + data.layer_omitted_note + ')';
 
                 UndoStack.resume();
@@ -217,8 +218,10 @@ let ComposerSearch = (function() {
             self.canvasElements = {};
             /* The same cards as buttons, so a keyboard or screen reader opens a layer too. */
             self.layerCards = data.overview.map(function(row) {
+                let apart = row.not_on_model_map
+                    ? ', ' + row.not_on_model_map + ' of them entered in a register and not drawn' : '';
                 return { layer: row.layer, title: row.title, count: row.count,
-                         label: row.title + ', ' + row.count + (row.count === 1 ? ' element' : ' elements') };
+                         label: row.title + ', ' + row.count + (row.count === 1 ? ' element' : ' elements') + apart };
             });
             self.layerCardsTotal = data.store_total;
             self.elementCount = 0;

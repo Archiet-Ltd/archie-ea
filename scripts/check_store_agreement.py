@@ -577,6 +577,18 @@ for _layer in ("motivation", "strategy", "business", "application"):
                 "/architecture/api/layer/%s/elements?per_page=1" % _layer,
                 extract="pagination.total"),
     ]
+# Application A supports capability C. The model holds it as one Realization or Serving relationship, the
+# support table projects it, the coverage page counts the cells it draws, and the application pages list it.
+CONCEPTS["applications supporting capabilities"] = [
+    Surface("call:support relationships in the model", "call",
+            "app.services.capability_support:count_support_relationships"),
+    Surface("call:projected support rows", "call",
+            "app.services.capability_support:count_support_rows"),
+    Surface("GET /genome/coverage/generate (recorded supports)", "http",
+            "/genome/coverage/generate", extract="testid:coverage-support-count"),
+    Surface("call:capabilities listed on the application pages", "call",
+            "app.services.capability_support:count_listed_on_application_pages"),
+]
 CONCEPTS["critical gaps"] = [
     Surface("gap_register_service.count_gaps(critical)", "call",
             "app.services.gap_register_service:count_gaps",

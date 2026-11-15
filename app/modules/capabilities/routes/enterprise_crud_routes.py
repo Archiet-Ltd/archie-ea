@@ -98,16 +98,25 @@ def list_capabilities():
 def capability_app_counts():
     """Return app counts for all capabilities in one query."""
     try:
-        from app.models.business_capabilities import ApplicationCapabilityCoverage
-        rows = (
-            db.session.query(
-                ApplicationCapabilityCoverage.capability_id,
-                db.func.count(ApplicationCapabilityCoverage.id),
-            )
-            .group_by(ApplicationCapabilityCoverage.capability_id)
-            .all()
-        )
-        counts = {str(cid): cnt for cid, cnt in rows}
+        from app.models.unified_capability import UnifiedCapability  # noqa: PLC0415
+        from app.services.capability_support import support_rows  # noqa: PLC0415
+
+        org_id = current_org_id()
+        counts = {}
+        if org_id is not None:
+            business_id_of = {
+                u.id: int(u.source_id)
+                for u in UnifiedCapability.query.filter(
+                    UnifiedCapability.organization_id == org_id,
+                    UnifiedCapability.source_table == "business_capability",
+                    UnifiedCapability.retired_into_id.is_(None),
+                ).all()
+                if str(u.source_id or "").isdigit()
+            }
+            for row in support_rows(org_id):
+                bid = business_id_of.get(row["capability_id"])
+                if bid is not None:
+                    counts[str(bid)] = counts.get(str(bid), 0) + 1
         return jsonify({"success": True, "counts": counts})
     except Exception as e:
         logger.exception(f"Error getting app counts: {e}")
@@ -164,7 +173,7 @@ def capability_fact_sheet(capability_id):
     from app.utils.role_access import can_edit_capabilities  # noqa: PLC0415
 
     cap = BusinessCapability.query.get(capability_id)
-    if not cap:
+    if not cap or cap.organization_id != current_org_id():
         abort(404)
     return render_template("capabilities/capability_fact_sheet.html",
                            type_labels=CAPABILITY_TYPE_LABELS,
@@ -212,34 +221,16 @@ def get_capability(capability_id):
     """Get a specific capability detail."""
     try:
         capability = BusinessCapability.query.get(capability_id)
-        if not capability:
+        if not capability or capability.organization_id != current_org_id():
             return jsonify({"success": False, "error": "Capability not found"}), 404
 
         data = capability.to_dict()
-        # Include app coverage mappings
-        from app.models.business_capabilities import ApplicationCapabilityCoverage
-        from app.models.application_portfolio import ApplicationComponent
-        coverages = (
-            db.session.query(ApplicationCapabilityCoverage, ApplicationComponent)
-            .join(ApplicationComponent, ApplicationCapabilityCoverage.application_component_id == ApplicationComponent.id)
-            .filter(ApplicationCapabilityCoverage.capability_id == capability_id)
-            .limit(50)
-            .all()
-        )
-        data["applications"] = [
-            {
-                "id": ac.id,
-                "name": ac.name,
-                "support_level": cov.support_level,
-                "confidence": cov.confidence_score,
-            }
-            for cov, ac in coverages
-        ]
-        data["application_count"] = (
-            ApplicationCapabilityCoverage.query
-            .filter_by(capability_id=capability_id)
-            .count()
-        )
+        # The applications are the ones the one support store records, as on the fact sheet.
+        from app.services.capability_fact_sheet import realizing_apps  # noqa: PLC0415
+
+        supporting = realizing_apps(capability)
+        data["applications"] = supporting
+        data["application_count"] = len(supporting)
         return jsonify({"success": True, "data": data})
     except Exception as e:
         logger.error(f"Error getting capability {capability_id}: {e}")
