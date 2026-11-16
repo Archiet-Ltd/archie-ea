@@ -28,7 +28,7 @@ def test_vendor_create_dialog_dismisses_without_write(browser, live_server, seed
         expect(dialog.get_by_role('heading', name='New vendor', exact=True)).to_be_visible()
         name = dialog.get_by_label('Vendor name *', exact=True)
         expect(name).to_be_visible()
-        name.fill('Unsaved QA vendor')
+        name.press_sequentially('Unsaved QA vendor')
         if dismissal == 'Escape':
             page.keyboard.press('Escape')
         else:

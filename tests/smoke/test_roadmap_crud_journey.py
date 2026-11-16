@@ -32,7 +32,7 @@ from tests.smoke.conftest import PASSWORD
 
 PAGE_TIMEOUT = 30000
 MODAL = "#roadmap-work-package-modal"
-NAME_INPUT = f"{MODAL} input[type=text]"
+NAME_INPUT = f"{MODAL} #wp-name"
 WP_API = re.compile(r"/api/applications/\d+/work-packages")
 
 
@@ -57,7 +57,8 @@ def _fill_required(page, name):
     client-side validation passes. fill/select_option fire the input/change events
     Alpine's x-model listens for."""
     modal = page.locator(MODAL)
-    modal.locator("input[type=text]").first.fill(name)
+    modal.locator("#wp-name").fill(name)
+    expect(modal.locator("#wp-name")).to_have_value(name)
     modal.locator("select").first.select_option(index=1)
     dates = modal.locator("input[type=date]")
     dates.nth(0).fill("2026-10-01")
