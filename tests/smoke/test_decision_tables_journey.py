@@ -159,7 +159,6 @@ def test_decision_and_rules_are_readable_on_a_phone(browser, live_server):
     link = row.get_by_test_id("decision-link")
     assert link.inner_text().strip() == NAME
     assert phone.evaluate("e => e.scrollWidth <= e.clientWidth", link.element_handle()), "the name is cut off"
-    last = row.locator("td").nth(2) if row.locator("td:visible").count() > 2 else None
     shown = [row.locator("td:visible").nth(i).inner_text().strip() for i in range(row.locator("td:visible").count())]
     assert "2" in shown, shown
     _shot(phone, "decision-tables-390")
