@@ -39,7 +39,7 @@
         <li class="relative" data-depth="0" data-root>
             <div class="flex h-10 items-center gap-2 rounded-md border border-border bg-card px-4">
                 <span class="h-2 w-2 shrink-0 rounded-full bg-foreground" aria-hidden="true"></span>
-                <span class="truncate text-sm font-semibold text-foreground" x-text="{{ root }}"></span>
+                <span class="min-w-0 break-words text-sm font-semibold text-foreground" x-text="{{ root }}"></span>
                 <span class="ml-auto shrink-0 text-2xs font-semibold uppercase tracking-[0.06em] text-muted-foreground">Asked about</span>
             </div>
         </li>
@@ -59,7 +59,7 @@
                      class="absolute -left-5 -top-2 h-12 w-5 text-border" viewBox="0 0 20 48" fill="none" aria-hidden="true">
                     <path :d="'M1 0 V' + (continues(i, {{ rows }}) ? 48 : 28) + ' M1 28 H20'" stroke="currentColor" stroke-width="1" />
                 </svg>
-                <div class="flex {{ 'min-h-10 flex-wrap py-2' if rich else 'h-10' }} items-center gap-2 rounded-md border bg-card px-4 transition-colors hover:bg-muted/50"
+                <div class="flex min-h-10 flex-wrap py-2 items-center gap-2 rounded-md border bg-card px-4 transition-colors hover:bg-muted/50"
                      :class="selected && selected.key === node.key ? 'border-ring' : 'border-border'"
                      @click="selected = node">
                     <svg x-show="!node.derived" class="h-4 w-4 shrink-0 text-muted-foreground" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -71,7 +71,7 @@
                     {% if rich %}
                     <h3 class="min-w-0 break-words text-sm font-semibold text-foreground">{{ element_name('node.name') }}</h3>
                     {% else %}
-                    <span class="truncate text-sm font-semibold text-foreground" x-text="node.entity_name || node.name"></span>
+                    <span class="min-w-0 break-words text-sm font-semibold text-foreground" x-text="node.entity_name || node.name"></span>
                     {% endif %}
                     <button type="button"
                             class="relative h-1.5 w-1.5 shrink-0 rounded-full bg-primary focus-visible:outline-offset-4"
@@ -93,7 +93,7 @@
                         {{ owner_field('node.ownerName') }}
                     </div>
                     {% else %}
-                    <span class="ml-auto shrink-0 truncate text-xs text-muted-foreground" x-text="node.owner || node.ownerName || 'No owner recorded'"></span>
+                    <span class="ml-auto min-w-0 break-words text-xs text-muted-foreground" x-text="node.owner || node.ownerName || 'No owner recorded'"></span>
                     {% endif %}
                     {% if caller %}{{ caller() }}{% endif %}
                 </div>

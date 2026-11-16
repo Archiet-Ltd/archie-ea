@@ -56,7 +56,7 @@ def test_dashboard_flow_count_includes_relationship_edges(app, db_session, make_
             dashboard_resp = c.get("/architecture/data-architecture")
             assert dashboard_resp.status_code == 200
             dashboard_html = dashboard_resp.get_data(as_text=True)
-            idx = dashboard_html.find("Data Lineage Flows")
+            idx = dashboard_html.find("Data lineage flows")
             assert idx != -1
             card_snippet = dashboard_html[idx:idx + 400]
             m2 = re.search(r'card-title"[^>]*>\s*(\d+)\s*<', card_snippet)

@@ -1,46 +1,70 @@
 {# design-block: dashboard #}
 {% extends "layouts/admin_base.html" %}
-{% from 'components/page_header.html' import page_header %}
-{% from 'components/metrics_card.html' import metrics_card %}
+{% from 'macros/page_shell.html' import page_shell %}
+{% import 'basecoat/card.html' as card %}
+{% from 'components/button.html' import button %}
 {% from 'components/badge.html' import badge %}
+{% from 'components/list_table.html' import list_table %}
+{% from 'components/empty_state.html' import empty_state %}
+{% from 'components/fact_list.html' import fact_list %}
 {% from 'components/answer_cascade.html' import answer_cascade %}
+{% from 'basecoat/table.html' import table_cell %}
 
-{% block title %}Data Architecture Dashboard{% endblock %}{% block content %}
-{# Builds the href for a row's record, or an empty string when the blueprint that
-   owns the destination failed to register -- blueprints register non-fatally here,
-   so an unguarded url_for would raise BuildError and 500 every page rendering the
-   sidebar. Callers keep the <a> in the row itself so the link is visible both to a
-   reader and to scripts/check_actionable_rows.py. #}
+{% block title %}{{ 'Data models' if models_page else 'Data architecture' }}{% endblock %}{% block content %}
+{# Builds a record's href, or an empty string when the blueprint that owns it failed to register
+   (blueprints register non-fatally, so an unguarded url_for would 500 every page). #}
 {% macro row_href(endpoint) %}{% if endpoint in flask.current_app.view_functions %}{{ url_for(endpoint, **kwargs) }}{% endif %}{% endmacro %}
 
-<div class="space-y-6">
-    <!-- Page Header -->
-    {{ page_header(
-        title='Data Architecture',
-        description='Manage and analyze data architecture models',
-        actions=[
-            {'text': 'Data Models', 'icon': 'database', 'href': url_for('enterprise.data_models'), 'variant': 'default'}
-        ]
-    ) }}
+{# One stat card: the figure, what it counts, and the list that holds those rows. A figure of zero says
+   why and what to do, so no card shows a bare zero. #}
+{% macro stat_card(testid, title, count, icon, link_text, href, why_zero, next_text=none, next_href=none) %}
+{% call card.card(class='@container/card', attrs={'data-testid': testid}) %}
+    {% call card.card_header() %}
+        {% call card.card_description() %}{{ title }}{% endcall %}
+        {% call card.card_title(class='tabular-nums @[250px]/card:text-3xl', attrs={'data-testid': testid ~ '-value'}) %}{{ count|dash }}{% endcall %}
+        {% call card.card_action() %}<i data-lucide="{{ icon }}" class="h-4 w-4 text-muted-foreground" aria-hidden="true"></i>{% endcall %}
+    {% endcall %}
+    {% call card.card_content(class='space-y-2') %}
+        {% if count is none %}
+        <p class="text-sm text-muted-foreground">Could not be read just now. Reload the page to try again.</p>
+        {% elif count == 0 %}
+        <p class="text-sm text-muted-foreground" data-testid="{{ testid }}-why">{{ why_zero }}</p>
+        {% endif %}
+        {% if count and href %}<a class="text-sm text-primary underline underline-offset-4 hover:no-underline" data-testid="{{ testid }}-link" href="{{ href }}">{{ link_text }}</a>
+        {% elif not count and next_href %}<a class="text-sm text-primary underline underline-offset-4 hover:no-underline" data-testid="{{ testid }}-link" href="{{ next_href }}">{{ next_text }}</a>{% endif %}
+    {% endcall %}
+{% endcall %}
+{% endmacro %}
 
-    <!-- Metrics Cards -->
-    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-8">
-        {{ metrics_card(title='Conceptual Models', value=conceptual_count|dash, icon='brain') }}
-        {{ metrics_card(title='Logical Models', value=logical_count|dash, icon='git-branch') }}
-        {{ metrics_card(title='Physical Models', value=physical_count|dash, icon='server') }}
-        {{ metrics_card(title='Data Lineage Flows', value=data_lineage_count|dash, icon='git-merge') }}
+<div class="space-y-6">
+{% if models_page %}
+    {% macro _back() %}{{ button(text='Data architecture overview', variant='outline', href=url_for('data_architecture.data_architecture_dashboard')) }}{% endmacro %}
+    {{ page_shell(title='Data models', subtitle='Conceptual, logical and physical models of the data your organisation holds', actions_caller=_back) }}
+    <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        {{ stat_card('conceptual-models-card', 'Conceptual models', conceptual_count, 'brain', none, none,
+            'None recorded yet. A conceptual model names the main things your organisation cares about and how they relate.') }}
+        {{ stat_card('logical-models-card', 'Logical models', logical_count, 'git-branch', none, none,
+            'None recorded yet. A logical model works those things into entities, attributes and keys.') }}
+        {{ stat_card('physical-models-card', 'Physical models', physical_count, 'server', none, none,
+            'None recorded yet. A physical model maps the logical design onto the tables of a specific database.') }}
+    </div>
+{% else %}
+    {% macro _actions() %}{{ button(text='See every entity', icon='database', href=url_for('data_architecture.data_entity_catalog')) }}{% endmacro %}
+    {{ page_shell(title='Data architecture', subtitle='The data your organisation holds, where it flows and what is not yet traced', actions_caller=_actions) }}
+    {% if load_error %}<p class="text-sm text-destructive" role="alert" data-testid="data-architecture-error">{{ load_error }}</p>{% endif %}
+
+    <div class="grid grid-cols-1 gap-4 @xl/main:grid-cols-2 @5xl/main:grid-cols-4 sm:grid-cols-2 lg:grid-cols-4" data-testid="data-stat-row">
+        {{ stat_card('data-entities-card', 'Data entities', overview.entity_count if overview else none, 'database', 'See every entity', url_for('data_architecture.data_entity_catalog'),
+            'No data entity is recorded yet.', 'Add a data entity', url_for('data_architecture.create_data_entity')) }}
+        {{ stat_card('personal-data-card', 'Holding personal data', personal_count, 'user-round', 'See these entities', url_for('data_architecture.data_entity_catalog', personal=1),
+            'No entity is marked as holding personal data. Mark one on its edit page.', 'See every entity', url_for('data_architecture.data_entity_catalog')) }}
+        {{ stat_card('lineage-flows-card', 'Data lineage flows', data_lineage_count, 'git-merge', 'See the lineage', url_for('data_architecture.data_lineage_view'),
+            'No flow is recorded yet. Record where one data object feeds another.', 'Record a flow', url_for('data_architecture.data_lineage_view')) }}
+        {{ stat_card('untraced-card', 'Not yet traced', untraced_count, 'search-x', 'See what is not traced', url_for('data_architecture.data_lineage_view') ~ '#lineage-untraced',
+            'Every data object has a recorded flow.') }}
     </div>
 
     {% if overview %}
-    <section class="space-y-2" aria-labelledby="data-entities-heading" data-testid="data-entities">
-        <h2 id="data-entities-heading" class="text-lg font-semibold">Data entities</h2>
-        {% if overview.entities %}
-        <p class="text-sm text-muted-foreground"><span data-testid="data-entity-count">{{ overview.entity_count }} {{ 'entity' if overview.entity_count == 1 else 'entities' }}</span>, each with the applications that create, read, update or delete it and who is accountable for it. <a class="text-primary underline underline-offset-2" data-testid="data-entities-link" href="{{ url_for('data_architecture.data_entity_catalog') }}">See every entity</a></p>
-        {% else %}
-        <p class="text-sm text-muted-foreground" data-testid="data-entities-none">Your organisation has not recorded the data it holds yet. <a class="text-primary underline underline-offset-2" href="{{ url_for('data_architecture.create_data_entity') }}">Add a data entity</a>, such as customers or invoices, then record which applications create, read, update or delete it.</p>
-        {% endif %}
-    </section>
-
     {% if flow %}
     <section id="data-flow" class="space-y-2" aria-labelledby="data-flow-heading" data-testid="data-flow"
              x-data='{ flowRows: {{ flow.nodes | tojson }}, flowRoot: {{ flow.entity.name | tojson }}, flowQuestion: {{ ("Where does " ~ flow.entity.name ~ " data flow, and who is accountable at each step?") | tojson }} }'>
@@ -52,140 +76,34 @@
 
     <section class="space-y-2" aria-labelledby="personal-data-heading" data-testid="personal-data-applications">
         <h2 id="personal-data-heading" class="text-lg font-semibold">Applications that handle personal data</h2>
-        {% if overview.personal_data_applications %}
-        <p class="text-sm text-muted-foreground">Every application recorded as using an entity marked as personal data.</p>
-        <ul class="divide-y divide-border rounded-lg border border-border bg-card" data-testid="personal-data-list">
-            {% for app in overview.personal_data_applications %}
-            <li class="flex flex-col gap-1 px-4 py-3 sm:flex-row sm:items-center sm:justify-between" data-testid="personal-data-application">
-                {% set _h = row_href('unified_applications.application_detail', id=app.application_id)|trim if app.application_id else '' %}
-                <span class="text-sm font-medium text-foreground">{% if _h %}<a class="hover:underline underline-offset-4" href="{{ _h }}">{{ app.name }}</a>{% else %}{{ app.name }}{% endif %}</span>
-                <span class="flex flex-wrap gap-1">{% for name in app.entities %}{% call badge(variant='secondary') %}{{ name }}{% endcall %}{% endfor %}</span>
-            </li>
-            {% endfor %}
-        </ul>
-        {% else %}
-        <p class="text-sm text-muted-foreground" data-testid="personal-data-none">No application is recorded as using personal data. Mark an entity as personal data on its edit page, and record which applications use it.</p>
-        {% endif %}
+        {% call(app) list_table(rows=overview.personal_data_applications, columns=[('Application', ''), ('Personal data it uses', '')],
+                caption='Applications that handle personal data', testid='personal-data-list', row_testid='personal-data-application',
+                empty_message='No application is recorded as using personal data. Mark an entity as personal data on its edit page, then record which applications use it.') %}
+            {% call table_cell(class='font-medium') %}{% set _h = row_href('unified_applications.application_detail', id=app.application_id)|trim if app.application_id else '' %}{% if _h %}<a class="hover:underline underline-offset-4" href="{{ _h }}">{{ app.name }}</a>{% else %}{{ app.name }}{% endif %}{% endcall %}
+            {% call table_cell() %}<span class="flex flex-wrap gap-1">{% for name in app.entities %}{% call badge(variant='secondary') %}{{ name }}{% endcall %}{% endfor %}</span>{% endcall %}
+        {% endcall %}
     </section>
     {% endif %}
 
-    <!-- Quick Actions -->
-    <div class="rounded-xl border-2 border-input bg-background p-6">
-        <h2 class="text-xl font-semibold mb-6">Quick Actions</h2>
-        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            <a href="{{ url_for('enterprise.data_models') }}" class="flex items-center gap-3 p-4 rounded-lg border-2 border-input bg-background hover:border-primary/50 transition-all duration-200">
-                <i data-lucide="database" class="w-5 h-5 text-muted-foreground" aria-hidden="true"></i>
-                <span class="text-sm font-medium">View All Models</span>
-            </a>
-            <a href="{{ url_for('data_architecture.data_lineage_view') }}" data-testid="data-architecture-lineage-link" class="flex items-center gap-3 p-4 rounded-lg border-2 border-input bg-background hover:border-primary/50 transition-all duration-200">
-                <i data-lucide="git-merge" class="w-5 h-5 text-muted-foreground" aria-hidden="true"></i>
-                <span class="text-sm font-medium">Data Lineage</span>
-            </a>
-            <span class="flex items-center gap-3 p-4 rounded-lg border-2 border-input bg-muted/30 cursor-not-allowed" title="Coming soon">
-                <i data-lucide="bar-chart" class="w-5 h-5 text-muted-foreground" aria-hidden="true"></i>
-                <span class="text-sm font-medium text-muted-foreground">Analytics</span>
-            </span>
-            <span class="flex items-center gap-3 p-4 rounded-lg border-2 border-input bg-muted/30 cursor-not-allowed" title="Coming soon">
-                <i data-lucide="settings" class="w-5 h-5 text-muted-foreground" aria-hidden="true"></i>
-                <span class="text-sm font-medium text-muted-foreground">Settings</span>
-            </span>
-        </div>
-    </div>
+    <section class="space-y-2" aria-labelledby="data-stack-heading" data-testid="data-platform-stack">
+        <h2 id="data-stack-heading" class="text-lg font-semibold">Data platform capability stack</h2>
+        {% call(item) list_table(rows=data_stack, columns=[('Capability', ''), ('Domain', 'hidden sm:table-cell'), ('Product', ''), ('Maturity', 'hidden md:table-cell'), ('Fit', 'hidden md:table-cell')],
+                caption='Data platform capabilities and the products that provide them', testid='data-stack-table', row_testid='data-stack-row',
+                empty_message='No data platform capability is linked to a vendor product yet. Link a data storage or analytics capability to a product in the capability catalogue.') %}
+            {% call table_cell(class='font-medium whitespace-normal') %}{{ item.capability }}{% endcall %}
+            {% call table_cell(class='hidden sm:table-cell') %}{% call badge(variant='secondary') %}{{ item.domain }}{% endcall %}{% endcall %}
+            {% call table_cell(class='whitespace-normal') %}{{ item.product }}<br>{% set _h = row_href('unified_vendors.vendor_detail', vendor_id=item.vendor_id)|trim if item.vendor_id else '' %}{% if _h %}<a class="text-xs text-primary hover:underline" href="{{ _h }}">{{ item.vendor }}</a>{% else %}<span class="text-xs text-muted-foreground">{{ item.vendor }}</span>{% endif %}{% endcall %}
+            {% call table_cell(class='hidden md:table-cell tabular-nums') %}{{ ('Level ' ~ item.maturity) if item.maturity is not none else '—' }}{% endcall %}
+            {% call table_cell(class='hidden md:table-cell tabular-nums') %}{{ (item.fit ~ '%') if item.fit is not none else '—' }}{% endcall %}
+        {% endcall %}
+    </section>
 
-    <!-- Data Platform Capability Stack -->
-    <div class="mt-8 rounded-xl border-2 border-input bg-background overflow-hidden">
-        <div class="p-6 border-b border-input flex items-center justify-between bg-muted/30">
-            <div>
-                <h2 class="text-xl font-semibold">Data Platform Capability Stack</h2>
-                <p class="text-sm text-muted-foreground mt-1">Technical capabilities and products powering the data ecosystem</p>
-            </div>
-        </div>
-        <div class="overflow-x-auto" tabindex="0" role="region" aria-label="Data architecture capabilities">
-            <table class="dense-table w-full text-sm text-left">
-                <thead class="bg-muted/50 text-muted-foreground font-medium border-b border-input">
-                    <tr>
-                        <th class="px-6 py-4">Capability Area</th>
-                        <th class="px-6 py-4">Domain</th>
-                        <th class="px-6 py-4">Technology Solutions</th>
-                        <th class="px-6 py-4 text-center">Maturity Level</th>
-                        <th class="px-6 py-4 text-center">Solution Fit</th>
-                    </tr>
-                </thead>
-                <tbody class="divide-y divide-input">
-                    {% for item in data_stack %}
-                    <tr class="hover:bg-muted/30 transition-colors">
-                        <td class="px-6 py-4">
-                            <div class="font-medium text-foreground">{{ item.capability }}</div>
-                        </td>
-                        <td class="px-6 py-4">
-                            <span class="text-xs px-2 py-0.5 bg-muted text-muted-foreground rounded-full border border-border font-bold uppercase tracking-wider">{{ item.domain }}</span>
-                        </td>
-                        <td class="px-6 py-4">
-                            <div class="flex flex-col">
-                                <span class="font-medium text-foreground">{{ item.product }}</span>
-                                {% if item.vendor_id %}
-                                <span class="text-xs italic">{% set _h = row_href('unified_vendors.vendor_detail', vendor_id=item.vendor_id)|trim %}{% if _h %}<a href="{{ _h }}" class="font-medium text-primary hover:underline">{{ item.vendor }}</a>{% else %}{{ item.vendor }}{% endif %}</span>
-                                {% else %}
-                                <span class="text-xs text-muted-foreground italic">{{ item.vendor }}</span>
-                                {% endif %}
-                            </div>
-                        </td>
-                        <td class="px-6 py-4">
-                            <div class="flex items-center justify-center gap-1.5">
-                                {% for i in range(5) %}
-                                <div class="w-2 h-4 rounded-sm {% if i < item.maturity %}bg-primary {% else %}bg-muted{% endif %}"></div>
-                                {% endfor %}
-                                <span class="ml-2 text-xs font-black text-primary">L{{ item.maturity }}</span>
-                            </div>
-                        </td>
-                        <td class="px-6 py-4">
-                            <div class="flex items-center justify-center gap-3">
-                                <div class="flex-1 max-w-[100px] h-2 bg-muted rounded-full overflow-hidden border border-border">
-                                    <div class="h-full bg-success rounded-full transition-all duration-700" style="width: {{ item.fit }}%"></div>
-                                </div>
-                                <span class="text-xs font-black text-success-emphasis tabular-nums">{{ item.fit }}%</span>
-                            </div>
-                        </td>
-                    </tr>
-                    {% endfor %}
-
-                    {% if not data_stack %}
-                    <tr>
-                        <td colspan="5" class="px-6 py-12 text-center text-muted-foreground">
-                            <div class="flex flex-col items-center gap-2">
-                                <i data-lucide="database" class="h-10 w-10 opacity-20 mb-2" aria-hidden="true"></i>
-                                <p class="text-sm font-medium">No platform capabilities are mapped to this stack yet.</p>
-                                <p class="text-xs opacity-70">Connect Technical Capabilities in DATA-STORAGE or AI-ANALYTICS to Vendor Products to populate this stack.</p>
-                            </div>
-                        </td>
-                    </tr>
-                    {% endif %}
-                </tbody>
-            </table>
-        </div>
-    </div>
+    <section class="space-y-2" aria-labelledby="repository-heading" data-testid="architecture-repository">
+        <h2 id="repository-heading" class="text-lg font-semibold">Architecture repository</h2>
+        {% call(p) fact_list(items=[{'label': 'Application and technology elements', 'key': 'elements'}, {'label': 'Relationships between elements', 'key': 'relationships'}], testid='repository-facts') %}
+            {{ (archimate_data_count if p.key == 'elements' else archimate_rel_count)|dash }}
+        {% endcall %}
+    </section>
+{% endif %}
 </div>
-
-    <!-- ArchiMate Architecture Repository -->
-    <div class="mt-8 rounded-xl border-2 border-input bg-background overflow-hidden">
-        <div class="p-6 border-b border-input bg-muted/30">
-            <div>
-                <h2 class="text-xl font-semibold">Architecture Repository</h2>
-                <p class="text-sm text-muted-foreground mt-1">ArchiMate elements and relationships from the enterprise architecture model</p>
-            </div>
-        </div>
-        <div class="p-6">
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                {{ metrics_card(title='Data & Application Elements', value=archimate_data_count|dash, icon='box') }}
-                {{ metrics_card(title='Architecture Relationships', value=archimate_rel_count|dash, icon='git-pull-request') }}
-            </div>
-        </div>
-    </div>
-
-<script>
-// Initialize Lucide icons
-if (typeof lucide !== 'undefined') {
-    lucide.createIcons();
-}
-</script>
 {% endblock %}

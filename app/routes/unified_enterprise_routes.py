@@ -89,6 +89,7 @@ def data_architecture_dashboard():
 
         return render_template(
             "enterprise/data_architecture_dashboard.html",
+            models_page=True,
             conceptual_count=conceptual_count,
             logical_count=logical_count,
             physical_count=physical_count,
@@ -120,6 +121,7 @@ def data_models():
     try:
         return render_template(
             "enterprise/data_architecture_dashboard.html",
+            models_page=True,
             conceptual_count=ConceptualDataModel.query.count(),
             logical_count=LogicalDataModel.query.count(),
             physical_count=PhysicalDataModel.query.count(),

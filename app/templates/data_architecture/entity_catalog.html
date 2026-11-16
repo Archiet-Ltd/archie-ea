@@ -10,7 +10,7 @@
 {% from 'components/table.html' import table, table_header, table_body, table_row, table_head, table_cell %}
 
 {% block title %}Data objects — {{ config.APP_NAME }}{% endblock %}{% block content %}
-{% set filtered = search or classification or entity_type or domain_id %}
+{% set filtered = search or classification or entity_type or domain_id or personal_only %}
 {% set page_tabs = [('List', url_for('data_architecture.data_entity_catalog'), true), ('Diagram', url_for('data_architecture.data_entity_diagram', domain_id=domain_id or none), false)] %}
 {% set classification_options = [('', 'All'), ('public', 'Public'), ('internal', 'Internal'), ('confidential', 'Confidential'), ('restricted', 'Restricted')] %}
 {% set type_options = [('', 'All'), ('master', 'Master'), ('transactional', 'Transactional'), ('reference', 'Reference'), ('derived', 'Derived')] %}
@@ -32,6 +32,7 @@
         {% endfor %}
     </div>
 
+    {% if personal_only %}<p class="text-sm text-muted-foreground" data-testid="catalog-personal-note">Showing only the entities marked as holding personal data. Use Clear to see every entity.</p>{% endif %}
     <div class="rounded-lg border border-border bg-card p-4">
     <form method="get" action="{{ url_for('data_architecture.data_entity_catalog') }}" class="flex flex-wrap items-end gap-3">
         {% call form_group(id='catalog-search', label='Search', class='min-w-[200px] flex-1') %}

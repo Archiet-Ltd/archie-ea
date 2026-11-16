@@ -141,50 +141,21 @@ def data_architecture_dashboard():
                         }
                     )
 
-        # Query real data model counts
-        conceptual_count = 0
-        logical_count = 0
-        physical_count = 0
-        data_lineage_count = 0
-        archimate_data_count = 0
-        archimate_rel_count = 0
+        # The lineage figures come from the same read the lineage page uses, so the card
+        # and the page it opens cannot disagree.
+        from app.models.archimate_core import ArchiMateElement as _ArchiMateElement
+
+        archimate_data_count = None
+        archimate_rel_count = None
+        data_lineage_count = None
+        untraced_count = None
         try:
-            # Re-importing inside try/except block as in original code to handle potential missing models
-            # although in this file we imported them at top level.
-            # We will use the top level imports for consistency unless they are truly optional/missing.
-            # The original code imported from app.models.all_missing_models which suggests they might be stubs?
-            # But line 21 of architecture_routes.py imported them from app.models.
-            # I will stick to app.models imports which I did at the top.
-
-            conceptual_count = ConceptualDataModel.query.count()
-            logical_count = LogicalDataModel.query.count()
-            physical_count = PhysicalDataModel.query.count()
-            # DEF-064, Capgemini dry-run: this counted DataLineage rows only,
-            # while /architecture/data-lineage's "Recorded Lineage Edges"
-            # (data_lineage_view below) counts those SAME rows plus
-            # ArchiMateRelationship edges between DataObjects — a real,
-            # already-drawn subset of lineage this tile just never counted.
-            # Match the fuller, more complete definition rather than leave
-            # two different numbers answering "how much lineage exists".
-            from app.models.archimate_core import ArchiMateElement as _ArchiMateElement
-            from app.models.archimate_core import ArchiMateRelationship as _ArchiMateRelationship
-
-            _data_object_ids = [
-                row.id for row in
-                db.session.query(_ArchiMateElement.id).filter(_ArchiMateElement.type == "DataObject").all()
-            ]
-            data_lineage_count = DataLineage.query.count()
-            if _data_object_ids:
-                data_lineage_count += _ArchiMateRelationship.query.filter(
-                    db.or_(
-                        _ArchiMateRelationship.source_id.in_(_data_object_ids),
-                        _ArchiMateRelationship.target_id.in_(_data_object_ids),
-                    )
-                ).count()
+            data_objects = _ArchiMateElement.query.filter(_ArchiMateElement.type == "DataObject").all()
+            grounded, edges, untraced = _lineage_picture(data_objects)
+            data_lineage_count = len(grounded) + len(edges)
+            untraced_count = len(untraced)
         except Exception:
-            logger.debug(
-                "Failed to query data architecture model counts", exc_info=True
-            )
+            logger.debug("Failed to read lineage figures", exc_info=True)
 
         try:
             from app.models.archimate_core import (
@@ -233,10 +204,9 @@ def data_architecture_dashboard():
             flow=flow_cascade(flow_entity) if flow_entity else None,
             data_stack=data_platform_stack,
             data_cap_count=len(data_caps_objs),
-            conceptual_count=conceptual_count,
-            logical_count=logical_count,
-            physical_count=physical_count,
+            personal_count=sum(1 for row in overview["entities"] if row["personal_data"]),
             data_lineage_count=data_lineage_count,
+            untraced_count=untraced_count,
             archimate_data_count=archimate_data_count,
             archimate_rel_count=archimate_rel_count,
         )
@@ -250,10 +220,9 @@ def data_architecture_dashboard():
             "enterprise/data_architecture_dashboard.html",
             data_stack=[],
             data_cap_count=None,
-            conceptual_count=None,
-            logical_count=None,
-            physical_count=None,
+            personal_count=None,
             data_lineage_count=None,
+            untraced_count=None,
             archimate_data_count=None,
             archimate_rel_count=None,
             overview=None,
@@ -265,6 +234,39 @@ def data_architecture_dashboard():
 # ============================================================================
 # Data Architecture API Endpoints
 # ============================================================================
+
+
+def _lineage_picture(data_objects):
+    """The recorded lineage over these data objects: ``(grounded rows, relationship
+    edges, objects with no recorded edge)``. The lineage page and the overview's
+    figures both read this, so their numbers cannot differ."""
+    from app import db
+    from app.models.archimate_core import ArchiMateRelationship
+
+    object_ids = [o.id for o in data_objects]
+    grounded, edges = [], []
+    if object_ids:
+        grounded = (
+            DataLineage.query.filter(DataLineage.archimate_element_id.in_(object_ids))
+            .order_by(DataLineage.id.desc())
+            .all()
+        )
+        edges = (
+            ArchiMateRelationship.query.filter(
+                db.or_(
+                    ArchiMateRelationship.source_id.in_(object_ids),
+                    ArchiMateRelationship.target_id.in_(object_ids),
+                )
+            )
+            .order_by(ArchiMateRelationship.id)
+            .all()
+        )
+    traced_ids = {row.archimate_element_id for row in grounded if row.archimate_element_id}
+    traced_ids |= {row.target_archimate_element_id for row in grounded if row.target_archimate_element_id}
+    for edge in edges:
+        traced_ids.add(edge.source_id)
+        traced_ids.add(edge.target_id)
+    return grounded, edges, [o for o in data_objects if o.id not in traced_ids]
 
 
 @data_architecture_bp.route("/data-lineage")
@@ -279,8 +281,7 @@ def data_lineage_view():
          reviewer's embedding engine — labelled as suggestions, never
          asserted as lineage until a human confirms them.
     """
-    from app import db
-    from app.models.archimate_core import ArchiMateElement, ArchiMateRelationship
+    from app.models.archimate_core import ArchiMateElement
 
     data_objects = (
         ArchiMateElement.query.filter(ArchiMateElement.type == "DataObject")
@@ -288,28 +289,9 @@ def data_lineage_view():
         .all()
     )
     object_ids = [o.id for o in data_objects]
-
-    grounded_lineage = []
-    relationship_edges = []
+    grounded_lineage, relationship_edges, untraced = _lineage_picture(data_objects)
     suggestions = []
     if object_ids:
-        grounded_lineage = (
-            DataLineage.query.filter(
-                DataLineage.archimate_element_id.in_(object_ids)
-            )
-            .order_by(DataLineage.id.desc())
-            .all()
-        )
-        relationship_edges = (
-            ArchiMateRelationship.query.filter(
-                db.or_(
-                    ArchiMateRelationship.source_id.in_(object_ids),
-                    ArchiMateRelationship.target_id.in_(object_ids),
-                )
-            )
-            .order_by(ArchiMateRelationship.id)
-            .all()
-        )
         try:
             from app.modules.solutions_strategic.v2.services.data_stewardship_reviewer import (
                 _semantic_pairs,
@@ -328,16 +310,6 @@ def data_lineage_view():
 
     overview = data_flow_overview(_current_org_id())
 
-    traced_ids = {row.archimate_element_id for row in grounded_lineage if row.archimate_element_id}
-    traced_ids |= {
-        row.target_archimate_element_id
-        for row in grounded_lineage
-        if row.target_archimate_element_id
-    }
-    for edge in relationship_edges:
-        traced_ids.add(edge.source_id)
-        traced_ids.add(edge.target_id)
-    untraced = [o for o in data_objects if o.id not in traced_ids]
 
     return render_template(
         "enterprise/data_lineage.html",
@@ -587,8 +559,11 @@ def data_entity_catalog():
     classification = request.args.get("classification", "")
     domain_id = request.args.get("domain_id", "", type=str)
     entity_type = request.args.get("entity_type", "")
+    personal_only = request.args.get("personal") == "1"
 
     query = DataEntity.query
+    if personal_only:
+        query = query.filter(DataEntity.contains_pii.is_(True))
 
     if search:
         query = query.filter(
@@ -617,6 +592,7 @@ def data_entity_catalog():
     return render_template(
         "data_architecture/entity_catalog.html",
         entities=entities,
+        personal_only=personal_only,
         domains=domains,
         search=search,
         classification=classification,

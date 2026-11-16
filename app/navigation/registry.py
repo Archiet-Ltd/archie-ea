@@ -115,7 +115,8 @@ WORK: tuple = (
                        "Consolidation", "Savings", "Gap findings"),
               owns=("unified_applications.rationalization_",)),
            _l("data_register", "Data register", "data_architecture.data_entity_catalog", job="1",
-              aliases=("Data entities", "Data catalogue", "Data objects", "Data model")),
+              aliases=("Data entities", "Data catalogue", "Data objects", "Data model", "Data architecture"),
+              owns=("data_architecture.data_architecture_dashboard",)),
            _l("interfaces", "Interfaces", "interface_register.index", job="1", requires="section:data_integration",
               aliases=("Interface register", "Integrations register")),
            _l("tech_radar", "Technology radar", "tech_radar.index", job="1", aliases=("Tech radar", "Radar")),
@@ -582,8 +583,10 @@ def _item(user, link: NavLink, role: str, endpoint: str | None, current_entry: N
                 here = _here(child_link, endpoint, values)
                 # a page the item holds (a Portfolio tab) lights the item; only its own page is current
                 held = bool(child.owns) and endpoint is not None and _holds(child, endpoint)
+                # a page the sub-item names exactly as its own (not a prefix) is marked current too
+                named = endpoint is not None and endpoint in child.owns
                 children.append(SidebarItem(child_link.key, child_link.label, child_url, None, child.job,
-                                            active=here or held, current=here))
+                                            active=here or held, current=here or named))
         if not children:
             return None
         in_entry = (current_entry is not None and current_entry.key == link.key) or any(c.current for c in children)
