@@ -20,6 +20,7 @@ from flask import url_for
 from werkzeug.routing import BuildError
 
 from app import db
+from app.models.archimate_element_types import is_application_kind
 
 logger = logging.getLogger(__name__)
 
@@ -254,7 +255,7 @@ def money_text(value, currency="USD") -> str:
 def what_it_changes(solution, groups) -> dict:
     from app.models.solution_models import SolutionCapabilityMapping
 
-    apps = [e for g in groups for e in g["elements"] if e["type"] == "ApplicationComponent"]
+    apps = [e for g in groups for e in g["elements"] if is_application_kind(e["type"])]
     try:
         capabilities = SolutionCapabilityMapping.query.filter_by(solution_id=solution.id).count()
     except Exception:
