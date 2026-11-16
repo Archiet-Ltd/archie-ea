@@ -20,6 +20,8 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import Optional
 
+import logging
+
 from app.extensions import db
 
 STATE_OPERATIONAL = "operational"
@@ -258,6 +260,59 @@ def set_subscribed(user_id: int, subscribed: bool) -> bool:
     return pref.notify_on_service_status
 
 
+_log = logging.getLogger(__name__)
+_IMPACT_WORDS = {"outage": "Down", "degraded": "Degraded"}
+
+
+def notify_subscribers(incident, resolved: bool) -> int:
+    """Email every active subscriber, one message each. Returns how many went out.
+
+    An incident is platform-wide, so subscribers in every organisation are told.
+    A failure is logged and never undoes the incident, which is already saved.
+    """
+    from flask import current_app
+
+    from app.flask_email import deliver_email, mail_available
+    from app.models.ai_suggestion import UserPreference
+    from app.models.user import User
+    from app.services.origin import canonical_origin
+
+    try:
+        if not mail_available():
+            return 0
+        users = (
+            User.query.join(UserPreference, UserPreference.user_id == User.id)  # tenant-scoping-ok: an incident is platform-wide, so every subscriber in every organisation is told
+            .filter(UserPreference.notify_on_service_status.is_(True), User.disabled_at.is_(None))
+            .all()
+        )
+        link = canonical_origin() + "/status"
+        when = (incident.resolved_at if resolved else incident.started_at) or datetime.utcnow()
+        subject = ("Resolved: " if resolved else "Incident: ") + incident.title
+        sent = 0
+        # The operator command runs outside a request; the shared page context
+        # processors expect one, so render inside a throwaway request context.
+        with current_app.test_request_context("/status"):
+            for user in users:
+                try:
+                    delivered, _error = deliver_email(
+                        user.email,
+                        subject,
+                        "monitoring/email/service_incident",
+                        incident=incident,
+                        resolved=resolved,
+                        impact_label=_IMPACT_WORDS.get(incident.impact, incident.impact),
+                        when=when,
+                        status_link=link,
+                    )
+                    sent += 1 if delivered else 0
+                except Exception:
+                    _log.error("service status email to one subscriber failed", exc_info=True)
+        return sent
+    except Exception:
+        _log.error("service status emails were not sent", exc_info=True)
+        return 0
+
+
 # --------------------------------------------------------------------------- #
 # Operator actions (the CLI)
 # --------------------------------------------------------------------------- #
@@ -274,6 +329,7 @@ def open_incident(title: str, impact: str, summary: Optional[str] = None):
     incident = ServiceIncident(title=title[:200], impact=impact, summary=(summary or None))
     db.session.add(incident)
     db.session.commit()
+    notify_subscribers(incident, resolved=False)
     return incident
 
 
@@ -286,4 +342,5 @@ def resolve_incident(incident_id: int):
     if incident.resolved_at is None:
         incident.resolved_at = datetime.utcnow()
         db.session.commit()
+        notify_subscribers(incident, resolved=True)
     return incident

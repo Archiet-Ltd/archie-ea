@@ -35,6 +35,7 @@ from flask import current_app, jsonify, request
 from flask_login import current_user, login_required
 from app.core.auth.permissions import can, can_change_model
 from app.middleware.tenant_context import current_org_id
+from app.utils.route_guards import load_entity_in_active_org
 
 from app.decorators import audit_log, require_roles
 from app.services.rate_limiter import rate_limit
@@ -1568,9 +1569,7 @@ def _derived_capability_name(capability_type, capability_id):
     if capability_type == "business":
         from app.models.business_capabilities import BusinessCapability
 
-        row = BusinessCapability.query.get(capability_id)
-        if row is not None and row.organization_id != current_org_id():
-            row = None
+        row = load_entity_in_active_org(BusinessCapability, capability_id)
     elif capability_type == "unified":
         from app.models.unified_capability import UnifiedCapability
 
@@ -2329,8 +2328,8 @@ def api_capability_traceability(capability_id):
         from app.models.unified_capability import UnifiedCapability
         from app.services.capability_support import applications_of_capability
 
-        capability = BusinessCapability.query.get(capability_id)
-        if not capability or capability.organization_id != current_org_id():
+        capability = load_entity_in_active_org(BusinessCapability, capability_id)
+        if not capability:
             return jsonify({"success": False, "error": "Capability not found"}), 404
 
         org_id = current_org_id()
