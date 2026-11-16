@@ -9,8 +9,6 @@ cleaned or updated here.
 
 import logging
 
-from app import db
-
 logger = logging.getLogger(__name__)
 
 NAME_MAX = 200
