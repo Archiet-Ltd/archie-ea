@@ -285,6 +285,19 @@ def compute_gap_signals(capability_type_filter="business", gap_type_filter=None)
             else []
         )
         gap_unified_caps_by_id = {c.id: c for c in biz_caps}
+        # A parent outside the live set (for example retired) is read once for all rows, so its
+        # path names the store its id belongs to without a query per gap.
+        outside_parent_ids = {
+            c.parent_capability_id for c in biz_caps
+            if c.parent_capability_id and c.parent_capability_id not in gap_unified_caps_by_id
+        }
+        if outside_parent_ids and org_id is not None:
+            gap_unified_caps_by_id.update({
+                c.id: c for c in UnifiedCapability.query.filter(
+                    UnifiedCapability.id.in_(outside_parent_ids),
+                    UnifiedCapability.organization_id == org_id,
+                ).all()
+            })
 
         support_by_cap = {}
         for row in support_rows(org_id) if org_id is not None else []:
@@ -384,13 +397,6 @@ def compute_gap_signals(capability_type_filter="business", gap_type_filter=None)
                 # Get parent info for hierarchy filtering (use prefetched lookup)
                 parent_id = cap.parent_capability_id
                 parent_cap = gap_unified_caps_by_id.get(parent_id) if parent_id else None
-                if parent_id and parent_cap is None:
-                    # The parent is outside the live set (for example retired): read its real
-                    # row so the path names the store its id belongs to.
-                    parent_cap = UnifiedCapability.query.filter(
-                        UnifiedCapability.id == parent_id,
-                        UnifiedCapability.organization_id == org_id,
-                    ).first()
                 gap_cap_id = _gap_capability_id(cap)
                 parent_gap_id = _gap_capability_id(parent_cap) if parent_cap else parent_id
 
@@ -1268,7 +1274,7 @@ def api_roadmap_delete_gap(gap_id):
         return jsonify({"success": False, "error": "An internal error occurred"}), 500
 
 
-@capability_map.route("/api/roadmap/gaps/<int:gap_id>/work-packages", methods=["POST"])
+@capability_map.route("/api/roadmap/gaps/<gap_id>/work-packages", methods=["POST"])
 @login_required
 @rate_limit(30, "1m")
 @audit_log("roadmap_work_package_create")
@@ -1294,8 +1300,12 @@ def api_roadmap_create_work_package(gap_id):
 
         # A query, not .get(): .get() answers from the session's identity map
         # without SQL, which would skip the organisation filter on a cache hit.
-        gap = Gap.query.filter_by(id=gap_id).first()
-        if not gap:
+        # A stored gap id, or a derived "{type}-{id}" one (including "unified-N")
+        # that the roadmap list offers: the one resolver turns either into a row.
+        gap, gap_error = _resolve_roadmap_gap_id(gap_id)
+        if gap_error is not None:
+            return gap_error
+        if gap is None:
             return jsonify({"success": False, "error": "Gap not found"}), 404
 
         data = request.get_json() or {}
