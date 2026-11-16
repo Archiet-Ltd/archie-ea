@@ -2490,7 +2490,8 @@ def test_two_click_reachability_from_home_page(app):
 
     with app.test_client() as client:
         sitemap_xml = client.get("/sitemap-en.xml").data.decode()
-        must_reach = set(re.findall(r"<loc>https://entelim\.org([^<]*)</loc>", sitemap_xml))
+        must_reach = set(re.findall(rf"<loc>{re.escape(canonical_origin())}([^<]*)</loc>", sitemap_xml))
+        assert must_reach, "the sitemap lists no page at the configured address"
         must_reach.discard("/")  # the home page itself, not a link target
 
         home_html = client.get("/").data.decode()

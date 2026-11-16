@@ -65,7 +65,10 @@ def test_pages_and_previews_name_the_configured_address(browser, configured_serv
         shots.mkdir(exist_ok=True)
         page.screenshot(path=str(shots / ("share-%s.png" % size)), full_page=True)
 
-        sitemap = page.goto(base + "/sitemap.xml", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT).text()
+        index = page.goto(base + "/sitemap.xml", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT).text()
+        listed = re.findall(r"<loc>([^<]+)</loc>", index)
+        assert listed and all(loc.startswith(CONFIGURED + "/") for loc in listed), listed
+        sitemap = page.goto(base + listed[0][len(CONFIGURED):], wait_until="domcontentloaded", timeout=PAGE_TIMEOUT).text()
         locs = re.findall(r"<loc>([^<]+)</loc>", sitemap)
         assert len(locs) > 10
         assert all(loc.startswith(CONFIGURED + "/") or loc == CONFIGURED for loc in locs), [

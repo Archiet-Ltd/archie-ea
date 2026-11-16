@@ -6,6 +6,8 @@ import re
 
 import pytest
 
+from app.services.origin import canonical_origin
+
 
 @pytest.fixture(params=["off", "1"])
 def switch(request, app, _schema, monkeypatch):
@@ -36,7 +38,7 @@ def _hub(client):
 
 
 def _sitemap(client):
-    return re.findall(r"<loc>https?://[^/<]+([^<]*)</loc>", client.get("/sitemap-en.xml").get_data(as_text=True))
+    return re.findall(rf"<loc>{re.escape(canonical_origin())}([^<]*)</loc>", client.get("/sitemap-en.xml").get_data(as_text=True))
 
 
 def test_the_hub_lists_exactly_the_coming_capabilities_that_have_a_page_to_open(app, switch):

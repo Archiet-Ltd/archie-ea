@@ -15,6 +15,7 @@ import tempfile
 import uuid
 
 import pytest
+from app.services.origin import canonical_origin
 from playwright.sync_api import expect, sync_playwright
 
 PATH = "/modules/sysml-to-archimate"
@@ -198,7 +199,7 @@ def test_the_hub_row_opens_the_waiting_list_page_which_is_in_the_sitemap_and_its
     expect(module).to_have_count(1)
     assert blurb in " ".join(module.inner_text().split())
     assert page.get_by_test_id("early-access-page").count() == 0
-    assert PATH in re.findall(r"<loc>https?://[^/<]+([^<]*)</loc>", page.request.get(site_url + "/sitemap-en.xml").text())
+    assert PATH in re.findall(rf"<loc>{re.escape(canonical_origin())}([^<]*)</loc>", page.request.get(site_url + "/sitemap-en.xml").text())
 
     closing = page.get_by_test_id("landing-closing").get_by_role("link", name="Talk to us")
     expect(closing).to_have_attribute("href", "/contact?from=sysml-to-archimate")
