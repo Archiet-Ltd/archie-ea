@@ -3693,6 +3693,7 @@ def _seed_demo_company() -> dict:
     from app.models.vendor.vendor_organization import EnterpriseInitiative
     from app.services import work_package_service
     from app.models.implementation_migration import Plateau, Gap
+    from app.services.gap_register_service import effective_severity, set_severity
     from app.jobs.tenant_safe_job import tenant_scope
     from werkzeug.security import generate_password_hash
 
@@ -4726,15 +4727,15 @@ def _seed_demo_company() -> dict:
                 )
                 db.session.add(gap)
                 gaps_created += 1
-            elif gap.severity is None:
+            elif effective_severity(gap) is None:
                 # Only complete the hook's unrated record: fill only empty fields,
                 # leave any field a person has since set untouched.
                 changed = False
                 if not gap.gap_kind:
                     gap.gap_kind = kind
                     changed = True
-                if gap.severity is None:
-                    gap.severity = severity
+                if effective_severity(gap) is None:
+                    set_severity(gap, severity)
                     changed = True
                 if el is not None and gap.archimate_element_id is None:
                     gap.archimate_element_id = el.id
