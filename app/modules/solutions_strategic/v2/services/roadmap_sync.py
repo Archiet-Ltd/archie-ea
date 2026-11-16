@@ -171,7 +171,7 @@ class RoadmapDataSync:
             logger.error(f"Error in application sync: {e}")
             raise
 
-    def sync_gaps_to_initiatives(self) -> Dict[str, Any]:
+    def sync_gaps_to_initiatives(self, organization_id=None, user_id=None) -> Dict[str, Any]:
         """
         Synchronize implementation gaps with work package initiatives
 
@@ -183,10 +183,17 @@ class RoadmapDataSync:
 
             sync_results = {"created": 0, "updated": 0, "resolved": 0, "errors": []}
 
+            if not organization_id:
+                # Gaps carry no organisation of their own: without one there is nothing safe to read.
+                sync_results["errors"].append("Gap sync needs an organisation; no gaps were read.")
+                return sync_results
+
             # Get unresolved gaps
-            unresolved_gaps = ImplementationGap.query.filter(
-                ImplementationGap.resolution_status.in_(["open", "in_progress"])
-            ).all()
+            unresolved_gaps = (
+                ImplementationGap.in_organization(organization_id)
+                .filter(ImplementationGap.status.in_(["open", "in_progress"]))
+                .all()
+            )
 
             for gap in unresolved_gaps:
                 try:
@@ -202,7 +209,7 @@ class RoadmapDataSync:
                             sync_results["updated"] += 1
                     else:
                         # Create new work package
-                        self._create_gap_work_package(gap)
+                        self._create_gap_work_package(gap, user_id)
                         sync_results["created"] += 1
 
                 except Exception as e:
@@ -211,7 +218,7 @@ class RoadmapDataSync:
                     sync_results["errors"].append(error_msg)
 
             # Mark resolved gaps as completed
-            resolved = self._sync_resolved_gaps()
+            resolved = self._sync_resolved_gaps(organization_id)
             sync_results["resolved"] = resolved
 
             logger.info(f"Gap sync completed: {sync_results}")
@@ -385,7 +392,7 @@ class RoadmapDataSync:
             full_sync_results["applications"] = self.sync_applications_to_deliverables(organization_id, user_id)
 
             # Sync gaps
-            full_sync_results["gaps"] = self.sync_gaps_to_initiatives()
+            full_sync_results["gaps"] = self.sync_gaps_to_initiatives(organization_id, user_id)
 
             # Sync vendor roadmaps
             full_sync_results["vendor_roadmaps"] = self.sync_vendor_roadmaps()
@@ -518,7 +525,7 @@ class RoadmapDataSync:
 
         return updated
 
-    def _create_gap_work_package(self, gap: ImplementationGap):
+    def _create_gap_work_package(self, gap: ImplementationGap, user_id=None):
         """Create work package from gap"""
         wp = ImplementationWorkPackage(
             name=f"Resolve {gap.gap_type} Gap: {gap.name}",
@@ -532,7 +539,7 @@ class RoadmapDataSync:
             auto_generated=True,
             confidence_score=gap.confidence_score,
             generation_method="gap_sync",
-            created_by=1,
+            created_by=user_id or 1,
             last_sync_at=datetime.utcnow(),
             sync_status="synced",
         )
@@ -630,11 +637,18 @@ class RoadmapDataSync:
 
         return archived
 
-    def _sync_resolved_gaps(self) -> int:
+    def _sync_resolved_gaps(self, organization_id=None) -> int:
         """Mark work packages as completed when gaps are resolved"""
         resolved = 0
 
-        resolved_gaps = ImplementationGap.query.filter(ImplementationGap.resolution_status == "resolved").all()
+        if not organization_id:
+            return resolved
+
+        resolved_gaps = (
+            ImplementationGap.in_organization(organization_id)
+            .filter(ImplementationGap.status == "resolved")
+            .all()
+        )
 
         for gap in resolved_gaps:
             wp = ImplementationWorkPackage.query.filter_by(

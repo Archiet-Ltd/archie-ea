@@ -390,6 +390,30 @@ class RoadmapGap(db.Model):
     source_capability = relationship("UnifiedCapability", backref="related_roadmap_gaps")
     source_application = relationship("ApplicationComponent", backref="related_roadmap_gaps")
 
+    @classmethod
+    def in_organization(cls, organization_id):
+        """Query of the gaps that belong to one organisation.
+
+        The table carries no organisation column, so a gap belongs to the organisation that owns
+        the capability or application it was raised against. A gap tied to neither, a gap tied to
+        a shared capability, and an unknown organisation all read as no gaps.
+        """
+        from app.models.application_portfolio import ApplicationComponent
+        from app.models.unified_capability import UnifiedCapability
+
+        if organization_id is None:
+            return cls.query.filter(db.false())
+        own_capabilities = db.select(UnifiedCapability.id).where(
+            UnifiedCapability.organization_id == organization_id)
+        own_applications = db.select(ApplicationComponent.id).where(
+            ApplicationComponent.organization_id == organization_id)
+        return cls.query.filter(
+            db.or_(
+                cls.source_capability_id.in_(own_capabilities),
+                cls.source_application_id.in_(own_applications),
+            )
+        )
+
     def to_dict(self):
         """Convert to dictionary"""
         return {
