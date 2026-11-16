@@ -10,9 +10,6 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional  # dead-code-ok
 
-from sqlalchemy import text  # dead-code-ok
-
-from app import db
 from app.models.roadmap_models import (  # dead-code-ok
     ImplementationGap,
     PlanningDeliverable,
