@@ -27,7 +27,12 @@ from app.models.archimate_core import (
     ArchiMateElement as ArchitectureElement,
     ArchiMateRelationship as Relationship,
 )
-from app.modules.intelligence.services.query_service import filter_relationships_by_org
+from app.modules.intelligence.services.query_service import (
+    RELATIONSHIP_PAGE_SIZES,
+    filter_relationships_by_org,
+    relationship_sort_args,
+    relationships_page,
+)
 from app.services.architecture_validation_service import ArchitectureValidator
 from app.services.architecture_search_service import ArchitectureSearchService
 from app.services.architecture_import_export_service import (
@@ -45,6 +50,20 @@ architecture_crud_bp = Blueprint(
 validator = ArchitectureValidator()
 search_service = ArchitectureSearchService()
 import_export_service = ArchitectureImportExportService()
+
+
+def _own_element_or_404(element_id):
+    """The element with this id inside the signed-in organisation, else 404."""
+    return ArchitectureElement.query.filter_by(
+        id=element_id, organization_id=current_org_id()
+    ).first_or_404()
+
+
+def _own_relationship_or_404(rel_id):
+    """The relationship with this id inside the signed-in organisation, else 404."""
+    return Relationship.query.filter_by(
+        id=rel_id, organization_id=current_org_id()
+    ).first_or_404()
 
 
 # ==================== ELEMENT ROUTES ====================
@@ -187,11 +206,16 @@ def create_element():
 @login_required
 def view_element(element_id):
     """View element details."""
-    element = ArchitectureElement.query.get_or_404(element_id)
+    element = _own_element_or_404(element_id)
 
-    # Get relationships
-    incoming = Relationship.query.filter_by(target_id=element_id).all()
-    outgoing = Relationship.query.filter_by(source_id=element_id).all()
+    # Get relationships, leaving out any whose far end is in another organisation
+    org_id = current_org_id()
+    incoming = filter_relationships_by_org(
+        Relationship.query.filter_by(target_id=element_id).all(), org_id, direction="incoming"
+    )
+    outgoing = filter_relationships_by_org(
+        Relationship.query.filter_by(source_id=element_id).all(), org_id, direction="outgoing"
+    )
 
     return render_template(
         "architecture/elements.html",
@@ -206,7 +230,7 @@ def view_element(element_id):
 @require_roles("admin", "architect")
 def edit_element_form(element_id):
     """Show edit element form."""
-    element = ArchitectureElement.query.get_or_404(element_id)
+    element = _own_element_or_404(element_id)
     return jsonify(
         {"success": True, "data": element.to_dict(), "message": "Use PUT to update"}
     )
@@ -218,7 +242,7 @@ def edit_element_form(element_id):
 @audit_log("architecture_element_update")
 def update_element(element_id):
     """Update element."""
-    element = ArchitectureElement.query.get_or_404(element_id)
+    element = _own_element_or_404(element_id)
     data = request.get_json() or {}
 
     # Validate
@@ -249,7 +273,7 @@ def update_element(element_id):
 @audit_log("architecture_element_delete")
 def delete_element(element_id):
     """Delete element and all related relationships."""
-    element = ArchitectureElement.query.get_or_404(element_id)
+    element = _own_element_or_404(element_id)
     element_name = element.name
 
     # Delete related relationships
@@ -298,75 +322,31 @@ def list_relationships():
     is the caller's org while the far element belongs to another). Only relationships
     where both source and target elements belong to the current organisation are listed.
     """
-    from app.models.archimate_core import ArchiMateRelationship
-
     page = safe_int_arg('page', 1, minimum=1)
-    per_page = 20
-
-    org_id = current_org_id()
+    per_page = request.args.get("per_page", 20, type=int)
+    if per_page not in RELATIONSHIP_PAGE_SIZES:
+        per_page = 20
 
     # An address that names one relationship ("Open relationship record" in an
     # answer) shows that relationship, so the row it points at is on the page.
     focus_id = request.args.get("relationship", type=int)
-    listing = ArchiMateRelationship.query
-    if focus_id is not None:
-        listing = listing.filter(ArchiMateRelationship.id == focus_id)
-
-    # Apply the shared fence BEFORE paging so each page holds its full 20 rows
-    all_rels = listing.order_by(
-        ArchiMateRelationship.type, ArchiMateRelationship.id
-    ).all()
-    filtered_rels = filter_relationships_by_org(all_rels, org_id, direction="both")
-
-    # Manual pagination on the filtered list
-    total = len(filtered_rels)
-    start = (page - 1) * per_page
-    end = start + per_page
-    page_items = filtered_rels[start:end]
-
-    element_ids = set()
-    for rel in page_items:
-        element_ids.add(rel.source_id)
-        element_ids.add(rel.target_id)
-
-    names_by_id = {}
-    if element_ids:
-        names_by_id = dict(
-            db.session.query(ArchitectureElement.id, ArchitectureElement.name)
-            .filter(ArchitectureElement.id.in_(element_ids))
-        )
-
-    relationships = [
-        {
-            "id": rel.id,
-            "type": rel.type,
-            "source_id": rel.source_id,
-            "target_id": rel.target_id,
-            "source_name": names_by_id.get(rel.source_id),
-            "target_name": names_by_id.get(rel.target_id),
-        }
-        for rel in page_items
-    ]
-
-    # Pagination data for the template
-    pages = (total + per_page - 1) // per_page if per_page else 0
-    has_prev = page > 1
-    has_next = page < pages
-    prev_num = page - 1 if has_prev else None
-    next_num = page + 1 if has_next else None
+    sort, direction = relationship_sort_args(request.args)
+    listing = relationships_page(current_org_id(), page, per_page, focus_id, sort, direction)
+    relationships, total, pages, page = (
+        listing["relationships"], listing["total"], listing["pages"], listing["page"]
+    )
 
     return render_template(
         "architecture/relationships.html",
+        relationship_page_sizes=RELATIONSHIP_PAGE_SIZES,
         relationships=relationships,
         total=total,
         page=page,
         per_page=per_page,
         pages=pages,
-        has_prev=has_prev,
-        has_next=has_next,
-        prev_num=prev_num,
-        next_num=next_num,
         focus_id=focus_id,
+        sort=sort,
+        sort_dir=direction,
     )
 
 
@@ -412,7 +392,7 @@ def create_relationship():
 @audit_log("architecture_relationship_update")
 def update_relationship(rel_id):
     """Update relationship."""
-    relationship = Relationship.query.get_or_404(rel_id)
+    relationship = _own_relationship_or_404(rel_id)
     data = request.get_json() or {}
 
     # Validate
@@ -441,7 +421,7 @@ def update_relationship(rel_id):
 @audit_log("architecture_relationship_delete")
 def delete_relationship(rel_id):
     """Delete relationship."""
-    relationship = Relationship.query.get_or_404(rel_id)
+    relationship = _own_relationship_or_404(rel_id)
 
     db.session.delete(relationship)
     db.session.commit()
@@ -743,7 +723,7 @@ def api_element_relationships(element_id):
     are returned.
     """
     org_id = current_org_id()
-    ArchitectureElement.query.filter_by(id=element_id, organization_id=org_id).first_or_404()
+    _own_element_or_404(element_id)
 
     incoming_rels = Relationship.query.filter_by(target_id=element_id).all()
     outgoing_rels = Relationship.query.filter_by(source_id=element_id).all()
