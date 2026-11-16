@@ -41,9 +41,9 @@ def test_data_architect_entity_create_filter_edit_cancel_delete(browser, live_se
     try:
         _login(page, live_server, seeded["emails"]["data_architect"])
         assert page.goto(live_server + CATALOG, timeout=PAGE_TIMEOUT).status == 200
-        page.get_by_role("link", name="Create Entity", exact=True).click()
+        page.get_by_role("link", name="Create entity", exact=True).click()
         expect(page.get_by_role("heading", name="Create Data Entity", exact=True)).to_be_visible()
-        assert page.locator('input[name="csrf_token"]').input_value()
+        assert page.locator('#main-content input[name="csrf_token"]').input_value()
         page.locator("#name").fill(marker)
         page.get_by_label("Business Name", exact=True).fill("Synthetic lifecycle fixture")
         page.get_by_label("Description", exact=True).fill("Created by an isolated browser qualification run.")
@@ -65,7 +65,7 @@ def test_data_architect_entity_create_filter_edit_cancel_delete(browser, live_se
         page.get_by_role("textbox", name="Search", exact=True).fill(marker)
         page.get_by_label("Classification", exact=True).select_option("restricted")
         page.get_by_role("button", name="Filter", exact=True).click()
-        expect(page.get_by_role("heading", name="No data entities found", exact=True)).to_be_visible()
+        expect(page.get_by_role("heading", name="No data entities match these filters", exact=True)).to_be_visible()
         page.get_by_label("Classification", exact=True).select_option("confidential")
         page.get_by_label("Type", exact=True).select_option("master")
         page.get_by_role("button", name="Filter", exact=True).click()
