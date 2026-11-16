@@ -92,8 +92,10 @@ def _walk(page, name):
     os.makedirs(folder, exist_ok=True)
     if os.environ.get("WALK_MODE") == "narrow-dark":
         page.evaluate("() => document.documentElement.classList.add('dark')")
-    page.screenshot(path=os.path.join(folder, "%s-%s.png" % (os.environ.get("WALK_MODE", "wide-light"), name)),
-                    full_page=True)
+    owner = page.get_by_test_id("application-owner")
+    if owner.count():
+        owner.first.scroll_into_view_if_needed()
+    page.screenshot(path=os.path.join(folder, "%s-%s.png" % (os.environ.get("WALK_MODE", "wide-light"), name)))
 
 
 def _run_owner_step(estate):
