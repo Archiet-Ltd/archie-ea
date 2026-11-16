@@ -256,7 +256,9 @@ def test_the_legend_and_the_nodes_read_the_same_layer_tokens(app, db_session, ma
     dots = {}
     for layer, markup in re.findall(r'<li[^>]*data-layer="(\w+)"[^>]*>(.*?)</li>', html, flags=re.S):
         dots[layer] = re.search(r'class="([^"]*bg-notation-[^"]*)"', markup).group(1)
-    assert set(dots) == {"strategy", "business", "application", "technology", "physical", "motivation", "implementation"}
+    # The rack is Physical by its stored layer and Technology by its type: the map counts it with Technology,
+    # as the dashboard tab and the Composer card do, so there is no Physical row.
+    assert set(dots) == {"strategy", "business", "application", "technology", "motivation", "implementation"}
     for layer, classes in dots.items():
         assert ("bg-notation-%s " % layer) in (classes + " ") and "border-notation-%s-stroke" % layer in classes
     assert len(set(dots.values())) == len(dots)
@@ -270,3 +272,83 @@ def test_the_graph_canvas_has_no_inline_style_and_one_force_simulation():
     assert "style=" not in html
     script = (_ROOT / "app/static/js/impact_graph.js").read_text()
     assert script.count("d3.forceSimulation(") == 1
+
+
+def test_register_only_count_is_one_query_per_layer(db_session, make_org, tenant_ctx):
+    """_register_only_count issues one UNION ALL query per layer, not one per element type."""
+    from app import db
+    from app.services import archimate_viewpoint_service as counting
+    from sqlalchemy import event
+
+    a = make_org("a")
+    statements = []
+    engine = db_session.get_bind()
+
+    def _record(conn, cursor, statement, parameters, context, executemany):
+        text = " ".join(str(statement).split())
+        if "set_config" not in text:
+            statements.append(text)
+
+    event.listen(engine, "before_cursor_execute", _record)
+    try:
+        with tenant_ctx(a.id):
+            counting._register_only_count("business", a.id)
+    finally:
+        event.remove(engine, "before_cursor_execute", _record)
+
+    assert len(statements) == 1, f"expected 1 query, got {len(statements)}: {statements}"
+
+
+def test_register_only_count_matches_per_type_total(db_session, make_org, tenant_ctx):
+    """The UNION ALL register-only count equals the sum of per-type counts for every layer."""
+    from app.services import archimate_viewpoint_service as counting
+    from app.modules.architecture.routes.archimate_crud.routes import LAYER_CONFIG, MODEL_REGISTRY
+
+    a = make_org("a")
+    with tenant_ctx(a.id):
+        for layer in ("business", "application", "technology"):
+            new_count = counting._register_only_count(layer, a.id)
+            old_count = 0
+            keys = [layer] + (["physical"] if layer == "technology" else [])
+            for key in keys:
+                for type_name in LAYER_CONFIG.get(key, {}).get("elements", []):
+                    model_class = MODEL_REGISTRY.get(type_name)
+                    if not model_class:
+                        continue
+                    query = model_class.query
+                    if hasattr(model_class, "organization_id"):
+                        query = query.filter(model_class.organization_id == a.id)
+                    if hasattr(model_class, "archimate_element_id"):
+                        query = query.filter(model_class.archimate_element_id.is_(None))
+                    old_count += query.count()
+            assert new_count == old_count, f"layer {layer}: new={new_count}, old={old_count}"
+
+
+def _header_phrase(drawn, total):
+    """Run the page script's ofTotal in node and return what the header says for these figures."""
+    import json
+    import shutil
+    import subprocess
+
+    node = shutil.which("node")
+    if not node:
+        pytest.skip("node is not installed")
+    script = (_ROOT / "app/static/js/impact_graph.js").read_text()
+    start = script.index("function ofTotal(")
+    body = script[start:script.index("// The figure the dashboard gives", start)]
+    code = body + "\nconsole.log(JSON.stringify(ofTotal(%s, %s)));" % (json.dumps(drawn), json.dumps(total))
+    out = subprocess.run([node, "-e", code], capture_output=True, text=True, timeout=60, check=True)
+    return json.loads(out.stdout)
+
+
+def test_header_says_the_total_is_not_known_when_the_register_cannot_be_counted():
+    assert _header_phrase(1547, None) == "1547 elements drawn, total not known"
+    assert _header_phrase(1, None) == "1 element drawn, total not known"
+    assert _header_phrase(1547, 1562) == "1547 of 1562 elements"
+    assert _header_phrase(1, 1) == "1 element"
+    assert _header_phrase(12, 12) == "12 elements"
+
+
+def test_the_not_drawn_sentence_agrees_with_one_and_with_many():
+    html = (_ROOT / "app/templates/architecture/impact_graph.html").read_text()
+    assert "element entered in a register is' if undrawn_n == 1 else 'elements entered in a register are'" in html

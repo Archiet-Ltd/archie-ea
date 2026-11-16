@@ -1308,6 +1308,24 @@ entries:
       Searched before writing: joint, d3, mermaid, plantuml, cytoscape, dagre, bpmn, UMLModel, SavedDiagram across
       app/. dagre is a layout helper that composer.js and erd.js already use and is not a drawing library.
 
+  - id: layer-counts
+    concept: How many elements each ArchiMate layer holds (the architecture dashboard's tabs and the Composer's layer cards)
+    status: active
+    canonical:
+      path: app/services/archimate_viewpoint_service.py
+      symbols: [count_layers, layer_model_query, layer_criterion, element_layer, LAYER_TYPES]
+    reuse: >
+      count_layers is the one count of every layer, element_layer the one rule and layer_model_query the one
+      reader of a layer's elements: an element counts in the layer it is stored in, whatever its type (Physical
+      is Technology's); one that names no layer is placed by its type through LAYER_TYPES, and a type no layer
+      holds is the composite row. The dashboard's tab counts, its layer lists, the Composer's layer cards and
+      the model map all read them. Do not count a layer with a second query or a second type map, and do not
+      take a tab's count from the list that opens under it.
+    note: >
+      One layer set for the dashboard tabs, the Composer cards and the model map: Strategy, Motivation, Business,
+      Application, Technology (Physical's four types are inside it), Implementation and migration, and the composite
+      row (Other on the map). The model map (app/services/model_map.py) reads count_layers and layer_model_query.
+
   - id: application-model-links
     concept: What the architecture model links to an application (technology, suppliers, every other element), and the
       type spelling those links are read by

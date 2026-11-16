@@ -60,6 +60,22 @@ def _refuse_unless_may_work_package(action):
     return jsonify({"success": False, "error": "Your role may read the roadmap but not change it."}), 403
 
 
+def _supported_business_capability_ids(organization_id):
+    """Ids of the business capabilities that at least one application supports, read from the one support store."""
+    from app.models.unified_capability import UnifiedCapability
+    from app.services.capability_support import support_rows
+
+    supported = {r["capability_id"] for r in support_rows(organization_id)}
+    if not supported:
+        return set()
+    rows = UnifiedCapability.query.filter(
+        UnifiedCapability.organization_id == organization_id,
+        UnifiedCapability.id.in_(supported),
+        UnifiedCapability.source_table == "business_capability",
+    ).all()
+    return {int(r.source_id) for r in rows if str(r.source_id or "").isdigit()}
+
+
 @capability_map.route("/api/roadmap/capabilities")
 @login_required
 @rate_limit(60, "1m")
@@ -70,15 +86,11 @@ def api_roadmap_capabilities():
     Returns capabilities organized for roadmap visualization with timeline data.
     """
     try:
-        from app.models.business_capabilities import (
-            ApplicationCapabilityCoverage,
-            BusinessCapability,
-        )
+        from app.models.business_capabilities import BusinessCapability
         from app.models.unified_capability import UnifiedCapability
 
         capabilities = BusinessCapability.query.all()
-        mappings = ApplicationCapabilityCoverage.query.all()
-        mapped_cap_ids = {m.capability_id for m in mappings}
+        mapped_cap_ids = _supported_business_capability_ids(current_org_id())
 
         # D-R7-2: this is the roadmap screen's own data feed, sitting in the
         # same file/blueprint as api_roadmap_detect_gaps() (the "Detect gaps"
@@ -211,6 +223,18 @@ def api_roadmap_capabilities():
 # =============================================================================
 
 
+def _figures_if_asked(org_id):
+    """The roadmap's tile figures and evidence line, counted once for this answer.
+
+    The page already carries them on first paint, so its first reads ask with ?figures=0 and skip the count;
+    any other read, such as the one after a save, gets the fresh figures."""
+    if request.args.get("figures") == "0":
+        return None
+    from app.services import result_footer_service
+
+    return result_footer_service.roadmap_figures(org_id)
+
+
 def compute_gap_signals(capability_type_filter="business", gap_type_filter=None):
     """The capability gap signals: coverage, quality, retirement and modernisation findings, not yet recorded.
 
@@ -222,10 +246,6 @@ def compute_gap_signals(capability_type_filter="business", gap_type_filter=None)
     from app.models.application_portfolio import ApplicationComponent
     from app.models.apqc_process import APQCProcess
     from app.models.technical_capability import TechnicalCapability
-    from app.models.business_capabilities import (
-        ApplicationCapabilityCoverage,
-        BusinessCapability,
-    )
 
     # C1 fix: default to "business" when no capability_type is requested.
     # Technical capabilities and APQC processes are SHARED reference taxonomies
@@ -250,23 +270,44 @@ def compute_gap_signals(capability_type_filter="business", gap_type_filter=None)
     if not capability_type_filter or capability_type_filter == "business":
         from app.models.application_layer import ApplicationComponent
 
-        biz_caps = BusinessCapability.query.all()
+        from app.models.unified_capability import UnifiedCapability
+        from app.services.capability_support import support_rows
+
+        # The one support reader: the capabilities of the signed-in organisation and the
+        # applications that support them, the same rows the investment matrix counts.
+        org_id = current_org_id()
+        biz_caps = (
+            UnifiedCapability.query.filter(
+                UnifiedCapability.organization_id == org_id,
+                UnifiedCapability.retired_into_id.is_(None),
+            ).order_by(UnifiedCapability.name).all()
+            if org_id is not None
+            else []
+        )
         gap_unified_caps_by_id = {c.id: c for c in biz_caps}
 
-        # Batch-prefetch coverage mappings
-        all_coverage = ApplicationCapabilityCoverage.query.all()
-        coverage_by_cap = {}
-        for cov in all_coverage:
-            coverage_by_cap.setdefault(cov.capability_id, []).append(cov)
+        support_by_cap = {}
+        for row in support_rows(org_id) if org_id is not None else []:
+            support_by_cap.setdefault(row["capability_id"], []).append(row["application_id"])
 
-        # Batch-prefetch applications
-        all_app_ids = {cov.application_component_id for cov in all_coverage}
+        all_app_ids = {aid for ids in support_by_cap.values() for aid in ids}
         all_apps = ApplicationComponent.query.filter(ApplicationComponent.id.in_(all_app_ids)).all() if all_app_ids else []
         apps_by_id = {a.id: a for a in all_apps}
 
+        def _from_business(unified):
+            return unified.source_table == "business_capability" and str(unified.source_id or "").isdigit()
+
+        def _gap_capability_id(unified):
+            # Recorded gaps are keyed by the store the id comes from: the business capability a
+            # capability was projected from, or else the capability's own id in the unified store.
+            return int(unified.source_id) if _from_business(unified) else unified.id
+
+        def _gap_capability_type(unified):
+            # The two id sequences overlap, so the type must say which store the id belongs to.
+            return "business" if _from_business(unified) else "unified"
+
         for cap in biz_caps:
-            cap_mappings = coverage_by_cap.get(cap.id, [])
-            apps = [apps_by_id.get(m.application_component_id) for m in cap_mappings if apps_by_id.get(m.application_component_id)]
+            apps = [apps_by_id[aid] for aid in support_by_cap.get(cap.id, []) if aid in apps_by_id]
             app_count = len(apps)
 
             gap_types = []
@@ -341,25 +382,29 @@ def compute_gap_signals(capability_type_filter="business", gap_type_filter=None)
                     priority = "critical"
 
                 # Get parent info for hierarchy filtering (use prefetched lookup)
-                parent_id = getattr(cap, "parent_id", None)
-                parent_cap = None
-                if parent_id:
-                    parent_cap = gap_unified_caps_by_id.get(parent_id)
+                parent_id = cap.parent_capability_id
+                parent_cap = gap_unified_caps_by_id.get(parent_id) if parent_id else None
+                gap_cap_id = _gap_capability_id(cap)
+                parent_gap_id = _gap_capability_id(parent_cap) if parent_cap else parent_id
 
                 # Build hierarchy path for filtering descendants
-                hierarchy_path = f"business-{cap.id}"
+                gap_cap_type = _gap_capability_type(cap)
+                hierarchy_path = f"{gap_cap_type}-{gap_cap_id}"
                 if parent_id:
-                    hierarchy_path = f"business-{parent_id}," + hierarchy_path
+                    parent_gap_type = _gap_capability_type(parent_cap) if parent_cap else "business"
+                    hierarchy_path = f"{parent_gap_type}-{parent_gap_id}," + hierarchy_path
 
                 gaps.append(
                     {
-                        "id": f"business-{cap.id}",
-                        "capability_id": cap.id,
-                        "capability_type": "business",
+                        "id": f"{gap_cap_type}-{gap_cap_id}",
+                        "capability_id": gap_cap_id,
+                        "unified_capability_id": cap.id,
+                        "has_fact_sheet": _from_business(cap),
+                        "capability_type": gap_cap_type,
                         "name": cap.name,
-                        "domain": getattr(cap, "business_domain", None) or "Unknown",
+                        "domain": (cap.domain.name if cap.domain else None) or "Unknown",
                         "level": cap.level or 1,
-                        "parent_id": parent_id,
+                        "parent_id": parent_gap_id,
                         "parent_name": parent_cap.name if parent_cap else None,
                         "hierarchy_path": hierarchy_path,
                         "gap_types": gap_types,
@@ -705,6 +750,7 @@ def api_roadmap_gaps():
             "high_priority": len([g for g in gaps if g["priority"] == "high"]),
             "by_capability_type": {
                 "business": len([g for g in gaps if g["capability_type"] == "business"]),
+                "unified": len([g for g in gaps if g["capability_type"] == "unified"]),
                 "technical": len([g for g in gaps if g["capability_type"] == "technical"]),
                 "process": len([g for g in gaps if g["capability_type"] == "process"]),
             },
@@ -712,16 +758,14 @@ def api_roadmap_gaps():
 
         # The one gap count is the recorded gaps; the list above is signals
         # computed from capability coverage, and is counted separately.
-        from app.services import result_footer_service
-
-        figures = result_footer_service.roadmap_figures(current_org_id())
+        figures = _figures_if_asked(current_org_id())
 
         return jsonify(
             {
                 "success": True,
                 "gaps": gaps,
                 "statistics": stats,
-                "recorded_gaps": figures["recorded_gaps"],
+                "recorded_gaps": figures["recorded_gaps"] if figures else None,
                 "signal_count": len(gaps),
                 "figures": figures,
             }
@@ -1075,6 +1119,12 @@ def api_roadmap_add_from_capability():
                 400,
             )
 
+        if data.get("capability_type") == "business" and not str(data.get("capability_id")).isdigit():
+            return jsonify({"success": False, "error": "Capability not found"}), 404
+        if data.get("capability_type") == "business" and _derived_capability_name(
+                "business", int(data.get("capability_id"))) is None:
+            return jsonify({"success": False, "error": "Capability not found"}), 404
+
         # Check if gap already exists for this capability
         existing_gap = gap_archimate_service.find_existing_gap(
             data.get("capability_type"), data.get("capability_id")
@@ -1355,13 +1405,12 @@ def api_roadmap_work_packages():
         include_children = request.args.get("include_children", "true").lower() == "true"
 
         query = work_package_service.query_for(org_id)
+        # Every package of the organisation (parts included), whatever gap or rows this answer lists.
+        all_count = query.count()
         if gap_id:
             # The one reader of a work package's gap links (the relationships).
             query = query.filter(UWP.id.in_(
                 work_package_service.work_package_ids_for_gap(gap_id, org_id)))
-        # Every package of the organisation (parts included): the figure the roadmap
-        # board and the headline count give, whatever rows this answer lists.
-        all_count = query.count()
         if root_only:
             query = query.filter(UWP.parent_id.is_(None))
         work_packages = query.order_by(UWP.start_date, UWP.id).all()
@@ -1378,13 +1427,14 @@ def api_roadmap_work_packages():
                 current_app.logger.warning(f"WorkPackage {wp.id} serialization failed: {se}")
                 serialized.append({"id": wp.id, "name": wp.name, "status": wp.status})
 
-        # Always include footer data for the evidence line
-        from app.services import result_footer_service
+        figures = _figures_if_asked(org_id)
+        if request.args.get("footer"):
+            # One evidence line under each row, only for the page that shows rows.
+            from app.services import result_footer_service
 
-        figures = result_footer_service.roadmap_figures(org_id)
-        for wp, item in zip(work_packages, serialized):
-            item["footer_html"] = result_footer_service.render_footer(
-                result_footer_service.work_package_footer(wp, name_shown=True))
+            for wp, item in zip(work_packages, serialized):
+                item["footer_html"] = result_footer_service.render_footer(
+                    result_footer_service.work_package_footer(wp, name_shown=True))
 
         from app.services.cost_visibility import withhold_reply
 
@@ -1498,6 +1548,8 @@ def _derived_capability_name(capability_type, capability_id):
         from app.models.business_capabilities import BusinessCapability
 
         row = BusinessCapability.query.get(capability_id)
+        if row is not None and row.organization_id != current_org_id():
+            row = None
     elif capability_type == "technical":
         from app.models.technical_capability import TechnicalCapability
 
@@ -1881,8 +1933,6 @@ def api_roadmap_get_plateaus():
         # by its packages, and the packages that realise it.
         gaps_by_plateau = get_plateau_gap_rows(ids, org_id)
         wps_by_plateau = work_package_service.plateau_work_package_ids(ids, org_id)
-        from app.services import result_footer_service
-
         shown = [
             {
                 "id": p.id,
@@ -1897,7 +1947,7 @@ def api_roadmap_get_plateaus():
             for p in plateaus
         ]
         return jsonify({"success": True, "plateaus": shown,
-                        "figures": result_footer_service.roadmap_figures(org_id)})
+                        "figures": _figures_if_asked(org_id)})
     except Exception as e:
         current_app.logger.error(f"Error fetching plateaus: {e}", exc_info=True)
         return jsonify({"success": False, "error": "An internal error occurred"}), 500
@@ -2246,22 +2296,25 @@ def api_capability_traceability(capability_id):
         import json as _json
 
         from app.models.application_portfolio import ApplicationComponent
-        from app.models.business_capabilities import (
-            ApplicationCapabilityCoverage,
-            BusinessCapability,
-        )
+        from app.models.business_capabilities import BusinessCapability
+        from app.models.unified_capability import UnifiedCapability
+        from app.services.capability_support import applications_of_capability
 
         capability = BusinessCapability.query.get(capability_id)
-        if not capability:
+        if not capability or capability.organization_id != current_org_id():
             return jsonify({"success": False, "error": "Capability not found"}), 404
 
-        mappings = (
-            ApplicationCapabilityCoverage.query
-            .filter_by(capability_id=capability_id)
-            .all()
+        org_id = current_org_id()
+        unified = UnifiedCapability.query.filter(
+            UnifiedCapability.organization_id == org_id,
+            UnifiedCapability.source_table == "business_capability",
+            UnifiedCapability.source_id == str(capability_id),
+        ).first()
+        app_ids = (
+            [r["application_id"] for r in applications_of_capability(org_id, unified.id)]
+            if unified is not None
+            else []
         )
-
-        app_ids = [m.application_component_id for m in mappings]
         apps = (
             ApplicationComponent.query.filter(ApplicationComponent.id.in_(app_ids)).all()
             if app_ids
