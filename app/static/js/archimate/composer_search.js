@@ -283,6 +283,7 @@ let ComposerSearch = (function() {
                     // Platform.fetch returns parsed data directly
                     let resp = data;
                     let dataArray = resp.data || resp || [];
+                    self.searchActive = -1;
                     self.searchResults = Array.isArray(dataArray) ? dataArray.filter(function(el) {
                         if (self.canvasElements[el.id]) return false;
                         /* Client-side layer filter fallback if API doesn't support it */
@@ -321,6 +322,7 @@ let ComposerSearch = (function() {
                     self.elementCount++;
                     if (self.solutionId) self.linkElementToSolution(elem.id);
                     self.statusText = 'Created: ' + el.name;
+                    self._chooseCell(node);
                     self.refreshMaturityOverlay();
                     /* BUG-CMP-004: Check if dropped onto an existing element */
                     if (self._checkDropOverlap) self._checkDropOverlap(node);
@@ -349,8 +351,25 @@ let ComposerSearch = (function() {
             this.quickAddResults = [];
         },
 
+        /* Arrow keys move through the found elements; Enter in the search field adds the one it is on. */
+        searchStep: function(delta) {
+            let n = this.searchResults.length;
+            if (!n) return;
+            this.searchActive = (this.searchActive + delta + n) % n;
+            this.$nextTick(function() {
+                let row = document.querySelector('#search-overlay [role="option"][aria-selected="true"]');
+                if (row && row.scrollIntoView) row.scrollIntoView({ block: 'nearest' });
+            });
+        },
+
+        searchChooseActive: function() {
+            let item = this.searchResults[this.searchActive];
+            if (item) this.pickElement(item);
+        },
+
         closeSearch: function() {
             this.searchOpen = false;
+            this.searchActive = -1;
             this.searchQuery = '';
             this.searchResults = [];
             this.newElementName = '';

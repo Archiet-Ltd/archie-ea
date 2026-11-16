@@ -455,6 +455,8 @@ let ComposerGraph = (function() {
         confirmBulkDelete: function() {
             let cells = this._selectedCells.slice();
             let self = this;
+            /* Work out where focus goes next before the elements are gone. */
+            let next = cells.length ? this._nearestElementTo(cells) : null;
             cells.forEach(function(cell) {
                 let elId = cell.get('elementId');
                 cell.remove();
@@ -466,6 +468,12 @@ let ComposerGraph = (function() {
             self._selectedCells = [];
             self.bulkDeleteConfirmOpen = false;
             self.statusText = 'Removed ' + cells.length + ' element(s) from canvas';
+            /* Focus returns to the drawing, on the element nearest the one removed. */
+            self._chooseCell(next);
+            self.$nextTick(function() {
+                let canvas = document.getElementById('composer-canvas');
+                if (canvas) canvas.focus();
+            });
             /* GAP-CMP-002/003: Update validation badge + orphan highlights */
             if (self._diagramChanged) self._diagramChanged();
         },

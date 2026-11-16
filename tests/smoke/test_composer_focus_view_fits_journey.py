@@ -544,3 +544,114 @@ def test_walking_brings_the_whole_element_into_the_drawing(browser, live_server,
         assert edge_cases, "%s: the zoomed drawing never needed to move, so the edge was not tested" % where
     finally:
         context.close()
+
+
+ADD_STATE = """() => {
+  const a = Alpine.$data(document.querySelector('[x-data^="composerApp"]'));
+  const ae = document.activeElement;
+  const dlg = document.querySelector('#search-overlay');
+  return {count: a.graph.getElements().length, open: a.searchOpen,
+          active: ae ? (ae.getAttribute('aria-label') || ae.getAttribute('data-testid') || (ae.tagName === 'BUTTON' && ae.textContent.trim()) || ae.id || ae.tagName) : null,
+          inDialog: !!(dlg && ae && dlg.contains(ae)),
+          selected: (a._selectedCells || []).map(c => c.get('elName'))};
+}"""
+
+
+def _open_add_dialog_by_keyboard(page, where):
+    """Focus a palette item and press Enter; the add dialog must open."""
+    if not page.get_by_test_id("composer-rail").is_visible():
+        page.get_by_test_id("shell-rail-toggle").focus()
+        page.keyboard.press("Enter")
+    if not page.get_by_test_id("diagram-palette").is_visible():
+        page.get_by_test_id("rail-tab-add").focus()
+        page.keyboard.press("Enter")
+    page.get_by_test_id("palette-search").fill("Application Component")
+    item = page.get_by_test_id("palette-item-ApplicationComponent")
+    expect(item).to_be_visible()
+    item.focus()
+    page.keyboard.press("Enter")
+    page.wait_for_function("() => Alpine.$data(document.querySelector('[x-data^=\"composerApp\"]')).searchOpen", timeout=5000)
+    page.wait_for_timeout(400)
+    assert page.evaluate(ADD_STATE)["inDialog"], "%s: focus did not move into the add dialog" % where
+
+
+@pytest.mark.parametrize("scheme,width,height", [("light", 1440, 900), ("dark", 390, 844)])
+def test_keyboard_alone_adds_a_new_element_from_the_palette(browser, live_server, hub, scheme, width, height):
+    """A person who never touches the mouse opens a palette item with Enter, reaches the name field by Tab,
+    types a name and presses Enter on Create: the drawing gains that element."""
+    context, page = _open(browser, live_server, hub, width, height, scheme)
+    try:
+        where = "%dx%d %s" % (width, height, scheme)
+        before = page.evaluate(ADD_STATE)["count"]
+        _open_add_dialog_by_keyboard(page, where)
+        seen = []
+        for _ in range(8):
+            if page.evaluate(ADD_STATE)["active"] == "New Element Name":
+                break
+            page.keyboard.press("Tab")
+            state = page.evaluate(ADD_STATE)
+            seen.append(state["active"])
+            assert state["inDialog"], "%s: Tab left the add dialog: %r" % (where, seen)
+        assert page.evaluate(ADD_STATE)["active"] == "New Element Name", "%s: Tab never reached the name field: %r" % (where, seen)
+        name = "Keyboard Added %s" % uuid.uuid4().hex[:5]
+        page.keyboard.type(name)
+        page.keyboard.press("Tab")
+        assert page.evaluate(ADD_STATE)["active"] == "Create", "%s: Create is not next after the name" % where
+        page.screenshot(path="%s/add_dialog_%s_%d.png" % (_walk_dir(), scheme, width))
+        page.keyboard.press("Enter")
+        page.wait_for_function(
+            "(n) => Alpine.$data(document.querySelector('[x-data^=\"composerApp\"]')).graph.getElements().length === n",
+            arg=before + 1, timeout=8000)
+        state = page.evaluate(ADD_STATE)
+        assert not state["open"], "%s: the dialog stayed open" % where
+        assert state["selected"] == [name], "%s: the new element is not the chosen one: %r" % (where, state["selected"])
+        # Delete asks once, by name, and focus goes into the confirmation and back to the drawing.
+        page.keyboard.press("Delete")
+        page.wait_for_timeout(300)
+        dlg = page.get_by_role("dialog", name="Delete Selected Elements")
+        expect(dlg).to_contain_text("Remove %s" % name)
+        assert page.evaluate("() => !!document.activeElement.closest('[aria-label=\"Delete Selected Elements\"]')"), \
+            "%s: focus did not move into the delete confirmation" % where
+        page.keyboard.press("Tab")
+        page.keyboard.press("Enter")
+        page.wait_for_function(
+            "(n) => Alpine.$data(document.querySelector('[x-data^=\"composerApp\"]')).graph.getElements().length === n",
+            arg=before, timeout=8000)
+        page.wait_for_timeout(300)
+        focus = page.evaluate(FOCUS_STATE)
+        assert focus["inCanvas"], "%s: focus fell out of the drawing after the delete: %r" % (where, focus)
+        assert focus["selected"], "%s: no element is chosen after the delete" % where
+        page.screenshot(path="%s/after_delete_%s_%d.png" % (_walk_dir(), scheme, width))
+    finally:
+        context.close()
+
+
+@pytest.mark.parametrize("scheme,width,height", [("light", 1440, 900), ("dark", 390, 844)])
+def test_keyboard_alone_adds_a_found_element_and_escape_returns_to_the_palette(browser, live_server, hub, scheme, width, height):
+    """Typing a search finds catalogue elements; one is chosen with the arrow keys and Enter. Escape closes
+    the dialog and focus returns to the palette item that opened it."""
+    context, page = _open(browser, live_server, hub, width, height, scheme)
+    try:
+        where = "%dx%d %s" % (width, height, scheme)
+        before = page.evaluate(ADD_STATE)["count"]
+        _open_add_dialog_by_keyboard(page, where)
+        page.keyboard.press("Escape")
+        page.wait_for_timeout(300)
+        state = page.evaluate(ADD_STATE)
+        assert not state["open"]
+        assert state["active"] == "Add Application Component", "%s: focus did not return to the palette item: %r" % (where, state["active"])
+        _open_add_dialog_by_keyboard(page, where)
+        page.keyboard.type("Retention Policy")
+        page.wait_for_selector("#search-overlay [role=option]", timeout=8000)
+        options = page.locator("#search-overlay [role=option]")
+        assert options.count() >= 1
+        wanted = options.first.inner_text().split("\n")[0]
+        page.keyboard.press("ArrowDown")
+        page.keyboard.press("Enter")
+        page.wait_for_function(
+            "(n) => Alpine.$data(document.querySelector('[x-data^=\"composerApp\"]')).graph.getElements().length === n",
+            arg=before + 1, timeout=8000)
+        state = page.evaluate(ADD_STATE)
+        assert state["selected"] == [wanted], "%s: the chosen result is not the selected element: %r vs %r" % (where, state["selected"], wanted)
+    finally:
+        context.close()

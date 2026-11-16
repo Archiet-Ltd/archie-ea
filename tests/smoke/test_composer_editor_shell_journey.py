@@ -349,7 +349,9 @@ def test_architect_finds_adds_connects_edits_undoes_exports_and_deletes(browser,
         # The confirmation asks about the one chosen element; its Delete button is the one pressed.
         confirm = page.get_by_role("dialog").filter(has_text="Delete Selected Elements")
         expect(confirm).to_be_visible(timeout=PAGE_TIMEOUT)
-        expect(confirm).to_contain_text("Remove 1 element(s)")
+        # The confirmation now names the element it removes instead of counting "1 element(s)".
+        expect(confirm).to_contain_text("Remove ")
+        expect(confirm).not_to_contain_text("element(s)")
         confirm.get_by_role("button", name="Delete", exact=True).click()
         page.wait_for_function(
             "([sel, n]) => !Alpine.$data(document.querySelector(sel)).graph.getElements().some(c => c.get('elName') === n)",

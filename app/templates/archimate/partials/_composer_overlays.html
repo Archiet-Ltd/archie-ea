@@ -1,11 +1,15 @@
     {# ── Search + Create modal ───────────────────────────── #}
     <div id="search-overlay" x-show="searchOpen" x-cloak class="search-overlay" @click.self="closeSearch()"
-         role="dialog" aria-modal="true" aria-label="Search and add elements">
+         role="dialog" aria-modal="true" aria-label="Search and add elements" x-trap.inert="searchOpen">
         <div class="search-panel" @keydown.escape="closeSearch()"
              x-effect="if (searchOpen) $nextTick(() => $refs.searchInput && $refs.searchInput.focus())">
             <input type="text" x-model="searchQuery" x-ref="searchInput"
                    class="search-header-input"
                    @input.debounce.200ms="doSearch()"
+                   @keydown.arrow-down.prevent="searchStep(1)" @keydown.arrow-up.prevent="searchStep(-1)"
+                   @keydown.enter.prevent="searchChooseActive()"
+                   role="combobox" aria-expanded="true" aria-controls="search-result-list" aria-autocomplete="list"
+                   :aria-activedescendant="searchActive >= 0 ? 'search-result-' + searchActive : null"
                    :placeholder="'Search existing ' + (searchType || 'elements') + '...'"
                    autofocus aria-label="Search Query">
             <div class="flex items-center gap-2 px-3 py-1.5 border-b border-border bg-muted/30">
@@ -27,7 +31,7 @@
                     </label>
                 </template>
             </div>
-            <div class="search-results">
+            <div class="search-results" id="search-result-list" role="listbox" tabindex="-1" aria-label="Matching elements">
                 <template x-if="searchLoading">
                     <div class="p-4 text-center text-sm text-muted-foreground">
                         <span class="inline-block animate-pulse">Searching catalog...</span>
@@ -43,8 +47,10 @@
                         Type to search, or create new below
                     </div>
                 </template>
-                <template x-for="item in searchResults" :key="item.id">
-                    <div class="search-result-item" @click="pickElement(item)">
+                <template x-for="(item, index) in searchResults" :key="item.id">
+                    <div class="search-result-item" role="option" :id="'search-result-' + index"
+                         :aria-selected="searchActive === index ? 'true' : 'false'"
+                         :class="searchActive === index ? 'bg-accent' : ''" @click="pickElement(item)">
                         <div>
                             <div class="search-result-name" x-text="item.name"></div>
                             <div class="search-result-meta" x-text="item.type + ' \u00b7 ' + (item.layer || '')"></div>
@@ -78,8 +84,9 @@
                             Did you mean to use an existing element?
                         </div>
                         <template x-for="sim in similarElements" :key="sim.id">
-                            <div class="flex items-center justify-between gap-2 px-2 py-1 rounded hover:bg-warning/10 cursor-pointer transition-colors"
-                                 @click="pickSimilarElement(sim)">
+                            <div class="flex items-center justify-between gap-2 px-2 py-1 rounded hover:bg-warning/10 cursor-pointer transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                                 role="button" tabindex="0" :aria-label="'Use existing ' + sim.name"
+                                 @click="pickSimilarElement(sim)" @keydown.enter.prevent="pickSimilarElement(sim)">
                                 <div class="flex-1 min-w-0">
                                     <span class="text-xs font-medium text-foreground truncate block" x-text="sim.name"></span>
                                     <span class="text-2xs text-muted-foreground" x-text="(sim.type || '') + (sim.layer ? ' \u00b7 ' + sim.layer : '') + (sim.solution_count ? ' \u00b7 used by ' + sim.solution_count + ' solution' + (sim.solution_count > 1 ? 's' : '') : '')"></span>

@@ -214,16 +214,16 @@
     </div>
 
     {# ── Bulk delete confirmation ─────────────────────── #}
-    <div x-show="bulkDeleteConfirmOpen" x-cloak role="dialog" aria-modal="true" class="search-overlay" @click.self="cancelBulkDelete()" @keydown.escape.window="cancelBulkDelete()">
+    <div x-show="bulkDeleteConfirmOpen" x-cloak role="dialog" aria-modal="true" aria-label="Delete Selected Elements" x-trap.inert.noreturn="bulkDeleteConfirmOpen" class="search-overlay" @click.self="cancelBulkDelete()" @keydown.escape.window="cancelBulkDelete()">
         <div class="search-panel" style="max-width: 340px;">
             <div class="p-4 border-b border-border">
                 <p class="text-sm font-semibold text-foreground">Delete Selected Elements</p>
                 <p class="text-xs text-muted-foreground mt-1">
-                    Remove <span class="font-medium text-destructive-emphasis" x-text="bulkDeleteCount"></span> element(s) from the canvas? Connected relationships will also be removed.
+                    <span class="font-medium text-destructive-emphasis" x-text="bulkDeleteLabel"></span> from the canvas? Connected relationships will also be removed.
                 </p>
             </div>
             <div class="flex items-center justify-end gap-2 p-3">
-                <button type="button" @click="cancelBulkDelete()"
+                <button type="button" @click="cancelBulkDelete()" data-delete-cancel
                         class="px-3 py-1.5 text-xs rounded-md border border-border bg-background text-foreground hover:bg-accent transition-colors">Cancel</button>
                 <button type="button" @click="confirmBulkDelete()"
                         class="px-3 py-1.5 text-xs rounded-md bg-destructive text-destructive-foreground hover:bg-destructive/90 transition-colors font-medium">Delete</button>

@@ -762,6 +762,7 @@ function composerApp() {
         searchType: '',
         searchTypeFilter: '',
         searchResults: [],
+        searchActive: -1,
         searchLoading: false,
         searchLayerFilter: '',
         newElementName: '',
@@ -886,6 +887,7 @@ function composerApp() {
 
         /* Bulk delete confirmation */
         bulkDeleteConfirmOpen: false,
+        bulkDeleteLabel: '',
         bulkDeleteCount: 0,
 
         /* Generic confirm dialog (used by deleteRelationship / deleteElement) */
@@ -3820,6 +3822,7 @@ function composerApp() {
             this.searchTypeFilter = typeObj.type;
             this.searchQuery = '';
             this.searchResults = [];
+            this.searchActive = -1;
             this.searchLayerFilter = '';
             this.newElementName = '';
             this.searchOpen = true;
@@ -3918,6 +3921,7 @@ function composerApp() {
             this.canvasElements[item.id] = item;
             this.elementCount++;
             this.statusText = 'Added: ' + item.name;
+            this._chooseCell(node);
             this.logAuditEvent('element_added', 'element', item.id, item.name, null, item.type);
 
             if (this.solutionId) {
@@ -4590,12 +4594,57 @@ function composerApp() {
             if (this.mode === 'view') return;
             if (this._selectedCells.length === 0) return;
             this.bulkDeleteCount = this._selectedCells.length;
+            /* The confirmation names what it removes, so a person who pressed Delete is not asked about "1 element(s)". */
+            this.bulkDeleteLabel = this._selectedCells.length === 1
+                ? 'Remove ' + (this._selectedCells[0].get('elName') || 'this element')
+                : 'Remove ' + this._selectedCells.length + ' elements';
             this.bulkDeleteConfirmOpen = true;
+            let self = this;
+            this.$nextTick(function() {
+                let cancel = document.querySelector('[aria-label="Delete Selected Elements"] [data-delete-cancel]');
+                if (cancel) cancel.focus();
+            });
+        },
+
+        /* Make one element the chosen one, as Tab or an arrow key does: highlighted, announced, the next Delete acts on it. */
+        _chooseCell: function(cell) {
+            if (!cell || !this.paper) return;
+            this._clearSelection();
+            this._selectedCells = [cell];
+            this._currentSelectedCell = cell;
+            this._lastSelectedElementId = cell.id;
+            let view = this.paper.findViewByModel(cell);
+            if (view) this._highlightCell(view);
+            this._announceSelection(cell);
+        },
+
+        /* The drawn element whose centre is closest to the centre of any of the given cells, apart from those cells. */
+        _nearestElementTo: function(cells) {
+            let skip = cells.map(function(c) { return c.id; });
+            let from = cells.map(function(c) { let b = c.getBBox(); return { x: b.x + b.width / 2, y: b.y + b.height / 2 }; });
+            let best = null;
+            let bestGap = Infinity;
+            this.graph.getElements().forEach(function(el) {
+                if (skip.indexOf(el.id) !== -1 || el.get('isLayerZone') || el.get('isAnnotation')) return;
+                let b = el.getBBox();
+                let cx = b.x + b.width / 2;
+                let cy = b.y + b.height / 2;
+                from.forEach(function(p) {
+                    let gap = (cx - p.x) * (cx - p.x) + (cy - p.y) * (cy - p.y);
+                    if (gap < bestGap) { bestGap = gap; best = el; }
+                });
+            });
+            return best;
         },
 
 
         cancelBulkDelete: function() {
+            if (!this.bulkDeleteConfirmOpen) return;
             this.bulkDeleteConfirmOpen = false;
+            this.$nextTick(function() {
+                let canvas = document.getElementById('composer-canvas');
+                if (canvas) canvas.focus();
+            });
         },
 
         /* Generic confirm dialog helpers */
