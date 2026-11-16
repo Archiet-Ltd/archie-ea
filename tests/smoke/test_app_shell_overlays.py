@@ -372,3 +372,57 @@ def test_phone_sidebar_trigger_clickable_and_opens_the_drawer(browser, live_serv
         assert not drawer.is_visible(), "Escape did not close the drawer"
     finally:
         page.close()
+
+
+def test_desktop_sidebar_trigger_and_rail_both_collapse_and_restore_the_sidebar(browser, live_server, seeded):
+    """At 1440 wide a person clicks the header trigger and the sidebar collapses to the
+    icon rail; clicking the rail on its edge brings it back. Both controls carry the
+    toggle hook the shell script listens for."""
+    page = browser.new_page(viewport={"width": 1440, "height": 900})
+    try:
+        _login(page, live_server, seeded["emails"]["platform_admin"])
+        page.goto(live_server + "/dashboard/overview",
+                  wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        page.wait_for_timeout(1000)
+        sidebar = page.locator('[data-slot="sidebar"]').first
+        trigger = page.locator('[data-slot="sidebar-trigger"]').first
+        rail = page.locator('[data-slot="sidebar-rail"]').first
+        assert trigger.get_attribute("data-sidebar-toggle") is not None, "trigger lacks the toggle hook"
+        assert rail.get_attribute("data-sidebar-toggle") is not None, "rail lacks the toggle hook"
+        assert sidebar.get_attribute("data-state") == "expanded", "sidebar should start expanded"
+        assert trigger.get_attribute("aria-expanded") == "true"
+
+        trigger.click()
+        page.wait_for_timeout(300)
+        assert sidebar.get_attribute("data-state") == "collapsed", "the trigger did not collapse the sidebar"
+        assert trigger.get_attribute("aria-expanded") == "false"
+
+        rail.click(force=True)
+        page.wait_for_timeout(300)
+        assert sidebar.get_attribute("data-state") == "expanded", "the rail did not restore the sidebar"
+        assert trigger.get_attribute("aria-expanded") == "true"
+    finally:
+        page.close()
+
+
+def test_phone_sidebar_trigger_reports_open_and_closed_state_to_the_person(browser, live_server, seeded):
+    """At 390 wide, clicking the trigger opens the Navigation drawer with links in it and
+    the trigger says it is expanded; Escape closes it and the trigger says it is not."""
+    page = browser.new_page(viewport={"width": 390, "height": 844})
+    try:
+        _login(page, live_server, seeded["emails"]["platform_admin"])
+        page.goto(live_server + "/dashboard/overview",
+                  wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        page.wait_for_timeout(1000)
+        trigger = page.locator('[data-slot="sidebar-trigger"]').first
+        assert trigger.get_attribute("data-sidebar-toggle") is not None, "trigger lacks the toggle hook"
+        trigger.click()
+        drawer = page.get_by_role("dialog", name="Navigation")
+        assert drawer.is_visible(), "the trigger did not open the drawer"
+        assert drawer.locator("a[href]").count() > 0, "the drawer opened with no destinations in it"
+        assert trigger.get_attribute("aria-expanded") == "true"
+        page.keyboard.press("Escape")
+        assert not drawer.is_visible(), "Escape did not close the drawer"
+        assert trigger.get_attribute("aria-expanded") == "false"
+    finally:
+        page.close()
