@@ -75,7 +75,7 @@ def test_a_write_tool_marked_mcp_is_neither_listed_nor_callable(client, db_sessi
     token = _mint_token_with_scope(current_app, user, org, "mcp:read")
     assert "create_solution" not in {t["name"] for t in _mcp_tools_list(client, token)}
     status, _body = _mcp_call(client, token, "create_solution", {"name": "x", "description": "y"})
-    assert status == 404
+    assert status == 200 and _body["error"]["code"] == -32601
 
 
 @pytest.mark.parametrize("name,kind", OLD_NAMES_WITH_ARGUMENTS)
@@ -93,7 +93,7 @@ def test_every_old_tool_name_still_answers_with_its_old_arguments(
 
     if not tool_released(name):
         # held back by the wave map: a plain "not available yet", not a page and not a crash
-        assert status == 404 and "not available yet" in body["error"]["message"], body
+        assert status == 200 and "not available yet" in body["error"]["message"], body
         return
     assert status == 200, body
     assert isinstance(json.loads(body["result"]["content"][0]["text"]), dict)
