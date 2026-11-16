@@ -4390,6 +4390,14 @@ def rationalization_gaps():
         # With no list asked for, open the first one that has something in it.
         counts = (summary or {}).get("data") or {} if not (summary or {}).get("error") else {}
         gap_tab = next((key for key, count_key in _GAP_TAB_COUNTS if counts.get(count_key)), "critical-gaps")
+    gaps = _ai_gap_section(gap_tab)
+    if gap_tab == "rationalization" and not gaps.get("error") and not costs_visible(current_user):
+        # a saving is a sum of costs, so a role that may not read costs reads the sentence instead
+        for row in gaps["data"]:
+            row["estimated_annual_savings"] = None
+            row["savings_reason"] = COSTS_WITHHELD
+            for each in row.get("applications", []):
+                each["annual_cost"] = None
     return render_template(
         "applications/rationalization/gaps.html",
         active_tab="gaps",
@@ -4397,7 +4405,7 @@ def rationalization_gaps():
         gap_tab=gap_tab,
         gap_label=dict(_GAP_TABS)[gap_tab],
         summary=summary,
-        gaps=_ai_gap_section(gap_tab),
+        gaps=gaps,
     )
 
 

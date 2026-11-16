@@ -3,7 +3,8 @@
 {% import 'basecoat/index.html' as ui %}
 {% from 'macros/page_shell.html' import page_shell %}
 {% from 'components/figures.html' import stat_cards, state_badge, section %}
-{% from 'components/list_table.html' import list_table %}
+{% from 'components/list_table.html' import list_table, row_actions, row_action %}
+{% from 'components/explained_value.html' import explained_value %}
 {% from 'basecoat/table.html' import table_cell %}
 {% block title %}Gap findings{% endblock %}
 
@@ -53,10 +54,15 @@
     {% call table_cell() %}{{ state_badge(item.gap_severity) }}{% endcall %}
   {% endcall %}
 {% elif gap_tab == 'rationalization' %}
-  {% call(item) list_table(rows=gaps.data, columns=[('Capability', ''), {'label': 'Estimated savings a year', 'align': 'right', 'sortable': true}], caption='Rationalization opportunities', testid='rationalization-opportunities-table', row_testid='rationalization-opportunity-row',
+  {% call(item) list_table(rows=gaps.data, columns=[('Capability', ''), ('Applications', ''), {'label': 'Estimated saving a year', 'align': 'right', 'sortable': true}, {'label': '', 'class': 'w-12'}], caption='Rationalization opportunities', testid='rationalization-opportunities-table', row_testid='rationalization-opportunity-row',
                            toolbar=true, toolbar_actions=_section_menu, search_placeholder='Filter opportunities...', empty_message='No opportunities found. No capability is served by more than one application.') %}
-    {% call table_cell(class='max-w-[500px] truncate font-medium') %}{{ item.capability_name or item.name or 'Unnamed capability' }}{% endcall %}
-    {% call table_cell(class='text-right tabular-nums whitespace-nowrap', attrs={'data-sort': item.estimated_annual_savings if item.estimated_annual_savings is not none else -1}) %}{% if item.estimated_annual_savings is not none %}{{ item.estimated_annual_savings|format_currency }}{% else %}<span class="text-muted-foreground">Not estimated</span>{% endif %}{% endcall %}
+    {%- set cap_name = item.capability_name or item.name or 'Unnamed capability' -%}
+    {% call table_cell(class='max-w-[320px] font-medium') %}{% if item.record_id %}<a href="{{ url_for('business_capability_management.capability_detail', capability_id=item.record_id) }}" class="hover:underline" data-testid="gap-capability-link">{{ cap_name }}</a>{% else %}{{ cap_name }}{% endif %}{% endcall %}
+    {% call table_cell(class='min-w-[220px]') %}<ul class="space-y-1" data-testid="gap-applications">{% for a in item.applications %}<li><a href="{{ url_for('unified_applications.application_detail', id=a.app_id) }}" class="hover:underline" data-testid="gap-application-link">{{ a.app_name }}</a></li>{% endfor %}</ul>{% endcall %}
+    {% call table_cell(class='min-w-[200px] text-right tabular-nums', attrs={'data-sort': item.estimated_annual_savings if item.estimated_annual_savings is not none else -1}) %}{% if item.estimated_annual_savings is not none %}<span data-testid="gap-saving">{{ item.estimated_annual_savings|format_currency }}</span><span class="block text-xs text-muted-foreground">Estimated</span>{% else %}<span class="block text-left" data-testid="gap-saving-reason">{{ explained_value(basis=item.savings_reason or 'Not worked out: no annual cost is recorded') }}</span>{% endif %}{% endcall %}
+    {% call table_cell(class='w-12 text-right') %}{% if item.record_id %}{% call row_actions('Actions for ' ~ cap_name) %}
+      {{ row_action('Open capability', href=url_for('business_capability_management.capability_detail', capability_id=item.record_id), testid='gap-open-capability') }}
+    {% endcall %}{% endif %}{% endcall %}
   {% endcall %}
 {% else %}
   {% call(item) list_table(rows=gaps.data, columns=[('Product', ''), ('Risk', '')], caption='Vendor lifecycle risks', testid='vendor-lifecycle-table', row_testid='vendor-lifecycle-row',

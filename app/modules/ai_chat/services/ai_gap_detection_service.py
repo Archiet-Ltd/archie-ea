@@ -44,8 +44,6 @@ from app.models.unified_capability import UnifiedCapability  # dead-code-ok
 
 logger = logging.getLogger(__name__)
 
-BASE_SAVINGS_PER_APP_USD = 50000  # fabricated-ok: declared estimation baseline constant, not a measured value
-
 
 class AIGapDetectionService:
     """
@@ -339,6 +337,8 @@ class AIGapDetectionService:
             ).all() if all_app_ids else []
             app_lookup = {a.id: a for a in all_apps}
 
+            costs = self._recorded_run_costs(all_apps)
+
             for cap_id, app_count in capability_apps:
                 capability = cap_lookup.get(cap_id)
                 if not capability:
@@ -358,22 +358,29 @@ class AIGapDetectionService:
                             "coverage_percentage": mapping.coverage_percentage or 0,
                             "support_level": mapping.support_level,
                             "lifecycle_status": app.lifecycle_status or "unknown",
+                            "annual_cost": costs.get(app.id),
                         }
                         apps_info.append(app_info)
 
-                # Calculate potential savings (simplified)
-                estimated_savings = self._estimate_rationalization_savings(apps_info)
+                estimated_savings, savings_reason = self._estimate_rationalization_savings(apps_info)
 
                 results.append(
                     {
                         "capability_id": capability.id,
                         "capability_name": capability.name,
                         "capability_code": capability.code,
+                        "record_id": (
+                            int(capability.source_id)
+                            if capability.source_table == "business_capability"
+                            and str(capability.source_id or "").isdigit()
+                            else None
+                        ),
                         "level": capability.level,
                         "strategic_importance": capability.strategic_importance,
                         "application_count": app_count,
                         "applications": apps_info,
                         "estimated_annual_savings": estimated_savings,
+                        "savings_reason": savings_reason,
                         "rationalization_priority": self._calculate_rationalization_priority(
                             app_count, capability.strategic_importance
                         ),
@@ -385,7 +392,7 @@ class AIGapDetectionService:
             results.sort(
                 key=lambda x: (
                     -self._priority_score(x["rationalization_priority"]),
-                    -x["estimated_annual_savings"],
+                    -(x["estimated_annual_savings"] or 0),
                 )
             )
 
@@ -735,13 +742,13 @@ class AIGapDetectionService:
             )
 
         elif query_type == "rationalization":
-            potential_savings = sum(r.get("estimated_annual_savings", 0) for r in results)
+            potential_savings = sum(r.get("estimated_annual_savings") or 0 for r in results)
             recommendations.append(
                 {
                     "priority": "high" if potential_savings > 100000 else "medium",
                     "category": "cost_optimization",
                     "title": f"Rationalize {count} capability overlaps",
-                    "description": f"Estimated annual savings potential: ${potential_savings:,.0f}",
+                    "description": f"Estimated annual savings where every overlapping application has a recorded cost: {potential_savings:,.0f}",
                     "action": "Prioritize rationalization projects by ROI",
                 }
             )
@@ -850,11 +857,32 @@ class AIGapDetectionService:
         ]
         return any(legacy_indicators)
 
-    def _estimate_rationalization_savings(self, apps: List[Dict]) -> float:
-        """Estimate potential annual savings from rationalization."""
-        # Simplified calculation: assume $50k per redundant app in maintenance/licensing
-        base_savings_per_app = BASE_SAVINGS_PER_APP_USD
-        return max(0, (len(apps) - 1) * base_savings_per_app)
+    @staticmethod
+    def _recorded_run_costs(apps) -> Dict[int, Optional[float]]:
+        """Each application's recorded annual run cost, the figure the overview reads; None when none is recorded."""
+        from app.services import vendor_register
+        from app.services.application_cost_accessor import get_run_cost_with_source
+
+        costs: Dict[int, Optional[float]] = {}
+        by_org: Dict[Any, Any] = {}
+        for app in apps:
+            if app.organization_id not in by_org:
+                ledger = vendor_register.contract_ledger(app.organization_id) if app.organization_id else None
+                by_org[app.organization_id] = vendor_register.counted_by_system(ledger) if ledger else {}
+            costs[app.id] = get_run_cost_with_source(app, by_org[app.organization_id].get(app.id, []))[0]
+        return costs
+
+    def _estimate_rationalization_savings(self, apps: List[Dict]):
+        """(saving, reason): the recorded annual costs of all but the most expensive application.
+
+        Worked out only when every overlapping application has a recorded annual cost; otherwise the
+        saving is None and the reason says how many applications lack one.
+        """
+        missing = [a for a in apps if a.get("annual_cost") is None]
+        if missing:
+            return None, "Not worked out: %d of %d applications have no annual cost recorded" % (len(missing), len(apps))
+        costs = sorted(a["annual_cost"] for a in apps)
+        return sum(costs[:-1]), None
 
     def _find_capabilities_using_product(self, product_id: int) -> List[Dict]:
         """Find capabilities that use a specific vendor product."""
