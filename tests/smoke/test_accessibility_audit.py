@@ -539,7 +539,7 @@ def _candidate_tag_lists(expr, tree):
         right = _candidate_tag_lists(expr.right, tree)
         if left is None or right is None:
             return None
-        return [l + r for l in left for r in right]
+        return [head + tail for head in left for tail in right]
     if isinstance(expr, ast.Attribute):
         return [TAGS] if expr.attr == "TAGS" and _imports_the_audit_module(tree) else None
     if not isinstance(expr, ast.Name):
