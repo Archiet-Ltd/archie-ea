@@ -381,3 +381,52 @@ def test_the_completed_steps_summary_never_lists_a_line_twice(runner, monkeypatc
     result = runner.run("What applications do we have?")
     lines = [ln for ln in result["response"].splitlines() if ln.startswith("- ")]
     assert lines == ["- Found 1 application(s) - this is the complete set."]
+
+
+def _timeout():
+    return openai.APITimeoutError(request=httpx.Request("POST", "https://example.invalid/v1/chat/completions"))
+
+
+def _platform_keys(monkeypatch):
+    """Keys for NVIDIA, OpenRouter and Gemini in the environment, with only the first two in the order."""
+    _no_env_keys(monkeypatch)
+    monkeypatch.setenv("LLM_PROVIDER_ORDER", "nvidia,openrouter")
+    monkeypatch.setenv("NVIDIA_API_KEY", "shared-nv")
+    monkeypatch.setenv("OPENROUTER_API_KEY", "shared-or")
+    monkeypatch.setenv("GEMINI_API_KEY", "shared-gemini")
+    monkeypatch.setattr(ar, "build_provider_chain", REAL_CHAIN)
+    monkeypatch.setattr(LLMService, "_get_all_api_keys", staticmethod(
+        lambda p, **k: ["shared-" + p]
+    ))
+
+
+def test_an_nvidia_timeout_is_answered_by_openrouter_in_the_same_turn(
+    runner, make_org, tenant_ctx, monkeypatch
+):
+    _platform_keys(monkeypatch)
+    calls = _script(monkeypatch, runner, [_timeout(), "Three applications are recorded."])
+    with tenant_ctx(make_org("failover").id):
+        result = runner.run("How many applications do we run?")
+    assert [c[0] for c in calls] == ["nvidia", "openrouter"]
+    assert result["response"] == "Three applications are recorded."
+    assert "busy" not in result["response"].lower()
+    assert not result.get("error")
+
+
+def test_both_providers_timing_out_shows_the_busy_sentence(runner, make_org, tenant_ctx, monkeypatch):
+    _platform_keys(monkeypatch)
+    calls = _script(monkeypatch, runner, [_timeout(), _timeout()])
+    with tenant_ctx(make_org("bothdown").id):
+        result = runner.run("How many applications do we run?")
+    assert [c[0] for c in calls] == ["nvidia", "openrouter"]
+    assert "busy" in result["response"].lower() and "Retry" in result["response"]
+    assert result["error"]
+
+
+def test_a_provider_outside_the_order_is_never_called(runner, make_org, tenant_ctx, monkeypatch):
+    _platform_keys(monkeypatch)
+    calls = _script(monkeypatch, runner, [_timeout(), _timeout()])
+    with tenant_ctx(make_org("outside").id):
+        runner.run("How many applications do we run?")
+    assert "gemini" not in {c[0] for c in calls}
+    assert {c[0] for c in calls} == {"nvidia", "openrouter"}

@@ -1,0 +1,15 @@
+{{ 'An incident has been resolved.' if resolved else 'A service incident has been opened.' }}
+
+{{ incident.title }}
+Impact: {{ impact_label }}
+{{ 'Resolved' if resolved else 'Started' }}: {{ when.strftime('%d %b %Y at %H:%M') }} UTC
+{% if incident.summary %}
+{{ incident.summary }}
+{% endif %}
+Current status: {{ status_link }}
+
+You receive this because you subscribed to service status updates. You can unsubscribe on the status page.
+
+The {{ config.APP_NAME }} Team
+
+Note: replies to this email address are not monitored.

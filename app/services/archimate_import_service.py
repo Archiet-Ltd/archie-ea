@@ -1359,13 +1359,23 @@ class ArchiMateImportService:
                     # Association stays distinct from a softened Serving.
                     incoming_note = _modelled_note_type(rel.get("description"))
                     existing_rel = None
+                    # A row given back its modelled type after the matrix
+                    # started allowing it keeps its note, so a stored row whose
+                    # type and note both name the incoming type is the same
+                    # relationship as the plain incoming one.
+                    types = {rel["type"]}
+                    if incoming_note:
+                        types.add(incoming_note)
                     for cand in ArchiMateRelationship.query.filter(
                         ArchiMateRelationship.source_id == source_db_id,
                         ArchiMateRelationship.target_id == target_db_id,
-                        ArchiMateRelationship.type == rel["type"],
+                        ArchiMateRelationship.type.in_(types),
                         *self._in_organization(ArchiMateRelationship, org_id),
                     ).all():
-                        if _modelled_note_type(cand.description) == incoming_note:
+                        cand_note = _modelled_note_type(cand.description)
+                        if cand_note == incoming_note or (
+                            cand.type == rel["type"] and cand_note == rel["type"]
+                        ):
                             existing_rel = cand
                             break
                     if existing_rel is not None:
