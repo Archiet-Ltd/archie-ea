@@ -143,7 +143,13 @@ def _reaches_connections_not_billing(page, base, email):
     page.keyboard.press("Escape")
     _walk_connections(page)
     page.goto(base + "/admin/billing/", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
-    expect(page.locator("main").first).not_to_contain_text("Plan")
+    # A member who is not an administrator is shown no plan, no price and no billing figure, and is told
+    # who buys the plan instead.
+    main = page.locator("main").first
+    expect(page.get_by_test_id("plan-card-team")).to_have_count(0)
+    expect(page.get_by_test_id("billing-renewal")).to_have_count(0)
+    expect(main).not_to_contain_text("USD")
+    expect(main).to_contain_text("An administrator of your organisation buys the plan")
 
 
 def test_enterprise_architect_who_does_not_administer_finds_connections_only(page, live_server, colleagues):
@@ -178,8 +184,8 @@ def test_owner_reads_the_plans_prices_and_a_plain_renewal_line(page, live_server
     _assert_startup_cto(world["owner"]["email"])
     sign_in(page, live_server, world["owner"]["email"])
     page.goto(live_server + "/admin/billing/", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
-    expect(page.locator("#admin-sidebar .sidebar-app-name")).to_contain_text("Entelim")
-    expect(page.get_by_test_id("billing-renewal")).to_have_text("No renewal yet")
+    expect(page.locator("#admin-sidebar").get_by_test_id("org-switcher")).to_contain_text("Entelim")
+    expect(page.get_by_test_id("billing-renewal")).to_have_text("Nothing to renew")
     shown = {}
     for key in ("free", "startup", "team", "enterprise"):
         shown[key] = " ".join(page.get_by_test_id("plan-price-%s" % key).inner_text().split())
@@ -189,7 +195,7 @@ def test_owner_reads_the_plans_prices_and_a_plain_renewal_line(page, live_server
     assert shown["enterprise"] == "From USD 24,000 a year"
     page.goto(live_server + "/pricing", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
     pricing = page.locator("main").inner_text()
-    for figure in ("$490", "$49", "$290", "$29", "$24,000"):
+    for figure in ("USD 490", "USD 49", "USD 290", "USD 29", "USD 24,000"):
         assert figure in pricing, figure
     # Choosing a plan lands on its checkout step, which says plainly what to do.
     page.goto(live_server + "/admin/billing/", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
