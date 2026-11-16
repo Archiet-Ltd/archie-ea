@@ -605,13 +605,13 @@
             <div class="entity-actions" x-show="!entity.elementUrl">
               <template x-if="entity.status === 'matched'">
                 <div class="flex gap-2">
-                  {{ ui.button(text='Accept', size='xs', attrs={'@click.stop': 'acceptMatch(entity)', 'aria-label': 'Accept matched entity'}) }}
+                  {{ ui.button(text='Accept', size='xs', attrs={'@click.stop': 'acceptEntity(entity)', 'aria-label': 'Accept matched entity'}) }}
                   {{ ui.button(text='Details', variant='outline', size='xs', attrs={'@click.stop': 'viewDetails(entity)', 'aria-label': 'View entity details'}) }}
                 </div>
               </template>
               <template x-if="entity.status === 'new'">
                 <div class="flex gap-2">
-                  {{ ui.button(text='Import', size='xs', attrs={'@click.stop': 'importEntity(entity)', 'aria-label': 'Import new entity'}) }}
+                  {{ ui.button(text='Accept', size='xs', attrs={'@click.stop': 'acceptEntity(entity)', 'aria-label': 'Accept new entity'}) }}
                   {{ ui.button(text='Review', variant='outline', size='xs', attrs={'@click.stop': 'reviewEntity(entity)', 'aria-label': 'Review new entity'}) }}
                 </div>
               </template>
@@ -857,7 +857,9 @@ function entityMatchingChat() {
         });
       }
       
-      return suggestions.slice(0, 5); // Limit to 5 suggestions
+      // The same name can come back under several entity kinds; one row per id keeps Alpine's keyed list valid.
+      const unique = suggestions.filter((s, i) => suggestions.findIndex(o => o.id === s.id) === i);
+      return unique.slice(0, 5); // Limit to 5 suggestions
     },
     
     extractActionSuggestions(result) {
@@ -906,7 +908,6 @@ function entityMatchingChat() {
         : { name: data.name || entity.name, type: data.type, recommendation: data.recommendation };
       try {
         const result = await Platform.fetch.post('/ai-chat/entity-matching/accept', { entity: payload }, { silent: true });
-        entity.status = 'accepted';
         entity.matched = result.matched;
         entity.elementId = result.element_id;
         entity.elementUrl = result.element_url;
@@ -933,14 +934,6 @@ function entityMatchingChat() {
       if (index > -1) {
         this.allEntities.splice(index, 1);
       }
-    },
-    
-    acceptMatch(entity) {
-      return this.acceptEntity(entity);
-    },
-    
-    importEntity(entity) {
-      return this.acceptEntity(entity);
     },
     
     resolveDuplicate(entity) {

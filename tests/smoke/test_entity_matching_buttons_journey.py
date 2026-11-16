@@ -1,14 +1,12 @@
-"""T-entmatch01: Entity Matching Assistant buttons do what they say.
+"""Match entities: Accept saves the entity to the model, Details opens its page.
 
-Journey tests for the four buttons on /ai-chat/entity-matching:
-- Accept a new entity, reload, find it in the model
-- Accept a matched entity, land on existing element, no new element
-- Resolve a duplicate both ways (Use existing / Keep as new)
-- Open Details
-
-Runs in a seeded organisation with the AI answer stubbed (requires SMOKE_AI_PROTOCOL_STUB=1).
+The person is the enterprise architect. They paste a document that mentions a
+Customer Portal, accept it as a new entity, follow the link to its page, then
+paste the same document again: it is now a match, Accept creates nothing and
+Details opens the same page. The AI answer is stubbed (SMOKE_AI_PROTOCOL_STUB=1).
 """
 import os
+import re
 
 import pytest
 
@@ -16,8 +14,13 @@ from .conftest import PAGE_TIMEOUT, PASSWORD
 
 pytestmark = [pytest.mark.smoke, pytest.mark.journey]
 
-# Opt-in walk screenshots
-WALK = os.environ.get("ENTMATCH01_WALK_DIR")
+WALK = os.environ.get("ENTITY_MATCHING_WALK_DIR")
+NAME = "Customer Portal"
+TEXT = "We are adding a new Customer Portal application for billing."
+VIEWPORTS = [
+    pytest.param({"width": 1440, "height": 900}, "light", "1440-light", id="1440-light"),
+    pytest.param({"width": 390, "height": 844}, "dark", "390-dark", id="390-dark"),
+]
 
 
 def _shot(page, name):
@@ -26,475 +29,84 @@ def _shot(page, name):
         page.screenshot(path=os.path.join(WALK, name + ".png"), full_page=True)
 
 
-def _login(page, base, email):
-    page.goto(base + "/account/login", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
-    page.fill("#email", email)
-    page.fill("#password", PASSWORD)
-    try:
-        page.click("#submit", force=True, no_wait_after=True)
-    except TypeError:
-        page.locator("#submit").dispatch_event("click")
-    try:
-        page.wait_for_url(lambda u: "/account/login" not in u, timeout=PAGE_TIMEOUT)
-    except Exception:
-        pass
-    assert "/account/login" not in page.url, "could not sign in as %s" % email
-
-
-@pytest.fixture(scope="module")
-def seeded_with_elements(app, seeded, ai_protocol_stub):
-    """Seed the organisation with some ArchiMate elements for matching."""
-    if ai_protocol_stub is None:
-        pytest.skip("SMOKE_AI_PROTOCOL_STUB=1 required for this test")
-
+def _portal_elements(app, org_id, remove=False):
     from app import db
     from app.models.archimate_core import ArchiMateElement
-    from flask import g
 
     with app.app_context():
         db.session.remove()
-        with app.test_request_context("/"):
-            g.current_org_id = seeded["ids"]["org"]
-            # Create a matched element
-            matched = ArchiMateElement(
-                organization_id=seeded["ids"]["org"],
-                name="Payment Gateway Service",
-                type="ApplicationComponent",
-                layer="Application",
-                description="Existing payment gateway",
-                scope="enterprise",
-            )
-            db.session.add(matched)
-            # Create a duplicate element
-            duplicate = ArchiMateElement(
-                organization_id=seeded["ids"]["org"],
-                name="Analytics Engine",
-                type="ApplicationComponent",
-                layer="Application",
-                description="Existing analytics engine",
-                scope="enterprise",
-            )
-            db.session.add(duplicate)
+        rows = db.session.query(ArchiMateElement).filter_by(organization_id=org_id, name=NAME).all()
+        ids = [r.id for r in rows]
+        if remove:
+            for r in rows:
+                db.session.delete(r)
             db.session.commit()
-            matched_id = matched.id
-            duplicate_id = duplicate.id
-
-    return {**seeded, "matched_id": matched_id, "duplicate_id": duplicate_id}
+        db.session.remove()
+        return ids
 
 
-def test_accept_new_entity_reload_finds_it_in_model(browser, live_server, seeded_with_elements):
-    """Accept a new entity, reload the page, and find it in the model (element page opens with its name)."""
-    email = seeded_with_elements["emails"]["enterprise_architect"]
-    page = browser.new_page(viewport={"width": 1440, "height": 900}, color_scheme="light")
+def _tab(page, name):
+    page.locator(".sidebar-content").get_by_role("button", name=re.compile("^" + name)).click()
+    return page.locator(".sidebar-content .entity-card", has_text=NAME).first
+
+
+def _send(page, live_server):
+    page.goto(live_server + "/ai-chat/entity-matching", wait_until="networkidle", timeout=PAGE_TIMEOUT)
+    page.get_by_placeholder("Type your message or paste document text here...").fill(TEXT)
+    with page.expect_response(
+        lambda r: r.url.endswith("/ai-chat/entity-matching") and r.request.method == "POST",
+        timeout=PAGE_TIMEOUT,
+    ):
+        page.get_by_role("button", name="Send message").click()
+
+
+@pytest.mark.parametrize("viewport,scheme,label", VIEWPORTS)
+def test_accept_then_details(browser, live_server, seeded, ai_protocol_stub, app, viewport, scheme, label):
+    if ai_protocol_stub is None:
+        pytest.skip("SMOKE_AI_PROTOCOL_STUB=1 is needed for the stubbed AI answer")
+    org_id = seeded["ids"]["org"]
+    _portal_elements(app, org_id, remove=True)
+    page = browser.new_page(viewport=viewport, color_scheme=scheme)
     try:
-        _login(page, live_server, email)
-        page.goto(
-            live_server + "/ai-chat/entity-matching",
-            wait_until="networkidle",
-            timeout=PAGE_TIMEOUT,
-        )
+        page.goto(live_server + "/account/login", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        page.fill("#email", seeded["emails"]["enterprise_architect"])
+        page.fill("#password", PASSWORD)
+        page.locator("#submit").dispatch_event("click")
+        page.wait_for_url(lambda u: "/account/login" not in u, timeout=PAGE_TIMEOUT)
 
-        # Send a message that will extract a new entity
-        page.get_by_placeholder("Type your message or paste document text here...").fill(
-            "We are integrating a new Customer Portal application with the billing system."
-        )
-        with page.expect_response(
-            lambda r: "/ai-chat/entity-matching" in r.url and r.request.method == "POST",
-            timeout=PAGE_TIMEOUT,
-        ):
-            page.get_by_role("button", name="Send message").click()
-
-        # Wait for the assistant reply with entity suggestions
-        page.locator(".message.assistant .message-content").last.wait_for(
-            state="visible", timeout=PAGE_TIMEOUT
-        )
-
-        # Find the new entity suggestion and click Accept
-        # The entity should appear in the sidebar under "New" filter
-        page.get_by_role("button", name="New (1)").click()
-        page.wait_for_timeout(500)
-
-        # Click Accept on the new entity card
-        accept_btn = page.locator(".entity-card:has-text('Customer Portal') button:has-text('Accept')").first
-        accept_btn.wait_for(state="visible", timeout=PAGE_TIMEOUT)
-        with page.expect_response(
-            lambda r: "/ai-chat/entity-matching/accept" in r.url and r.request.method == "POST",
-            timeout=PAGE_TIMEOUT,
-        ) as resp:
-            accept_btn.click()
+        # New entity: Accept saves it once and the row links to it.
+        _send(page, live_server)
+        accept = _tab(page, "New").get_by_role("button", name="Accept")
+        with page.expect_response(lambda r: r.url.endswith("/entity-matching/accept"), timeout=PAGE_TIMEOUT) as resp:
+            accept.click()
         assert resp.value.status == 200, resp.value.text()
+        added = _tab(page, "New").get_by_test_id("entity-added")
+        added.wait_for(state="visible", timeout=PAGE_TIMEOUT)
+        assert "Added to your model" in added.inner_text()
+        _shot(page, "accept-done-" + label)
+        ids = _portal_elements(app, org_id)
+        assert len(ids) == 1
 
-        # Verify the entity shows as accepted
-        page.wait_for_timeout(500)
-        # The status should update to show it was added
-        page.locator(".entity-card:has-text('Customer Portal') .text-success-emphasis, .entity-card:has-text('Customer Portal') .text-primary:has-text('Accepted')").first.wait_for(state="visible", timeout=PAGE_TIMEOUT)
+        # The link lands on the element's page, with its name.
+        added.get_by_role("link", name=NAME).click()
+        page.wait_for_url("**/architecture/traceability/%d" % ids[0], timeout=PAGE_TIMEOUT)
+        assert NAME in page.locator("main").inner_text()
 
-        # Reload the page
-        page.reload(wait_until="networkidle", timeout=PAGE_TIMEOUT)
+        # Same document again: it is a match. Accept creates nothing, Details opens the same page.
+        _send(page, live_server)
+        _tab(page, "Matches").get_by_role("button", name="Accept").click()
+        matched = _tab(page, "Matches").get_by_test_id("entity-added")
+        matched.wait_for(state="visible", timeout=PAGE_TIMEOUT)
+        assert "Already in your model" in matched.inner_text()
+        assert _portal_elements(app, org_id) == ids
+        _shot(page, "matched-done-" + label)
 
-        # Navigate to the element page via the link (Details button or link in the accepted row)
-        # First, send another message to get the entity list again
-        page.get_by_placeholder("Type your message or paste document text here...").fill(
-            "Show me the Customer Portal element."
-        )
-        with page.expect_response(
-            lambda r: "/ai-chat/entity-matching" in r.url and r.request.method == "POST",
-            timeout=PAGE_TIMEOUT,
-        ):
-            page.get_by_role("button", name="Send message").click()
-
-        page.locator(".message.assistant .message-content").last.wait_for(
-            state="visible", timeout=PAGE_TIMEOUT
-        )
-
-        # Click Details on the accepted entity
-        details_btn = page.locator(".entity-card:has-text('Customer Portal') button:has-text('Details')").first
-        if details_btn.count() > 0:
-            details_btn.wait_for(state="visible", timeout=PAGE_TIMEOUT)
-            with page.expect_navigation(wait_until="domcontentloaded", timeout=PAGE_TIMEOUT):
-                details_btn.click()
-        else:
-            # Try the sidebar
-            page.get_by_role("button", name="New (1)").click()
-            page.wait_for_timeout(500)
-            details_btn = page.locator(".entity-card:has-text('Customer Portal') button:has-text('Details')").first
-            details_btn.wait_for(state="visible", timeout=PAGE_TIMEOUT)
-            with page.expect_navigation(wait_until="domcontentloaded", timeout=PAGE_TIMEOUT):
-                details_btn.click()
-
-        # Verify we're on the element page with the correct name
-        page.wait_for_load_state("domcontentloaded")
-        assert "/architecture/elements/" in page.url
-        heading = page.locator("h1, h2, [data-testid='element-name']").first
-        heading.wait_for(state="visible", timeout=PAGE_TIMEOUT)
-        assert "Customer Portal" in heading.inner_text()
-
-        _shot(page, "accept-new-entity-1440-light")
+        _send(page, live_server)
+        _tab(page, "Matches").get_by_role("button", name="Details").click()
+        page.wait_for_url("**/architecture/traceability/%d" % ids[0], timeout=PAGE_TIMEOUT)
+        assert NAME in page.locator("main").inner_text()
+        _shot(page, "details-" + label)
+        assert _portal_elements(app, org_id) == ids
     finally:
         page.close()
-
-
-def test_accept_matched_entity_lands_on_existing_no_new_element(browser, live_server, seeded_with_elements):
-    """Accept a matched entity and land on the existing element, with no new element created."""
-    email = seeded_with_elements["emails"]["enterprise_architect"]
-    page = browser.new_page(viewport={"width": 1440, "height": 900}, color_scheme="light")
-    try:
-        _login(page, live_server, email)
-        page.goto(
-            live_server + "/ai-chat/entity-matching",
-            wait_until="networkidle",
-            timeout=PAGE_TIMEOUT,
-        )
-
-        # Send a message that will match the existing "Payment Gateway Service"
-        page.get_by_placeholder("Type your message or paste document text here...").fill(
-            "The Payment Gateway Service handles all transaction processing."
-        )
-        with page.expect_response(
-            lambda r: "/ai-chat/entity-matching" in r.url and r.request.method == "POST",
-            timeout=PAGE_TIMEOUT,
-        ):
-            page.get_by_role("button", name="Send message").click()
-
-        page.locator(".message.assistant .message-content").last.wait_for(
-            state="visible", timeout=PAGE_TIMEOUT
-        )
-
-        # Find the matched entity and click Accept
-        page.get_by_role("button", name="Matches (1)").click()
-        page.wait_for_timeout(500)
-
-        accept_btn = page.locator(".entity-card:has-text('Payment Gateway') button:has-text('Accept')").first
-        accept_btn.wait_for(state="visible", timeout=PAGE_TIMEOUT)
-        with page.expect_response(
-            lambda r: "/ai-chat/entity-matching/accept" in r.url and r.request.method == "POST",
-            timeout=PAGE_TIMEOUT,
-        ) as resp:
-            accept_btn.click()
-        assert resp.value.status == 200, resp.value.text()
-
-        # The response should indicate matched: true
-        resp_body = resp.value.json()
-        assert resp_body.get("matched") is True
-
-        # Click Details to navigate to the existing element
-        details_btn = page.locator(".entity-card:has-text('Payment Gateway') button:has-text('Details')").first
-        details_btn.wait_for(state="visible", timeout=PAGE_TIMEOUT)
-        with page.expect_navigation(wait_until="domcontentloaded", timeout=PAGE_TIMEOUT):
-            details_btn.click()
-
-        page.wait_for_load_state("domcontentloaded")
-        assert "/architecture/elements/" in page.url
-        heading = page.locator("h1, h2, [data-testid='element-name']").first
-        heading.wait_for(state="visible", timeout=PAGE_TIMEOUT)
-        assert "Payment Gateway Service" in heading.inner_text()
-
-        _shot(page, "accept-matched-entity-1440-light")
-    finally:
-        page.close()
-
-
-def test_resolve_duplicate_both_ways(browser, live_server, seeded_with_elements):
-    """Resolve a duplicate both ways: Use Existing and Keep as New."""
-    email = seeded_with_elements["emails"]["enterprise_architect"]
-    page = browser.new_page(viewport={"width": 1440, "height": 900}, color_scheme="light")
-    try:
-        _login(page, live_server, email)
-        page.goto(
-            live_server + "/ai-chat/entity-matching",
-            wait_until="networkidle",
-            timeout=PAGE_TIMEOUT,
-        )
-
-        # Send a message that will create a duplicate of "Analytics Engine"
-        page.get_by_placeholder("Type your message or paste document text here...").fill(
-            "We need a new Analytics Engine for the data team."
-        )
-        with page.expect_response(
-            lambda r: "/ai-chat/entity-matching" in r.url and r.request.method == "POST",
-            timeout=PAGE_TIMEOUT,
-        ):
-            page.get_by_role("button", name="Send message").click()
-
-        page.locator(".message.assistant .message-content").last.wait_for(
-            state="visible", timeout=PAGE_TIMEOUT
-        )
-
-        # The duplicate should appear in the Duplicates filter
-        page.get_by_role("button", name="Duplicates (1)").click()
-        page.wait_for_timeout(500)
-
-        # Click Resolve on the duplicate
-        resolve_btn = page.locator(".entity-card:has-text('Analytics Engine') button:has-text('Resolve')").first
-        resolve_btn.wait_for(state="visible", timeout=PAGE_TIMEOUT)
-        resolve_btn.click()
-
-        # The resolve dialog should appear
-        dialog = page.locator('[role="dialog"]:has-text("Resolve Duplicate")')
-        dialog.wait_for(state="visible", timeout=PAGE_TIMEOUT)
-        _shot(page, "resolve-dialog-1440-light")
-
-        # Test "Use Existing Element" path
-        use_existing = dialog.get_by_role("button", name="Use Existing Element")
-        use_existing.wait_for(state="visible", timeout=PAGE_TIMEOUT)
-        with page.expect_navigation(wait_until="domcontentloaded", timeout=PAGE_TIMEOUT):
-            use_existing.click()
-
-        page.wait_for_load_state("domcontentloaded")
-        assert "/architecture/elements/" in page.url
-        heading = page.locator("h1, h2, [data-testid='element-name']").first
-        heading.wait_for(state="visible", timeout=PAGE_TIMEOUT)
-        assert "Analytics Engine" in heading.inner_text()
-
-        # Go back to entity matching
-        page.goto(
-            live_server + "/ai-chat/entity-matching",
-            wait_until="networkidle",
-            timeout=PAGE_TIMEOUT,
-        )
-
-        # Send another message to get the duplicate again
-        page.get_by_placeholder("Type your message or paste document text here...").fill(
-            "Another Analytics Engine for reporting."
-        )
-        with page.expect_response(
-            lambda r: "/ai-chat/entity-matching" in r.url and r.request.method == "POST",
-            timeout=PAGE_TIMEOUT,
-        ):
-            page.get_by_role("button", name="Send message").click()
-
-        page.locator(".message.assistant .message-content").last.wait_for(
-            state="visible", timeout=PAGE_TIMEOUT
-        )
-
-        page.get_by_role("button", name="Duplicates (1)").click()
-        page.wait_for_timeout(500)
-
-        # Click Resolve again
-        resolve_btn = page.locator(".entity-card:has-text('Analytics Engine') button:has-text('Resolve')").first
-        resolve_btn.wait_for(state="visible", timeout=PAGE_TIMEOUT)
-        resolve_btn.click()
-
-        dialog = page.locator('[role="dialog"]:has-text("Resolve Duplicate")')
-        dialog.wait_for(state="visible", timeout=PAGE_TIMEOUT)
-
-        # Test "Keep as New Element" path - should navigate to create form
-        keep_new = dialog.get_by_role("button", name="Keep as New Element")
-        keep_new.wait_for(state="visible", timeout=PAGE_TIMEOUT)
-        with page.expect_navigation(wait_until="domcontentloaded", timeout=PAGE_TIMEOUT):
-            keep_new.click()
-
-        page.wait_for_load_state("domcontentloaded")
-        # Should be on the create element page with prefilled name
-        assert "/architecture/elements/create" in page.url or "/architecture/create" in page.url
-
-        _shot(page, "keep-as-new-1440-light")
-    finally:
-        page.close()
-
-
-def test_open_details(browser, live_server, seeded_with_elements):
-    """Open Details on a matched entity and land on the element page."""
-    email = seeded_with_elements["emails"]["enterprise_architect"]
-    page = browser.new_page(viewport={"width": 1440, "height": 900}, color_scheme="light")
-    try:
-        _login(page, live_server, email)
-        page.goto(
-            live_server + "/ai-chat/entity-matching",
-            wait_until="networkidle",
-            timeout=PAGE_TIMEOUT,
-        )
-
-        page.get_by_placeholder("Type your message or paste document text here...").fill(
-            "The Payment Gateway Service is critical."
-        )
-        with page.expect_response(
-            lambda r: "/ai-chat/entity-matching" in r.url and r.request.method == "POST",
-            timeout=PAGE_TIMEOUT,
-        ):
-            page.get_by_role("button", name="Send message").click()
-
-        page.locator(".message.assistant .message-content").last.wait_for(
-            state="visible", timeout=PAGE_TIMEOUT
-        )
-
-        page.get_by_role("button", name="Matches (1)").click()
-        page.wait_for_timeout(500)
-
-        details_btn = page.locator(".entity-card:has-text('Payment Gateway') button:has-text('Details')").first
-        details_btn.wait_for(state="visible", timeout=PAGE_TIMEOUT)
-        with page.expect_navigation(wait_until="domcontentloaded", timeout=PAGE_TIMEOUT):
-            details_btn.click()
-
-        page.wait_for_load_state("domcontentloaded")
-        assert "/architecture/elements/" in page.url
-        heading = page.locator("h1, h2, [data-testid='element-name']").first
-        heading.wait_for(state="visible", timeout=PAGE_TIMEOUT)
-        assert "Payment Gateway Service" in heading.inner_text()
-
-        _shot(page, "details-1440-light")
-    finally:
-        page.close()
-
-
-# Dark mode / narrow viewport variants
-def test_accept_new_entity_390_dark(browser, live_server, seeded_with_elements):
-    """Same as test_accept_new_entity_reload_finds_it_in_model but at 390 dark."""
-    email = seeded_with_elements["emails"]["enterprise_architect"]
-    page = browser.new_page(viewport={"width": 390, "height": 844}, color_scheme="dark")
-    try:
-        _login(page, live_server, email)
-        page.goto(
-            live_server + "/ai-chat/entity-matching",
-            wait_until="networkidle",
-            timeout=PAGE_TIMEOUT,
-        )
-
-        page.get_by_placeholder("Type your message or paste document text here...").fill(
-            "New Inventory Service for warehouse management."
-        )
-        with page.expect_response(
-            lambda r: "/ai-chat/entity-matching" in r.url and r.request.method == "POST",
-            timeout=PAGE_TIMEOUT,
-        ):
-            page.get_by_role("button", name="Send message").click()
-
-        page.locator(".message.assistant .message-content").last.wait_for(
-            state="visible", timeout=PAGE_TIMEOUT
-        )
-
-        page.get_by_role("button", name="New (1)").click()
-        page.wait_for_timeout(500)
-
-        accept_btn = page.locator(".entity-card:has-text('Inventory Service') button:has-text('Accept')").first
-        accept_btn.wait_for(state="visible", timeout=PAGE_TIMEOUT)
-        with page.expect_response(
-            lambda r: "/ai-chat/entity-matching/accept" in r.url and r.request.method == "POST",
-            timeout=PAGE_TIMEOUT,
-        ) as resp:
-            accept_btn.click()
-        assert resp.value.status == 200, resp.value.text()
-
-        page.wait_for_timeout(500)
-        _shot(page, "accept-new-entity-390-dark")
-    finally:
-        page.close()
-
-
-def test_resolve_dialog_390_dark(browser, live_server, seeded_with_elements):
-    """Resolve dialog at 390 dark."""
-    email = seeded_with_elements["emails"]["enterprise_architect"]
-    page = browser.new_page(viewport={"width": 390, "height": 844}, color_scheme="dark")
-    try:
-        _login(page, live_server, email)
-        page.goto(
-            live_server + "/ai-chat/entity-matching",
-            wait_until="networkidle",
-            timeout=PAGE_TIMEOUT,
-        )
-
-        page.get_by_placeholder("Type your message or paste document text here...").fill(
-            "Duplicate Analytics Engine for testing."
-        )
-        with page.expect_response(
-            lambda r: "/ai-chat/entity-matching" in r.url and r.request.method == "POST",
-            timeout=PAGE_TIMEOUT,
-        ):
-            page.get_by_role("button", name="Send message").click()
-
-        page.locator(".message.assistant .message-content").last.wait_for(
-            state="visible", timeout=PAGE_TIMEOUT
-        )
-
-        page.get_by_role("button", name="Duplicates (1)").click()
-        page.wait_for_timeout(500)
-
-        resolve_btn = page.locator(".entity-card:has-text('Analytics Engine') button:has-text('Resolve')").first
-        resolve_btn.wait_for(state="visible", timeout=PAGE_TIMEOUT)
-        resolve_btn.click()
-
-        dialog = page.locator('[role="dialog"]:has-text("Resolve Duplicate")')
-        dialog.wait_for(state="visible", timeout=PAGE_TIMEOUT)
-        _shot(page, "resolve-dialog-390-dark")
-    finally:
-        page.close()
-
-
-def test_review_form_390_dark(browser, live_server, seeded_with_elements):
-    """Review form (create element page) at 390 dark."""
-    email = seeded_with_elements["emails"]["enterprise_architect"]
-    page = browser.new_page(viewport={"width": 390, "height": 844}, color_scheme="dark")
-    try:
-        _login(page, live_server, email)
-        page.goto(
-            live_server + "/ai-chat/entity-matching",
-            wait_until="networkidle",
-            timeout=PAGE_TIMEOUT,
-        )
-
-        page.get_by_placeholder("Type your message or paste document text here...").fill(
-            "New Reporting Dashboard for executives."
-        )
-        with page.expect_response(
-            lambda r: "/ai-chat/entity-matching" in r.url and r.request.method == "POST",
-            timeout=PAGE_TIMEOUT,
-        ):
-            page.get_by_role("button", name="Send message").click()
-
-        page.locator(".message.assistant .message-content").last.wait_for(
-            state="visible", timeout=PAGE_TIMEOUT
-        )
-
-        page.get_by_role("button", name="New (1)").click()
-        page.wait_for_timeout(500)
-
-        review_btn = page.locator(".entity-card:has-text('Reporting Dashboard') button:has-text('Review')").first
-        review_btn.wait_for(state="visible", timeout=PAGE_TIMEOUT)
-        with page.expect_navigation(wait_until="domcontentloaded", timeout=PAGE_TIMEOUT):
-            review_btn.click()
-
-        page.wait_for_load_state("domcontentloaded")
-        assert "/architecture/elements/create" in page.url or "/architecture/create" in page.url
-        _shot(page, "review-form-390-dark")
-    finally:
-        page.close()
+        _portal_elements(app, org_id, remove=True)

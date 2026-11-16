@@ -51,6 +51,20 @@ CASE_SEED = {
     }),
     'stream': False,
 }
+ENTITY_EXTRACTION = {
+    'marker': 'Analyze the following document and extract entities for enterprise architecture matching.',
+    'prompt': 'Analyze the following document and extract entities for enterprise architecture matching.',
+    'reply': json.dumps({
+        'application_data': {'name': 'Customer Portal', 'description': 'Customer-facing web portal', 'technology_stack': 'React, Node.js', 'business_domain': 'Customer Service'},
+        'vendor_data': {},
+        'archimate_elements': [
+            {'name': 'Customer Portal', 'type': 'ApplicationComponent', 'layer': 'Application', 'description': 'Customer-facing web portal'}
+        ],
+        'relationships': [],
+        'business_capabilities': []
+    }),
+    'stream': False,
+}
 
 # Provider refusals in the shape each provider sends them. A prompt carrying the
 # marker gets the refusal on whichever transport the app uses.
@@ -157,6 +171,7 @@ class AIProtocolStub:
                 matches = [(name, scenario) for name, scenario in [
                     ('chat', CHAT), ('guide', GUIDE),
                     ('programme_prefill', PROGRAMME_PREFILL), ('case_seed', CASE_SEED),
+                    ('entity_extraction', ENTITY_EXTRACTION),
                 ] if isinstance(content, str) and scenario['marker'] in content]
                 stream = body.get('stream', False)
                 if last.get('role') != 'user' or len(matches) != 1 or type(stream) is not bool:
