@@ -50,7 +50,7 @@ MCP_TESTS = (
     "tests/test_origin_request.py::test_metadata_on_server_ip_names_canonical",
     "tests/test_origin_request.py::test_the_token_endpoint_accepts_only_listed_addresses_as_the_resource",
     "tests/test_origin_request.py::test_a_token_for_an_unlisted_address_does_not_open_the_connector",
-    "tests/test_mcp_transport_never_404.py::test_an_assistant_handshake_never_meets_a_404",
+    "tests/test_mcp_transport_never_404.py::test_a_claude_handshake_never_meets_a_404",
     "tests/test_mcp_transport_never_404.py::test_invalid_request_array_body_returns_32600",
     "tests/test_mcp_transport_never_404.py::test_invalid_request_number_body_returns_32600",
     "tests/test_mcp_transport_never_404.py::test_parse_error_non_json_body_returns_32700",

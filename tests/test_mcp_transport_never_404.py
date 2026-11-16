@@ -40,7 +40,7 @@ def _released_tool(client, token):
     return reply.get_json()["result"]["tools"][0]["name"]
 
 
-def test_an_assistant_handshake_never_meets_a_404(client, token):
+def test_a_claude_handshake_never_meets_a_404(client, token):
     replies = {}
 
     def send(key, payload):
