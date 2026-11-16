@@ -108,6 +108,9 @@ ANSWERS_FOR_ITSELF = {
     "unified_ai_chat.entity_matching_message": (
         "Reads the text the person sent; a link it would store asks the assistant's write rule, which refuses and records it."
     ),
+    "unified_ai_chat.accept_entity_match": (
+        "Checks write permission itself and returns PERMISSION_DENIED for read-only members."
+    ),
     "unified_ai_chat.generate_archimate_for_application": (
         "A preview stores nothing; saving the elements asks the matrix for creating relationships first."
     ),
