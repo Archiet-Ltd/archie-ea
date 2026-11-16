@@ -100,10 +100,10 @@ class RoadmapAutomationEngine:
     ) -> List[Dict[str, Any]]:
         """Generate work packages from business capability"""
         org_id = current_organization_id()
-        # Get capability scoped to current organisation
+        # The organisation's own capability, or an explicit shared reference one
         capability = UnifiedCapability.query.filter(
             UnifiedCapability.id == capability_id,
-            UnifiedCapability.organization_id == org_id,
+            UnifiedCapability.visibility_predicate(org_id),
         ).first_or_404()
 
         # Get related applications using the canonical reader (org-scoped)

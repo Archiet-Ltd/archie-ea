@@ -104,6 +104,12 @@ class PredictiveInsightsService:
     def _predict_single_app_lifecycle(self, app_id: int) -> Dict[str, Any]:
         """Predict lifecycle for a single application."""
         # Gather application signals
+        if self._load_visible_application(app_id) is None:
+            return {
+                "application_id": app_id,
+                "error": "Application not found",
+                "prediction_date": datetime.utcnow().isoformat(),
+            }
         signals = self._gather_lifecycle_signals(app_id)
 
         # Calculate current stage
@@ -374,51 +380,55 @@ class PredictiveInsightsService:
 
     # Private helper methods
 
+    def _load_visible_application(self, app_id: int):
+        """The application when it belongs to the signed-in organisation, else None."""
+        from app.models.application_portfolio import ApplicationComponent
+        from app.utils.route_guards import load_entity
+        from app.utils.tenant_sql import current_org_id
+
+        organization_id = current_org_id()
+        if organization_id is None:
+            return None
+        app = load_entity(ApplicationComponent, app_id)
+        if app is None or app.organization_id != organization_id:
+            return None
+        return app
+
     def _gather_lifecycle_signals(self, app_id: int) -> Dict[str, Any]:
-        """Gather signals for lifecycle prediction from database using ORM."""
-        try:
-            from app.models.application_portfolio import ApplicationComponent
+        """Gather signals for lifecycle prediction from the application record.
 
-            app = ApplicationComponent.query.filter(
-                ApplicationComponent.id == app_id
-            ).first()
-            if app and app.created_at:
-                age = (datetime.utcnow() - app.created_at).days / 365.25
-                # Determine vendor support status from available fields
-                vendor_support = "unknown"
-                if app.vendor_risk:
-                    vendor_support = app.vendor_risk
-                elif app.support_level:
-                    vendor_support = app.support_level
-                elif app.vendor_type:
-                    vendor_support = app.vendor_type
-
-                return {
-                    "application_name": app.name,
-                    "age_years": round(age, 1),
-                    "technology_currency": 0,
-                    "vendor_support_status": vendor_support,
-                    "usage_trend": "unknown",
-                    "maintenance_cost_trend": "unknown",
-                    "incident_frequency": "unknown",
-                    "strategic_alignment": 0,
-                }
-        except Exception:
-            logger.debug("lifecycle_signals: DB unavailable for app %s", app_id)
-        return {
-            "age_years": 0,
-            "technology_currency": 0,
+        A factor nothing measures (technology currency, strategic alignment) is
+        None, never 0: a zero would read as a measured worst case.
+        """
+        signals = {
+            "age_years": None,
+            "technology_currency": None,
+            # No field on the application states whether the vendor still
+            # supports it (vendor_risk, support_level and vendor_type describe
+            # something else), so the status stays unknown.
             "vendor_support_status": "unknown",
             "usage_trend": "unknown",
             "maintenance_cost_trend": "unknown",
             "incident_frequency": "unknown",
-            "strategic_alignment": 0,
+            "strategic_alignment": None,
         }
+        try:
+            app = self._load_visible_application(app_id)
+            if app is not None:
+                signals["application_name"] = app.name
+                if app.created_at:
+                    age = (datetime.utcnow() - app.created_at).days / 365.25
+                    signals["age_years"] = round(age, 1)
+        except Exception:
+            logger.debug("lifecycle_signals: DB unavailable for app %s", app_id)
+        return signals
 
     def _determine_lifecycle_stage(self, signals: Dict[str, Any]) -> str:
         """Determine current lifecycle stage from signals."""
-        age = signals.get("age_years", 0)
-        currency = signals.get("technology_currency", 1.0)
+        age = signals.get("age_years")
+        currency = signals.get("technology_currency")
+        if age is None or currency is None:
+            return "unknown"
 
         if age < 2 and currency > 0.8:
             return "emerging"
@@ -436,6 +446,8 @@ class PredictiveInsightsService:
     ) -> List[Dict[str, Any]]:
         """Predict future stage transitions."""
         stages = ["emerging", "growth", "mature", "declining", "retiring"]
+        if current_stage not in stages:
+            return []
         current_idx = stages.index(current_stage)
 
         predictions = []
@@ -459,8 +471,15 @@ class PredictiveInsightsService:
 
     def _predict_end_of_life(self, signals: Dict[str, Any]) -> Dict[str, Any]:
         """Predict end-of-life timing."""
-        currency = signals.get("technology_currency", 1.0)
-        age = signals.get("age_years", 0)
+        currency = signals.get("technology_currency")
+        age = signals.get("age_years")
+        if currency is None or age is None:
+            return {
+                "predicted_date": None,
+                "months_remaining": None,
+                "confidence": None,
+                "triggers": [],
+            }
 
         # Simple heuristic for EOL prediction
         eol_months = max(6, int((currency * 36) + (12 - age)))
@@ -515,16 +534,17 @@ class PredictiveInsightsService:
     def _identify_lifecycle_risks(self, signals: Dict[str, Any]) -> List[Dict[str, Any]]:
         """Identify risks related to lifecycle."""
         risks = []
-        if signals.get("technology_currency", 1.0) < 0.5:
+        currency = signals.get("technology_currency")
+        if currency is not None and currency < 0.5:
             risks.append({"risk": "Technology obsolescence", "severity": "High"})
-        if signals.get("vendor_support_status") == "limited":
-            risks.append({"risk": "Vendor support ending", "severity": "Medium"})
         if signals.get("maintenance_cost_trend") == "increasing":
             risks.append({"risk": "Rising maintenance costs", "severity": "Medium"})
         return risks
 
     def _recommend_investment(self, stage: str) -> Dict[str, Any]:
         """Recommend investment level based on lifecycle stage."""
+        if stage == "unknown":
+            return None
         recommendations = {
             "emerging": {"level": "High", "focus": "Capability building"},
             "growth": {"level": "Medium-High", "focus": "Scaling and optimization"},

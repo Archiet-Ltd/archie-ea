@@ -582,8 +582,14 @@ class RoadmapDataSync:
         archived = 0
 
         # Use ORM to find orphaned deliverables (source_application_id points to non-existent ApplicationComponent)
+        from app.utils.tenant_sql import current_org_id
+
+        organization_id = current_org_id()
+        if organization_id is None:
+            return 0
         orphaned_deliverables = (
             Deliverable.query.filter(
+                Deliverable.organization_id == organization_id,
                 Deliverable.source_application_id.isnot(None),
                 Deliverable.status != "archived",
             )

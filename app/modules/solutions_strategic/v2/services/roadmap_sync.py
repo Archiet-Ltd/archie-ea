@@ -613,6 +613,7 @@ class RoadmapDataSync:
         # The tenant isolation filter will automatically scope to organization_id
         orphaned_deliverables = (
             RoadmapDeliverable.query.filter(
+                RoadmapDeliverable.organization_id == organization_id,
                 RoadmapDeliverable.source_application_id.isnot(None),
                 RoadmapDeliverable.status != "archived",
             )

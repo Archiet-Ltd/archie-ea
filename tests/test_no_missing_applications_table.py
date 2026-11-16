@@ -1,5 +1,5 @@
 """
-Tests for appstable01: no Entelim route answers 500 because raw SQL reads an
+Tests that no Entelim route answers 500 because raw SQL reads an
 `applications` table the schema does not have.
 
 These tests verify that the three raw SQL reads against the missing `applications`
@@ -7,6 +7,8 @@ table have been replaced with the canonical application reader.
 """
 
 import pytest
+
+from app import db
 from datetime import datetime
 
 
@@ -152,6 +154,129 @@ class TestGenerateWorkPackagesCapability:
         assert response.status_code == 404, f"Expected 404, got {response.status_code}: {response.get_data(as_text=True)}"
 
 
+class TestSharedReferenceCapability:
+    """A shared reference capability is open to every organisation; an unclassified one is not."""
+
+    def _shared(self, db_session, name, scope):
+        from app.models.unified_capability import UnifiedCapability
+        import uuid
+
+        cap = UnifiedCapability(
+            name=name,
+            code=f"SHR{uuid.uuid4().hex[:6].upper()}",
+            level=1,
+            scope=scope,
+            organization_id=None,
+            strategic_importance="high",
+        )
+        db_session.add(cap)
+        db_session.commit()
+        return cap
+
+    def test_shared_reference_capability_generates_for_any_organisation(
+        self, db_session, make_org, client, login_as
+    ):
+        org_a, user_a = _org_with_user(db_session, make_org, "a")
+        shared = self._shared(db_session, "Shared Reference Capability", "reference")
+
+        login_as(client, user_a)
+        response = client.post(
+            "/api/roadmap/automation/generate-work-packages",
+            json={"source_type": "capability", "source_id": shared.id},
+        )
+        assert response.status_code == 200, response.get_data(as_text=True)
+        names = [p.get("name", "") for p in response.get_json()["generated_packages"]]
+        # Applications are linked to an organisation's own capabilities only,
+        # so a shared reference capability yields just its own package.
+        assert names == ["Implement Shared Reference Capability"]
+
+    def test_unclassified_null_organisation_capability_is_not_found(
+        self, db_session, make_org, client, login_as
+    ):
+        org_a, user_a = _org_with_user(db_session, make_org, "a")
+        legacy = self._shared(db_session, "Unclassified Capability", None)
+
+        login_as(client, user_a)
+        response = client.post(
+            "/api/roadmap/automation/generate-work-packages",
+            json={"source_type": "capability", "source_id": legacy.id},
+        )
+        assert response.status_code == 404, response.get_data(as_text=True)
+
+
+class TestEngineApplicationWorkPackage:
+    """The older engine turns each linked application into a named work package."""
+
+    def test_capability_with_linked_application_yields_application_package(
+        self, db_session, make_org, tenant_ctx
+    ):
+        org_a, _ = _org_with_user(db_session, make_org, "a")
+        cap = _capability(db_session, org_a, "Capability A")
+        linked = _application(db_session, org_a, "Ledger Alpha")
+        _link_app_cap(db_session, org_a, linked, cap)
+
+        from app.services.roadmap_automation import RoadmapAutomationEngine
+
+        with tenant_ctx(org_a.id):
+            packages = RoadmapAutomationEngine().generate_work_packages(
+                "capability", cap.id
+            )
+
+        by_source = [p for p in packages if p.get("source_type") == "application"]
+        assert [p["name"] for p in by_source] == ["Modernize Ledger Alpha"]
+        assert by_source[0]["source_id"] == linked.id
+
+
+class TestOrphanArchiveIsFencedByOrganisation:
+    """Archiving orphaned deliverables touches only the organisation it was given."""
+
+    def test_second_organisation_orphan_is_left_alone(
+        self, db_session, make_org, tenant_ctx
+    ):
+        org_a, user_a = _org_with_user(db_session, make_org, "a")
+        org_b, user_b = _org_with_user(db_session, make_org, "b")
+        app_a = _application(db_session, org_a, "Ledger Alpha")
+        app_b = _application(db_session, org_b, "Ledger Beta")
+
+        from app.models.roadmap_models import RoadmapDeliverable
+
+        def deliverable(org, user, app, name):
+            d = RoadmapDeliverable(
+                name=name,
+                status="planned",
+                organization_id=org.id,
+                created_by=user.id,
+                source_application_id=app.id,
+            )
+            db_session.add(d)
+            db_session.flush()
+            return d
+
+        d_a = deliverable(org_a, user_a, app_a, "Alpha deliverable")
+        d_b = deliverable(org_b, user_b, app_b, "Beta deliverable")
+        # Both applications are now deleted; the foreign key is switched off
+        # for this transaction only so the rows are real orphans.
+        db_session.execute(db.text("SET LOCAL session_replication_role = replica"))
+        db_session.execute(
+            db.text("DELETE FROM application_components WHERE id IN (:a, :b)"),
+            {"a": app_a.id, "b": app_b.id},
+        )
+        db_session.execute(db.text("SET LOCAL session_replication_role = DEFAULT"))
+        db_session.commit()
+
+        from app.modules.solutions_strategic.v2.services.roadmap_sync import (
+            RoadmapDataSync,
+        )
+
+        # The caller sits in organisation B's context but asks for A.
+        with tenant_ctx(org_b.id):
+            archived = RoadmapDataSync()._archive_orphaned_deliverables(org_a.id)
+
+        assert archived == 0
+        assert db_session.get(RoadmapDeliverable, d_b.id).status == "planned"
+        assert db_session.get(RoadmapDeliverable, d_a.id).status == "planned"
+
+
 class TestRoadmapSyncApplications:
     """The application sync reads applications through the application model."""
 
@@ -211,11 +336,11 @@ class TestPredictiveInsightsApplication:
         signals = result["signals_analyzed"]
         assert result["application_id"] == app_a.id
         assert signals["application_name"] == "Ledger Alpha"
-        assert signals["vendor_support_status"] == "high"
+        assert signals["vendor_support_status"] == "unknown"
         assert signals["age_years"] > 5
-        # Another organisation's application is not read at all.
-        assert "application_name" not in other["signals_analyzed"]
-        assert other["signals_analyzed"]["vendor_support_status"] == "unknown"
+        # Another organisation's application answers not found, with no signals.
+        assert other["error"] == "Application not found"
+        assert "signals_analyzed" not in other
 
     def test_application_with_no_vendor_fields_is_unknown(
         self, db_session, make_org, tenant_ctx
@@ -239,6 +364,148 @@ class TestPredictiveInsightsApplication:
         signals = result["signals_analyzed"]
         assert signals["application_name"] == "Ledger Alpha"
         assert signals["vendor_support_status"] == "unknown"
+
+
+class TestPredictiveInsightsNotMeasured:
+    """A factor nothing measures is not measured; it is never a zero."""
+
+    def test_unmeasured_application_has_no_obsolescence_risk(
+        self, db_session, make_org, tenant_ctx
+    ):
+        org_a, _ = _org_with_user(db_session, make_org, "a")
+        app_a = _application(db_session, org_a, "Ledger Alpha")
+        app_a.created_at = datetime(2020, 1, 1)
+        db_session.commit()
+
+        from app.services.ai_chat_extensions.predictive_insights_service import (
+            PredictiveInsightsService,
+        )
+
+        with tenant_ctx(org_a.id):
+            result = PredictiveInsightsService().predict_application_lifecycle(
+                app_id=app_a.id
+            )
+        signals = result["signals_analyzed"]
+        assert signals["technology_currency"] is None
+        assert signals["strategic_alignment"] is None
+        assert result["risk_factors"] == []
+        assert result["current_stage"] == "unknown"
+        assert result["stage_predictions"] == []
+        assert result["end_of_life"]["predicted_date"] is None
+        assert result["investment_recommendation"] is None
+
+    def test_other_organisation_application_id_is_not_found(
+        self, db_session, make_org, tenant_ctx
+    ):
+        org_a, _ = _org_with_user(db_session, make_org, "a")
+        org_b, _ = _org_with_user(db_session, make_org, "b")
+        app_b = _application(db_session, org_b, "Ledger Beta")
+        db_session.commit()
+
+        from app.services.ai_chat_extensions.predictive_insights_service import (
+            PredictiveInsightsService,
+        )
+
+        service = PredictiveInsightsService()
+        with tenant_ctx(org_a.id):
+            other = service.predict_application_lifecycle(app_id=app_b.id)
+            missing = service.predict_application_lifecycle(app_id=987654321)
+        assert other["error"] == "Application not found"
+        assert missing["error"] == "Application not found"
+        assert "current_stage" not in other
+
+
+class TestEngineCapabilityIsTenantScoped:
+    """The older engine answers not found for another organisation's capability."""
+
+    def test_other_organisation_capability_is_not_found(
+        self, db_session, make_org, tenant_ctx
+    ):
+        from werkzeug.exceptions import NotFound
+
+        org_a, _ = _org_with_user(db_session, make_org, "a")
+        org_b, _ = _org_with_user(db_session, make_org, "b")
+        cap_a = _capability(db_session, org_a, "Capability A")
+        db_session.commit()
+
+        from app.services.roadmap_automation import RoadmapAutomationEngine
+
+        with tenant_ctx(org_b.id):
+            with pytest.raises(NotFound):
+                RoadmapAutomationEngine().generate_work_packages(
+                    "capability", cap_a.id
+                )
+
+
+class TestOrphanArchiveArchivesOwnOrphansOnly:
+    """Each archive archives the signed-in organisation's orphans and no one else's."""
+
+    def _two_orphans(self, db_session, make_org):
+        org_a, user_a = _org_with_user(db_session, make_org, "a")
+        org_b, user_b = _org_with_user(db_session, make_org, "b")
+        app_a = _application(db_session, org_a, "Ledger Alpha")
+        app_b = _application(db_session, org_b, "Ledger Beta")
+
+        from app.models.roadmap_models import RoadmapDeliverable
+
+        def deliverable(org, user, app, name):
+            d = RoadmapDeliverable(
+                name=name,
+                status="planned",
+                organization_id=org.id,
+                created_by=user.id,
+                source_application_id=app.id,
+            )
+            db_session.add(d)
+            db_session.flush()
+            return d
+
+        d_a = deliverable(org_a, user_a, app_a, "Alpha deliverable")
+        d_b = deliverable(org_b, user_b, app_b, "Beta deliverable")
+        db_session.execute(db.text("SET LOCAL session_replication_role = replica"))
+        db_session.execute(
+            db.text("DELETE FROM application_components WHERE id IN (:a, :b)"),
+            {"a": app_a.id, "b": app_b.id},
+        )
+        db_session.execute(db.text("SET LOCAL session_replication_role = DEFAULT"))
+        db_session.commit()
+        return org_a, org_b, d_a, d_b, RoadmapDeliverable
+
+    def test_older_archive_archives_own_orphan_only(
+        self, db_session, make_org, tenant_ctx
+    ):
+        org_a, org_b, d_a, d_b, model = self._two_orphans(db_session, make_org)
+
+        from app.services.roadmap_sync import RoadmapDataSync
+
+        # The orphan rows have no application, so the foreign key is switched
+        # off for the archive's own transaction only.
+        db_session.execute(db.text("SET LOCAL session_replication_role = replica"))
+        with tenant_ctx(org_a.id):
+            archived = RoadmapDataSync()._archive_orphaned_deliverables()
+
+        assert archived == 1
+        assert db_session.get(model, d_a.id).status == "archived"
+        assert db_session.get(model, d_b.id).status == "planned"
+
+    def test_v2_archive_archives_own_orphan_only(
+        self, db_session, make_org, tenant_ctx
+    ):
+        org_a, org_b, d_a, d_b, model = self._two_orphans(db_session, make_org)
+
+        from app.modules.solutions_strategic.v2.services.roadmap_sync import (
+            RoadmapDataSync,
+        )
+
+        # The orphan rows have no application, so the foreign key is switched
+        # off for the archive's own transaction only.
+        db_session.execute(db.text("SET LOCAL session_replication_role = replica"))
+        with tenant_ctx(org_a.id):
+            archived = RoadmapDataSync()._archive_orphaned_deliverables(org_a.id)
+
+        assert archived == 1
+        assert db_session.get(model, d_a.id).status == "archived"
+        assert db_session.get(model, d_b.id).status == "planned"
 
 
 class TestNoRawSQLOnApplicationsTable:
