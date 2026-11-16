@@ -2493,6 +2493,11 @@ function composerApp() {
                         self.paper.trigger('element:pointerclick', chosenView, {});
                         /* Opening an element makes it the one the arrow keys walk out from. */
                         self._tabCycleOrigin = null;
+                        /* Move focus into the details that just opened, so the next key goes there. */
+                        setTimeout(function() {
+                            let nameField = document.querySelector('.detail-panel input[aria-label="Element name"]');
+                            if (nameField && nameField.offsetParent !== null) nameField.focus();
+                        }, 60);
                     }
                 }
                 /* 1-6 — toggle layer visibility */
@@ -2503,6 +2508,17 @@ function composerApp() {
                     let layerName = layerKeys[e.key];
                     self.statusText = layerName.charAt(0).toUpperCase() + layerName.slice(1) + ' layer ' + (self.layerVisibility[layerName] ? 'visible' : 'hidden');
                 }
+            });
+
+            /* Escape inside the details closes them and hands focus back to the drawing. */
+            document.addEventListener('keydown', function(e) {
+                if (e.key !== 'Escape' || !e.target.closest || !e.target.closest('.detail-panel')) return;
+                if (!self.selectedNode && !self.selectedEdge) return;
+                e.preventDefault();
+                self.selectedNode = null;
+                self.selectedEdge = null;
+                let canvasEl = document.getElementById('composer-canvas');
+                if (canvasEl) canvasEl.focus();
             });
 
             /* ── Arrow keys: nudge selected elements ── */
@@ -3456,10 +3472,12 @@ function composerApp() {
             let size = nextCell.size();
             let scale = self.paper.scale();
             let canvasEl = document.getElementById('composer-canvas');
-            /* Bring the element into view only when it has gone off screen. */
-            let at = { x: (pos.x + size.width / 2) * scale.sx + self.paper.translate().tx,
-                       y: (pos.y + size.height / 2) * scale.sy + self.paper.translate().ty };
-            if (canvasEl && (at.x < 0 || at.y < 0 || at.x > canvasEl.clientWidth || at.y > canvasEl.clientHeight)) {
+            /* Bring the element into view whenever any edge of it has left the visible drawing. */
+            let left = pos.x * scale.sx + self.paper.translate().tx;
+            let top = pos.y * scale.sy + self.paper.translate().ty;
+            let right = left + size.width * scale.sx;
+            let bottom = top + size.height * scale.sy;
+            if (canvasEl && (left < 0 || top < 0 || right > canvasEl.clientWidth || bottom > canvasEl.clientHeight)) {
                 self.paper.translate(Math.round(canvasEl.clientWidth / 2 - (pos.x + size.width / 2) * scale.sx),
                                      Math.round(canvasEl.clientHeight / 2 - (pos.y + size.height / 2) * scale.sy));
             }

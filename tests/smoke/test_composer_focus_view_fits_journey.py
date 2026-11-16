@@ -394,8 +394,15 @@ def test_keyboard_alone_reaches_walks_opens_leaves_and_moves_in_the_drawing(
             state = page.evaluate(FOCUS_STATE)
             assert state["inCanvas"], "%s: an arrow key took focus out of the drawing" % where
             walked.append(state["selected"])
-            expect(page.get_by_test_id("diagram-status-line").get_by_role("status", include_hidden=True)).to_contain_text(
-                "%s, %d of 12 connected" % (state["selected"], step + 1))
+            expect(page.get_by_test_id("diagram-status-line").get_by_test_id("status-text")).to_contain_text(
+                "%s, %d of 10 connected" % (state["selected"], step + 1))
+            # (Ten: an element reached both by a recorded link and by a worked-out one is one row, so the two
+            # worked-out connections here now count once with the recorded ones.)
+            # One announcer only: of every live region on the page, exactly one carries this step's words.
+            carriers = page.evaluate("""(name) => Array.from(document.querySelectorAll(
+                '[aria-live]:not([aria-live="off"]), [role="status"], [role="alert"]'))
+                .filter(e => (e.textContent || '').includes(name)).length""", state["selected"])
+            assert carriers == 1, "%s: %d live regions carry the step for %s" % (where, carriers, state["selected"])
         assert len(set(walked)) == 3 and set(walked) <= connected, "%s: the arrows reached %r" % (where, walked)
         said = page.evaluate("() => window.__said")
         assert len(said) == 3 and [m.split(",")[0] for m in said] == walked, "%s: three steps made announcements %r" % (where, said)
@@ -412,7 +419,14 @@ def test_keyboard_alone_reaches_walks_opens_leaves_and_moves_in_the_drawing(
         box = panel.bounding_box()
         assert box["x"] >= 0 and box["x"] + box["width"] <= width, "%s: the details run off the screen: %r" % (where, box)
         page.screenshot(path="%s/composer-keyboard-details-%d-%s.png" % (_walk_dir(), width, scheme))
+        # Focus moves into the details when they open; Escape closes them and returns focus to the drawing.
+        page.wait_for_function("() => !!document.activeElement.closest('.detail-panel')", timeout=PAGE_TIMEOUT)
         page.keyboard.press("Escape")
+        expect(panel).to_be_hidden(timeout=PAGE_TIMEOUT)
+        assert page.evaluate("() => document.activeElement.id") == "composer-canvas", "%s: Escape left focus off the drawing" % where
+        # Open them again, as the next steps expect.
+        page.keyboard.press("Enter")
+        expect(panel).to_be_visible(timeout=PAGE_TIMEOUT)
 
         # Tab leaves the drawing for the next control; Shift+Tab comes back to it and Shift+Tab again leaves
         # it for the control before, with the chosen element unchanged throughout.
@@ -481,5 +495,39 @@ def test_keyboard_alone_reaches_walks_opens_leaves_and_moves_in_the_drawing(
             return r.x < c.right && r.right > c.x && r.y < c.bottom && r.bottom > c.y; }""", moved["name"])
         assert on_screen, "%s: the moved element is not in sight" % where
         page.screenshot(path="%s/composer-keyboard-moved-%d-%s.png" % (_walk_dir(), width, scheme))
+    finally:
+        context.close()
+
+
+@pytest.mark.parametrize("scheme,width,height", [("light", 1440, 900), ("dark", 390, 844)])
+def test_walking_brings_the_whole_element_into_the_drawing(browser, live_server, hub, scheme, width, height):
+    """Zoomed in, some neighbours sit across the edge of the drawing. Walking to one must show all of its
+    box, not leave it half cut off."""
+    context, page = _open(browser, live_server, hub, width, height, scheme)
+    try:
+        where = "%dx%d %s" % (width, height, scheme)
+        factor = 1.8 if width > 800 else 1.2
+        page.evaluate("""() => { const a = Alpine.$data(document.querySelector('[x-data^="composerApp"]'));
+            const s = a.paper.scale(); a.paper.scale(s.sx * %s, s.sy * %s); }""" % (factor, factor))
+        page.get_by_test_id("zoom-fit").focus()
+        assert _tab_until_in_drawing(page, "Tab"), "%s: Tab never reached the drawing" % where
+        edge_cases = 0
+        for step in range(12):
+            before = page.evaluate("""() => { const a = Alpine.$data(document.querySelector('[x-data^="composerApp"]'));
+                return a.paper.translate(); }""")
+            page.keyboard.press("ArrowDown")
+            page.wait_for_timeout(120)
+            box = page.evaluate("""() => {
+                const a = Alpine.$data(document.querySelector('[x-data^="composerApp"]'));
+                const cell = a._selectedCells[0];
+                const r = a.paper.findViewByModel(cell).el.getBoundingClientRect();
+                const c = document.querySelector('#composer-canvas').getBoundingClientRect();
+                return {name: cell.get('elName'), l: r.left - c.left, t: r.top - c.top, r: c.right - r.right, b: c.bottom - r.bottom};
+            }""")
+            assert min(box["l"], box["t"], box["r"], box["b"]) >= -1, "%s: %s is cut off by the drawing edge: %r" % (where, box["name"], box)
+            after = page.evaluate("""() => { const a = Alpine.$data(document.querySelector('[x-data^="composerApp"]'));
+                return a.paper.translate(); }""")
+            edge_cases += before != after
+        assert edge_cases, "%s: the zoomed drawing never needed to move, so the edge was not tested" % where
     finally:
         context.close()

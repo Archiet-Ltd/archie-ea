@@ -12,7 +12,7 @@
   <span class="font-medium text-foreground tabular-nums" data-testid="status-counts"
         x-text="(typeof overviewCounts === 'function' && overviewCounts()) || (typeof focusCounts === 'function' && focusCounts()) || shellElementTotal + (shellElementTotal === 1 ? ' {{ noun }}, ' : ' {{ noun_plural }}, ') + shellRelTotal + (shellRelTotal === 1 ? ' {{ relation_noun }}' : ' {{ relation_noun_plural }}')"></span>
   <span x-show="selectedNode" x-cloak data-testid="status-selection" x-text="selectedNode ? ('Selected: ' + selectedNode.label) : ''"></span>
-  <span class="hidden md:inline" x-show="statusText && statusText !== 'Ready'" x-cloak role="status" aria-live="polite" x-text="statusText"></span>
+  <span class="hidden md:inline" x-show="statusText && statusText !== 'Ready'" x-cloak data-testid="status-text" x-text="statusText"></span>
   <span class="ml-auto hidden items-center gap-3 lg:flex">
     <span><kbd class="rounded-sm border border-border bg-muted px-1 font-mono">Del</kbd> remove</span>
     <span><kbd class="rounded-sm border border-border bg-muted px-1 font-mono">Ctrl</kbd>+<kbd class="rounded-sm border border-border bg-muted px-1 font-mono">Z</kbd> undo</span>

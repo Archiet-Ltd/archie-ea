@@ -570,6 +570,6 @@ z-index: 45;
 @media (max-width: 640px) {
     .detail-panel {
         position: fixed; top: 0; right: 0; bottom: 0; z-index: 60;
-        width: min(280px, 100vw); max-width: 100vw; box-shadow: 0 0 24px hsl(var(--foreground) / 0.2);
+        width: min(280px, 100vw); max-width: 100vw; border-left: 1px solid hsl(var(--border));
     }
 }

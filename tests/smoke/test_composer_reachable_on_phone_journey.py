@@ -64,5 +64,46 @@ def test_a_person_on_a_phone_opens_the_composer_from_the_navigation(browser, liv
             "the Composer opened with no elements drawn"
         if SHOTS:
             page.screenshot(path=os.path.join(SHOTS, "composer_phone_opened_390_dark.png"))
+
+        # The drawing fills the screen width and the page does not scroll sideways.
+        box = canvas.bounding_box()
+        assert box and box["width"] >= 380 and box["x"] <= 10, "the drawing does not fill the phone screen: %r" % box
+        overflow = page.evaluate("() => document.documentElement.scrollWidth - window.innerWidth")
+        assert overflow <= 0, "the page scrolls sideways by %dpx" % overflow
+
+        # A named element can be opened and its details name it.
+        # The drawing opens on the layers; tapping a layer card shows its elements, and tapping an element
+        # opens its details.
+        def tappable(summary):
+            return page.evaluate("""(summary) => {
+                const a = Alpine.$data(document.querySelector('[x-data^="composerApp"]'));
+                const c = document.querySelector('#composer-canvas').getBoundingClientRect();
+                for (const cell of a.graph.getElements()) {
+                    const named = summary ? cell.get('isLayerSummary') : (cell.get('elementId') && !cell.get('isLayerZone')
+                        && !cell.get('isAnnotation') && !cell.get('isLayerSummary'));
+                    if (!named) continue;
+                    const r = a.paper.findViewByModel(cell).el.getBoundingClientRect();
+                    const mx = r.left + r.width / 2, my = r.top + r.height / 2;
+                    if (mx > c.left + 10 && mx < c.right - 10 && my > c.top + 10 && my < c.bottom - 10 && r.width > 20)
+                        return {name: cell.get('elName'), x: mx, y: my};
+                }
+                return null; }""", summary)
+
+        layer = tappable(True)
+        assert layer, "no layer card sits inside the drawing on a phone"
+        page.mouse.click(layer["x"], layer["y"])
+        page.wait_for_function(
+            """() => Alpine.$data(document.querySelector('[x-data^="composerApp"]')).graph.getElements()
+                .some(c => c.get('elementId') && !c.get('isLayerSummary'))""", timeout=PAGE_TIMEOUT)
+        page.wait_for_timeout(800)
+        target = tappable(False)
+        assert target and target["name"], "no named element sits inside the drawing on a phone"
+        page.mouse.click(target["x"], target["y"])
+        panel = page.locator(".detail-panel")
+        panel.wait_for(state="visible", timeout=PAGE_TIMEOUT)
+        name = panel.locator('input[aria-label="Element name"]').input_value()
+        assert name == target["name"], "the details opened %r, not the element tapped, %r" % (name, target["name"])
+        pbox = panel.bounding_box()
+        assert pbox["x"] >= 0 and pbox["x"] + pbox["width"] <= 390, "the details run off the screen: %r" % pbox
     finally:
         context.close()
