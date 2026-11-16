@@ -2147,6 +2147,7 @@ ROADMAP_WRITE_PATHS = [
     ("POST", "/api/roadmap/gaps"),
     ("POST", "/api/roadmap/automation/generate-work-packages"),
     ("POST", "/api/roadmap/sync/capabilities"),
+    ("POST", "/api/roadmap/sync/applications"),
     ("POST", "/api/roadmap/archimate/generate-roadmap"),
 ]
 
