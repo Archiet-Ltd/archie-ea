@@ -147,7 +147,9 @@ def _is_duplicate(A):
 
 
 def _is_decommissioned(A):
-    return db.and_(A.lifecycle_status.isnot(None), func.lower(A.lifecycle_status) == "5. decommissioned")
+    from app.models.application_portfolio import is_decommissioned_expression
+
+    return is_decommissioned_expression(A.lifecycle_status)
 
 
 def _active_applications():

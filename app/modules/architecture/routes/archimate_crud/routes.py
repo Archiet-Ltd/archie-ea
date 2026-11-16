@@ -43,6 +43,8 @@ from .services.field_configs import (
     get_element_field_names,
 )
 
+from app.models.application_portfolio import is_decommissioned_expression, lifecycle_label
+
 # Application Layer imports
 from app.models.application_layer import (
     ApplicationCollaboration,
@@ -1107,6 +1109,12 @@ def api_layer_elements(layer):
     else:
         query_types = layer_types
 
+    # The application list answers "how many applications" the way the overview and the Applications
+    # page do: a decommissioned one is left out unless the person asks for it.
+    hide_decommissioned = query_types == ["ApplicationComponent"] and request.args.get(
+        "include_decom", ""
+    ).strip().lower() not in ("1", "true", "yes", "on")
+
     all_elements = []
     if source_filter != "architecture":  # skip dedicated tables when filtering to architecture-only
         for etype in query_types:
@@ -1128,6 +1136,8 @@ def api_layer_elements(layer):
                 # the count endpoint was already fixed.
                 if hasattr(model_class, "archimate_element_id"):
                     q = q.filter(model_class.archimate_element_id.is_(None))
+                if hide_decommissioned:
+                    q = q.filter(~is_decommissioned_expression())
                 if search:
                     safe_search = escape_like_literal(search)
                     filters = []
@@ -1229,6 +1239,9 @@ def api_layer_elements(layer):
                     # select; the API calls the same value "plateau" — map it
                     # under both keys so typedFieldDefaults finds it.
                     elem_dict["architecture_state"] = elem_dict["plateau"] or ""
+                    if etype == "ApplicationComponent":
+                        elem_dict["lifecycle"] = lifecycle_label(elem.lifecycle_status)
+                        elem_dict["decommissioned"] = _stage_is_decommissioned(elem.lifecycle_status)
                     for field_name in typed_field_names:
                         if hasattr(elem, field_name):  # model-safety-ok: polymorphic ArchiMate elements
                             value = getattr(elem, field_name, None)
@@ -1259,6 +1272,15 @@ def api_layer_elements(layer):
                     or_(
                         ArchiMateElement.name.ilike(f"%{safe_s}%", escape="\\"),
                         ArchiMateElement.description.ilike(f"%{safe_s}%", escape="\\"),
+                    )
+                )
+            if hide_decommissioned:
+                ae_q = ae_q.filter(
+                    ~ArchiMateElement.id.in_(
+                        db.select(ApplicationComponent.archimate_element_id).where(
+                            ApplicationComponent.archimate_element_id.isnot(None),
+                            is_decommissioned_expression(),
+                        )
                     )
                 )
             ae_rows = ae_q.all()
@@ -1311,6 +1333,9 @@ def api_layer_elements(layer):
                 # record has none, and is addressed as an element.
                 if dedicated_row is not None:
                     ae_dict["record_id"] = dedicated_row.id
+                    if ae.type == "ApplicationComponent":
+                        ae_dict["lifecycle"] = lifecycle_label(dedicated_row.lifecycle_status)
+                        ae_dict["decommissioned"] = _stage_is_decommissioned(dedicated_row.lifecycle_status)
                 if ae_type_config:
                     for f in ae_type_config.fields:
                         if f.name == "architecture_state":
@@ -3411,6 +3436,11 @@ def _with_custom_fields(display_fields, element, element_type):
     if rest and len(kept) != len(display_fields):
         kept.append({"label": "Custom properties", "value": str(_readable(rest)), "technical": False})
     return kept + shown
+
+
+def _stage_is_decommissioned(stage):
+    """True when the recorded stage is the decommissioned one (the same rule the count uses)."""
+    return (stage or "").strip().lower() == "5. decommissioned"
 
 
 def _form_text(value):

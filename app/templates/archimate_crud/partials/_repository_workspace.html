@@ -132,6 +132,12 @@
                     </template>
                 </select>
             </div>
+            <div x-cloak x-show="typeFilter === 'ApplicationComponent'" class="flex h-9 items-center">
+                <label for="architecture-include-decom" class="inline-flex cursor-pointer items-center gap-2 text-sm text-foreground">
+                    <input id="architecture-include-decom" data-testid="filter-include-decom" type="checkbox" x-model="includeDecom" @change="currentPage = 1; loadElements()" class="h-4 w-4 rounded border-input">
+                    Include decommissioned
+                </label>
+            </div>
             <button type="button" data-testid="advanced-toggle" @click="showAdvanced = !showAdvanced"
                     :aria-expanded="showAdvanced.toString()" aria-controls="architecture-advanced-filters"
                     class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center"
@@ -295,7 +301,7 @@
                         <tr x-cloak x-show="!groupByType || !collapsedTypes[group.type]" class="transition-colors hover:bg-muted/20" @click="if (!$event.target.closest('a,button,input')) openDetailPanel(el)">
                             <td x-cloak x-show="bulkMode" class="px-4 py-3"><input type="checkbox" :value="selectionKey(el)" x-model="selectedIds" class="h-4 w-4 rounded border-input" :aria-label="'Select ' + el.name"></td>
                             <td class="px-4 py-3" data-field="element-name"><button type="button" @click="openDetailPanel(el)" class="h-8 max-w-[240px] truncate rounded-md text-left text-sm font-medium text-primary hover:underline disabled:pointer-events-none disabled:opacity-50" x-text="el.name" :title="el.name" :aria-label="'Open details for ' + el.name"></button></td>
-                            <td class="px-4 py-3" data-field="element-type"><span class="rounded-md bg-muted px-2 py-1 text-xs font-medium text-foreground" x-text="formatTypeName(el.element_type)"></span></td>
+                            <td class="px-4 py-3" data-field="element-type"><span class="rounded-md bg-muted px-2 py-1 text-xs font-medium text-foreground" x-text="formatTypeName(el.element_type)"></span><span x-cloak x-show="el.decommissioned" class="ml-2 rounded-md bg-muted px-2 py-1 text-xs font-medium text-muted-foreground" data-testid="lifecycle-badge" x-text="el.lifecycle"></span></td>
                             <td class="px-4 py-3" data-field="element-source"><span class="text-sm capitalize text-muted-foreground" x-text="el.source || '—'"></span></td>
                             <td class="px-4 py-3" data-field="element-documentation"><p class="max-w-[300px] truncate text-sm text-muted-foreground" :title="el.description || ''" x-text="el.description ? truncate(el.description, 100) : 'No description'"></p></td>
                             <td class="px-4 py-3 text-center" data-field="element-relationships"><span class="text-sm tabular-nums text-muted-foreground" x-text="el.rel_count === null || el.rel_count === undefined ? '—' : el.rel_count"></span></td>
@@ -318,7 +324,7 @@
         <template x-for="el in visibleElements" :key="'mobile-' + el.source + '-' + el.element_type + '-' + el.id">
             <article class="p-4">
                 <div class="flex items-start justify-between gap-3">
-                    <div class="min-w-0" data-field="element-name"><h3 class="truncate text-base font-semibold text-foreground" :title="el.name" x-text="el.name"></h3><p class="mt-1 text-xs text-muted-foreground" data-field="element-type" x-text="formatTypeName(el.element_type)"></p></div>
+                    <div class="min-w-0" data-field="element-name"><h3 class="truncate text-base font-semibold text-foreground" :title="el.name" x-text="el.name"></h3><p class="mt-1 text-xs text-muted-foreground" data-field="element-type"><span x-text="formatTypeName(el.element_type)"></span><span x-cloak x-show="el.decommissioned" class="ml-2 rounded-md bg-muted px-2 py-1 text-xs font-medium text-muted-foreground" data-testid="lifecycle-badge-mobile" x-text="el.lifecycle"></span></p></div>
                     <span class="shrink-0 rounded-md bg-muted px-2 py-1 text-xs capitalize text-muted-foreground" data-field="element-source" x-text="el.source || '—'"></span>
                 </div>
                 <p class="mt-3 text-sm text-muted-foreground" data-field="element-documentation" x-text="el.description ? truncate(el.description, 140) : 'No description'"></p>

@@ -59,6 +59,7 @@ document.addEventListener('alpine:init', function() {
             collapsedTypes: {},
             sourceFilter: '',
             kindFilter: '',
+            includeDecom: false,
 
             bulkMode: false,
             selectedIds: [],
@@ -374,7 +375,7 @@ document.addEventListener('alpine:init', function() {
             },
 
             get listNarrowed() {
-                return !!(this.searchQuery || this.typeFilter || this.sourceFilter || this.kindFilter
+                return !!(this.searchQuery || this.typeFilter || this.sourceFilter || this.kindFilter || this.includeDecom
                     || this.viewpointTypeFilter.length);
             },
 
@@ -421,6 +422,7 @@ document.addEventListener('alpine:init', function() {
                 this.searchQuery = '';
                 this.typeFilter = '';
                 this.sourceFilter = '';
+                this.includeDecom = false;
                 this.viewpointKey = 'basic';
                 this.viewpointTypeFilter = [];
                 this.filterScope = '';
@@ -545,6 +547,7 @@ document.addEventListener('alpine:init', function() {
                 let wantedType = params.get('element_type') || APP_CONFIG.initialElementType || '';
                 this.typeFilter = this.currentLayerTypes.indexOf(wantedType) >= 0 ? wantedType : '';
                 this.searchQuery = params.get('search') || '';
+                this.includeDecom = params.get('include_decom') === 'true';
                 this.sourceFilter = ['portfolio', 'architecture'].includes(params.get('source'))
                     ? params.get('source')
                     : '';
@@ -574,6 +577,7 @@ document.addEventListener('alpine:init', function() {
                 if (this.searchQuery) params.set('search', this.searchQuery);
                 if (this.typeFilter) params.set('element_type', this.typeFilter);
                 if (this.sourceFilter) params.set('source', this.sourceFilter);
+                if (this.includeDecom) params.set('include_decom', 'true'); else params.delete('include_decom');
                 if (this.viewpointKey !== 'basic') params.set('viewpoint', this.viewpointKey);
                 if (this.currentPage > 1) params.set('page', String(this.currentPage));
                 if (this.perPage !== 25) params.set('per_page', String(this.perPage));
@@ -617,6 +621,7 @@ document.addEventListener('alpine:init', function() {
                     if (this.searchQuery) params.search = this.searchQuery;
                     if (this.sourceFilter) params.source = this.sourceFilter;
                     if (this.kindFilter) params.kind = this.kindFilter;
+                    if (this.includeDecom) params.include_decom = 'true';
                     // Viewpoint type filter takes precedence over manual type filter
                     if (this.viewpointTypeFilter.length > 0 && !this.typeFilter) {
                         params.element_type = this.viewpointTypeFilter.join(',');

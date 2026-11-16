@@ -91,6 +91,13 @@ def is_sunset_stage(stage):
     return re.match(SUNSET_STAGE_PATTERN, (stage or "").strip(), re.IGNORECASE) is not None
 
 
+def is_decommissioned_expression(column=None):
+    """SQL for "recorded as decommissioned": the one rule the overview figure, the Applications page and
+    the Model list all use, so the three counts cannot drift apart."""
+    column = ApplicationComponent.lifecycle_status if column is None else column
+    return db.and_(column.isnot(None), db.func.lower(column) == "5. decommissioned")
+
+
 def lifecycle_label(stage):
     """The stage in plain words, or None when none is recorded."""
     text = (stage or "").strip()

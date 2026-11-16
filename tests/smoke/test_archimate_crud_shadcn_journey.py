@@ -16,10 +16,11 @@ journey that would pass as an administrator but fail as the persona fails here.
 """
 
 import os
+import tempfile
 
 import pytest
 
-from .test_archetype_journeys import _login, _visit, page  # noqa: F401
+from .test_archetype_journeys import _login, _open_sidebar_group, _visit, page  # noqa: F401
 
 pytestmark = [pytest.mark.smoke, pytest.mark.journey]
 
@@ -310,3 +311,112 @@ def test_walk_screenshots(browser, live_server, seeded, width, theme):
             )
     finally:
         ctx.close()
+
+def test_application_list_counts_like_the_overview(page, live_server, seeded):
+    """The architect asks "how many applications do we have" on three screens and gets one answer.
+
+    The organisation holds one decommissioned application. The overview, the Model list and the
+    Applications page all leave it out; the Model list's "Include decommissioned" shows it, badged.
+    """
+    import re
+
+    from app import create_app, db
+    from app.models.application_portfolio import ApplicationComponent
+
+    email = seeded["emails"][PERSONA]
+    org_id = seeded["ids"]["org"]
+    app = create_app("testing")
+    name = "Smoke retired app %s" % os.urandom(4).hex()
+    with app.app_context():
+        retired = ApplicationComponent(
+            name=name, organization_id=org_id, lifecycle_status="5. decommissioned"
+        )
+        db.session.add(retired)
+        db.session.commit()
+        retired_id = retired.id
+    try:
+        _login(page, live_server, email)
+        _assert_persona(email)
+        _visit(page, live_server, "/dashboard/overview")
+        figure = int(page.get_by_test_id("welcome-applications").locator("span").first.inner_text())
+        assert figure > 0
+
+        pagination = page.get_by_test_id("architecture-pagination")
+        # Model list, opened from the Application layer tab.
+        _visit(page, live_server, DASHBOARD_URL)
+        page.get_by_test_id("layer-spine").get_by_role("link", name=re.compile("Application", re.I)).first.click()
+        pagination.wait_for(state="visible", timeout=30000)
+        with page.expect_response(lambda r: "element_type=ApplicationComponent" in r.url):
+            page.get_by_test_id("filter-type").select_option("ApplicationComponent")
+        pagination.wait_for(state="visible", timeout=30000)
+        page.wait_for_timeout(500)
+        total = lambda: int(pagination.locator("span").nth(2).inner_text())  # noqa: E731
+        # The Model list also holds model elements that have no application record behind them (the
+        # shared fixture seeds two); the overview counts records, so those are the only difference.
+        with app.app_context():
+            from sqlalchemy import func
+
+            from app.models.archimate_core import ArchiMateElement
+
+            recorded = db.select(ApplicationComponent.archimate_element_id).where(
+                ApplicationComponent.archimate_element_id.isnot(None)
+            )
+            model_only = ArchiMateElement.query.filter(
+                ArchiMateElement.organization_id == org_id,
+                func.replace(func.lower(ArchiMateElement.type), "_", "") == "applicationcomponent",
+                ~ArchiMateElement.id.in_(recorded),
+            ).count()
+        for _ in range(20):
+            if total() == figure + model_only:
+                break
+            page.wait_for_timeout(250)
+        assert total() == figure + model_only, "Model list counts %s, the overview %s plus %s model-only" % (
+            total(), figure, model_only,
+        )
+        assert page.get_by_text(name).count() == 0
+
+        # Applications page, from the sidebar.
+        _open_sidebar_group(page, "layer_application")
+        page.get_by_test_id("sidebar").locator('a[href^="/applications"]').first.click()
+        page.wait_for_load_state("domcontentloaded")
+        shown = page.get_by_test_id("total-count-badge").inner_text()
+        assert shown.startswith("%s shown" % figure), "Applications page reads %r" % shown
+
+        # Back on the Model list, ask for the decommissioned one.
+        _visit(page, live_server, DASHBOARD_URL)
+        page.get_by_test_id("layer-spine").get_by_role("link", name=re.compile("Application", re.I)).first.click()
+        pagination.wait_for(state="visible", timeout=30000)
+        with page.expect_response(lambda r: "element_type=ApplicationComponent" in r.url):
+            page.get_by_test_id("filter-type").select_option("ApplicationComponent")
+        with page.expect_response(lambda r: "include_decom=true" in r.url):
+            page.get_by_test_id("filter-include-decom").check()
+        page.get_by_text(name).first.wait_for(state="visible", timeout=30000)
+        for _ in range(20):
+            if total() == figure + model_only + 1:
+                break
+            page.wait_for_timeout(250)
+        assert total() == figure + model_only + 1
+        row = page.locator("tr", has_text=name)
+        assert row.get_by_test_id("lifecycle-badge").inner_text() == "Decommissioned"
+
+        # The same screen as a person sees it: 1440 light and dark, 390 light.
+        shots = os.environ.get("APPCOUNT_WALK_DIR") or tempfile.mkdtemp(prefix="appcount-walk-")
+        os.makedirs(shots, exist_ok=True)
+        for width, theme in ((1440, "light"), (1440, "dark"), (390, "light")):
+            page.set_viewport_size({"width": width, "height": 900})
+            page.evaluate("t => localStorage.setItem('theme', t)", theme)
+            page.goto(
+                live_server + "/architecture/application/ApplicationComponent?include_decom=true",
+                wait_until="domcontentloaded",
+            )
+            page.get_by_text(name).and_(page.locator(":visible")).first.wait_for(state="visible", timeout=30000)
+            assert page.get_by_test_id("filter-include-decom").is_checked(), "the toggle was lost on reload"
+            assert total() == figure + model_only + 1
+            badge = "lifecycle-badge" if width > 1000 else "lifecycle-badge-mobile"
+            assert page.get_by_test_id(badge).and_(page.locator(":visible")).first.inner_text() == "Decommissioned"
+            page.get_by_text(name).and_(page.locator(":visible")).first.scroll_into_view_if_needed()
+            page.screenshot(path=os.path.join(shots, "model-list-%d-%s.png" % (width, theme)), full_page=True)
+    finally:
+        with app.app_context():
+            ApplicationComponent.query.filter_by(id=retired_id).delete()
+            db.session.commit()

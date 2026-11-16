@@ -24,7 +24,7 @@ from sqlalchemy.orm import joinedload, selectinload
 
 from app import db
 from app.models.application_capability import ApplicationCapabilityMapping
-from app.models.application_portfolio import ApplicationComponent
+from app.models.application_portfolio import ApplicationComponent, is_decommissioned_expression
 from app.models.unified_capability import UnifiedCapability
 from app.modules.my_applications.services import has_assigned_owner
 from app.security.import_decorators import with_import_security
@@ -272,12 +272,7 @@ def application_list():
 
         # APP-031: active portfolio by default (exclude Abacus decommissioned code)
         if not include_decom:
-            query = query.filter(
-                db.or_(
-                    ApplicationComponent.lifecycle_status.is_(None),
-                    func.lower(ApplicationComponent.lifecycle_status) != "5. decommissioned",
-                )
-            )
+            query = query.filter(~is_decommissioned_expression())
 
         # PLT-019: Apply BU scope filter via application_business_actor_mapping junction
         if bu_filter_active and not show_all_override:
