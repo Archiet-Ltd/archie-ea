@@ -1,244 +1,104 @@
 {# design-block: form #}
 {% extends "layouts/admin_base.html" %}
-{% from 'components/page_header.html' import page_header %}
+{% from 'archimate/_import_shared.html' import import_header with context %}
+{% from 'components/list_table.html' import list_table %}
+{% from 'components/button.html' import button %}
+{% from 'components/select.html' import native_select %}
+{% from 'basecoat/table.html' import table_cell %}
 
-{% block title %}Import Review{% endblock %}
+{% block title %}Review an import{% endblock %}
 
-{% block extra_css %}
-<style>
-  [x-cloak]{display:none!important}
-  .conf-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; flex-shrink: 0; }
-  .conf-fallback { background: rgb(220 38 38); }
-  .conf-stroke-stripped-label { background: rgb(217 119 6); }
-  .conf-nesting { background: rgb(202 138 4); }
-  .conf-notation { background: rgb(22 163 74); }
-  .conf-diagram-image { background: rgb(147 51 234); }
-</style>
-{% endblock %}
+{% macro _select_all() -%}
+<input type="checkbox" class="size-4 accent-primary align-middle" aria-label="Select all items" data-review-select-all>
+{%- endmacro %}
+
+{% macro _bulk() -%}
+<div class="flex flex-wrap items-center gap-2">
+  {{ button(text='Confirm as correct', variant='primary', size='sm', attrs_dict={'data-review-confirm': '', 'disabled': true}) }}
+  {% call native_select(id='review-retype', size='sm', aria_label='New element type', attrs_dict={'data-review-retype': ''}) %}
+    <option value="">Change the type to…</option>
+    {% for value, name in element_types %}<option value="{{ value }}">{{ name }}</option>{% endfor %}
+  {% endcall %}
+  {{ button(text='Change type', variant='outline', size='sm', attrs_dict={'data-review-apply': '', 'disabled': true}) }}
+</div>
+{%- endmacro %}
+
+{% macro _count() -%}
+<p class="flex-1 text-sm text-muted-foreground tabular-nums" data-review-count data-total="{{ items|length }}" role="status">0 of {{ items|length }} row(s) selected.</p>
+{%- endmacro %}
+
+{% macro _none() -%}
+{% if include_reviewed %}
+Nothing from an import is waiting, and nothing has been reviewed yet. <a class="underline" href="{{ url_for('archimate.import_diagram_page') }}">Import a diagram</a> to see what the importer guesses.
+{% else %}
+Nothing is waiting: everything an import guessed has been reviewed. <a class="underline" href="{{ url_for('archimate.import_review_page', include_reviewed=1) }}">Show the items already reviewed</a>.
+{% endif %}
+{%- endmacro %}
 
 {% block content %}
-<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8" x-data="importReview()" x-init="load()" x-cloak>
+<div class="p-6 space-y-6">
+{{ import_header('Review', 'Review an import', 'Each line below was worked out by the importer rather than stated in the file. Confirming marks it as checked; it changes nothing else.') }}
 
-    {{ page_header(title='Import Review', breadcrumbs=[{'label': 'Home', 'href': '/'}, {'label': 'Import Review'}], description='What the importer guessed, so you can confirm or correct it') }}
+<p id="review-message" class="text-sm text-muted-foreground" role="status" hidden></p>
 
-    {# Why this page exists, stated once. An unexplained queue gets cleared without being read. #}
-    <div class="rounded-lg border border-border bg-muted/30 p-4 mb-6 text-sm text-muted-foreground">
-        An import records how it decided each thing. Everything below was inferred rather than
-        stated outright — read from an arrowhead, a line label, or the fact that one box was drawn
-        inside another. Confirming an item marks it reviewed; it does not change it.
-    </div>
-
-    <div x-show="loading" class="p-12 text-center text-sm text-muted-foreground">Loading…</div>
-
-    <div x-show="!loading && loadError" x-cloak
-         class="rounded-lg border border-destructive bg-card p-12 text-center">
-        <p class="text-lg font-semibold text-destructive-emphasis">The review queue could not be read</p>
-        <p class="text-sm text-muted-foreground mt-1" x-text="loadError"></p>
-        <button type="button" @click="load()"
-                class="mt-4 text-xs underline text-muted-foreground hover:text-foreground">
-            Try again
-        </button>
-    </div>
-
-    <div x-show="!loading && !loadError && total === 0" x-cloak
-         class="rounded-lg border border-border bg-card p-12 text-center">
-        <p class="text-lg font-semibold text-foreground">Nothing waiting</p>
-        <p class="text-sm text-muted-foreground mt-1">
-            Every inferred element and relationship has been reviewed.
-        </p>
-        <button type="button" @click="includeReviewed = true; load()"
-                class="mt-4 text-xs underline text-muted-foreground hover:text-foreground">
-            Show items already reviewed
-        </button>
-    </div>
-
-    <template x-if="!loading && total > 0">
-    <div>
-        {# Confidence bands, worst first. #}
-        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-6">
-            <template x-for="g in groups" :key="g.reason">
-                <button type="button" @click="activeReason = (activeReason === g.reason ? '' : g.reason)"
-                        :class="activeReason === g.reason ? 'ring-2 ring-primary' : ''"
-                        class="rounded-xl border border-border bg-card p-4 text-left hover:bg-accent transition-colors">
-                    <div class="flex items-center gap-2 mb-1">
-                        <span class="conf-dot" :class="'conf-' + g.reason"></span>
-                        <span class="text-sm font-semibold text-foreground" x-text="g.label"></span>
-                    </div>
-                    <p class="text-2xl font-bold text-foreground" x-text="g.count"></p>
-                    <p class="text-xs text-muted-foreground mt-1" x-text="g.explanation"></p>
-                </button>
-            </template>
-        </div>
-
-        {# Bulk actions. Retype only applies to elements. #}
-        <div class="flex flex-wrap items-center gap-3 mb-4">
-            <label class="inline-flex items-center gap-2 text-sm text-muted-foreground">
-                <input type="checkbox" @change="toggleAll($event.target.checked)"
-                       class="rounded border-input" aria-label="Select all shown">
-                Select all shown
-            </label>
-            <span class="text-sm text-muted-foreground" x-text="selected.length + ' selected'"></span>
-
-            <button type="button" @click="accept()" :disabled="!selected.length"
-                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
-                Confirm as correct
-            </button>
-
-            <select x-model="retypeTo"
-                    class="rounded-md border border-input bg-background px-2 py-1.5 text-xs"
-                    aria-label="Change element type to">
-                <option value="">Change element type to…</option>
-                <template x-for="t in elementTypes" :key="t">
-                    <option :value="t" x-text="t"></option>
-                </template>
-            </select>
-            <button type="button" @click="retype()" :disabled="!retypeTo || !selectedElements.length"
-                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
-                Apply to <span x-text="selectedElements.length"></span> element(s)
-            </button>
-
-            <span x-show="message" x-cloak class="text-xs text-muted-foreground" x-text="message"></span>
-        </div>
-
-        <div class="rounded-lg border border-border bg-card overflow-hidden">
-            <div class="overflow-x-auto">
-                <table class="dense-table w-full text-sm" data-testid="review-table">
-                    <thead class="bg-muted/40">
-                        <tr>
-                            <th class="px-4 py-2 w-8"><span class="sr-only">Select</span></th>
-                            <th class="px-4 py-2 text-left text-xs font-medium text-muted-foreground">Item</th>
-                            <th class="px-4 py-2 text-left text-xs font-medium text-muted-foreground">Kind</th>
-                            <th class="px-4 py-2 text-left text-xs font-medium text-muted-foreground">Type</th>
-                            <th class="px-4 py-2 text-left text-xs font-medium text-muted-foreground">Why it needs review</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <template x-for="item in shown" :key="item.kind + '-' + item.id">
-                            <tr class="border-t border-border hover:bg-muted/40">
-                                <td class="px-4 py-2">
-                                    <input type="checkbox" :value="item.kind + '-' + item.id"
-                                           x-model="selected" class="rounded border-input"
-                                           :aria-label="'Select ' + item.name">
-                                </td>
-                                <td class="px-4 py-2 text-foreground" x-text="item.name"></td>
-                                <td class="px-4 py-2 text-xs text-muted-foreground" x-text="item.kind"></td>
-                                <td class="px-4 py-2 text-xs text-muted-foreground" x-text="item.type"></td>
-                                <td class="px-4 py-2">
-                                    <span class="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
-                                        <span class="conf-dot" :class="'conf-' + item.reason"></span>
-                                        <span x-text="reasonLabel(item.reason)"></span>
-                                    </span>
-                                </td>
-                            </tr>
-                        </template>
-                    </tbody>
-                </table>
-            </div>
-        </div>
-    </div>
-    </template>
+{% call(item) list_table(rows=items, columns=[{'label': _select_all(), 'class': 'w-10', 'sortable': false}, 'Item', {'label': 'Kind', 'class': 'whitespace-nowrap'}, {'label': 'Type', 'class': 'whitespace-nowrap'}, 'Why it needs review'],
+                         caption='Items an import guessed', testid='review-table', row_testid='review-row', toolbar=true, toolbar_actions=_bulk,
+                         search_placeholder='Filter items...', footer_count=_count, empty_message=_none()) %}
+  {% call table_cell(class='w-10') %}
+    <input type="checkbox" value="{{ item.kind }}-{{ item.id }}" data-kind="{{ item.kind }}" class="size-4 accent-primary align-middle" aria-label="Select {{ item.name }}" data-review-select>
+  {% endcall %}
+  {% call table_cell(class='max-w-[320px]') %}
+    {% if item.href %}<a href="{{ item.href }}" class="block truncate font-medium text-foreground hover:underline" data-testid="review-link">{{ item.name }}</a>
+    {% else %}<span class="block truncate font-medium text-foreground">{{ item.name }}</span>{% endif %}
+  {% endcall %}
+  {% call table_cell(class='whitespace-nowrap') %}{{ item.kind_label }}{% endcall %}
+  {% call table_cell(class='whitespace-nowrap') %}{{ item.type_label or 'Not set' }}{% endcall %}
+  {% call table_cell(class='min-w-[220px] text-sm text-muted-foreground') %}{{ item.reason_text }}{% endcall %}
+{% endcall %}
 </div>
 {% endblock %}
 
 {% block extra_js %}
 <script>
-function importReview() {
-    return {
-        loading: true,
-        items: [],
-        groups: [],
-        elementTypes: [],
-        total: null,
-        loadError: null,
-        selected: [],
-        retypeTo: '',
-        activeReason: '',
-        includeReviewed: false,
-        message: '',
-
-        get shown() {
-            return this.activeReason
-                ? this.items.filter(i => i.reason === this.activeReason)
-                : this.items;
-        },
-        get selectedElements() {
-            return this.selected.filter(k => k.startsWith('element-'));
-        },
-
-        reasonLabel(reason) {
-            const g = this.groups.find(x => x.reason === reason);
-            return g ? g.label : reason;
-        },
-
-        async load() {
-            this.loading = true;
-            const url = '/archimate/api/import-review/items'
-                + (this.includeReviewed ? '?include_reviewed=1' : '');
-            try {
-                const d = await Platform.fetch(url, { silent: true });
-                this.items = d.items || [];
-                this.groups = d.groups || [];
-                this.elementTypes = d.element_types || [];
-                this.total = d.total || 0;
-                this.loadError = null;
-            } catch (e) {
-                // total stays null so the "Nothing waiting" panel cannot stand in for
-                // a queue that was never read.
-                this.items = [];
-                this.groups = [];
-                this.elementTypes = [];
-                this.total = null;
-                this.loadError = 'Could not load the queue: ' + e.message;
-            }
-            this.selected = [];
-            this.loading = false;
-        },
-
-        toggleAll(checked) {
-            this.selected = checked
-                ? this.shown.map(i => i.kind + '-' + i.id)
-                : [];
-        },
-
-        _split() {
-            const ids = { element_ids: [], relationship_ids: [] };
-            this.selected.forEach(key => {
-                const [kind, id] = key.split('-');
-                if (kind === 'element') ids.element_ids.push(parseInt(id, 10));
-                else ids.relationship_ids.push(parseInt(id, 10));
-            });
-            return ids;
-        },
-
-        async _post(url, body) {
-            // Platform.fetch.post automatically injects CSRF token and serializes plain objects to JSON
-            return Platform.fetch.post(url, body, { silent: true });
-        },
-
-        async accept() {
-            try {
-                const d = await this._post('/archimate/api/import-review/accept', this._split());
-                this.message = d.success ? `Confirmed ${d.accepted}.` : (d.error || 'Failed.');
-                await this.load();
-            } catch (e) {
-                this.message = 'Failed to confirm: ' + e.message;
-            }
-        },
-
-        async retype() {
-            const body = Object.assign({ type: this.retypeTo },
-                                       { element_ids: this._split().element_ids });
-            try {
-                const d = await this._post('/archimate/api/import-review/retype', body);
-                this.message = d.success ? `Retyped ${d.changed} to ${this.retypeTo}.`
-                                         : (d.error || 'Failed.');
-                this.retypeTo = '';
-                await this.load();
-            } catch (e) {
-                this.message = 'Failed to retype: ' + e.message;
-            }
-        },
-    };
-}
+(function () {
+  const boxes = () => Array.from(document.querySelectorAll('[data-review-select]'));
+  const chosen = () => boxes().filter(b => b.checked);
+  const retype = document.querySelector('[data-review-retype]');
+  const note = document.getElementById('review-message');
+  function refresh() {
+    const picked = chosen();
+    const count = document.querySelector('[data-review-count]');
+    if (count) count.textContent = picked.length + ' of ' + count.dataset.total + ' row(s) selected.';
+    const elements = picked.filter(b => b.dataset.kind === 'element').length;
+    document.querySelector('[data-review-confirm]').disabled = !picked.length;
+    document.querySelector('[data-review-apply]').disabled = !(retype.value && elements);
+  }
+  function split() {
+    const out = { element_ids: [], relationship_ids: [] };
+    chosen().forEach(b => {
+      const [kind, id] = b.value.split('-');
+      (kind === 'element' ? out.element_ids : out.relationship_ids).push(parseInt(id, 10));
+    });
+    return out;
+  }
+  async function send(url, body, done) {
+    try {
+      const d = await Platform.fetch.post(url, body, { silent: true });
+      if (!d.success) throw new Error(d.error || 'The change was refused.');
+      window.location.reload();
+    } catch (e) {
+      note.hidden = false;
+      note.textContent = done + ' failed: ' + e.message;
+    }
+  }
+  document.addEventListener('change', e => {
+    if (e.target.matches('[data-review-select-all]')) boxes().forEach(b => { b.checked = e.target.checked; });
+    if (e.target.matches('[data-review-select-all], [data-review-select], [data-review-retype]')) refresh();
+  });
+  document.addEventListener('click', e => {
+    if (e.target.closest('[data-review-confirm]')) send('/archimate/api/import-review/accept', split(), 'Confirming');
+    if (e.target.closest('[data-review-apply]')) send('/archimate/api/import-review/retype', Object.assign({ type: retype.value }, { element_ids: split().element_ids }), 'Changing the type');
+  });
+})();
 </script>
 {% endblock %}

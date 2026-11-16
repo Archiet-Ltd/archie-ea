@@ -34,6 +34,9 @@ POOL_HEADER = 30
 LANE_HEIGHT = 160
 MAX_COORDINATE = 100000
 LANE_LINK = "bpmn_lane"
+# What the import review shows for a relationship this importer inferred.
+LANE_REVIEW_REASON = ("role inferred from a swim lane",
+                      "Placed in a lane, so the role was inferred.")
 MADE_KEY = "madeProcessIds"
 
 NODE_SIZES = {

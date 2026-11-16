@@ -484,21 +484,33 @@ def _review_org_id():
     return getattr(_g, "current_org_id", None)
 
 
-@archimate_bp.route("/import-review", methods=["GET"])
-@login_required
-def import_review_page():
-    """Triage what an import guessed, rather than trusting it silently."""
-    return render_template("archimate/import_review.html")
+def _review_reason(reason):
+    """(label, one plain sentence) for a recorded reason; each importer writes its own wording."""
+    if reason in _REVIEW_CONFIDENCE:
+        return _REVIEW_CONFIDENCE[reason]
+    from app.modules.business_architecture.bpmn_service import (  # noqa: PLC0415
+        LANE_LINK,
+        LANE_REVIEW_REASON,
+    )
+
+    if reason == LANE_LINK:
+        return LANE_REVIEW_REASON
+    return ("inferred by an import", "The import inferred this rather than reading it from the file.")
 
 
-@archimate_bp.route("/api/import-review/items", methods=["GET"])
-@login_required
-def api_import_review_items():
-    """Everything an import inferred and nobody has confirmed yet."""
+def _spaced_type(name):
+    """ApplicationComponent -> Application Component, as the Composer palette names it."""
+    import re  # noqa: PLC0415
+
+    return re.sub(r"(?<=[a-z])(?=[A-Z])", " ", name or "").strip()
+
+
+def _collect_review_items(include_reviewed=False):
+    """Everything an import inferred, with the words and links a person reads."""
     from app.models.models import ArchiMateElement, ArchiMateRelationship  # noqa: PLC0415
+    from app.services.model_map import element_href  # noqa: PLC0415
 
     org_id = _review_org_id()
-    include_reviewed = request.args.get("include_reviewed") == "1"
 
     # custom_properties is db.JSON, not JSONB, so `.astext` does not exist on it.
     # Cast in the predicate rather than pulling every element back to filter in
@@ -517,9 +529,12 @@ def api_import_review_items():
             continue
         elements.append({
             "kind": "element",
+            "kind_label": "Element",
             "id": row.id,
             "name": row.name,
+            "href": element_href(row.id, row.layer, row.type),
             "type": row.type,
+            "type_label": _spaced_type(row.type),
             "layer": row.layer,
             "reason": "fallback",
             "reviewed_at": props.get("reviewed_at"),
@@ -545,9 +560,12 @@ def api_import_review_items():
     for row in rows:
         relationships.append({
             "kind": "relationship",
+            "kind_label": "Relationship",
             "id": row.id,
             "name": f"{names.get(row.source_id, '?')} → {names.get(row.target_id, '?')}",
+            "href": None,
             "type": row.type,
+            "type_label": (row.type or "").replace("_", " ").replace("-", " ").title(),
             "layer": "",
             "reason": row.derived_from,
             "reviewed_at": row.reviewed_at.isoformat() if row.reviewed_at else None,
@@ -555,18 +573,35 @@ def api_import_review_items():
         })
 
     items = elements + relationships
+    for item in items:
+        item["reason_label"], item["reason_text"] = _review_reason(item["reason"])
     items.sort(key=lambda i: (_REVIEW_ORDER.index(i["reason"])
                               if i["reason"] in _REVIEW_ORDER else 99, i["name"]))
 
     groups = []
-    for reason in _REVIEW_ORDER:
-        matching = [i for i in items if i["reason"] == reason]
-        if not matching:
-            continue
-        label, explanation = _REVIEW_CONFIDENCE[reason]
-        groups.append({"reason": reason, "label": label,
-                       "explanation": explanation, "count": len(matching)})
+    for reason in dict.fromkeys(i["reason"] for i in items):
+        label, explanation = _review_reason(reason)
+        groups.append({"reason": reason, "label": label, "explanation": explanation,
+                       "count": sum(1 for i in items if i["reason"] == reason)})
+    return items, groups
 
+
+@archimate_bp.route("/import-review", methods=["GET"])
+@login_required
+def import_review_page():
+    """Triage what an import guessed, rather than trusting it silently."""
+    include_reviewed = request.args.get("include_reviewed") == "1"
+    items, _groups = _collect_review_items(include_reviewed)
+    return render_template("archimate/import_review.html", items=items,
+                           include_reviewed=include_reviewed,
+                           element_types=[(t, _spaced_type(t)) for t in _review_element_types()])
+
+
+@archimate_bp.route("/api/import-review/items", methods=["GET"])
+@login_required
+def api_import_review_items():
+    """Everything an import inferred and nobody has confirmed yet."""
+    items, groups = _collect_review_items(request.args.get("include_reviewed") == "1")
     return jsonify({
         "success": True,
         "items": items,
@@ -6700,8 +6735,27 @@ def _composer_url_for_elements(element_ids, name: str):
 @archimate_bp.route("/import", methods=["GET"])
 @login_required
 def import_page():
-    """REQ-ACD-001: Render the unified ArchiMate import page."""
-    return render_template("architecture/import_csv.html")
+    """REQ-ACD-001: Render the unified ArchiMate import page.
+
+    After an upload the page reloads with ``created`` (the new element ids) so the result is a
+    server-rendered list of links to the records, not a list drawn by script.
+    """
+    from app.models.models import ArchiMateElement  # noqa: PLC0415
+    from app.services.model_map import element_href  # noqa: PLC0415
+
+    ids = [int(i) for i in request.args.get("created", "").split(",")[:300] if i.strip().isdigit()]
+    created = []
+    if ids:
+        for row in ArchiMateElement.query.filter(ArchiMateElement.id.in_(ids)).order_by(ArchiMateElement.name).all():
+            created.append({"name": row.name, "href": element_href(row.id, row.layer, row.type),
+                            "type": _spaced_type(row.type), "layer": (row.layer or "").title()})
+    composer = request.args.get("composer", "")
+    if not composer.startswith("/archimate/") or composer.startswith("//"):
+        composer = ""
+    return render_template("architecture/import_csv.html", created=created, composer_url=composer,
+                           skipped=request.args.get("skipped", type=int, default=0),
+                           failed=request.args.get("errors", type=int, default=0),
+                           element_types=[(t, _spaced_type(t)) for t in _review_element_types()])
 
 
 # Keep old URL as redirect for bookmarks

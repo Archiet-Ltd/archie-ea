@@ -1,192 +1,72 @@
 {# design-block: form #}
 {% extends "layouts/admin_base.html" %}
-{% from 'components/page_header.html' import page_header %}
-{% from 'components/card.html' import card, card_content, card_header, card_title %}
+{% from 'archimate/_import_shared.html' import import_header, import_form_card with context %}
+{% from 'components/button.html' import button %}
+{% from 'components/select.html' import native_select %}
+{% from 'components/input.html' import label %}
+{% from 'components/element_table.html' import element_table %}
+{% from 'basecoat/table.html' import table_cell %}
 
-{% block title %}Import Architecture Documents{% endblock %}
+{% block title %}Import a file{% endblock %}
 
 {% block content %}
-<div class="space-y-6" x-data="archimateImport()">
-    {{ page_header(
-        title='Import Architecture Documents',
-        description='Upload CSV, Excel, ArchiMate XML, or documents (PDF/Word/PowerPoint) to create ArchiMate elements',
-        breadcrumbs=[
-            {'label': 'Dashboard', 'href': url_for('main.index')},
-            {'label': 'Architecture', 'href': url_for('archimate.export_xml')},
-            {'label': 'Import'}
-        ]
-    ) }}
+<div class="p-6 space-y-6" x-data="archimateImport()" @file-selected="onFileSelected($event.detail.files[0])">
+    {{ import_header('File', 'Import a file', 'Create ArchiMate elements from a spreadsheet, an ArchiMate exchange file or a document.') }}
 
-    {% call card() %}
-        {% call card_header() %}
-            {% call card_title() %}Upload File{% endcall %}
-        {% endcall %}
-        {% call card_content() %}
-            <div class="space-y-4">
-                {# File type detection info #}
-                <div class="grid grid-cols-3 gap-3 text-xs">
-                    <div class="rounded-md border px-3 py-2">
-                        <p class="font-medium mb-1">Structured Data</p>
-                        <p class="text-muted-foreground">.csv, .xlsx, .xls — rows become elements. Columns: name, type, description, layer.</p>
-                    </div>
-                    <div class="rounded-md border px-3 py-2">
-                        <p class="font-medium mb-1">ArchiMate Exchange</p>
-                        <p class="text-muted-foreground">.xml, .archimate — OEF 3.2 format from ArchiMate editors (Sparx EA, BiZZdesign).</p>
-                    </div>
-                    <div class="rounded-md border px-3 py-2">
-                        <p class="font-medium mb-1">Documents (AI-Powered)</p>
-                        <p class="text-muted-foreground">.pdf, .docx, .pptx, .txt — AI extracts architecture elements automatically.</p>
-                    </div>
-                </div>
+    {% call import_form_card('import-file', 'File',
+            '.csv,.xlsx,.xls,.xml,.archimate,.pdf,.docx,.doc,.pptx,.ppt,.txt,.md,.rtf',
+            'Spreadsheet (.csv, .xlsx), ArchiMate exchange file (.xml, .archimate) or document (.pdf, .docx, .pptx, .txt)',
+            'A spreadsheet needs the columns name, type, description and layer, and each row becomes an element. An ArchiMate exchange file (version 3.2, from Sparx EA or BiZZdesign) brings its elements across. A document is read by the assistant, which proposes the elements it finds.') %}
+        <p x-show="detectedMode" x-cloak class="text-sm text-muted-foreground">Read as: <span class="font-medium text-foreground" x-text="detectedMode"></span></p>
 
-                <div class="grid grid-cols-2 gap-4">
-                    <div class="space-y-2">
-                        <label class="block text-sm font-medium">File</label>
-                        <input type="file"
-                            accept=".csv,.xlsx,.xls,.xml,.archimate,.pdf,.docx,.doc,.pptx,.ppt,.txt,.md,.rtf"
-                            @change="onFileSelected($event)"
-                            class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" aria-label="File">
-                        <p x-show="detectedMode" x-cloak class="text-xs text-muted-foreground">
-                            Detected: <span class="font-medium" x-text="detectedMode"></span>
-                        </p>
-                    </div>
-                    <div class="space-y-2" x-show="detectedMode === 'Structured Data (CSV/Excel)'" x-cloak>
-                        <label class="block text-sm font-medium">Default Element Type (if no 'type' column)</label>
-                        <select x-model="defaultType"
-                            class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" aria-label="Default Element Type (if no 'type' column)">
-                            <option value="">-- Auto-detect from type column --</option>
-                            <optgroup label="Application Layer">
-                                <option value="ApplicationComponent">ApplicationComponent</option>
-                                <option value="ApplicationService">ApplicationService</option>
-                                <option value="DataObject">DataObject</option>
-                                <option value="ApplicationInterface">ApplicationInterface</option>
-                            </optgroup>
-                            <optgroup label="Business Layer">
-                                <option value="BusinessProcess">BusinessProcess</option>
-                                <option value="BusinessService">BusinessService</option>
-                                <option value="BusinessFunction">BusinessFunction</option>
-                                <option value="BusinessObject">BusinessObject</option>
-                                <option value="BusinessActor">BusinessActor</option>
-                                <option value="BusinessRole">BusinessRole</option>
-                            </optgroup>
-                            <optgroup label="Technology Layer">
-                                <option value="Node">Node</option>
-                                <option value="Device">Device</option>
-                                <option value="SystemSoftware">SystemSoftware</option>
-                                <option value="Artifact">Artifact</option>
-                                <option value="CommunicationNetwork">CommunicationNetwork</option>
-                            </optgroup>
-                            <optgroup label="Motivation Layer">
-                                <option value="Driver">Driver</option>
-                                <option value="Goal">Goal</option>
-                                <option value="Requirement">Requirement</option>
-                                <option value="Constraint">Constraint</option>
-                                <option value="Stakeholder">Stakeholder</option>
-                                <option value="Principle">Principle</option>
-                            </optgroup>
-                            <optgroup label="Strategy Layer">
-                                <option value="Capability">Capability</option>
-                                <option value="Resource">Resource</option>
-                                <option value="ValueStream">ValueStream</option>
-                                <option value="CourseOfAction">CourseOfAction</option>
-                            </optgroup>
-                            <optgroup label="Implementation Layer">
-                                <option value="WorkPackage">WorkPackage</option>
-                                <option value="Deliverable">Deliverable</option>
-                                <option value="Plateau">Plateau</option>
-                                <option value="Gap">Gap</option>
-                            </optgroup>
-                        </select>
-                    </div>
-                    <div class="space-y-2" x-show="detectedMode === 'ArchiMate Exchange (XML)'" x-cloak>
-                        <label class="block text-sm font-medium">Import Strategy</label>
-                        <select x-model="importStrategy"
-                            class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" aria-label="Import Strategy">
-                            <option value="skip_duplicates">Skip duplicates (safest)</option>
-                            <option value="update_existing">Update existing descriptions</option>
-                            <option value="create_all">Create all (allows duplicates)</option>
-                        </select>
-                    </div>
-                </div>
-
-                <div class="flex gap-3">
-                    <button type="button" @click="uploadFile()" :disabled="!file || uploading"
-                        class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
-                        <span x-show="!uploading" x-cloak>
-                            <span x-text="detectedMode === 'Document (AI Analysis)' ? 'Analyse & Extract Elements' : 'Upload & Create Elements'"></span>
-                        </span>
-                        <span x-show="uploading" x-cloak class="inline-flex items-center gap-2">
-                            <svg class="h-4 w-4 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
-                            <span x-text="detectedMode === 'Document (AI Analysis)' ? 'Analysing document...' : 'Importing...'"></span>
-                        </span>
-                    </button>
-                </div>
-
-                {# Error #}
-                <div x-show="errorMsg" x-cloak class="rounded-md bg-destructive/10 border border-destructive/30 px-3 py-2 text-sm text-destructive-emphasis" x-text="errorMsg"></div>
-
-                {# Suggestion for AI docs #}
-                <div x-show="suggestion" x-cloak class="rounded-md bg-warning/10 border border-warning/30 px-3 py-2 text-sm text-warning-emphasis" x-text="suggestion"></div>
-
-                {# Results #}
-                <div x-show="result" x-cloak class="space-y-4">
-                    <div class="rounded-md bg-success/10 border border-success/40 px-4 py-2">
-                        <p class="text-sm font-medium text-success-emphasis">
-                            <span x-text="result?.created_count || 0"></span> elements created,
-                            <span x-text="result?.skipped_count || 0"></span> duplicates skipped,
-                            <span x-text="result?.error_count || 0"></span> errors
-                        </p>
-                    </div>
-
-                    {# Action buttons #}
-                    <div x-show="result?.element_ids?.length > 0" x-cloak class="flex gap-3">
-                        <button type="button" @click="createDiagram()"
-                            :disabled="creatingDiagram"
-                            class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
-                            <span x-show="!creatingDiagram" x-cloak>
-                                <i data-lucide="layout" class="h-4 w-4 mr-2 inline"></i>
-                                Generate Diagram in Composer
-                            </span>
-                            <span x-show="creatingDiagram" x-cloak>Creating diagram...</span>
-                        </button>
-                        <a href="/archimate/traceability"
-                            class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
-                            View in Traceability
-                        </a>
-                    </div>
-
-                    {# Created elements table #}
-                    <div x-show="result?.created?.length > 0" x-cloak>
-                        <h3 class="text-sm font-medium mb-2">Created Elements</h3>
-                        <div class="border rounded-md overflow-hidden max-h-96 overflow-y-auto">
-                            <table class="dense-table w-full text-sm">
-                                <thead class="bg-muted/50 sticky top-0">
-                                    <tr>
-                                        <th class="px-3 py-2 text-left font-medium">Name</th>
-                                        <th class="px-3 py-2 text-left font-medium">Type</th>
-                                        <th class="px-3 py-2 text-left font-medium">Layer</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <template x-for="elem in (result?.created || [])" :key="elem.id">
-                                        <tr class="border-t">
-                                            <td class="px-3 py-2" x-text="elem.name"></td>
-                                            <td class="px-3 py-2">
-                                                <span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-primary/10 text-info-emphasis border border-primary/30" x-text="elem.type"></span>
-                                            </td>
-                                            <td class="px-3 py-2" x-text="elem.layer"></td>
-                                        </tr>
-                                    </template>
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                </div>
+        <div x-show="detectedMode === 'Spreadsheet'" x-cloak>
+            {% call label(for='default-type') %}Type for rows with no type column{% endcall %}
+            <div class="mt-1.5">
+            {% call native_select(id='default-type', attrs_dict={'x-model': 'defaultType'}) %}
+                <option value="">Use the type column</option>
+                {% for value, name in element_types %}<option value="{{ value }}">{{ name }}</option>{% endfor %}
+            {% endcall %}
             </div>
-        {% endcall %}
-    {% endcall %}
-</div>
+        </div>
+        <div x-show="detectedMode === 'ArchiMate exchange file'" x-cloak>
+            {% call label(for='import-strategy') %}When an element already exists{% endcall %}
+            <div class="mt-1.5">
+            {% call native_select(id='import-strategy', attrs_dict={'x-model': 'importStrategy'}) %}
+                <option value="skip_duplicates">Skip it (safest)</option>
+                <option value="update_existing">Update its description</option>
+                <option value="create_all">Create another copy</option>
+            {% endcall %}
+            </div>
+        </div>
 
+        <div class="flex flex-wrap items-center gap-3">
+            {{ button(text='Import', variant='primary', on_click='uploadFile()', attrs_dict={':disabled': '!file || uploading', 'data-testid': 'import-submit'}) }}
+            <span x-show="uploading" x-cloak class="text-sm text-muted-foreground">Importing…</span>
+        </div>
+
+        <div x-show="errorMsg" x-cloak role="alert" class="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive-emphasis" x-text="errorMsg"></div>
+        <div x-show="suggestion" x-cloak class="rounded-md border border-border bg-muted/40 px-3 py-2 text-sm text-foreground" x-text="suggestion"></div>
+    {% endcall %}
+
+    {% if created or skipped or failed %}
+    <section class="mx-auto w-full max-w-3xl space-y-4" data-testid="import-result" aria-labelledby="import-result-title">
+        <h2 id="import-result-title" class="text-lg font-semibold text-foreground">
+            {{ created|length }} element{{ '' if created|length == 1 else 's' }} created{% if skipped %}, {{ skipped }} already there{% endif %}{% if failed %}, {{ failed }} could not be read{% endif %}
+        </h2>
+        {% if composer_url %}
+        <div>{{ button(text='Open in the Composer', variant='primary', icon='layout', href=composer_url, attrs_dict={'data-testid': 'open-in-composer'}) }}</div>
+        {% endif %}
+        {% call(row) element_table(rows=created, columns=[('Type', ''), ('Layer', '')], caption='Elements created by this import', testid='import-created-table',
+                                   empty_message='Nothing new was created.') %}
+          {% call table_cell() %}{{ row.type }}{% endcall %}
+          {% call table_cell() %}{{ row.layer }}{% endcall %}
+        {% endcall %}
+        <p class="text-sm text-muted-foreground">
+          Shapes and relationships a guess was needed for wait on the <a class="underline" href="{{ url_for('archimate.import_review_page') }}">Review</a> tab.
+        </p>
+    </section>
+    {% endif %}
+</div>
 {% endblock %}
 
 {% block extra_js %}
@@ -198,26 +78,23 @@ function archimateImport() {
         importStrategy: 'skip_duplicates',
         detectedMode: '',
         uploading: false,
-        creatingDiagram: false,
         errorMsg: '',
         suggestion: '',
-        result: null,
 
-        onFileSelected(event) {
-            this.file = event.target.files[0];
-            this.result = null;
+        onFileSelected(file) {
+            this.file = file || null;
             this.errorMsg = '';
             this.suggestion = '';
             if (!this.file) { this.detectedMode = ''; return; }
             const ext = this.file.name.split('.').pop().toLowerCase();
             if (['csv', 'xlsx', 'xls'].includes(ext)) {
-                this.detectedMode = 'Structured Data (CSV/Excel)';
+                this.detectedMode = 'Spreadsheet';
             } else if (['xml', 'archimate'].includes(ext)) {
-                this.detectedMode = 'ArchiMate Exchange (XML)';
+                this.detectedMode = 'ArchiMate exchange file';
             } else if (['pdf', 'docx', 'doc', 'pptx', 'ppt', 'txt', 'md', 'rtf'].includes(ext)) {
-                this.detectedMode = 'Document (AI Analysis)';
+                this.detectedMode = 'Document';
             } else {
-                this.detectedMode = 'Unknown';
+                this.detectedMode = 'An unsupported file type';
             }
         },
 
@@ -226,7 +103,6 @@ function archimateImport() {
             this.uploading = true;
             this.errorMsg = '';
             this.suggestion = '';
-            this.result = null;
 
             const ext = this.file.name.split('.').pop().toLowerCase();
             const formData = new FormData();
@@ -244,56 +120,27 @@ function archimateImport() {
             }
 
             try {
-                // Platform.fetch automatically injects CSRF token for POST
-                const data = await Platform.fetch(url, {
-                    method: 'POST',
-                    body: formData,
-                    silent: true  // suppress global toast because we show inline error
-                });
-                if (data.error && !data.success) {
-                    this.errorMsg = data.error;
-                } else if (data.success === false) {
-                    this.errorMsg = data.error || 'Import failed';
+                // Platform.fetch injects the CSRF token for POST
+                const data = await Platform.fetch(url, { method: 'POST', body: formData, silent: true });
+                if (data.success === false || (data.error && !data.success)) {
+                    this.errorMsg = data.error || 'The import failed.';
+                } else if ((data.element_ids || []).length || data.skipped_count || data.error_count) {
+                    // The result is a server-rendered list of links to the records created.
+                    const q = new URLSearchParams({
+                        created: (data.element_ids || []).join(','),
+                        skipped: data.skipped_count || 0,
+                        errors: data.error_count || 0,
+                    });
+                    if (data.composer_url) q.set('composer', data.composer_url);
+                    window.location.href = '/archimate/import?' + q.toString();
+                    return;
                 } else {
-                    this.result = data;
-                    if (data.suggestion) this.suggestion = data.suggestion;
-                    if (data.message && (data.created_count || 0) === 0) {
-                        this.suggestion = data.message;
-                    }
+                    this.suggestion = data.suggestion || data.message || 'Nothing was created from this file.';
                 }
             } catch (e) {
-                // Platform.fetch throws on network errors or non-ok responses
-                this.errorMsg = 'Network error: ' + e.message;
-            } finally {
-                this.uploading = false;
+                this.errorMsg = 'The import could not be sent: ' + e.message;
             }
-        },
-
-        async createDiagram() {
-            if (!this.result?.element_ids?.length) return;
-            this.creatingDiagram = true;
-            const fileName = this.file?.name || 'Imported Elements';
-            try {
-                // Platform.fetch automatically injects CSRF token and serializes plain object to JSON
-                const data = await Platform.fetch('/archimate/api/create-diagram-from-elements', {
-                    method: 'POST',
-                    body: {
-                        element_ids: this.result.element_ids,
-                        name: fileName.replace(/\.[^.]+$/, '') + ' — Architecture View'
-                    },
-                    silent: true  // suppress global toast because we show inline error
-                });
-                if (data.success && data.composer_url) {
-                    window.location.href = data.composer_url;
-                } else {
-                    this.errorMsg = data.error || 'Failed to create diagram';
-                }
-            } catch (e) {
-                // Platform.fetch throws on network errors or non-ok responses
-                this.errorMsg = 'Network error: ' + e.message;
-            } finally {
-                this.creatingDiagram = false;
-            }
+            this.uploading = false;
         }
     };
 }

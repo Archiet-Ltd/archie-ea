@@ -1,8 +1,8 @@
 {# design-block: form #}
 {% extends "layouts/admin_base.html" %}
-{% from 'macros/page_shell.html' import page_shell %}
+{% from 'archimate/_import_shared.html' import import_header, import_form_card with context %}
 {% from 'components/button.html' import button %}
-{% from 'components/input.html' import input, label %}
+{% from 'components/input.html' import label %}
 {% from 'components/select.html' import native_select %}
 {% from 'components/checkbox.html' import checkbox %}
 {% import 'components/card.html' as card %}
@@ -16,46 +16,28 @@
 {% endblock %}
 
 {% block content %}
-<div x-data="diagramImport()" x-cloak>
-    {% macro _ps_meta() %}
-    <div class="rounded-lg border border-border bg-muted/30 p-4 text-sm text-muted-foreground">
-        Export from Lucidchart with <strong class="text-foreground">File → Export → JSON</strong>,
-        or upload a native <code>.lucid</code> archive or a Visio <code>.vsdx</code> drawing.
-        Prefer <code>.vsdx</code> where you have it: Lucid's JSON export discards shape
-        geometry, and geometry is what tells the importer which application sits inside
-        which data centre. Nothing is written until you press Import — the preview shows
-        exactly what would be created, attached to what is already here, or changed.
-    </div>
-    {% endmacro %}
-    {{ page_shell(
-        title='Import a diagram',
-        breadcrumb=[('Home', '/'), ('Import a diagram', None)],
-        meta_caller=_ps_meta
-    ) }}
+<div x-data="diagramImport()" x-cloak @file-selected="file = $event.detail.files[0]; report = null; committed = false">
+    {{ import_header('Diagram', 'Import a diagram', 'Bring in a Lucidchart or Visio drawing and check what it would create before anything is saved.') }}
 
     {# ── Step 1: the file and how to read it ─────────────────────────────── #}
-    {% call card.card() %}
-        {% call card.card_content() %}
+    {% call import_form_card('diagram-file', 'Diagram file',
+            '.json,.lucid,.vsdx', 'Lucidchart .json or .lucid, Visio .vsdx',
+            'In Lucidchart choose File, Export, JSON; or use a .lucid archive or a Visio .vsdx drawing. A .vsdx file gives the best result, because Lucidchart\'s JSON export loses the position of each shape, and the position shows which application sits inside which data centre. Nothing is saved until you press Import.') %}
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <div>
-                {% call label(for='diagram-file') %}Diagram export{% endcall %}
-                {{ input(id='diagram-file', type='file', class='file:text-foreground', attrs_dict={'accept': '.json,.lucid,.vsdx', '@change': "file = $event.target.files[0]; report = null; committed = false"}) }}
-            </div>
-
             <div>
                 {% call label(for='fallback-type') %}Shapes without an ArchiMate type{% endcall %}
                 <div class="mt-1.5">
                 {% call native_select(id='fallback-type', attrs_dict={'x-model': 'fallbackType'}) %}
                     <option value="">Skip them (safest)</option>
                     <template x-for="t in elementTypes" :key="t">
-                        <option :value="t" x-text="'Import as ' + t"></option>
+                        <option :value="t" x-text="'Import as ' + t.replace(/([a-z])([A-Z])/g, '$1 $2')"></option>
                     </template>
                 {% endcall %}
                 </div>
                 <p class="mt-1 text-xs text-muted-foreground">
-                    Diagrams drawn with ordinary rectangles carry no type. Importing them keeps
-                    their names, colours and nesting; the type is a guess you can correct in
-                    <a href="/archimate/import-review" class="underline">Import Review</a>.
+                    Shapes drawn as plain rectangles carry no type. Importing them keeps their
+                    names, colours and nesting; the type is a guess you can correct on the
+                    <a href="{{ url_for('archimate.import_review_page') }}" class="underline">Review</a> tab.
                 </p>
             </div>
 
@@ -82,7 +64,7 @@
         </div>
 
         <div class="mt-4 rounded-md border border-border bg-muted/20 px-3 py-2">
-            {{ checkbox(id='ai-assist', attrs_dict={'x-model': 'aiAssist'}, label='Ask AI to fill the gaps', description='After the deterministic import, an AI pass proposes a type for shapes it could not recognise and recovers relationships it had to drop. Suggestions appear below the preview — nothing is saved until you tick it and press Import. Needs an LLM key configured; if none is set, the import still runs and this is simply skipped.') }}
+            {{ checkbox(id='ai-assist', attrs_dict={'x-model': 'aiAssist'}, label='Ask the assistant to fill the gaps', description='After the import, the assistant proposes a type for shapes it could not recognise and recovers relationships it had to drop. Suggestions appear below the preview — nothing is saved until you tick it and press Import. If the assistant is not set up for your organisation, the import still runs and this step is left out.') }}
         </div>
 
         <div class="mt-6 flex flex-wrap items-center gap-3">
@@ -92,13 +74,12 @@
             <span x-show="busy && mode === 'commit'" x-cloak>{{ button(text='Importing…', variant='primary', disabled=true) }}</span>
             <span x-show="error" x-cloak class="text-sm text-destructive-emphasis" x-text="error"></span>
             <template x-if="committed && report && report.composer_url">
-                {{ button(text='Open in composer', icon='external-link', variant='primary', attrs_dict={':href': 'report.composer_url'}) }}
+                {{ button(text='Open in the Composer', icon='external-link', variant='primary', attrs_dict={':href': 'report.composer_url'}) }}
             </template>
             <span x-show="committed" x-cloak class="text-sm text-foreground">
-                Imported. <a href="/archimate/import-review" class="underline">Review what was guessed →</a>
+                Imported. <a href="{{ url_for('archimate.import_review_page') }}" class="underline">Review what was guessed →</a>
             </span>
         </div>
-        {% endcall %}
     {% endcall %}
 
     {# ── Step 2: what it would do ────────────────────────────────────────── #}

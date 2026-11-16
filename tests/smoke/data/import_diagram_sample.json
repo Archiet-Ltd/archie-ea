@@ -1,0 +1,4 @@
+{"pages": [{"id": "p1", "title": "Order flow", "items": {"shapes": [
+  {"id": "s1", "class": "DefaultSquareBlock", "textAreas": [{"label": "Text", "text": "Order Desk"}]},
+  {"id": "s2", "class": "DefaultSquareBlock", "textAreas": [{"label": "Text", "text": "Billing Ledger"}]}
+], "lines": []}}]}
