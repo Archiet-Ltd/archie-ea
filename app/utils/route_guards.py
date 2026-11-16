@@ -108,6 +108,18 @@ def entity_in_active_org(
     return _load_in_active_org(model, entity_id, id_column, org_column) is not None
 
 
+def load_entity_in_active_org(
+    model, entity_id, *, id_column: str = "id", org_column: str = "organization_id"
+):
+    """Return the row in the caller's active organisation, else ``None``.
+
+    Fails closed: ``None`` when the active organisation is unknown. For routes
+    that answer with their own 404 body (or sit inside a ``try`` that would
+    swallow an abort).
+    """
+    return _load_in_active_org(model, entity_id, id_column, org_column)
+
+
 def require_entity_in_active_org(
     model,
     entity_id,
