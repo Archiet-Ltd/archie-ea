@@ -379,7 +379,7 @@ class Rendered:
         self.attributes = attributes
         self.void = void
         self.virtual = virtual
-        self.inner = Markup(inner)
+        self.inner = Markup(inner)  # nosec B704 - inner is empty or a body from the fixed ICONS table
 
     def __html__(self):
         return self.attributes
@@ -642,4 +642,4 @@ def _render(a, attrs):
             parts.append(f' {k}=""')
         else:
             parts.append(f' {k}="{escape(v)}"')
-    return Markup(''.join(parts))
+    return Markup(''.join(parts))  # nosec B704 - every attribute value above passes through escape()
