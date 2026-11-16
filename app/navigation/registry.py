@@ -573,10 +573,15 @@ def _here(link: NavLink, endpoint: str | None, values: dict | None) -> bool:
     return all(str(values.get(k)) == str(v) for k, v in link.values.items())
 
 
+# Model types whose page is a Systems entry's page too, and which the Model group must not mark as well
+# (Application component is deliberately marked under both, so it is not listed).
+_MARKED_UNDER_SYSTEMS_ONLY = frozenset({"type_DataObject"})
+
+
 def _listed_twice(child: NavLink, endpoint: str | None) -> bool:
     """A model type page that a Systems entry also holds (Application > Data object, Systems > Data
     register) is marked on the Systems entry only: one page lights one entry."""
-    return endpoint is not None and child.key.startswith("type_") and any(
+    return endpoint is not None and child.key in _MARKED_UNDER_SYSTEMS_ONLY and any(
         _holds(c, endpoint) for top in WORK if top.toggle for c in top.children)
 
 

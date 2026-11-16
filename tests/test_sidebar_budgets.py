@@ -268,6 +268,16 @@ def test_a_page_two_entries_open_is_current_under_both(ctx):
     assert systems.open and application.open
 
 
+@pytest.mark.parametrize("endpoint", ["data_architecture.data_entity_catalog", "data_architecture.create_data_entity",
+                                       "data_architecture.data_entity_diagram"])
+def test_the_data_register_pages_mark_the_data_register_alone(ctx, endpoint):
+    person = _Person(ROLE_PLATFORM_ADMIN, admin=True)
+    nav = registry.sidebar_for(person, endpoint)
+    marked = [c.label for section in nav.values() for i in section for c in i.children if c.current or c.active]
+    assert marked == ["Data register"]
+    assert registry.page_trail(person, endpoint) == [("Systems", None), ("Data register", "/architecture/data-entities")]
+
+
 def test_two_element_types_on_one_list_page_are_told_apart(ctx):
     person = _Person(ROLE_PLATFORM_ADMIN, admin=True)
     nav = registry.sidebar_for(person, "archimate_crud.list_elements",
