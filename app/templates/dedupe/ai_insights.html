@@ -1,7 +1,6 @@
 {# design-block: data-table #}
 {% extends "layouts/admin_base.html" %}
 {% from 'macros/page_shell.html' import page_shell %}
-{% import 'components/card.html' as card %}
 {% from 'components/fact_list.html' import fact_list %}
 
 {% block title %}AI Dedupe Insights{% endblock %}
@@ -25,12 +24,10 @@
     </div>
 
     {% if ai_insights and ai_insights.insight_facts %}
-    {% call card.card() %}
-    {% call card.card_header() %}{% call card.card_title() %}What the review found{% endcall %}{% endcall %}
-    {% call card.card_content() %}
-    {% call(p) fact_list(items=ai_insights.insight_facts, testid='ai-insight-facts') %}{{ p.value if p.value is not none else '—' }}{% endcall %}
-    {% endcall %}
-    {% endcall %}
+    <div data-slot="card" class="rounded-lg border border-border bg-card p-5">
+        <h3 class="font-medium text-foreground mb-3">What the review found</h3>
+        {% call(p) fact_list(items=ai_insights.insight_facts, testid='ai-insight-facts') %}{{ p.value if p.value is not none else '—' }}{% endcall %}
+    </div>
     {% else %}
     <div data-slot="card" class="rounded-lg border border-border bg-card p-8 text-center text-muted-foreground">
         No AI insights available for this run.
