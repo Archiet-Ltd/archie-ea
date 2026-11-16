@@ -12,7 +12,6 @@ from typing import Any, Dict  # dead-code-ok
 from sqlalchemy import text  # dead-code-ok
 
 from app import db
-from app.utils.tenant import current_organization_id
 from app.models.roadmap_models import (  # dead-code-ok
     PlanningDeliverable,
     RoadmapAudit,
@@ -834,38 +833,12 @@ class RoadmapDataSync:
         return type_mapping.get(gap.gap_type, "general_improvement")
 
     def _get_primary_capability_for_application(self, application_id: int) -> str:
-        """Get primary capability for application using ORM"""
-        from app.models.application_capability import ApplicationCapabilityMapping
-        from app.models.business_capabilities import BusinessCapability
+        """Name of the capability the application supports, from the canonical reader."""
+        from app.services.capability_support import capabilities_of_application
+        from app.utils.tenant_sql import current_org_id
 
-        org_id = current_organization_id()
-        mapping = (
-            ApplicationCapabilityMapping.query.filter(
-                ApplicationCapabilityMapping.organization_id == org_id,
-                ApplicationCapabilityMapping.application_component_id == application_id,
-                ApplicationCapabilityMapping.is_primary_enabler == True,
-            )
-            .join(BusinessCapability, BusinessCapability.id == ApplicationCapabilityMapping.business_capability_id)
-            .first()
-        )
-
-        if mapping and mapping.business_capability:
-            return mapping.business_capability.name
-
-        # Fallback: get any capability for this application
-        mapping = (
-            ApplicationCapabilityMapping.query.filter(
-                ApplicationCapabilityMapping.organization_id == org_id,
-                ApplicationCapabilityMapping.application_component_id == application_id,
-            )
-            .join(BusinessCapability, BusinessCapability.id == ApplicationCapabilityMapping.business_capability_id)
-            .first()
-        )
-
-        if mapping and mapping.business_capability:
-            return mapping.business_capability.name
-
-        return "unknown_capability"
+        rows = capabilities_of_application(current_org_id(), application_id)
+        return rows[0]["capability_name"] if rows else "unknown_capability"
 
     def _application_needs_deliverable(self, application: ApplicationComponent) -> bool:
         """Determine if application needs a deliverable"""

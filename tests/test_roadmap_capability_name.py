@@ -1,5 +1,5 @@
 """
-Tests for appstable02: _get_primary_capability_for_application returns the
+Tests: _get_primary_capability_for_application returns the
 correct capability name from the application-capability mapping.
 
 These tests verify that the raw SQL querying a non-existent column has been

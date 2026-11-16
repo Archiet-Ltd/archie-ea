@@ -203,6 +203,27 @@ class TestSharedReferenceCapability:
         )
         assert response.status_code == 404, response.get_data(as_text=True)
 
+    def test_older_engine_refuses_unclassified_capability_without_organisation(
+        self, db_session, make_org, tenant_ctx
+    ):
+        from werkzeug.exceptions import NotFound
+
+        from app.services.roadmap_automation import (
+            GenerationOptions,
+            RoadmapAutomationEngine,
+        )
+
+        org_a, _ = _org_with_user(db_session, make_org, "a")
+        legacy = self._shared(db_session, "Unclassified Capability", None)
+        reference = self._shared(db_session, "Shared Reference Capability", "reference")
+
+        with tenant_ctx(org_a.id):
+            engine = RoadmapAutomationEngine()
+            with pytest.raises(NotFound):
+                engine._generate_from_capability(legacy.id, GenerationOptions())
+            packages = engine._generate_from_capability(reference.id, GenerationOptions())
+        assert packages
+
 
 class TestEngineApplicationWorkPackage:
     """The older engine turns each linked application into a named work package."""
@@ -393,6 +414,25 @@ class TestPredictiveInsightsNotMeasured:
         assert result["stage_predictions"] == []
         assert result["end_of_life"]["predicted_date"] is None
         assert result["investment_recommendation"] is None
+
+    def test_unmeasured_stage_does_not_claim_high_confidence(
+        self, db_session, make_org, tenant_ctx
+    ):
+        org_a, _ = _org_with_user(db_session, make_org, "a")
+        app_a = _application(db_session, org_a, "Ledger Alpha")
+        app_a.created_at = datetime(2020, 1, 1)
+        db_session.commit()
+
+        from app.services.ai_chat_extensions.predictive_insights_service import (
+            PredictiveInsightsService,
+        )
+
+        with tenant_ctx(org_a.id):
+            result = PredictiveInsightsService().predict_application_lifecycle(
+                app_id=app_a.id
+            )
+        assert result["current_stage"] == "unknown"
+        assert result["stage_confidence"] == "low"
 
     def test_other_organisation_application_id_is_not_found(
         self, db_session, make_org, tenant_ctx

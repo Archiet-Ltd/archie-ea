@@ -17,7 +17,7 @@ from app.models.roadmap_models import (  # dead-code-ok
 from app.models.unified_work_package import UnifiedWorkPackage
 from app.services import work_package_service
 from app.services.capability_support import applications_of_capability
-from app.utils.tenant import current_organization_id
+from app.utils.tenant_sql import current_org_id
 
 # Aliases for backwards compatibility
 Deliverable = PlanningDeliverable
@@ -96,7 +96,7 @@ class RoadmapAutomationEngine:
         self, capability_id: int, options: GenerationOptions
     ) -> List[Dict[str, Any]]:
         """Generate work packages from business capability"""
-        org_id = current_organization_id()
+        org_id = current_org_id()
         # The organisation's own capability, or an explicit shared reference one
         capability = UnifiedCapability.query.filter(
             UnifiedCapability.id == capability_id,
@@ -111,7 +111,8 @@ class RoadmapAutomationEngine:
         applications = []
         if app_ids:
             applications = ApplicationComponent.query.filter(
-                ApplicationComponent.id.in_(app_ids)
+                ApplicationComponent.id.in_(app_ids),
+                ApplicationComponent.organization_id == org_id,
             ).all()
 
         # Get related gaps
@@ -361,9 +362,7 @@ class RoadmapAutomationEngine:
     def _load_work_packages(work_package_ids: List[int]) -> List[UnifiedWorkPackage]:
         """The caller's own work packages among these ids; another
         organisation's id is simply not found."""
-        from app.utils.tenant import current_organization_id
-
-        org_id = current_organization_id()
+        org_id = current_org_id()
         found = []
         for raw in work_package_ids or []:
             try:
@@ -813,39 +812,12 @@ class RoadmapAutomationEngine:
         return supporting_wps
 
     def _get_primary_capability_for_application(self, application_id: int) -> str:
-        """Get primary business capability for application"""
-        from app.models.application_capability import ApplicationCapabilityMapping
-        from app.models.business_capabilities import BusinessCapability
-        from app.utils.tenant import current_organization_id
+        """Name of the capability the application supports, from the canonical reader."""
+        from app.services.capability_support import capabilities_of_application
+        from app.utils.tenant_sql import current_org_id
 
-        org_id = current_organization_id()
-        mapping = (
-            ApplicationCapabilityMapping.query.filter(
-                ApplicationCapabilityMapping.organization_id == org_id,
-                ApplicationCapabilityMapping.application_component_id == application_id,
-                ApplicationCapabilityMapping.is_primary_enabler == True,
-            )
-            .join(BusinessCapability, BusinessCapability.id == ApplicationCapabilityMapping.business_capability_id)
-            .first()
-        )
-
-        if mapping and mapping.business_capability:
-            return mapping.business_capability.name
-
-        # Fallback: get any capability for this application
-        mapping = (
-            ApplicationCapabilityMapping.query.filter(
-                ApplicationCapabilityMapping.organization_id == org_id,
-                ApplicationCapabilityMapping.application_component_id == application_id,
-            )
-            .join(BusinessCapability, BusinessCapability.id == ApplicationCapabilityMapping.business_capability_id)
-            .first()
-        )
-
-        if mapping and mapping.business_capability:
-            return mapping.business_capability.name
-
-        return "unknown_capability"
+        rows = capabilities_of_application(current_org_id(), application_id)
+        return rows[0]["capability_name"] if rows else "unknown_capability"
 
     def _estimate_assessment_cost(self, application: Any) -> float:
         """Estimate cost for application assessment"""

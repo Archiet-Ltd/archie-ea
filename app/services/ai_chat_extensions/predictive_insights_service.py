@@ -495,7 +495,15 @@ class PredictiveInsightsService:
 
     def _calculate_confidence(self, signals: Dict[str, Any]) -> str:
         """Calculate confidence level for prediction."""
-        signal_count = len([v for v in signals.values() if v is not None])
+        # Only a measured value counts: None, "unknown" and the application's
+        # name say nothing about its lifecycle.
+        signal_count = len(
+            [
+                v
+                for k, v in signals.items()
+                if k != "application_name" and v is not None and v != "unknown"
+            ]
+        )
         if signal_count >= 6:
             return ConfidenceLevel.HIGH.value
         elif signal_count >= 4:
