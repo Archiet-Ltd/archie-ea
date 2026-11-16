@@ -57,7 +57,7 @@ def _open_status(page, live_server):
     return response
 
 
-def _assert_the_page_answers(page, org_name):
+def _assert_the_page_answers(page, org_name, signed_in=False):
     assert "/account/login" not in page.url, "status page sent the visitor to sign in: %s" % page.url
     expect(page.get_by_test_id("service-status-page")).to_be_visible(timeout=PAGE_TIMEOUT)
     for key in COMPONENTS:
@@ -67,8 +67,12 @@ def _assert_the_page_answers(page, org_name):
         assert badge_text in STATES, "%s reads %r" % (key, badge_text)
         assert badge_text not in ("—", "-", ""), "%s reads a dash" % key
     expect(page.get_by_test_id("status-last-checked")).to_contain_text("UTC")
-    # Read-only: no form, no sign-in prompt, no organisation.
-    assert page.locator("main form").count() == 0
+    # Signed out: no form. Signed in: exactly one, the subscription control.
+    if signed_in:
+        assert page.locator("main form").count() == 1
+        assert page.locator("main form[data-testid=service-status-subscription]").count() == 1
+    else:
+        assert page.locator("main form").count() == 0
     assert page.locator("input[type=password]").count() == 0
     body = page.locator("body").inner_text()
     assert org_name not in body
@@ -97,7 +101,7 @@ def test_signed_in_viewer_sees_the_same_page_in_the_public_shell(browser, live_s
         _login(page, live_server, status_viewer)
         response = _open_status(page, live_server)
         assert response.status == 200
-        _assert_the_page_answers(page, "Smoke Org")
+        _assert_the_page_answers(page, "Smoke Org", signed_in=True)
         assert page.get_by_test_id("app-sidebar").count() == 0
         assert page.locator("aside, [data-slot=sidebar]").count() == 0, "the signed-in sidebar is on the public page"
     finally:
@@ -112,7 +116,7 @@ def test_signed_in_footer_link_lands_on_the_status_page(browser, live_server, se
         page.goto(live_server + "/dashboard/overview", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
         page.get_by_test_id("footer-service-status").click()
         page.wait_for_url("**/status", timeout=PAGE_TIMEOUT)
-        _assert_the_page_answers(page, "Smoke Org")
+        _assert_the_page_answers(page, "Smoke Org", signed_in=True)
     finally:
         context.close()
 

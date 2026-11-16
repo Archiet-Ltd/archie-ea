@@ -2,8 +2,9 @@
 
 Anyone can open it, signed in or not. It reads only what the
 platform already measures (``app/modules/monitoring/services/service_status.py``)
-and shows the same platform-wide state to every organisation; the page has
-no form and no action.
+and shows the same platform-wide state to every organisation. A signed-out
+visitor gets a read-only page with no form and no action; a signed-in person
+also gets one control to subscribe to, or leave, incident emails.
 """
 
 from flask import Blueprint, flash, redirect, render_template, request, url_for
@@ -17,8 +18,10 @@ status_bp = Blueprint("service_status", __name__)
 @status_bp.route("/status", methods=["GET"])
 def status_page():
     """Public and read-only: platform-wide state only, never an organisation's data."""
+    subscribed = current_user.is_authenticated and service_status.is_subscribed(current_user.id)
     return render_template(
         "monitoring/service_status.html",
+        subscribed=subscribed,
         status=service_status.public_status(),
         component_labels=service_status.COMPONENT_STATE_LABELS,
     )

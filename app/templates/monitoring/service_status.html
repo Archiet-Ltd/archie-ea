@@ -4,6 +4,7 @@
    smoke-coverage-ok: covered by tests/smoke/test_status_page_public_journey.py #}
 {% extends 'layouts/public_base.html' %}
 {% import 'basecoat/index.html' as ui %}
+{% from 'components/input.html' import hidden_input %}
 
 {% block title %}Service status{% endblock %}
 
@@ -20,6 +21,21 @@
     <p class="text-sm text-muted-foreground" data-testid="service-status-state" data-state="{{ status.state }}">{{ status.label }}</p>
     <p class="text-xs text-muted-foreground" data-testid="status-last-checked">Last checked {{ status.checked_at.strftime('%d %b %Y %H:%M') }} UTC</p>
   </header>
+
+  {% if current_user.is_authenticated %}
+  <form method="post" action="{{ url_for('service_status.update_subscription') }}" class="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-card p-4" data-testid="service-status-subscription">
+    {{ hidden_input('csrf_token', value=csrf_token()) }}
+    {% if subscribed %}
+    <p class="text-sm text-foreground" data-testid="service-status-subscribed">You are subscribed to status updates. We email you when an incident opens and when it is resolved.</p>
+    {{ hidden_input('subscribe', value='0') }}
+    {% call ui.button(variant='outline', class='gap-2', attrs={'type': 'submit', 'data-testid': 'service-status-unsubscribe'}) %}<i data-lucide="bell-off" class="size-4" aria-hidden="true"></i> Unsubscribe{% endcall %}
+    {% else %}
+    <p class="text-sm text-muted-foreground" data-testid="service-status-not-subscribed">Get an email when an incident opens or is resolved.</p>
+    {{ hidden_input('subscribe', value='1') }}
+    {% call ui.button(class='gap-2', attrs={'type': 'submit', 'data-testid': 'service-status-subscribe'}) %}<i data-lucide="bell" class="size-4" aria-hidden="true"></i> Subscribe{% endcall %}
+    {% endif %}
+  </form>
+  {% endif %}
 
   <section aria-labelledby="components-heading" class="flex flex-col gap-3">
     <h2 id="components-heading" class="text-base font-semibold text-foreground">Components</h2>
