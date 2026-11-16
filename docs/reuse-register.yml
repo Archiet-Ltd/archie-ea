@@ -336,6 +336,21 @@ entries:
       - path: app/utils/tenant_sql.py
         reason: raw-SQL variant that returns None with no application context at all (getattr on flask.g raises when unbound); org_scope builds on it
 
+  - id: archimate-layer-types
+    concept: The canonical element type-to-layer map used by ArchiMateValidationService
+    status: active
+    canonical:
+      path: app/services/archimate_viewpoint_service.py
+      symbols: [LAYER_TYPES]
+    reuse: >
+      Use the `LAYER_TYPES` map from app.services.archimate_viewpoint_service to determine layer
+      membership. Do not define a second element-type-to-layer map.
+    must_not_create:
+      - id: second-layer-types-map
+        regex: '^LAYER_TYPES\s*='
+        scope: [app]
+        suffixes: [.py]
+
   - id: archimate-element-writer
     concept: Creating an ArchiMate element (the one element writer)
     status: active

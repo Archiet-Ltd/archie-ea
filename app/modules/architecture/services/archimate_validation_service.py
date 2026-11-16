@@ -27,6 +27,7 @@ from app import db
 from app.models.archimate_core import ArchiMateElement, ArchiMateRelationship
 from app.models.constants import ArchiMateLayer, ArchiMateRelationshipType
 from app.models.archimate_metamodel import ArchiMateRelationshipRule, MetamodelViolation
+from app.services.archimate_viewpoint_service import LAYER_TYPES as CANONICAL_LAYER_TYPES
 
 # ---------------------------------------------------------------------------
 # ARCH-016: ArchiMate 3.2 metamodel validation constants
@@ -72,32 +73,6 @@ LAYER_RELATIONSHIP_RULES = {
     # Business ↔ Technology direct is a violation (must go through Application)
     ('business', 'technology'): [],
     ('technology', 'business'): [],
-}
-
-# ArchiMate 3.2 element types per layer (lowercase layer keys)
-LAYER_TYPES = {
-    'business': [
-        'BusinessActor', 'BusinessRole', 'BusinessCollaboration', 'BusinessInterface',
-        'BusinessProcess', 'BusinessFunction', 'BusinessInteraction', 'BusinessEvent',
-        'BusinessService', 'BusinessObject', 'Contract', 'Representation',
-    ],
-    'application': [
-        'ApplicationComponent', 'ApplicationInterface', 'ApplicationService',
-        'ApplicationFunction', 'ApplicationProcess', 'ApplicationInteraction',
-        'ApplicationCollaboration', 'ApplicationEvent', 'DataObject',
-    ],
-    'technology': [
-        'Node', 'Device', 'SystemSoftware', 'TechnologyService', 'TechnologyInterface',
-        'TechnologyCollaboration', 'TechnologyFunction', 'TechnologyProcess',
-        'TechnologyInteraction', 'TechnologyEvent', 'Path', 'CommunicationNetwork', 'Artifact',
-    ],
-    'strategy': ['Resource', 'Capability', 'CourseOfAction', 'ValueStream'],
-    'motivation': [
-        'Stakeholder', 'Driver', 'Assessment', 'Goal', 'Outcome',
-        'Principle', 'Requirement', 'Constraint', 'Meaning', 'Value',
-    ],
-    'implementation': ['WorkPackage', 'Deliverable', 'ImplementationEvent', 'Plateau', 'Gap'],
-    'physical': ['Equipment', 'Facility', 'DistributionNetwork', 'Material'],
 }
 
 REQUIRED_ELEMENT_FIELDS = ['name', 'layer', 'type']
@@ -660,8 +635,18 @@ class ArchiMateValidationService:
         3.3: normalize the layer name ('implementation & migration' -> the
         'implementation' table key) so a valid element like WorkPackage is not
         falsely flagged.
+
+        The canonical map (app.services.archimate_viewpoint_service) folds
+        'physical' into 'technology'; callers passing 'physical' still work.
         """
-        return element_type in LAYER_TYPES.get(_norm_layer(layer), [])
+        normalized_layer = _norm_layer(layer)
+        # 'physical' layer is treated as 'technology' per the canonical map
+        if normalized_layer == 'physical':
+            normalized_layer = 'technology'
+        # Check against the canonical LAYER_TYPES (lowercase element types)
+        return element_type.lower() in {
+            t.lower() for t in CANONICAL_LAYER_TYPES.get(normalized_layer, [])
+        }
 
 
 # Convenience functions for common use cases

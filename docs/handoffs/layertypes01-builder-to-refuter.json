@@ -1,0 +1,9 @@
+{
+  "from": "builder",
+  "to": "refuter",
+  "artifact": "docs/buckets/layertypes01/build-report-test_validator_layer_map_is_canonical.md",
+  "approval_status": "approved",
+  "gate_conditions": ["tests_reported_passing"],
+  "unmet_conditions": [],
+  "timestamp": "2026-11-16T00:18:47Z"
+}
