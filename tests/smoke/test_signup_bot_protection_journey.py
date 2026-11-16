@@ -342,3 +342,44 @@ def test_the_platform_administrator_sees_their_own_members_and_an_empty_holding_
         ctx.close()
         held_ctx.close()
         _remove_administrator(ids)
+
+
+@pytest.mark.parametrize("width,theme", VIEWS)
+def test_a_reserved_domain_is_refused_with_its_reason_and_the_person_can_carry_on(
+    browser, guarded_server, width, theme
+):
+    tag = uuid.uuid4().hex[:8]
+    ctx = _context(browser, width, theme)
+    try:
+        email = "walker-%s@example.test" % tag
+        page = _open_form(ctx, guarded_server)
+        _fill(page, email)
+        page.wait_for_timeout((MIN_SECONDS + 1) * 1000)
+        _submit(page)
+        expect(page.locator("main")).to_contain_text(
+            "This address's domain (example.test) is reserved and cannot receive email. "
+            "Use an address you can open."
+        )
+        expect(page.locator("main")).not_to_contain_text("Invalid email address")
+        _shot(page, "refused-reserved-domain", width, theme)
+        assert _account(email) is None
+
+        # A plainly malformed address is still called invalid.
+        page.fill("#email", "walker@nowhere")
+        page.fill("#password", PASSWORD)
+        page.fill("#password2", PASSWORD)
+        page.wait_for_timeout((MIN_SECONDS + 1) * 1000)
+        _submit(page)
+        expect(page.locator("main")).to_contain_text("Invalid email address")
+
+        # The same person, with an address they can open, gets an account.
+        good = "walker-%s@example.com" % tag
+        page.fill("#email", good)
+        page.fill("#password", PASSWORD)
+        page.fill("#password2", PASSWORD)
+        page.wait_for_timeout((MIN_SECONDS + 1) * 1000)
+        _submit(page)
+        page.wait_for_url("**/account/unconfirmed**")
+        assert _account(good) is not None
+    finally:
+        ctx.close()

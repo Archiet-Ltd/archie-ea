@@ -4,6 +4,7 @@ Each refusal creates nothing. A workspace (an organisation and its agent charter
 address is confirmed, never at sign-up. Messages are captured by Flask-Mail's test backend and the link
 is followed as a person would follow it.
 """
+import html as html_lib
 import time
 import uuid
 
@@ -342,3 +343,42 @@ def test_the_first_sign_up_step_has_exactly_one_h1(app):
     html = app.test_client().get("/account/register").get_data(as_text=True)
     assert len(re.findall(r"<h1[\s>]", html)) == 1
     assert re.search(r"<h1[^>]*>\s*Create an account\s*</h1>", html)
+
+
+def test_reserved_domain_shows_plain_reason(app, db_session, mail_on, outbox):
+    """A reserved domain (example.test) is refused with a sentence naming the domain."""
+    client = app.test_client()
+    token = _form_token(client)
+    email = "test@example.test"
+    data = _data(email, form_issued=token, nickname="")
+    resp = client.post("/account/register", data=data, headers={"User-Agent": PERSON_AGENT})
+    body = html_lib.unescape(resp.get_data(as_text=True))
+    assert resp.status_code == 200
+    # The apostrophe is HTML-escaped in the rendered page; compare what a person reads
+    assert "This address's domain (example.test) is reserved and cannot receive email" in body
+    assert "Use an address you can open" in body
+
+
+def test_malformed_address_still_shows_invalid_message(app, db_session, mail_on, outbox):
+    """A malformed address still shows the generic invalid message."""
+    client = app.test_client()
+    token = _form_token(client)
+    email = "notanemail"
+    data = _data(email, form_issued=token, nickname="")
+    resp = client.post("/account/register", data=data, headers={"User-Agent": PERSON_AGENT})
+    body = resp.get_data(as_text=True)
+    assert resp.status_code == 200
+    assert "Invalid email address" in body
+
+
+def test_example_com_is_still_accepted(app, db_session, mail_on, outbox):
+    """An example.com address is accepted and creates an account."""
+    import uuid
+    client = app.test_client()
+    token = _form_token(client)
+    email = "test-{}@example.com".format(uuid.uuid4().hex[:8])
+    data = _data(email, form_issued=token, nickname="")
+    resp = client.post("/account/register", data=data, headers={"User-Agent": PERSON_AGENT})
+    # Should redirect to unconfirmed page (302)
+    assert resp.status_code == 302
+    assert "/account/unconfirmed" in resp.headers.get("Location", "")

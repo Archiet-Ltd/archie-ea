@@ -269,6 +269,13 @@ def _made_since(commit: Any, start: datetime) -> bool:
         return True
 
 
+def _is_bot(item: Any) -> bool:
+    """Whether a GitHub commit record was made by an automation account, not a person."""
+    account = (item.get("author") if isinstance(item, dict) else None) or {}
+    return (str(account.get("login") or "").strip().lower().endswith("[bot]")
+            or str(account.get("type") or "").strip().lower() == "bot")
+
+
 def summarise_commits(org_id, repository: str, commits: List[dict]) -> Dict[str, Any]:
     """Who of this organisation made the recent commits of a repository.
 
@@ -282,13 +289,22 @@ def summarise_commits(org_id, repository: str, commits: List[dict]) -> Dict[str,
 
     by_email: Dict[str, int] = {}
     by_login: Dict[str, Dict[str, int]] = {}
+    login_shown: Dict[str, str] = {}
+    login_total: Dict[str, int] = {}
     stamps: List[Tuple[str, str]] = []
+    bot_commits = 0
     for item in commits or []:
         detail = item.get("commit") if isinstance(item, dict) else None
         author = (detail or {}).get("author") or {}
+        if _is_bot(item):
+            bot_commits += 1
+            continue
         email = str(author.get("email") or "").strip().lower()
         login = str(((item.get("author") if isinstance(item, dict) else None) or {}).get("login") or "").strip().lower()
         if login:
+            shown = str(((item.get("author") if isinstance(item, dict) else None) or {}).get("login") or "").strip()
+            login_shown.setdefault(login, shown)
+            login_total[login] = login_total.get(login, 0) + 1
             tally = by_login.setdefault(login, {"": 0})
             tally[""] += 1
             if email:
@@ -322,6 +338,13 @@ def summarise_commits(org_id, repository: str, commits: List[dict]) -> Dict[str,
                 matched[key] = matched.get(key, 0) + n
         if matched:
             logins[login] = {"commits": tally[""], "members": matched}
+    # The one GitHub account behind more than half of all the commits read, member or not.
+    total = len(commits or []) - bot_commits
+    leader_login = None
+    if login_total:
+        top = max(login_total, key=lambda k: (login_total[k], k))
+        if login_total[top] * 2 > total:
+            leader_login = {"login": login_shown[top], "commits": login_total[top]}
     return {
         "repository": repository,
         "days": COMMIT_WINDOW_DAYS,
@@ -330,6 +353,8 @@ def summarise_commits(org_id, repository: str, commits: List[dict]) -> Dict[str,
         "member_commits": sum(counts.values()),
         "candidates": candidates[:MAX_SUGGESTED_OWNERS],
         "logins": logins,
+        "total_commits": total,
+        "leader_login": leader_login,
     }
 
 
@@ -338,6 +363,13 @@ def code_owner_handles(element) -> List[str]:
     entry = (getattr(element, "acm_properties", None) or {}).get("github_code_owners")
     owners = entry.get("value") if isinstance(entry, dict) else None
     return [o for o in (owners or []) if isinstance(o, str) and o.startswith("@") and "/" not in o and len(o) > 1]
+
+
+def code_owner_count(element) -> int:
+    """How many owners (teams, people, addresses) CODEOWNERS names for an application."""
+    entry = (getattr(element, "acm_properties", None) or {}).get("github_code_owners")
+    owners = entry.get("value") if isinstance(entry, dict) else None
+    return len([o for o in (owners or []) if isinstance(o, str) and o])
 
 
 def handle_owner(org_id, summary: Dict[str, Any], handles: List[str]) -> Tuple[Optional[Dict[str, Any]], Optional[str]]:
@@ -413,34 +445,79 @@ def commit_limit_reason(repository: str) -> str:
     )
 
 
+def code_owner_provenance(element) -> str:
+    """The words that say a person was named by the repository's CODEOWNERS file."""
+    try:
+        ref = json.loads(element.source_ref or "")
+    except (TypeError, ValueError):
+        ref = None
+    commit = str((ref or {}).get("commit") or "")[:7] if isinstance(ref, dict) else ""
+    repository = application_repository(element) or "the repository"
+    return f"Named by GitHub: code owner in {repository} CODEOWNERS" + (f" at {commit}" if commit else "")
+
+
+def login_leader_provenance(summary: Dict[str, Any], leader: Dict[str, Any]) -> str:
+    """The words that say a person was named by leading the recent commits of a repository."""
+    return (f"Named by GitHub: leads the recent commits of {summary['repository']} "
+            f"({leader['commits']} of {summary['total_commits']})")
+
+
+def _login_leader(summary: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    leader = (summary or {}).get("leader_login")
+    total = (summary or {}).get("total_commits") or 0
+    if isinstance(leader, dict) and leader.get("login") and total and leader.get("commits", 0) * 2 > total:
+        return leader
+    return None
+
+
 def apply_commit_history(org_id, element, component, summary: Dict[str, Any], assigned_by=None) -> bool:
-    """Keep what the commits show on the element and, where one member leads, record that member
-    as the primary owner through the one owner writer. An application that already has a primary
-    owner, however it got one, is left as it is. Returns True when an owner was written."""
+    """Keep what the commits show on the element and record the owner GitHub names as the primary
+    owner through the one owner writer: first the one code owner CODEOWNERS names, then the one
+    author who leads the recent commits. A person who is a member of this organisation (by the
+    e-mail of their commits) is recorded as that user; anyone else is a named person ``@login``.
+    An application that already has a primary owner, however it got one, is left as it is.
+    Returns True when an owner was written."""
     from app.models.application_owner import ApplicationOwner
-    from app.services.element_ownership_service import set_application_owner
+    from app.services.element_ownership_service import set_application_owner, set_named_person_owner
 
     facts: Dict[str, Any] = {"github_commit_owners": summary}
     leader = commit_leader(summary)
+    login_leader = _login_leader(summary)
     owned = bool(component is not None and ApplicationOwner.query.filter_by(
         application_id=component.id, organization_id=org_id, ownership_type="primary").first())
     written = False
-    match, handle_reason = (None, None) if owned or component is None else handle_owner(
-        org_id, summary, code_owner_handles(element))
+    handles = code_owner_handles(element)
+    single = code_owner_count(element) == 1
+    match, handle_reason = (None, None) if owned or component is None else handle_owner(org_id, summary, handles)
+    if match is not None and not single:
+        match = None
+
+    def _member(user_id, text):
+        record = set_application_owner(
+            component, user_id, "primary", organization_id=org_id, assigned_by=assigned_by)
+        record.source_table = PROPOSAL_SOURCE
+        facts["github_owner_source"] = {"user_id": user_id, "text": text}
+
+    def _named(login, text):
+        record = set_named_person_owner(
+            component, "@" + login.lstrip("@"), "primary", organization_id=org_id,
+            assigned_by=assigned_by, replace=False)
+        record.source_table = PROPOSAL_SOURCE
+        facts["github_owner_source"] = {"user_id": None, "person_name": record.person_name, "text": text}
+
     if match is not None:
         from app.models.user import User
 
-        record = set_application_owner(
-            component, match["user_id"], "primary", organization_id=org_id, assigned_by=assigned_by)
-        record.source_table = PROPOSAL_SOURCE
-        facts["github_owner_source"] = {
-            "user_id": match["user_id"], "text": handle_provenance(summary, match, db.session.get(User, match["user_id"]))}
+        _member(match["user_id"], handle_provenance(summary, match, db.session.get(User, match["user_id"])))
+        written = True
+    elif single and len(handles) == 1 and component is not None and not owned:
+        _named(handles[0], code_owner_provenance(element))
         written = True
     elif leader is not None and component is not None and not owned:
-        record = set_application_owner(
-            component, leader["user_id"], "primary", organization_id=org_id, assigned_by=assigned_by)
-        record.source_table = PROPOSAL_SOURCE
-        facts["github_owner_source"] = {"user_id": leader["user_id"], "text": commit_provenance(summary, leader)}
+        _member(leader["user_id"], commit_provenance(summary, leader))
+        written = True
+    elif login_leader is not None and component is not None and not owned:
+        _named(login_leader["login"], login_leader_provenance(summary, login_leader))
         written = True
     elif summary.get("unavailable") and not owned:
         facts["github_owner_source"] = {"user_id": None, "text": summary["unavailable"]}
@@ -541,7 +618,7 @@ def owners_from_commits(org_id) -> List[Dict[str, Any]]:
             lines.append({**line, "outcome": "owner set", "text": source.get("text", "")})
             continue
         after = ((element.acm_properties or {}).get("github_commit_owners") or {}).get("value")
-        text = summary.get("unavailable") or "No single member leads the recent commits"
+        text = summary.get("unavailable") or "No single author leads the recent commits"
         outcome = "unchanged" if before == after and before is not None else "reason recorded"
         lines.append({**line, "outcome": outcome, "text": text})
     return lines
