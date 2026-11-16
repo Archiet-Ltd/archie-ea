@@ -57,7 +57,7 @@ def test_a_row_projected_the_old_way_is_regraded_from_the_mapping_flag(db_sessio
     from app.services.connector_framework import ensure_application_row  # noqa: F401
     from app.services.archimate_backbone import create_backbone_element
 
-    org, other = make_org("regrade-a"), make_org("regrade-b")
+    org = make_org("regrade-a")
     sides = {}
     for who, flagged in (("primary", True), ("secondary", False)):
         element = create_backbone_element(
