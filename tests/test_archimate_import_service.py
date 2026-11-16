@@ -222,3 +222,51 @@ def test_export_then_reimport_preserves_custom_properties(app, org_ctx, fixture_
     # been dropped or reversed into a failure by the export path.
     assert result_reimport["relationships_created"] == 0
     assert ArchiMateRelationship.query.count() == relationships_before
+
+
+_MOTIVATION_FILE = """<?xml version="1.0" encoding="UTF-8"?>
+<model xmlns="http://www.opengroup.org/xsd/archimate/3.0/"
+       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" identifier="id-m" version="3.0">
+  <name xml:lang="en">Motivation</name>
+  <elements>
+    <element identifier="id-g" xsi:type="Goal"><name xml:lang="en">Reimport goal</name></element>
+    <element identifier="id-o" xsi:type="Outcome"><name xml:lang="en">Reimport outcome</name></element>
+  </elements>
+  <relationships>
+    <relationship identifier="id-r" source="id-o" target="id-g" xsi:type="Realization"/>
+  </relationships>
+</model>
+"""
+
+
+def test_reimport_after_a_retyped_relationship_adds_nothing(app, org_ctx, db_session):
+    """A relationship the retype migration gave back its type keeps its note; importing the
+    same file again must recognise it rather than add a second one between the pair."""
+    from alembic.migration import MigrationContext
+    from alembic.operations import Operations
+    from sqlalchemy import text
+
+    from app.models.archimate_core import ArchiMateRelationship
+    from app.services.archimate_import_service import ArchiMateImportService
+    from tests.test_motivation_retype_migration import _load
+
+    service = ArchiMateImportService()
+    service.execute_import(service.parse_oef_xml(_MOTIVATION_FILE), strategy="skip_duplicates")
+    ids = [r.id for r in ArchiMateRelationship.query.filter_by(organization_id=org_ctx.id).all()]
+    assert len(ids) == 1
+    # The state an import left before the matrix allowed the pair.
+    db_session.execute(
+        text(
+            "UPDATE archimate_relationships SET type = 'association', "
+            "description = 'As modelled: Realization.' WHERE id = :i"
+        ),
+        {"i": ids[0]},
+    )
+    ctx = MigrationContext.configure(db_session.connection())
+    with Operations.context(ctx):
+        _load().upgrade()
+    db_session.expire_all()
+
+    service.execute_import(service.parse_oef_xml(_MOTIVATION_FILE), strategy="skip_duplicates")
+    rows = ArchiMateRelationship.query.filter_by(organization_id=org_ctx.id).all()
+    assert [(r.type, r.id) for r in rows] == [("realization", ids[0])]
