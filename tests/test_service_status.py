@@ -183,8 +183,10 @@ def test_page_shows_state_history_and_footer_link(
     assert response.status_code == 200
     _assert_history(body)
     # The page itself is the public shell; the signed-in footer link sits on the app layout.
-    # The page offers no subscribe control; the POST route stays signed-in only.
-    assert 'data-testid="service-status-subscribe"' not in body
+    # A signed-in person sees exactly one form: the subscription control.
+    assert body.count("<form") == 1
+    assert 'data-testid="service-status-subscription"' in body
+    assert 'data-testid="service-status-subscribe"' in body
 
     overview = client.get("/dashboard/overview")
     assert overview.status_code == 200
