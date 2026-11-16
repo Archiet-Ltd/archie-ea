@@ -23,7 +23,7 @@ from app.services.enterprise_audit_log import EnterpriseAuditLog
 from app.services.enterprise_search_service import EnterpriseSearchService
 from app.middleware.tenant_context import current_org_id
 from app.utils.pagination import safe_int_arg
-from app.utils.route_guards import require_entity_in_active_org
+from app.utils.route_guards import load_entity_in_active_org, require_entity_in_active_org
 
 logger = logging.getLogger(__name__)
 
@@ -172,8 +172,8 @@ def capability_fact_sheet(capability_id):
     )
     from app.utils.role_access import can_edit_capabilities  # noqa: PLC0415
 
-    cap = BusinessCapability.query.get(capability_id)
-    if not cap or cap.organization_id != current_org_id():
+    cap = load_entity_in_active_org(BusinessCapability, capability_id)
+    if not cap:
         abort(404)
     return render_template("capabilities/capability_fact_sheet.html",
                            type_labels=CAPABILITY_TYPE_LABELS,
@@ -220,8 +220,8 @@ def set_capability_type_route(capability_id):
 def get_capability(capability_id):
     """Get a specific capability detail."""
     try:
-        capability = BusinessCapability.query.get(capability_id)
-        if not capability or capability.organization_id != current_org_id():
+        capability = load_entity_in_active_org(BusinessCapability, capability_id)
+        if not capability:
             return jsonify({"success": False, "error": "Capability not found"}), 404
 
         data = capability.to_dict()
@@ -402,8 +402,8 @@ def create_capability():
 def update_capability(capability_id):
     """Update an existing capability."""
     try:
-        capability = BusinessCapability.query.get(capability_id)
-        if not capability or capability.organization_id != current_org_id():
+        capability = load_entity_in_active_org(BusinessCapability, capability_id)
+        if not capability:
             return jsonify({"success": False, "error": "Capability not found"}), 404
 
         data = request.get_json() or {}
@@ -476,8 +476,8 @@ def update_capability(capability_id):
 def delete_capability(capability_id):
     """Delete a capability."""
     try:
-        capability = BusinessCapability.query.get(capability_id)
-        if not capability or capability.organization_id != current_org_id():
+        capability = load_entity_in_active_org(BusinessCapability, capability_id)
+        if not capability:
             return jsonify({"success": False, "error": "Capability not found"}), 404
 
         cap_name = capability.name
