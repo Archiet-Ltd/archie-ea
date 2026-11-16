@@ -84,7 +84,8 @@ def history_records(providerless_guide_configuration, app, seeded):
                     'Refusing to seed into or clear an existing guide conversation')
             for index, (user_id, page_key, scope_key, role, text) in enumerate(definitions):
                 row = ChatMessageEmbedding(
-                    user_id=user_id, chat_session_id=f'guide_user_{user_id}_{page_key}_{scope_key}',
+                    user_id=user_id, organization_id=seeded['ids']['org'],
+                    chat_session_id=f'guide_user_{user_id}_{page_key}_{scope_key}',
                     message_role=role, message_text=text, domain='guide',
                     created_at=datetime(2026, 1, 1) + timedelta(seconds=index),
                     metadata_json={'guide_mode': True, 'page_key': page_key, 'scope_key': scope_key})
