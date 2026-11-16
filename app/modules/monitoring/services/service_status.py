@@ -275,6 +275,7 @@ def notify_subscribers(incident, resolved: bool) -> int:
     from app.flask_email import deliver_email, mail_available
     from app.models.ai_suggestion import UserPreference
     from app.models.user import User
+    from app.services.origin import canonical_origin
 
     try:
         if not mail_available():
@@ -284,7 +285,7 @@ def notify_subscribers(incident, resolved: bool) -> int:
             .filter(UserPreference.notify_on_service_status.is_(True), User.disabled_at.is_(None))
             .all()
         )
-        link = (current_app.config.get("PUBLIC_BASE_URL") or "").rstrip("/") + "/status"
+        link = canonical_origin() + "/status"
         when = (incident.resolved_at if resolved else incident.started_at) or datetime.utcnow()
         subject = ("Resolved: " if resolved else "Incident: ") + incident.title
         sent = 0

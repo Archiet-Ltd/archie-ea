@@ -121,3 +121,15 @@ def test_each_message_has_one_recipient_and_no_organisation_data(app, outbox, pe
         assert not message.cc and not message.bcc
         assert people["org_a"].name not in message.body + message.html
         assert people["org_b"].name not in message.body + message.html
+
+
+def test_the_status_link_in_the_email_is_absolute_when_no_base_url_is_set(app, outbox, people, monkeypatch):
+    from app.modules.monitoring.services import service_status
+
+    monkeypatch.setitem(app.config, "PUBLIC_BASE_URL", "")
+    service_status.open_incident("Search is slow", "degraded")
+    sent = _mine(outbox, people)
+    assert sent
+    for message in sent:
+        assert "http://" in message.body + message.html or "https://" in message.body + message.html
+        assert "https://entelim.tech/status" in message.body
