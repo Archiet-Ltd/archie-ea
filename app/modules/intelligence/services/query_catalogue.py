@@ -12,7 +12,7 @@ drawn/derived/synchronised vocabulary, read from the row's own
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 from app import db
 
@@ -560,13 +560,55 @@ def _source_line(element, first_recorded=None) -> str:
     return "added by hand on %s" % date if date else "added by hand"
 
 
-def _single_points_of_failure(organization_id: int, limit: int = 10) -> Dict[str, Any]:
+def _element_types_for_category(category: Optional[str]) -> Tuple[str, ...]:
+    """Return the ArchiMate element types for a given category.
+
+    Categories: "application", "service", "data", "technology", or None for all systems.
+    """
+    from app.models.archimate_element_types import (
+        application_kind_types,
+        system_kind_types,
+    )
+
+    if category == "application":
+        return application_kind_types()
+    if category == "service":
+        return ("ApplicationService",)
+    if category == "data":
+        return ("DataObject",)
+    if category == "technology":
+        return ("Node", "SystemSoftware")
+    return system_kind_types()
+
+
+def _category_label_for_type(element_type: str) -> str:
+    """Return the human-readable category label for an element type."""
+    if element_type in ("ApplicationComponent", "Application"):
+        return "application"
+    if element_type == "ApplicationService":
+        return "service"
+    if element_type == "DataObject":
+        return "data"
+    if element_type in ("Node", "SystemSoftware"):
+        return "technology"
+    return "system"
+
+
+def _single_points_of_failure(
+    organization_id: int, limit: int = 10, element_type: Optional[str] = None
+) -> Dict[str, Any]:
     """The systems the most other things depend on, by how many
     relationships point at them (their in-degree) in the one relationship
-    store. These are the single points of failure; each is a record to open."""
+    store. These are the single points of failure; each is a record to open.
+
+    When ``element_type`` is provided (one of "application", "service", "data",
+    "technology"), only elements of that category are considered. When omitted,
+    all system kinds are included and each row carries its category label.
+    """
     from app.models.archimate_core import ArchiMateElement, ArchiMateRelationship
 
-    from app.models.archimate_element_types import system_kind_types
+    allowed_types = _element_types_for_category(element_type)
+    include_category = element_type is None
 
     # In-degree per target element, scoped to this organisation's relationships;
     # only systems count, so a process or function is never listed as one.
@@ -579,7 +621,7 @@ def _single_points_of_failure(organization_id: int, limit: int = 10) -> Dict[str
         .filter(
             ArchiMateRelationship.organization_id == organization_id,
             ArchiMateElement.organization_id == organization_id,
-            ArchiMateElement.type.in_(system_kind_types()),
+            ArchiMateElement.type.in_(allowed_types),
             ArchiMateElement.deleted_at.is_(None),
         )
         .group_by(ArchiMateRelationship.target_id)
@@ -613,16 +655,17 @@ def _single_points_of_failure(organization_id: int, limit: int = 10) -> Dict[str
         element = elements.get(target_id)
         if element is None:
             continue
-        rows.append(
-            {
-                "id": element.id,
-                "name": element.name,
-                "depends_on_count": int(in_degree),
-                "source_line": _source_line(element, first_recorded.get(element.id)),
-                "source_table": "archimate_relationships",
-                "truth_class": truth_class_for("archimate_relationships"),
-            }
-        )
+        row = {
+            "id": element.id,
+            "name": element.name,
+            "depends_on_count": int(in_degree),
+            "source_line": _source_line(element, first_recorded.get(element.id)),
+            "source_table": "archimate_relationships",
+            "truth_class": truth_class_for("archimate_relationships"),
+        }
+        if include_category:
+            row["type"] = _category_label_for_type(element.type)
+        rows.append(row)
         citations.append(element_citation(element.id, element.name))
 
     return {
@@ -820,7 +863,9 @@ def _risk_url(risk_id: int) -> Optional[str]:
     return url_for("risk.risk_page", risk_id=risk_id) if has_request_context() else None
 
 
-def _what_breaks_if_fails(organization_id: int, service: Optional[str] = None, **_: Any) -> Dict[str, Any]:
+def _what_breaks_if_fails(
+    organization_id: int, service: Optional[str] = None, element_type: Optional[str] = None, **_: Any
+) -> Dict[str, Any]:
     """"What breaks if this service fails?" (UC-S2-01) — the one impact
     envelope, called for the named service. Impact is never recomputed here:
     the named service is resolved to an element and the canonical impact walk
@@ -829,6 +874,10 @@ def _what_breaks_if_fails(organization_id: int, service: Optional[str] = None, *
 
     With no service named, or a name that resolves to nothing, it returns a
     plain reason rather than a guessed answer.
+
+    When ``element_type`` is provided (one of "application", "service", "data",
+    "technology"), the single-points-of-failure fallback is filtered to that
+    category.
     """
     element = _resolve_service_element(organization_id, service)
     if element is None:
@@ -862,7 +911,7 @@ def _what_breaks_if_fails(organization_id: int, service: Optional[str] = None, *
         # points of failure. Count how many relationships point at each
         # element (its in-degree) from the one relationship store; the most
         # depended-on are the answer, each one a record to open.
-        return _single_points_of_failure(organization_id)
+        return _single_points_of_failure(organization_id, element_type=element_type)
 
     from app.modules.intelligence.services.answer_envelope import (
         KIND_IMPACT,
@@ -1374,7 +1423,7 @@ CATALOGUE: Dict[str, CatalogueEntry] = {
         id="what_breaks_if_fails",
         title="What breaks if a service fails?",
         description="The blast radius of a named service's failure, from the one impact answer.",
-        params=["service"],
+        params=["service", "element_type"],
         run=_what_breaks_if_fails,
     ),
 }

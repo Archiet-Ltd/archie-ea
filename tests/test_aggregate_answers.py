@@ -893,6 +893,176 @@ class TestWhatBreaksIfFailsTwoOrgIsolation:
         assert result["total"] == 0
         assert result["citations"] == []
 
+    def test_most_connected_application_filters_to_application_components(
+        self, app, db_session, make_org
+    ):
+        """When the question names 'application', only application components
+        are returned. A data object with more dependents is excluded."""
+        from app import db
+        from app.models.archimate_core import ArchiMateElement, ArchiMateRelationship
+        from app.modules.intelligence.services.query_catalogue import run_entry
+
+        org = make_org("spof-application-filter")
+
+        # Data object with 5 dependents (most connected overall)
+        data_obj = ArchiMateElement(
+            name="Customer Data", type="DataObject", layer="application", organization_id=org.id
+        )
+        # Application component with 3 dependents (most connected application)
+        app_comp = ArchiMateElement(
+            name="Order Service", type="ApplicationComponent", layer="application", organization_id=org.id
+        )
+        # Service with 4 dependents (most connected service)
+        app_svc = ArchiMateElement(
+            name="Payment Gateway", type="ApplicationService", layer="application", organization_id=org.id
+        )
+        db.session.add_all([data_obj, app_comp, app_svc])
+        db.session.flush()
+
+        # 5 callers -> data object
+        for i in range(5):
+            caller = ArchiMateElement(
+                name=f"Data Caller {i}", type="ApplicationComponent", layer="application", organization_id=org.id
+            )
+            db.session.add(caller)
+            db.session.flush()
+            db.session.add(ArchiMateRelationship(
+                type="Access", source_id=caller.id, target_id=data_obj.id, organization_id=org.id,
+            ))
+        # 3 callers -> application component
+        for i in range(3):
+            caller = ArchiMateElement(
+                name=f"App Caller {i}", type="ApplicationComponent", layer="application", organization_id=org.id
+            )
+            db.session.add(caller)
+            db.session.flush()
+            db.session.add(ArchiMateRelationship(
+                type="Serving", source_id=caller.id, target_id=app_comp.id, organization_id=org.id,
+            ))
+        # 4 callers -> service
+        for i in range(4):
+            caller = ArchiMateElement(
+                name=f"Svc Caller {i}", type="ApplicationComponent", layer="application", organization_id=org.id
+            )
+            db.session.add(caller)
+            db.session.flush()
+            db.session.add(ArchiMateRelationship(
+                type="Serving", source_id=caller.id, target_id=app_svc.id, organization_id=org.id,
+            ))
+        db.session.flush()
+
+        # Ask for most connected application - should return only application components
+        result = run_entry("what_breaks_if_fails", org.id, element_type="application")
+        names = [r["name"] for r in result["rows"]]
+        assert names == ["Order Service"]
+        # No data object or service in results
+        assert "Customer Data" not in names
+        assert "Payment Gateway" not in names
+
+    def test_single_points_of_failure_includes_type_when_no_filter(
+        self, app, db_session, make_org
+    ):
+        """When no element_type is given, each row carries its category label."""
+        from app import db
+        from app.models.archimate_core import ArchiMateElement, ArchiMateRelationship
+        from app.modules.intelligence.services.query_catalogue import run_entry
+
+        org = make_org("spof-type-labels")
+
+        app_comp = ArchiMateElement(
+            name="Order Service", type="ApplicationComponent", layer="application", organization_id=org.id
+        )
+        app_svc = ArchiMateElement(
+            name="Payment Gateway", type="ApplicationService", layer="application", organization_id=org.id
+        )
+        data_obj = ArchiMateElement(
+            name="Customer Data", type="DataObject", layer="application", organization_id=org.id
+        )
+        node = ArchiMateElement(
+            name="Database Server", type="Node", layer="technology", organization_id=org.id
+        )
+        db.session.add_all([app_comp, app_svc, data_obj, node])
+        db.session.flush()
+
+        # Each has 2 dependents
+        for i in range(2):
+            caller = ArchiMateElement(
+                name=f"Caller {i}", type="ApplicationComponent", layer="application", organization_id=org.id
+            )
+            db.session.add(caller)
+            db.session.flush()
+            db.session.add(ArchiMateRelationship(
+                type="Serving", source_id=caller.id, target_id=app_comp.id, organization_id=org.id,
+            ))
+            db.session.add(ArchiMateRelationship(
+                type="Serving", source_id=caller.id, target_id=app_svc.id, organization_id=org.id,
+            ))
+            db.session.add(ArchiMateRelationship(
+                type="Access", source_id=caller.id, target_id=data_obj.id, organization_id=org.id,
+            ))
+            db.session.add(ArchiMateRelationship(
+                type="Access", source_id=caller.id, target_id=node.id, organization_id=org.id,
+            ))
+        db.session.flush()
+
+        result = run_entry("what_breaks_if_fails", org.id)
+        # All four should appear, each with a type label
+        types = {r["name"]: r.get("type") for r in result["rows"]}
+        assert types["Order Service"] == "application"
+        assert types["Payment Gateway"] == "service"
+        assert types["Customer Data"] == "data"
+        assert types["Database Server"] == "technology"
+
+    def test_cross_org_isolation_for_element_type_filter(
+        self, app, db_session, make_org
+    ):
+        """Organisation B's elements never appear when filtering by element_type."""
+        from app import db
+        from app.models.archimate_core import ArchiMateElement, ArchiMateRelationship
+        from app.modules.intelligence.services.query_catalogue import run_entry
+
+        org_a = make_org("spof-cross-org-a")
+        org_b = make_org("spof-cross-org-b")
+
+        # Org A has an application component with 2 dependents
+        app_a = ArchiMateElement(
+            name="App A Service", type="ApplicationComponent", layer="application", organization_id=org_a.id
+        )
+        db.session.add(app_a)
+        db.session.flush()
+        for i in range(2):
+            caller = ArchiMateElement(
+                name=f"Caller A {i}", type="ApplicationComponent", layer="application", organization_id=org_a.id
+            )
+            db.session.add(caller)
+            db.session.flush()
+            db.session.add(ArchiMateRelationship(
+                type="Serving", source_id=caller.id, target_id=app_a.id, organization_id=org_a.id,
+            ))
+
+        # Org B has an application component with 5 dependents (more connected)
+        app_b = ArchiMateElement(
+            name="App B Service", type="ApplicationComponent", layer="application", organization_id=org_b.id
+        )
+        db.session.add(app_b)
+        db.session.flush()
+        for i in range(5):
+            caller = ArchiMateElement(
+                name=f"Caller B {i}", type="ApplicationComponent", layer="application", organization_id=org_b.id
+            )
+            db.session.add(caller)
+            db.session.flush()
+            db.session.add(ArchiMateRelationship(
+                type="Serving", source_id=caller.id, target_id=app_b.id, organization_id=org_b.id,
+            ))
+        db.session.flush()
+
+        # Org A asks for most connected application - should only see its own
+        result = run_entry("what_breaks_if_fails", org_a.id, element_type="application")
+        names = [r["name"] for r in result["rows"]]
+        assert names == ["App A Service"]
+        assert "App B Service" not in names
+
 
 class TestEvaluationSetCoversAllThirtyStartupQuestions:
     def test_evaluation_set_has_all_thirty_questions_mapped(self):
@@ -900,7 +1070,7 @@ class TestEvaluationSetCoversAllThirtyStartupQuestions:
 
         cases = evaluation_set()
         answerable = [c for c in cases if c["expected_entry_id"] not in (None, "canvas_box_entries")]
-        assert len(answerable) == 30, "the thirty startup questions must each map to an entry"
+        assert len(answerable) == 31, "the startup questions must each map to an entry"
         canvas = [c for c in cases if c["expected_entry_id"] == "canvas_box_entries"]
         assert len(canvas) == 6, "the six canvas questions must each map to the canvas entry"
 

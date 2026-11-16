@@ -305,6 +305,14 @@ def _keyword_match(question: str, organization_id: Optional[int] = None) -> Opti
                 service = _extract_service(question)
                 if service:
                     resolved["service"] = service
+                else:
+                    # No specific service named (superlative phrase like "most
+                    # connected application"). Extract the element type if the
+                    # superlative phrase includes one (e.g., "application" in
+                    # "most connected application").
+                    element_type = _extract_element_type_from_superlative(question)
+                    if element_type:
+                        resolved["element_type"] = element_type
             return {"entry_id": entry_id, "params": resolved, "confidence": 0.9, "method": "keyword"}
     return None
 
@@ -334,6 +342,38 @@ _SUPERLATIVE_PHRASES = [
         re.I,
     ),
 ]
+
+# Map generic nouns in superlative phrases to the canonical element_type values.
+_SUPERLATIVE_TYPE_MAP = {
+    "application": "application",
+    "app": "application",
+    "system": None,  # "system" is generic, don't filter
+    "service": "service",
+    "platform": "service",  # platform maps to service
+    "database": "data",  # database maps to data
+    "single point of failure": None,  # generic, don't filter
+}
+
+
+def _extract_element_type_from_superlative(question: str) -> Optional[str]:
+    """Extract the element type from a superlative phrase in the question, if present.
+
+    Returns one of "application", "service", "data", "technology", or None
+    if the phrase is generic (e.g., "most connected system", "biggest single
+    point of failure") or no type noun is present.
+    """
+    text = (question or "").strip()
+    for pattern in _SERVICE_PATTERNS:
+        found = pattern.search(text)
+        if found:
+            service = found.group(1).strip().rstrip("?.! ")
+            if service and _is_superlative_phrase(service):
+                s = " ".join(service.strip().lower().split())
+                for noun, element_type in _SUPERLATIVE_TYPE_MAP.items():
+                    if s.endswith(" " + noun):
+                        return element_type
+                return None
+    return None
 
 
 def _is_superlative_phrase(service: str) -> bool:
@@ -473,6 +513,7 @@ def evaluation_set() -> List[Dict[str, Any]]:
         {"question": "What are the single points of failure in our stack?", "expected_entry_id": "what_breaks_if_fails"},
         {"question": "If the payment gateway is unavailable, which journeys are affected?", "expected_entry_id": "what_breaks_if_fails"},
         {"question": "What breaks for customers if the email provider is down?", "expected_entry_id": "what_breaks_if_fails"},
+        {"question": "What breaks if our most connected application fails?", "expected_entry_id": "what_breaks_if_fails"},
         # UC-S2-02 — nobody owns it.
         {"question": "Which applications have no owner recorded?", "expected_entry_id": "applications_without_owner"},
         {"question": "Are there any services nobody is responsible for?", "expected_entry_id": "applications_without_owner"},
