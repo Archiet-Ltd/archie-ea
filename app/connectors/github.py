@@ -487,7 +487,10 @@ def apply_commit_history(org_id, element, component, summary: Dict[str, Any], as
         application_id=component.id, organization_id=org_id, ownership_type="primary").first())
     written = False
     handles = code_owner_handles(element)
+    single = code_owner_count(element) == 1
     match, handle_reason = (None, None) if owned or component is None else handle_owner(org_id, summary, handles)
+    if match is not None and not single:
+        match = None
 
     def _member(user_id, text):
         record = set_application_owner(
@@ -507,7 +510,7 @@ def apply_commit_history(org_id, element, component, summary: Dict[str, Any], as
 
         _member(match["user_id"], handle_provenance(summary, match, db.session.get(User, match["user_id"])))
         written = True
-    elif len(handles) == 1 and code_owner_count(element) == 1 and component is not None and not owned:
+    elif single and len(handles) == 1 and component is not None and not owned:
         _named(handles[0], code_owner_provenance(element))
         written = True
     elif leader is not None and component is not None and not owned:

@@ -171,3 +171,54 @@ def test_imported_applications_show_the_owner_github_names_and_only_the_third_ha
     assert re.search(r"Billing Hub %s" % tag, page.locator("main").inner_text())
     assert "Archie Ea %s" % tag not in page.locator("main").inner_text()
     assert "Ledger %s" % tag not in page.locator("main").inner_text()
+
+
+def test_a_team_beside_a_member_person_in_code_owners_shows_no_owner_from_codeowners(browser, live_server):
+    """CODEOWNERS names a team and a person who is a member of the organisation: no single code owner
+    is named, and the page says there is no owner rather than showing that person."""
+    from types import SimpleNamespace
+
+    from app import create_app, db
+    from app.commands.owners_from_commits import run_for_organisation
+    from app.connectors import github
+    from app.models.connector_config import ConnectorConfig
+
+    tag = uuid.uuid4().hex[:6]
+    org = create_fresh_org("cto")
+    email = org["emails"]["cto"]
+    with create_app("testing").app_context():
+        db.session.add(ConnectorConfig(organization_id=org["org_id"], connector_type="github", name="GitHub",
+                                       status="active", config={"organization": "acme"}))
+        db.session.commit()
+        db.session.remove()
+    repository = "acme/teamed-%s" % tag
+    app_id = _import(org, "Teamed %s" % tag, repository, ["@acme/platform", "@ada-roe"])
+    commits = []
+    for login, address, count in (("ada-roe", email, 3), ("zed", "zed@users.example.org", 3)):
+        for _ in range(count):
+            n = len(commits)
+            commits.append({"sha": "%07xabc" % n, "author": {"login": login},
+                            "commit": {"author": {"email": address, "date": "2026-10-%02dT09:00:00Z" % (1 + n % 27)}}})
+
+    def history(self, full_name):
+        return github.summarise_commits(org["org_id"], full_name, commits)
+
+    fake = SimpleNamespace(_client=lambda: None, _organization=lambda: "acme")
+    with create_app("testing").app_context(), \
+            mock.patch("app.services.connector_framework.build_connector", return_value=fake), \
+            mock.patch.object(github._RepositoryEvidence, "_commit_history", history):
+        run_for_organisation(org["org_id"])
+
+    context = browser.new_context(ignore_https_errors=True, viewport={"width": 1440, "height": 1000})
+    context.add_init_script("localStorage.setItem('archie_onboarding_ts', Date.now().toString());")
+    page = context.new_page()
+    try:
+        sign_in(page, live_server, email)
+        page.goto("%s/applications/%s" % (live_server, app_id), wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        expect(page.locator("main").get_by_text("No owner recorded").first).to_be_visible(timeout=PAGE_TIMEOUT)
+        expect(page.get_by_test_id("application-owner")).not_to_contain_text("Named by GitHub: code owner")
+        expect(page.get_by_test_id("application-owner")).not_to_contain_text("ada-roe")
+        reason = page.get_by_test_id("need-owner-reason")
+        expect(reason).to_contain_text("GitHub names no single code owner", timeout=PAGE_TIMEOUT)
+    finally:
+        context.close()

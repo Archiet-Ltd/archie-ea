@@ -232,3 +232,34 @@ def test_a_team_beside_a_person_in_code_owners_names_no_single_owner(db_session,
 
     assert github.apply_commit_history(org.id, element, component, summary) is True
     assert named(db_session, component) == [("@zed", None, "github_connector")]
+
+
+def test_a_member_person_beside_a_team_in_code_owners_is_not_the_single_owner(db_session, make_org):
+    from app.connectors import github
+
+    org = make_org("gh-named-team-member")
+    ada, sam = make_user(db_session, org, "Ada", "Obi"), make_user(db_session, org, "Sam", "Lee")
+    element, component = make_application(db_session, org)
+    with_code_owners(element, ["@acme/platform", "@ada-obi"])
+    summary = github.summarise_commits(org.id, REPOSITORY, commits_by(
+        ("ada-obi", ada.email, 2), ("sam-lee", sam.email, 2)))
+
+    github.apply_commit_history(org.id, element, component, summary)
+
+    assert named(db_session, component) == []
+    assert [r.user_id for r in primaries(db_session, component)] != [ada.id]
+
+
+def test_an_author_of_type_bot_without_the_suffix_is_never_the_named_owner(db_session, make_org):
+    from app.connectors import github
+
+    org = make_org("gh-named-type-bot")
+    element, component = make_application(db_session, org)
+    records = commits_by(("release-helper", "h@example.org", 8), ("alice", "a@example.org", 2))
+    for item in records:
+        if item["author"]["login"] == "release-helper":
+            item["author"]["type"] = "Bot"
+    summary = github.summarise_commits(org.id, REPOSITORY, records)
+
+    assert github.apply_commit_history(org.id, element, component, summary) is True
+    assert named(db_session, component) == [("@alice", None, "github_connector")]
