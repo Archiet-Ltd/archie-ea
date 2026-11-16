@@ -528,12 +528,18 @@ def _candidate_tag_lists(expr, tree):
 
     Reads a list literal, this module's own TAGS (imported, or reached through the
     imported module), or a plain variable that is assigned list literals in the
-    same file. Anything else is unreadable, and the caller treats that as a failure.
+    same file, and two of those joined with `+`. Anything else is unreadable, and the caller treats that as a failure.
     """
     if isinstance(expr, (ast.List, ast.Tuple)):
         if all(isinstance(e, ast.Constant) and isinstance(e.value, str) for e in expr.elts):
             return [[e.value for e in expr.elts]]
         return None
+    if isinstance(expr, ast.BinOp) and isinstance(expr.op, ast.Add):
+        left = _candidate_tag_lists(expr.left, tree)
+        right = _candidate_tag_lists(expr.right, tree)
+        if left is None or right is None:
+            return None
+        return [head + tail for head in left for tail in right]
     if isinstance(expr, ast.Attribute):
         return [TAGS] if expr.attr == "TAGS" and _imports_the_audit_module(tree) else None
     if not isinstance(expr, ast.Name):
@@ -638,7 +644,7 @@ def test_audit_tag_set_is_wcag22_aa_and_keeps_wcag21():
 
 
 def test_every_axe_run_in_tests_smoke_uses_the_audit_tag_set():
-    """Every axe run under tests/smoke audits exactly TAGS.
+    """Every axe run under tests/smoke audits at least TAGS (extra rules are allowed).
 
     Three files run axe today: this module, the ARB governance journey (which
     keeps its own copy of the list) and the transformation room journeys (which
@@ -660,18 +666,31 @@ def test_every_axe_run_in_tests_smoke_uses_the_audit_tag_set():
                     "assigned a list literal)" % (name, line))
                 continue
             for candidate in candidates:
-                if candidate != TAGS:
-                    problems.append("%s:%d: audits %s, not the audit's %s"
+                if not set(TAGS) <= set(candidate):
+                    problems.append("%s:%d: audits %s, which lacks some of the audit's %s"
                                     % (name, line, candidate, TAGS))
     assert not problems, (
         "%d axe run(s) under tests/smoke do not use the audit's tag set:\n  %s"
         % (len(problems), "\n  ".join(problems)))
 
 
+def test_the_tag_check_accepts_a_superset_and_rejects_a_narrower_run():
+    for candidate, accepted in ((TAGS + ["best-practice"], True), (TAGS, True),
+                                (["color-contrast"], False), (TAGS[:-1], False)):
+        assert (set(TAGS) <= set(candidate)) is accepted
+
+
 def test_the_axe_walker_reads_a_stale_list_literal_in_a_run():
     source = ('Axe().run(page, options={"runOnly": '
               '{"type": "tag", "values": ["wcag2a", "wcag21aa"]}})')
     assert _axe_runs_in_source(source) == [(1, [["wcag2a", "wcag21aa"]])]
+
+
+def test_the_axe_walker_reads_the_audit_tags_joined_to_extra_rules():
+    source = ("from .test_accessibility_audit import TAGS\n"
+              "Axe().run(page, options={'runOnly': {'type': 'tag', "
+              "'values': TAGS + ['best-practice']}})\n")
+    assert _axe_runs_in_source(source) == [(2, [TAGS + ["best-practice"]])]
 
 
 def test_the_axe_walker_reads_variables_and_the_imported_tag_list():
