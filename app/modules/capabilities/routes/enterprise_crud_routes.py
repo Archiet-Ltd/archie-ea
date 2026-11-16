@@ -403,7 +403,7 @@ def update_capability(capability_id):
     """Update an existing capability."""
     try:
         capability = BusinessCapability.query.get(capability_id)
-        if not capability:
+        if not capability or capability.organization_id != current_org_id():
             return jsonify({"success": False, "error": "Capability not found"}), 404
 
         data = request.get_json() or {}
@@ -477,7 +477,7 @@ def delete_capability(capability_id):
     """Delete a capability."""
     try:
         capability = BusinessCapability.query.get(capability_id)
-        if not capability:
+        if not capability or capability.organization_id != current_org_id():
             return jsonify({"success": False, "error": "Capability not found"}), 404
 
         cap_name = capability.name
