@@ -81,7 +81,7 @@
         }
 
         document.addEventListener('click', function (e) {
-            var t = e.target.closest('[data-slot="sidebar-trigger"], [data-slot="sidebar-rail"]');
+            var t = e.target.closest('[data-sidebar-toggle]');
             if (t) { e.preventDefault(); toggle(); }
         });
         document.addEventListener('keydown', function (e) {
