@@ -26,6 +26,7 @@ ImplementationWorkPackage = RoadmapWorkPackage
 from app.models.application_portfolio import ApplicationComponent
 from app.models.unified_capability import UnifiedCapability
 from app.models.vendor.vendor_organization import VendorProduct
+from app.services.capability_support import primary_capability_name
 
 logger = logging.getLogger(__name__)
 
@@ -474,7 +475,7 @@ class RoadmapDataSync:
             wp = ImplementationWorkPackage(
                 name=f"Modernize {application.name}",
                 description=f"Modernize {application.name} application",
-                business_capability=self._get_primary_capability_for_application(application.id),
+                business_capability=primary_capability_name(application.id),
                 status="planned",
                 priority="medium",
                 source_type="application",
@@ -851,14 +852,6 @@ class RoadmapDataSync:
         }
 
         return type_mapping.get(gap.gap_type, "general_improvement")
-
-    def _get_primary_capability_for_application(self, application_id: int) -> str:
-        """Name of the capability the application supports, from the canonical reader."""
-        from app.services.capability_support import capabilities_of_application
-        from app.utils.tenant_sql import current_org_id
-
-        rows = capabilities_of_application(current_org_id(), application_id)
-        return rows[0]["capability_name"] if rows else "unknown_capability"
 
     def _application_needs_deliverable(self, application: ApplicationComponent) -> bool:
         """Determine if application needs a deliverable"""

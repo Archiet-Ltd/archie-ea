@@ -1,12 +1,15 @@
 """
-Tests: _get_primary_capability_for_application, in the older and v2 roadmap
-engines and roadmap syncs, names the capability the application is the primary
-enabler of, falls back only when nothing is mapped, and never answers across
-organisations. The name is read through the one capability-support reader.
+Tests: the capability a generated work package or deliverable is named for is the
+one the application is the primary enabler of, falls back only when nothing is
+mapped, and never answers across organisations. The older and v2 roadmap engines
+and syncs all call the one shared function, which reads through the one
+capability-support reader.
 """
 
 import pytest
 from datetime import datetime
+
+from app.services.capability_support import primary_capability_name
 
 
 def _org_with_user(db_session, make_org, suffix):
@@ -103,7 +106,7 @@ def _link_app_cap(db_session, org, app, cap, is_primary=True):
 
 
 class TestGetPrimaryCapabilityForApplication:
-    """Test _get_primary_capability_for_application in both roadmap_automation copies."""
+    """The shared primary-capability name, for mapped and unmapped applications."""
 
     def test_mapped_application_returns_capability_name_in_both_copies(
         self, db_session, make_org, tenant_ctx
@@ -125,15 +128,13 @@ class TestGetPrimaryCapabilityForApplication:
         db_session.commit()
 
         # Test v1 copy (app.services.roadmap_automation)
-        from app.services.roadmap_automation import RoadmapAutomationEngine as V1Engine
         with tenant_ctx(org_a.id):
-            v1_result = V1Engine()._get_primary_capability_for_application(app_a.id)
+            v1_result = primary_capability_name(app_a.id)
         assert v1_result == "Payments", f"V1 expected 'Payments', got '{v1_result}'"
 
         # Test v2 copy (app.modules.solutions_strategic.v2.services.roadmap_automation)
-        from app.modules.solutions_strategic.v2.services.roadmap_automation import RoadmapAutomationEngine as V2Engine
         with tenant_ctx(org_a.id):
-            v2_result = V2Engine()._get_primary_capability_for_application(app_a.id)
+            v2_result = primary_capability_name(app_a.id)
         assert v2_result == "Payments", f"V2 expected 'Payments', got '{v2_result}'"
 
     def test_same_application_id_from_different_org_context_does_not_leak(
@@ -156,12 +157,10 @@ class TestGetPrimaryCapabilityForApplication:
         db_session.commit()
 
         # Ask for app_a.id from org B's context - should NOT return "Payments"
-        from app.services.roadmap_automation import RoadmapAutomationEngine as V1Engine
-        from app.modules.solutions_strategic.v2.services.roadmap_automation import RoadmapAutomationEngine as V2Engine
 
         with tenant_ctx(org_b.id):
-            v1_result = V1Engine()._get_primary_capability_for_application(app_a.id)
-            v2_result = V2Engine()._get_primary_capability_for_application(app_a.id)
+            v1_result = primary_capability_name(app_a.id)
+            v2_result = primary_capability_name(app_a.id)
 
         # Both should return fallback since app_a is not mapped in org B
         assert v1_result == "unknown_capability", f"V1 from org B context expected fallback, got '{v1_result}'"
@@ -182,7 +181,7 @@ class TestGetPrimaryCapabilityForApplication:
 
         login_as(client, user_a)
 
-        # Trigger application sync which calls _get_primary_capability_for_application
+        # Trigger application sync which names the capability
         response = client.post("/api/roadmap/sync/applications", json={})
         assert response.status_code == 200, response.get_data(as_text=True)
 
@@ -215,12 +214,10 @@ class TestGetPrimaryCapabilityForApplication:
         app_a = _application(db_session, org_a, "Unmapped App")
         db_session.commit()
 
-        from app.services.roadmap_automation import RoadmapAutomationEngine as V1Engine
-        from app.modules.solutions_strategic.v2.services.roadmap_automation import RoadmapAutomationEngine as V2Engine
 
         with tenant_ctx(org_a.id):
-            v1_result = V1Engine()._get_primary_capability_for_application(app_a.id)
-            v2_result = V2Engine()._get_primary_capability_for_application(app_a.id)
+            v1_result = primary_capability_name(app_a.id)
+            v2_result = primary_capability_name(app_a.id)
 
         assert v1_result == "unknown_capability", f"V1 expected fallback, got '{v1_result}'"
         assert v2_result == "unknown_capability", f"V2 expected fallback, got '{v2_result}'"
@@ -290,11 +287,11 @@ class TestCapabilityJoinUsesBusinessCapability:
         app_a = _mapping_whose_id_matches_another_unified_capability(db_session, org_a)
 
         path, cls = module.split(":")
-        engine = getattr(importlib.import_module(path), cls)()
+        reader = importlib.import_module(path).primary_capability_name
         with tenant_ctx(org_a.id):
-            assert engine._get_primary_capability_for_application(app_a.id) == "Payments"
+            assert reader(app_a.id) == "Payments"
         with tenant_ctx(org_b.id):
-            assert engine._get_primary_capability_for_application(app_a.id) == "unknown_capability"
+            assert reader(app_a.id) == "unknown_capability"
 
 
 class TestPrimaryEnablerNamedFirst:
@@ -318,6 +315,6 @@ class TestPrimaryEnablerNamedFirst:
         _link_app_cap(db_session, org_a, app_a, _capability(db_session, org_a, "Alpha Billing"), is_primary=False)
 
         path, cls = module.split(":")
-        engine = getattr(importlib.import_module(path), cls)()
+        reader = importlib.import_module(path).primary_capability_name
         with tenant_ctx(org_a.id):
-            assert engine._get_primary_capability_for_application(app_a.id) == "Zeta Payments"
+            assert reader(app_a.id) == "Zeta Payments"

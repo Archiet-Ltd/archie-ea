@@ -259,9 +259,7 @@ def _project_relationship(session, rel) -> None:
         archimate_relationship_id=rel.id,
         unified_capability=capability,
         application=application,
-        support_level="primary"
-        if (rel.type or "").lower() == "realization" or _flagged_primary(session, application, rel)
-        else "linked",
+        support_level="primary" if _flagged_primary(session, application, rel) else "linked",
         is_active=True,
     )
     session.add(row)
@@ -736,6 +734,14 @@ def capabilities_of_application(organization_id: int, application_id: int) -> Li
         support_rows(organization_id, application_ids=[application_id]),
         key=lambda r: (not r["is_primary_enabler"], (r["capability_name"] or "").lower()),
     )
+
+
+def primary_capability_name(application_id: int) -> str:
+    """Name of the capability the application is the primary enabler of, in the signed-in organisation."""
+    from app.utils.tenant_sql import current_org_id
+
+    rows = capabilities_of_application(current_org_id(), application_id)
+    return rows[0]["capability_name"] if rows else "unknown_capability"
 
 
 def applications_of_capability(organization_id: int, capability_id: int) -> List[Dict[str, Any]]:

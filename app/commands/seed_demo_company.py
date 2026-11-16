@@ -4289,7 +4289,7 @@ def _seed_demo_company() -> dict:
                     if also is not None and (app.id, also.id) not in unified_mapped:
                         record_capability_support(
                             org_id, app.archimate_element_id, also.archimate_element_id, kind="realization",
-                            facts={"support_level": "primary", "coverage_percentage": 80})
+                            facts={"support_level": "secondary", "coverage_percentage": 80})
                         unified_mapped.add((app.id, also.id))
                         unified_created += 1
                 bc = existing_bcs.get(code)

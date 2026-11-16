@@ -24,6 +24,7 @@ Deliverable = PlanningDeliverable
 ImplementationWorkPackage = UnifiedWorkPackage
 from app.models.application_portfolio import ApplicationComponent
 from app.models.unified_capability import UnifiedCapability
+from app.services.capability_support import primary_capability_name
 
 logger = logging.getLogger(__name__)
 
@@ -191,7 +192,7 @@ class RoadmapAutomationEngine:
         wp_assessment = {
             "name": f"Assess {application.name}",
             "description": f"Comprehensive assessment of {application.name} for modernization roadmap",
-            "business_capability": self._get_primary_capability_for_application(application_id),
+            "business_capability": primary_capability_name(application_id),
             "status": "planned",
             "priority": "high",
             "estimated_cost": self._estimate_assessment_cost(application),
@@ -206,7 +207,7 @@ class RoadmapAutomationEngine:
         wp_modernization = {
             "name": f"Modernize {application.name}",
             "description": f"Modernize {application.name} based on assessment results",
-            "business_capability": self._get_primary_capability_for_application(application_id),
+            "business_capability": primary_capability_name(application_id),
             "status": "planned",
             "priority": "medium",
             "estimated_cost": self._estimate_modernization_cost(application),
@@ -810,14 +811,6 @@ class RoadmapAutomationEngine:
             supporting_wps.append(wp_requirements)
 
         return supporting_wps
-
-    def _get_primary_capability_for_application(self, application_id: int) -> str:
-        """Name of the capability the application supports, from the canonical reader."""
-        from app.services.capability_support import capabilities_of_application
-        from app.utils.tenant_sql import current_org_id
-
-        rows = capabilities_of_application(current_org_id(), application_id)
-        return rows[0]["capability_name"] if rows else "unknown_capability"
 
     def _estimate_assessment_cost(self, application: Any) -> float:
         """Estimate cost for application assessment"""
