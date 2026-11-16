@@ -202,6 +202,31 @@ class BusinessContextEngine:
         except Exception as e:
             logger.error(f"Failed to load business context: {e}")
 
+    def calculate_business_similarity(self, app1: Dict, app2: Dict) -> float:
+        """How alike two applications are in what they do for the business.
+
+        Two facts count: the same business domain, and the same known business
+        capability named in the application's name or description. Only the
+        facts both applications have are scored; with none, the answer is 0.0
+        rather than an invented figure.
+        """
+        scores = []
+
+        domain1 = (app1.get("business_domain") or "").strip().lower()
+        domain2 = (app2.get("business_domain") or "").strip().lower()
+        if domain1 and domain2:
+            scores.append(1.0 if domain1 == domain2 else 0.0)
+
+        def named_capabilities(app: Dict) -> set:
+            text = f"{app.get('name', '')} {app.get('description', '')}".lower()
+            return {name for name in self.capability_mappings if name and name in text}
+
+        caps1, caps2 = named_capabilities(app1), named_capabilities(app2)
+        if caps1 and caps2:
+            scores.append(len(caps1 & caps2) / len(caps1 | caps2))
+
+        return sum(scores) / len(scores) if scores else 0.0
+
 
 class AdaptiveLearningEngine:
     """Adaptive learning system for improving detection accuracy"""
@@ -755,7 +780,7 @@ class AIDuplicateDetectionService:
             estimated_savings=sum(
                 d.get("business_impact", {}).get("cost_savings", 0) for d in duplicates
             ),
-            algorithm_version="ai_v1.0",
+            config={"algorithm_version": "ai_v1.0"},
         )
 
         db.session.add(run)
