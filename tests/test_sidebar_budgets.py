@@ -30,6 +30,7 @@ from app.models.user import (
 )
 from app.navigation import registry
 from app.utils.role_access import SIDEBAR_LINK_BUDGET
+from app.utils.search_text import normalise_search_text
 
 # The retired Ask page's address; these tests assert it is absent and never open it.
 RETIRED_ASK = "/intelligence/ask"
@@ -445,3 +446,27 @@ def test_every_role_sees_one_business_processes_entry_under_the_business_layer_t
     business = next(link for link in registry.MODEL if link.key == "layer_business")
     entries = [c for c in business.children if c.endpoint == "business_architecture.processes"]
     assert [(c.label, c.roles) for c in entries] == [("Business processes", None)]
+
+
+def test_each_typed_word_may_match_a_different_term_of_the_same_page(ctx, monkeypatch):
+    person = _Person(ROLE_PLATFORM_ADMIN, admin=True)
+    rows = [
+        {"label": "Both", "terms": ["Roadmap", "Gaps analysis"]},
+        {"label": "One", "terms": ["Roadmap", "Timeline"]},
+        {"label": "Other", "terms": ["Gaps", "Findings"]},
+    ]
+    monkeypatch.setattr(registry, "search_index", lambda user: rows)
+    assert [r["label"] for r in registry.search_pages(person, "roadmap gaps")] == ["Both"]
+
+
+def test_a_one_word_search_finds_every_page_holding_that_word(ctx):
+    person = _Person(ROLE_PLATFORM_ADMIN, admin=True)
+    rows = registry.search_pages(person, "risk", limit=200)
+    held = [r for r in registry.search_index(person)
+            if any("risk" in normalise_search_text(t) for t in r["terms"])]
+    assert rows and {r["label"] for r in held} <= {r["label"] for r in rows}
+
+
+def test_a_page_missing_one_of_two_typed_words_is_not_returned(ctx):
+    person = _Person(ROLE_PLATFORM_ADMIN, admin=True)
+    assert registry.search_pages(person, "risk zzqxjv") == []

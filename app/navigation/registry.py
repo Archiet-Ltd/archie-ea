@@ -802,17 +802,19 @@ def search_pages(user, query: str, limit: int = 12) -> list:
     q = normalise_search_text(query or "")
     if not q:
         return []
+    words = set(q.split())
     scored = []
     for order, row in enumerate(search_index(user)):
         best_exact = -1
         best_fuzzy = -1
         whole = False
+        found = set()
         for rank, term in enumerate(row["terms"]):
             t = normalise_search_text(term)
             exact, fuzzy = fuzzy_match_score(q, t)
-            # every word typed must be found: a question is not a page just because "if" sits inside "Artifact"
-            if exact + fuzzy < len(q.split()):
+            if exact == 0 and fuzzy == 0:
                 continue
+            found.update(w for w in words if sum(fuzzy_match_score(w, t)))
             # a name or alias that is the whole query ("Integrations") beats one that only holds it
             whole = whole or t == q
             # Exact matches rank first (higher exact = better), then fuzzy matches
@@ -820,7 +822,10 @@ def search_pages(user, query: str, limit: int = 12) -> list:
             score = (-exact, -fuzzy, rank)
             if best_exact == -1 or score < ( -best_exact, -best_fuzzy, 999):
                 best_exact, best_fuzzy = exact, fuzzy
-        if best_exact != -1:
+        # every word typed must be found, each in any term of the page ("roadmap gaps" may take one
+        # word from the title and one from a keyword): a question is not a page just because "if"
+        # sits inside "Artifact"
+        if best_exact != -1 and len(found) == len(words):
             scored.append((-best_exact, not whole, -best_fuzzy, order, row))
     scored.sort(key=lambda item: item[:4])
     return [item[-1] for item in scored[:limit]]
