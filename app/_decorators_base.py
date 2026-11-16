@@ -25,8 +25,11 @@ def permission_required(permission):
 
 
 def admin_required(f):
-    """Require Permission.ADMINISTER AND organisation-admin authority in the
-    ACTIVE organisation (``g.current_org_id``), not merely a global Role flag.
+    """Require organisation-admin authority in the ACTIVE organisation
+    (``g.current_org_id``) -- an ``OrgRole`` org_admin there, or the
+    Administrator role in the person's own organisation -- or platform-admin
+    standing (which also needs ``Permission.ADMINISTER``). Never a global Role
+    flag alone.
     See the admin-rbac-active-org PR description for the full rationale.
 
     Built on ``permission_required(Permission.ADMINISTER)(f)`` rather than an
@@ -49,10 +52,13 @@ def admin_required(f):
         from app.services.rbac_service import rbac_service
 
         active_org_id = getattr(g, "current_org_id", None)
-        if not (
-            is_platform_admin(current_user)
-            or rbac_service.is_org_admin(current_user, active_org_id)
-        ):
+        if rbac_service.is_org_admin(current_user, active_org_id):
+            # An administrator of the active organisation by OrgRole (or the
+            # Administrator role in their own organisation) needs no
+            # account-wide ADMINISTER: that flag says nothing about a second
+            # organisation they were made administrator of.
+            return f(*args, **kwargs)
+        if not is_platform_admin(current_user):
             abort(403)
         return permission_gated(*args, **kwargs)
 
