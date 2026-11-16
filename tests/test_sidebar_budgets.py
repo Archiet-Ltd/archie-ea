@@ -470,3 +470,12 @@ def test_a_one_word_search_finds_every_page_holding_that_word(ctx):
 def test_a_page_missing_one_of_two_typed_words_is_not_returned(ctx):
     person = _Person(ROLE_PLATFORM_ADMIN, admin=True)
     assert registry.search_pages(person, "risk zzqxjv") == []
+
+
+@pytest.mark.parametrize("person", [
+    _Person(ROLE_PLATFORM_ADMIN, admin=True),
+    _Person(ROLE_ENTERPRISE_ARCHITECT),
+], ids=["platform_admin", "member"])
+def test_roadmap_gaps_typed_into_search_finds_the_gaps_page_first(ctx, person):
+    rows = registry.search_pages(person, "roadmap gaps")
+    assert rows and rows[0]["label"] == "Gaps"

@@ -136,7 +136,7 @@ WORK: tuple = (
              "intelligence_ui.twin_map")),
     _l("changes", "Changes", "enterprise.gap_analysis", "route", job="4", toggle=True, group="work",
        children=(
-           _l("gaps", "Gaps", "enterprise.gap_analysis", job="4", aliases=("Gap", "Gap analysis")),
+           _l("gaps", "Gaps", "enterprise.gap_analysis", job="4", aliases=("Gap", "Gap analysis", "Roadmap gaps")),
            _l("solutions", "Solutions", "solution_design.list_solutions", job="4",
               aliases=("Solution designs", "Solution design", "Designs")),
            _l("options_analysis", "Options analysis", "application_mgmt.vendor_analysis_list", job="4",
