@@ -77,6 +77,7 @@ def _compute_capability_mapping_counts():
 def index():
     """Main capability mapping page - new consolidated view with Map/Health/Maturity lenses"""
     from app.modules.capabilities.services.capability_count_service import (
+        capability_scope,
         count_capabilities,
     )
 
@@ -96,6 +97,7 @@ def index():
         costs_withheld=not costs_visible(current_user),
         costs_withheld_sentence=COSTS_WITHHELD,
         total_capabilities=total_capabilities,
+        capability_scope=capability_scope(),
         no_industry_chosen=no_industry_chosen,
     )
 
@@ -196,6 +198,7 @@ def _hierarchy_context():
     the header in the same response, cache hit or not.
     """
     from app.modules.capabilities.services.capability_count_service import (
+        capability_scope,
         count_capabilities,
     )
 
@@ -244,6 +247,7 @@ def _hierarchy_context():
         return {
             "catalog": catalog,
             "total_capabilities": total_capabilities,
+            "capability_scope": capability_scope(),
             "has_coverage_data": mapping_counts is not None,
             "load_error": None,
         }
@@ -258,6 +262,7 @@ def _hierarchy_context():
         return {
             "catalog": {"children": []},
             "total_capabilities": total_capabilities,
+            "capability_scope": None,
             "has_coverage_data": False,
             "load_error": "The capability hierarchy could not be read.",
         }
@@ -274,6 +279,7 @@ def hierarchy():
         "capability_map/hierarchy.html",
         catalog=context["catalog"],
         total_capabilities=context["total_capabilities"],
+        capability_scope=context["capability_scope"],
         has_coverage_data=context["has_coverage_data"],
         load_error=context["load_error"],
     )

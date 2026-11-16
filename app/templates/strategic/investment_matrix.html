@@ -4,6 +4,7 @@
 <link rel="stylesheet" href="{{ url_for('static', filename='css/basecoat_components.css') }}">
 {% endblock %}
 {% from 'components/page_header.html' import page_header %}
+{% from 'components/capability_scope.html' import capability_scope_line %}
 
 {% from 'components/card.html' import card, card_header, card_title, card_content %}
 {% from 'components/badge.html' import badge %}
@@ -37,14 +38,14 @@ const INVESTMENT_CAPABILITIES = {{ capability_scores | tojson }}.map(c => ({ ...
     <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <div data-slot="card" data-testid="total-capabilities" class="rounded-lg border bg-card text-card-foreground @container/card">
             <div data-slot="card-header" class="relative flex flex-col space-y-1.5 p-6 pb-2">
-                <p data-slot="card-description" class="text-sm font-medium tracking-tight">Total Capabilities</p>
-                <div data-slot="card-title" class="text-2xl font-bold tabular-nums text-primary">{% if scores_error %}Unavailable{% else %}{{ portfolio_metrics.total_capabilities if portfolio_metrics.total_capabilities is not none else '—' }}{% endif %}</div>
+                <p data-slot="card-description" class="text-sm font-medium tracking-tight">Your capabilities</p>
+                <div data-slot="card-title" class="text-2xl font-bold tabular-nums text-primary">{% if scores_error %}Unavailable{% else %}{{ portfolio_metrics.own_capabilities if portfolio_metrics.own_capabilities is not none else '—' }}{% endif %}</div>
                 <i data-lucide="layers" class="absolute top-4 right-4 h-4 w-4 text-muted-foreground" aria-hidden="true"></i>
             </div>
             {% if not scores_error %}
             <div class="px-6 pb-4 text-sm text-muted-foreground" data-testid="total-capabilities-scope">
-                {%- if portfolio_metrics.shared_capabilities -%}
-                {{ portfolio_metrics.own_capabilities }} of your own and {{ portfolio_metrics.shared_capabilities }} from the shared catalogue
+                {%- if portfolio_metrics.shared_capabilities or not portfolio_metrics.own_capabilities -%}
+                {{ capability_scope_line(portfolio_metrics, 'investment-capability-scope') }}
                 {%- else -%}
                 Your organisation's capabilities
                 {%- endif -%}

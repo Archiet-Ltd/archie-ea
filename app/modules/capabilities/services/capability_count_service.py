@@ -62,6 +62,24 @@ def capability_totals(organization_id):
     return {"total": own + shared, "own": own, "shared": shared}
 
 
+def capability_scope(organization_id=None):
+    """The figures a capability count card shows: own, shared, and the one sentence about the catalogue.
+
+    Every page that heads a capability count reads this, so the organisation's own number is the
+    count and the shared catalogue is said once, in the same words, beside it.
+    """
+    if organization_id is None:
+        from app.middleware.tenant_context import current_org_id
+
+        organization_id = current_org_id()
+    totals = capability_totals(organization_id)
+    shared = totals["shared"]
+    totals["catalogue_sentence"] = (
+        f"{shared} from the shared catalogue, not yet adopted" if shared else None
+    )
+    return totals
+
+
 def count_domains():
     """Distinct business domains that have at least one level-1 capability
     visible to the current tenant.

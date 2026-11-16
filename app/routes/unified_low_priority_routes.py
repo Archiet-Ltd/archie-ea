@@ -176,6 +176,7 @@ def capability_map_dashboard():
     # uses (app/modules/capabilities/services/capability_count_service.py) so
     # this surface cannot drift from that one (ADR 0008 / store-agreement).
     from app.modules.capabilities.services.capability_count_service import (
+        capability_scope,
         count_business_capabilities,
     )
 
@@ -192,6 +193,7 @@ def capability_map_dashboard():
             "capability_map/index.html",
             capability_count=capability_count,
             total_capabilities=capability_count,
+            capability_scope=capability_scope(),
             application_count=application_count,
             categories=categories,
         )

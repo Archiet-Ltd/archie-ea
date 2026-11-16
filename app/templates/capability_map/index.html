@@ -1,5 +1,6 @@
 {% extends "layouts/admin_base.html" %}
 {% from 'components/modal.html' import modal %}
+{% from 'components/capability_scope.html' import capability_scope_line %}
 {% from 'components/form_field.html' import form_group, form_footer %}
 {% from 'components/dense_table.html' import dense_table %}
 {# smoke-coverage-ok: CSP inline style fix (removed style="width:0%"); covered by tests/test_capability_map_a11y_csp.py #}
@@ -178,9 +179,9 @@
                     {{ data_card(
                         icon='boxes',
                         icon_color='green',
-                        value=('<span id="unified-cap-count">' ~ (total_capabilities|dash) ~ '</span>') | safe,
-                        label='Total Capabilities',
-                        subtitle='All types'
+                        value=('<span id="unified-cap-count">' ~ ((capability_scope.own if capability_scope else total_capabilities)|dash) ~ '</span>') | safe,
+                        label='Your capabilities',
+                        subtitle=(capability_scope_line(capability_scope, 'dashboard-capability-scope') if capability_scope else 'All types')
                     ) }}
                     {{ data_card(
                         icon='link',

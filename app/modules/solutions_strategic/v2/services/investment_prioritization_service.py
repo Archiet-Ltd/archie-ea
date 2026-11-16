@@ -130,7 +130,7 @@ class InvestmentPrioritizationService:
             Dict with prioritized investment recommendations
         """
         from app.middleware.tenant_context import current_org_id
-        from app.modules.capabilities.services.capability_count_service import capability_totals
+        from app.modules.capabilities.services.capability_count_service import capability_scope, capability_totals
 
         # The organisation's own capabilities and the shared catalogue's, by the one visibility rule
         org_id = current_org_id()
@@ -210,6 +210,8 @@ class InvestmentPrioritizationService:
             "own_capabilities": totals["own"],
             "shared_capabilities": totals["shared"],
         })
+        portfolio_metrics.update({"own": totals["own"], "shared": totals["shared"],
+                                  "catalogue_sentence": capability_scope(org_id)["catalogue_sentence"]})
 
         # Generate investment recommendations
         recommendations = self._generate_investment_recommendations(capability_scores)

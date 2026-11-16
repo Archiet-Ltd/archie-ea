@@ -9,6 +9,7 @@
 {% from 'macros/page_shell.html' import page_shell %}
 {% from 'components/button.html' import button %}
 {% import 'basecoat/index.html' as ui %}
+{% from 'components/capability_scope.html' import capability_scope_line %}
 
 {% block title %}Capability Map{% endblock %}
 
@@ -38,8 +39,8 @@
 
     <!-- Controls: Lens ToggleGroup, View ToggleGroup, Search -->
     <div class="p-6 space-y-4">
-        {% if total_capabilities is not none %}
-        <p class="text-sm text-muted-foreground" data-testid="capability-total">{{ total_capabilities }} {{ 'capability' if total_capabilities == 1 else 'capabilities' }}</p>
+        {% if capability_scope %}
+        <p class="text-sm text-muted-foreground" data-testid="capability-total">{{ capability_scope_line(capability_scope) }}</p>
         {% endif %}
         {% if costs_withheld %}
         <p class="text-sm text-muted-foreground" data-testid="capability-costs-withheld" role="status">{{ costs_withheld_sentence }}</p>
