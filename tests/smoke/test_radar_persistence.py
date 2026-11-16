@@ -30,7 +30,7 @@ def _get_element_name(element_id):
         return element.name if element else None
 
 
-def _classify_element(page, element_name, ring):
+def _classify_element(page, element_id, element_name, ring):
     """Classify an element by opening its row menu and choosing a ring."""
     row = page.get_by_test_id("radar-row").filter(has_text=element_name)
     expect(row).to_have_count(1)
@@ -38,7 +38,7 @@ def _classify_element(page, element_name, ring):
     row.locator("[aria-haspopup='menu']").first.click()
     page.wait_for_timeout(150)
     # Click the move item for the desired ring
-    move_button = page.locator(f"[data-testid^='radar-move-'][data-testid$='-{ring}']:visible").first
+    move_button = page.get_by_test_id(f"radar-move-{element_id}-{ring}")
     expect(move_button).to_be_visible(timeout=PAGE_TIMEOUT)
     with page.expect_navigation(timeout=PAGE_TIMEOUT) as submitted:
         move_button.click()
@@ -57,7 +57,7 @@ def test_cto_classification_and_reclassification_persist(browser, live_server, s
         response = page.goto(live_server + "/technology/radar/", timeout=PAGE_TIMEOUT)
         assert response.status == 200
         for ring in ("trial", "hold"):
-            _classify_element(page, element_name, ring)
+            _classify_element(page, element_id, element_name, ring)
             _assert_persisted_ring(page, element_name, ring)
             response = page.reload(timeout=PAGE_TIMEOUT)
             assert response.status == 200

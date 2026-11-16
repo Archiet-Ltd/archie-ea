@@ -38,7 +38,7 @@ def two_orgs(live_server):
     from app import create_app
 
     tag = uuid.uuid4().hex[:6]
-    mine = create_fresh_org("cto")
+    mine = create_fresh_org("cto", extra_roles=("enterprise_architect",))
     other = create_fresh_org("cto")
     app = create_app("testing")
     with app.app_context():
@@ -168,6 +168,15 @@ def test_roi_and_arb_dialogs_show_the_organisations_currency(browser, live_serve
     expect(arb).to_be_visible()
     text = arb.inner_text()
     assert "£0.1M" in text and "$" not in text, text
+
+
+@pytest.mark.smoke
+@pytest.mark.journey
+def test_enterprise_architect_sees_no_roi_control_on_the_matrix(browser, live_server, two_orgs):
+    page = _open(browser, live_server, two_orgs, role="enterprise_architect")
+    page.goto(live_server + MATRIX, wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+    expect(_row(page, two_orgs["names"]["top"])).to_have_count(1)
+    expect(page.get_by_role("button", name="Calculate ROI")).to_have_count(0)
 
 
 @pytest.mark.smoke
