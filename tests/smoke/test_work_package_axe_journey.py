@@ -14,6 +14,7 @@ import pytest
 from playwright.sync_api import expect
 
 from .conftest import PAGE_TIMEOUT, PASSWORD
+from .test_accessibility_audit import TAGS
 
 pytestmark = [pytest.mark.smoke, pytest.mark.journey]
 
@@ -54,8 +55,7 @@ def _shot(page, tmp_path, label):
 def _serious(page):
     from axe_playwright_python.sync_playwright import Axe
 
-    report = Axe().run(page, options={"runOnly": {"type": "tag", "values": [
-        "wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa", "best-practice"]}})
+    report = Axe().run(page, options={"runOnly": {"type": "tag", "values": TAGS + ["best-practice"]}})
     data = report.response if hasattr(report, "response") else report
     return [v for v in data.get("violations", []) if v.get("impact") in ("serious", "critical")]
 
