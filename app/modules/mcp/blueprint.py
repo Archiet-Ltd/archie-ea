@@ -205,7 +205,7 @@ def mcp_endpoint():
         return jsonify(_jsonrpc_error(None, JSONRPC_PARSE_ERROR, "Parse error")), 400
 
     if not isinstance(body, dict):
-        return jsonify(_jsonrpc_error(None, JSONRPC_PARSE_ERROR, "Parse error")), 400
+        return jsonify(_jsonrpc_error(None, JSONRPC_INVALID_REQUEST, "Invalid Request")), 400
 
     req_id = body.get("id")
     method = body.get("method", "")

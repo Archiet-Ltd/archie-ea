@@ -206,9 +206,25 @@ def test_enterprise_screen_lists_edits_and_deletes_by_unified_ids(
 
     assert client.delete("/enterprise/api/work-packages/%s" % new_id).status_code == 200
     assert UnifiedWorkPackage.query.get(new_id) is None
+    # A person who may change work packages but is not an administrator cannot delete several at once.
+    refused = _json(client, "delete", "/enterprise/api/work-packages/bulk",
+                    {"ids": [mine.id, theirs.id]})
+    assert refused.status_code == 403
+    assert "Only administrators may delete several work packages at once" in refused.get_data(as_text=True)
+    assert UnifiedWorkPackage.query.get(mine.id) is not None
+    assert UnifiedWorkPackage.query.get(theirs.id) is not None
+
+    # An administrator of the organisation deletes its own and leaves the other organisation's alone.
+    from tests.test_work_package_writer import _user as writer_user
+
+    admin = writer_user(db_session, org_a, "screenadmin", role="enterprise_architect")
+    admin.is_org_admin = True
+    db_session.flush()
+    login_as(client, admin)
     bulk = _json(client, "delete", "/enterprise/api/work-packages/bulk",
                  {"ids": [mine.id, theirs.id]})
     assert bulk.get_json() == {"deleted": 1}
+    assert UnifiedWorkPackage.query.get(mine.id) is None
     assert UnifiedWorkPackage.query.get(theirs.id) is not None
 
 

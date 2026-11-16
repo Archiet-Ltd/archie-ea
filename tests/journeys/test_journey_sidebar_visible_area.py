@@ -278,6 +278,8 @@ def test_no_zone_link_or_label_changed_for_any_persona(app, client, role):
             self.id = 0
             self.organization_id = None
             self.enterprise_role = role
+            # The organisation role the persona fixture gives real users (_persona above).
+            self.role_names = ["Administrator" if role == "platform_admin" else "Architect"]
             self.is_platform_admin = role == "platform_admin"
             self.is_org_admin = role == "platform_admin"
 
