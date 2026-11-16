@@ -810,7 +810,8 @@ def search_pages(user, query: str, limit: int = 12) -> list:
         for rank, term in enumerate(row["terms"]):
             t = normalise_search_text(term)
             exact, fuzzy = fuzzy_match_score(q, t)
-            if exact == 0 and fuzzy == 0:
+            # every word typed must be found: a question is not a page just because "if" sits inside "Artifact"
+            if exact + fuzzy < len(q.split()):
                 continue
             # a name or alias that is the whole query ("Integrations") beats one that only holds it
             whole = whole or t == q

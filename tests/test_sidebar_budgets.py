@@ -365,6 +365,12 @@ def test_old_names_find_the_new_entries(ctx, query, first):
     assert labels[0] == first, labels
 
 
+def test_a_question_typed_into_search_matches_no_page_by_one_stray_word(ctx):
+    person = _Person(ROLE_PLATFORM_ADMIN, admin=True)
+    rows = registry.search_pages(person, "What breaks if Postgres fails?")
+    assert [row["label"] for row in rows] == []
+
+
 def test_every_entry_is_in_the_search_index_under_its_name_and_where_it_sits(ctx):
     person = _Person(ROLE_PLATFORM_ADMIN, admin=True)
     rows = registry.search_index(person)
