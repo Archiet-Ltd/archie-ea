@@ -275,7 +275,7 @@
                 <a :href="'/implementation/work-packages/' + wp.id" class="font-medium text-primary hover:underline"
                    data-testid="roadmap-wp-link" x-text="wp.name"></a>
                 <p class="mt-0.5 text-xs text-muted-foreground" x-text="wp.element_type || 'WorkPackage'"></p>
-                <div class="min-w-72 whitespace-normal" x-html="wp.footer_html" data-testid="roadmap-wp-footer"></div>
+                <div class="min-w-0 max-w-full whitespace-normal break-words" x-html="wp.footer_html" data-testid="roadmap-wp-footer"></div>
               {% endcall %}
               {% call table_cell() %}
                 <span class="inline-flex rounded-full border px-2 py-0.5 text-xs capitalize"
@@ -586,13 +586,31 @@
     'work-packages': '/capability-map/api/roadmap/work-packages',
   };
   const sourceAnswers = {};
+  // Every request takes the next number; figures from an older request never replace newer ones.
+  let requestsMade = 0;
   window.rdmSource = function (key, again) {
     if (again || !sourceAnswers[key]) {
-      const asked = Platform.fetch(sourceUrls[key], { silent: true });
+      // The first read leaves out the figures (the page carries them) and asks for each row's evidence line;
+      // a read after a save asks for the fresh figures.
+      const params = [];
+      if (!again) params.push('figures=0');
+      if (key === 'work-packages') params.push('footer=1');
+      const sequence = ++requestsMade;
+      const asked = Platform.fetch(sourceUrls[key] + (params.length ? '?' + params.join('&') : ''), { silent: true })
+        .then((answer) => Object.assign({}, answer, { sequence }));
       sourceAnswers[key] = asked;
       asked.catch(() => { if (sourceAnswers[key] === asked) delete sourceAnswers[key]; });
     }
     return sourceAnswers[key];
+  };
+
+  // The one guard: an answer is shown only if no newer answer for the same part has been shown already.
+  const shownSequence = {};
+  window.rdmIsNewest = function (part, sequence) {
+    if (sequence === undefined) return true;
+    if (sequence < (shownSequence[part] || 0)) return false;
+    shownSequence[part] = sequence;
+    return true;
   };
 
   const CSRF = () => document.getElementById('rdm-csrf-token')?.value || '';
@@ -678,8 +696,9 @@
       async loadGaps(again) {
         try {
           const d = await window.rdmSource('gaps', again);
+          if (!this.isNewest('gaps', d.sequence)) return;
           this.gaps = d.gaps || [];
-          this.applyFigures(d.figures);
+          this.applyFigures(d.figures, d.sequence);
           this.signalCount = d.signal_count === undefined ? this.gaps.length : d.signal_count;
           Alpine.store('rdm').gaps = this.gaps;
           this.gapsError = '';
@@ -695,8 +714,9 @@
       async loadPlateaus(again) {
         try {
           const d = await window.rdmSource('plateaus', again);
+          if (!this.isNewest('plateaus', d.sequence)) return;
           this.plateaus = d.plateaus || [];
-          this.applyFigures(d.figures);
+          this.applyFigures(d.figures, d.sequence);
           this.plateausError = '';
           Alpine.store('rdm').plateaus = this.plateaus;
         } catch (e) {
@@ -711,8 +731,9 @@
       async loadWorkPackages(again) {
         try {
           const d = await window.rdmSource('work-packages', again);
+          if (!this.isNewest('work-packages', d.sequence)) return;
           this.workPackages = d.work_packages || [];
-          this.applyFigures(d.figures);
+          this.applyFigures(d.figures, d.sequence);
           this.workPackagesError = '';
           Alpine.store('rdm').workPackages = this.workPackages;
         } catch (e) {
@@ -740,9 +761,15 @@
       },
 
       // Every answer carries the figures and the evidence line counted together; the tiles and the line
-      // are set from that one answer in the same step. An answer that failed never reaches here.
-      applyFigures(figures) {
+      // are set from that one answer in the same step. An answer that failed never reaches here, and an answer
+      // older than the one already shown is left out.
+      isNewest(part, sequence) {
+        return window.rdmIsNewest(part, sequence);
+      },
+
+      applyFigures(figures, sequence) {
         if (!figures) return;
+        if (!this.isNewest('figures', sequence)) return;
         this.plateauCount = figures.plateau_count;
         this.workPackageCount = figures.work_package_count;
         this.recordedGaps = figures.recorded_gaps;
@@ -832,8 +859,8 @@
           if (!d.success) throw new Error(d.error || 'Delete failed');
           // Re-fetch from server so the tile count and evidence line agree (includes parts).
           await this.loadWorkPackages(true);
-          // Refresh the evidence line from the server's markup.
-            if (typeof window.rdmRedrawTimeline === 'function') window.rdmRedrawTimeline();
+          // Redraw the timeline from the fresh work packages.
+          if (typeof window.rdmRedrawTimeline === 'function') window.rdmRedrawTimeline();
         } catch (e) {
           this.workPackagesError = e.message || 'Failed to delete work package.';
         }
@@ -1282,6 +1309,7 @@
         window.rdmSource('gaps'),
         window.rdmSource('plateaus'),
       ]);
+      if (!window.rdmIsNewest('timeline', wpData.sequence)) return;
       const workPackages = (wpData.work_packages || [])
         .filter(wp => wp.start_date && (wp.end_date || wp.target_date));
       const gaps    = gapData.gaps     || [];

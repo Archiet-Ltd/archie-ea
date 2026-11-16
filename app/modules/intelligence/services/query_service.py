@@ -639,6 +639,103 @@ def _element_ids_in_rows(rows: List[Dict[str, Any]]) -> List[int]:
     return ids
 
 
+def relationship_fence_clause(org_id: Optional[int], *, direction: str = "both"):
+    """The fence of :func:`filter_relationships_by_org`, as a clause for a query.
+
+    Apply it to a relationship query before paging or counting, so a request
+    reads only rows that belong on the page. It keeps the same relationships
+    the list form keeps: ``direction`` names which far ends must sit in
+    ``org_id``. ``org_id`` of ``None`` keeps nothing.
+    """
+    from sqlalchemy import and_, false
+
+    from app.models.archimate_core import ArchiMateElement, ArchiMateRelationship
+
+    if org_id is None:
+        return false()
+    inside = db.select(ArchiMateElement.id).where(ArchiMateElement.organization_id == org_id)
+    clauses = []
+    if direction in ("incoming", "both"):
+        clauses.append(ArchiMateRelationship.source_id.in_(inside))
+    if direction in ("outgoing", "both"):
+        clauses.append(ArchiMateRelationship.target_id.in_(inside))
+    return and_(*clauses)
+
+
+RELATIONSHIP_SORTS = ("source", "type", "target")
+RELATIONSHIP_PAGE_SIZES = (10, 20, 25, 30, 40, 50)
+
+
+def relationship_sort_args(args) -> tuple:
+    """The ``sort`` / ``dir`` of a relationships address, or ``(None, "asc")`` when absent or unknown."""
+    sort = args.get("sort")
+    if sort not in RELATIONSHIP_SORTS:
+        return None, "asc"
+    return sort, ("desc" if args.get("dir") == "desc" else "asc")
+
+
+def relationships_page(
+    org_id: Optional[int], page: int, per_page: int, focus_id: Optional[int] = None,
+    sort: Optional[str] = None, direction: str = "asc",
+) -> Dict[str, Any]:
+    """One page of an organisation's relationships, fenced and paged in the query.
+
+    Returns ``{relationships, total, pages, page}``; each relationship carries
+    its id, type, both ends' ids and their names. The database reads one page
+    plus a count, never the whole organisation. ``focus_id`` narrows the list to
+    one relationship (still fenced). ``sort`` ("source", "type" or "target") with
+    ``direction`` orders the whole list before it is paged. A ``page`` past the last one gives the last.
+    """
+    from sqlalchemy import func  # noqa: PLC0415
+    from sqlalchemy.orm import aliased  # noqa: PLC0415
+
+    from app.models.archimate_core import ArchiMateElement, ArchiMateRelationship
+
+    listing = ArchiMateRelationship.query
+    if focus_id is not None:
+        listing = listing.filter(ArchiMateRelationship.id == focus_id)
+    ordered = listing.filter(relationship_fence_clause(org_id, direction="both"))
+    # The sort is part of the read, so every page follows it: by an end's name
+    # (joined) or by type, ties broken by id.
+    if sort in ("source", "target"):
+        end = aliased(ArchiMateElement)
+        end_id = ArchiMateRelationship.source_id if sort == "source" else ArchiMateRelationship.target_id
+        key = func.lower(func.coalesce(end.name, ""))
+        ordered = ordered.outerjoin(end, end.id == end_id)
+    else:
+        key = ArchiMateRelationship.type
+    ordered = ordered.order_by(key.desc() if direction == "desc" else key.asc(), ArchiMateRelationship.id)
+    pagination = ordered.paginate(page=page, per_page=per_page, error_out=False)
+    if page > 1 and not pagination.items and pagination.pages:
+        page = pagination.pages
+        pagination = ordered.paginate(page=page, per_page=per_page, error_out=False)
+
+    end_ids = {end for rel in pagination.items for end in (rel.source_id, rel.target_id)}
+    names_by_id: Dict[int, str] = {}
+    if end_ids:
+        names_by_id = dict(
+            db.session.query(ArchiMateElement.id, ArchiMateElement.name).filter(
+                ArchiMateElement.id.in_(end_ids)
+            )
+        )
+    return {
+        "relationships": [
+            {
+                "id": rel.id,
+                "type": rel.type,
+                "source_id": rel.source_id,
+                "target_id": rel.target_id,
+                "source_name": names_by_id.get(rel.source_id),
+                "target_name": names_by_id.get(rel.target_id),
+            }
+            for rel in pagination.items
+        ],
+        "total": pagination.total,
+        "pages": max(pagination.pages, 1),
+        "page": page,
+    }
+
+
 def filter_relationships_by_org(
     relationships: List[Any], org_id: Optional[int], *, direction: str = "both"
 ) -> List[Any]:
