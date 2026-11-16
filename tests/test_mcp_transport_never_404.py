@@ -20,6 +20,13 @@ def _post(client, token, payload):
     return fresh.post("/mcp", data=json.dumps(payload), content_type="application/json", headers=headers)
 
 
+def _post_raw(client, token, data, content_type="application/json"):
+    _clear_cached_identity()
+    fresh = client.application.test_client()
+    headers = {"Authorization": f"Bearer {token}"} if token else {}
+    return fresh.post("/mcp", data=data, content_type=content_type, headers=headers)
+
+
 @pytest.fixture
 def token(client, db_session, make_org, login_as):
     org = make_org("mcpnever404")
@@ -33,7 +40,7 @@ def _released_tool(client, token):
     return reply.get_json()["result"]["tools"][0]["name"]
 
 
-def test_a_claude_handshake_never_meets_a_404(client, token):
+def test_an_assistant_handshake_never_meets_a_404(client, token):
     replies = {}
 
     def send(key, payload):
@@ -71,7 +78,9 @@ def test_a_claude_handshake_never_meets_a_404(client, token):
 
     name = _released_tool(client, token)
     call = send("call", {"jsonrpc": "2.0", "id": 8, "method": "tools/call", "params": {"name": name, "arguments": {}}})
-    assert call.status_code != 404, call.get_json()
+    body = call.get_json()
+    assert call.status_code == 200
+    assert "result" in body and "error" not in body, body
 
     unknown = send("unknown", {"jsonrpc": "2.0", "id": 9, "method": "tools/call",
                                "params": {"name": "no_such_tool", "arguments": {}}})
@@ -81,6 +90,39 @@ def test_a_claude_handshake_never_meets_a_404(client, token):
     assert "Tool not found: no_such_tool" in body["error"]["message"]
 
     assert all(r.status_code != 404 for r in replies.values())
+
+
+def test_invalid_request_array_body_returns_32600(client, token):
+    """A JSON array is valid JSON but not a request object -> -32600 Invalid Request."""
+    reply = _post(client, token, [1, 2, 3])
+    assert reply.status_code == 400
+    body = reply.get_json()
+    assert body["jsonrpc"] == "2.0"
+    assert body["id"] is None
+    assert body["error"]["code"] == -32600
+    assert body["error"]["message"] == "Invalid Request"
+
+
+def test_invalid_request_number_body_returns_32600(client, token):
+    """A JSON number is valid JSON but not a request object -> -32600 Invalid Request."""
+    reply = _post(client, token, 42)
+    assert reply.status_code == 400
+    body = reply.get_json()
+    assert body["jsonrpc"] == "2.0"
+    assert body["id"] is None
+    assert body["error"]["code"] == -32600
+    assert body["error"]["message"] == "Invalid Request"
+
+
+def test_parse_error_non_json_body_returns_32700(client, token):
+    """A body that does not parse as JSON -> -32700 Parse error."""
+    reply = _post_raw(client, token, "not json", content_type="application/json")
+    assert reply.status_code == 400
+    body = reply.get_json()
+    assert body["jsonrpc"] == "2.0"
+    assert body["id"] is None
+    assert body["error"]["code"] == -32700
+    assert body["error"]["message"] == "Parse error"
 
 
 def test_an_early_access_tool_is_a_json_rpc_error_not_a_404(client, token, monkeypatch):
