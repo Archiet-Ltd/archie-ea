@@ -31,6 +31,7 @@ def world(app):
     from app.models.organization import Organization
     from app.models.unified_capability import UnifiedCapability
     from app.models.user import User
+    from app.models.roadmap_models import RoadmapGap
 
     w = {}
     with app.app_context():
@@ -40,11 +41,14 @@ def world(app):
         w["architect"] = _make_user_id(db, w["org_a"], "RgArchitect", enterprise_role="enterprise_architect", role_name="Architect")
         own = UnifiedCapability(name="Own capability", organization_id=w["org_a"], level=1)
         other = UnifiedCapability(name="Other capability", organization_id=w["org_b"], level=1)
-        db.session.add_all([own, other])
+        gap = RoadmapGap(name="Own gap", description="Test gap", gap_type="technology", priority="high", created_by=w["architect"])
+        db.session.add_all([own, other, gap])
         db.session.commit()
         w["cap_own"], w["cap_other"] = own.id, other.id
+        w["gap_own"] = gap.id
     yield w
     with app.app_context():
+        _cleanup_ids(db, RoadmapGap, [w["gap_own"]])
         _cleanup_ids(db, UnifiedCapability, [w["cap_own"], w["cap_other"]])
         _cleanup_ids(db, User, [w["viewer"], w["architect"]])
         _cleanup_ids(db, Organization, [w["org_a"], w["org_b"]])
@@ -57,18 +61,32 @@ def _post(app, world, who, path, body):
         return client.post(path, json=body)
 
 
-@pytest.mark.parametrize("path,body", [(GENERATE, {"source_type": "capability", "source_id": 0}), (SYNC, {})])
+@pytest.mark.parametrize("path,body", [(GENERATE, {"source_type": "gap", "source_id": 0}), (SYNC, {})])
 def test_viewer_is_refused(app, world, path, body):
-    response = _post(app, world, "viewer", path, {**body, "source_id": world["cap_own"]} if body else body)
+    if path == GENERATE:
+        body = {**body, "source_id": world["gap_own"]}
+    response = _post(app, world, "viewer", path, body)
     assert response.status_code == 403
     assert response.get_json()["error"] == REFUSAL
 
 
-@pytest.mark.parametrize("path,body", [(GENERATE, {"source_type": "capability", "source_id": 0}), (SYNC, {})])
+@pytest.mark.parametrize("path,body", [(GENERATE, {"source_type": "gap", "source_id": 0}), (SYNC, {})])
 def test_architect_is_not_refused(app, world, path, body):
-    response = _post(app, world, "architect", path, {**body, "source_id": world["cap_own"]} if body else body)
-    assert response.status_code != 403
-    assert response.status_code != 404
+    if path == GENERATE:
+        body = {**body, "source_id": world["gap_own"]}
+    response = _post(app, world, "architect", path, body)
+    assert 200 <= response.status_code < 300, f"Expected 2xx, got {response.status_code}: {response.get_json()}"
+    data = response.get_json()
+    if path == GENERATE:
+        assert data["message"] == "Work packages generated successfully"
+        assert "generated_packages" in data
+        assert "count" in data
+        assert isinstance(data["generated_packages"], list)
+        assert data["count"] == len(data["generated_packages"])
+    else:  # SYNC
+        assert data["message"] == "Applications synced successfully"
+        assert "sync_result" in data
+        assert isinstance(data["sync_result"], dict)
 
 
 def test_other_organisations_capability_is_refused(app, world):
