@@ -64,6 +64,11 @@
         strip.classList.toggle('at-scroll-end-x', strip.scrollWidth - strip.clientWidth <= strip.scrollLeft + 1);
     };
     update();
+    // The page's own tab is in view on a narrow screen, where the row scrolls.
+    var current = strip.querySelector('[aria-current="page"]');
+    if (current) {
+        strip.scrollLeft = Math.max(0, current.offsetLeft - (strip.clientWidth - current.offsetWidth) / 2);
+    }
     strip.addEventListener('scroll', update, { passive: true });
     window.addEventListener('resize', update);
     document.addEventListener('alpine:updated', update);
@@ -75,6 +80,9 @@
 })();
 </script>
 
+{% if type_table %}
+{% include 'archimate_crud/partials/_type_table.html' %}
+{% else %}
 <section data-testid="figure-cards" class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4" aria-label="{{ selected_layer.short_name }} repository metrics">
     {{ repository_metric('Elements', "layerCountKnown ? layerCount : '—'", "layerCountHint", 'layers', 'layerCountPending', 'layer-elements-card') }}
     {{ repository_metric('Connected', "relationshipMetrics.known ? relationshipMetrics.connected : '—'", "relationshipHint", 'git-branch', 'elementsPending') }}
@@ -354,6 +362,7 @@
         </div>
     </div>
 </section>
+{% endif %}
 
 {% if selected_layer.key == 'motivation' %}
 <div x-cloak x-show="currentViewMode === 'swimlane' && !loading && !loadError">{% include 'archimate_crud/partials/_motivation_swimlane.html' %}</div>

@@ -27,6 +27,9 @@
                     once at the top of the table, above its toolbar, so no row repeats it
    server_pagination  set when the server pages the rows: every row given is shown, the table's own footer is left
                     out, and a macro passed here renders the server's pager in its place
+   search_name      names the search box's field and makes the toolbar a form that reads the same page again with it, for a
+                    server-paged table where filtering the rows on screen would miss the others (search_value is what
+                    was searched; search_hidden holds the other query values to keep)
    row_id_prefix    gives each row the id <prefix><row.id>, so a link such as #gap-5 lands on that row (the row is marked
                     while it is the target)
    footer_count     a macro for the footer's left side in place of the row count ("0 of 21 row(s) selected")
@@ -48,7 +51,7 @@
 {%- if col is mapping -%}{{ col.get('label', '') }}{%- else -%}{{ col[0] }}{%- endif -%}
 {%- endmacro -%}
 
-{% macro list_table(rows, columns, caption='', testid='data-table', row_testid='list-row', page_size=25, component='list-table', search_placeholder='Filter...', toolbar=none, toolbar_actions=none, empty_message='Nothing here yet.', empty_title=none, empty_action=none, server_pagination=none, notice=none, footer_count=none, row_id_prefix=none) %}
+{% macro list_table(rows, columns, caption='', testid='data-table', row_testid='list-row', page_size=25, component='list-table', search_placeholder='Filter...', toolbar=none, toolbar_actions=none, empty_message='Nothing here yet.', empty_title=none, empty_action=none, server_pagination=none, notice=none, footer_count=none, row_id_prefix=none, search_name=none, search_value='', search_hidden=none) %}
 {%- set cells = caller -%}
 {%- set rows = rows or [] -%}
 {%- set total = rows|length -%}
@@ -59,9 +62,14 @@
 <div data-slot="data-table" data-table-id="{{ testid }}" data-component="{{ component }}" data-testid="{{ testid }}-pager" data-total="{{ total }}" data-page-size="{{ page_size }}" class="flex flex-col gap-4">
   {% if notice %}<p class="flex items-start gap-2 text-sm text-muted-foreground" data-slot="data-table-notice">{{ lucide('info', class='mt-0.5 size-4 shrink-0') }}<span>{{ notice }}</span></p>{% endif %}
   {% if show_toolbar %}
+  {% if search_name %}<form method="get" class="contents" data-slot="data-table-search">{% for k, v in (search_hidden or {}).items() %}{% if v not in (none, '') %}<input type="hidden" name="{{ k }}" value="{{ v }}">{% endif %}{% endfor %}{% endif %}
   <div class="flex flex-wrap items-center justify-between gap-2" data-slot="data-table-toolbar">
     <div class="flex min-w-0 flex-1 items-center gap-2">
+      {% if search_name %}
+      {{ input(type='search', name=search_name, value=search_value, placeholder=search_placeholder, class='h-8 w-[150px] lg:w-[250px]', attrs={'aria-label': search_placeholder}) }}
+      {% else %}
       {{ input(type='search', placeholder=search_placeholder, class='h-8 w-[150px] lg:w-[250px]', attrs=({'aria-label': search_placeholder, 'data-table-filter': ''} if total > 0 else {'aria-label': search_placeholder, 'data-table-filter': '', 'disabled': true})) }}
+      {% endif %}
       {% if total > 0 %}
       {% call button(variant='ghost', size='sm', class='h-8 px-2 lg:px-3', attrs={'data-table-reset': '', 'hidden': true}) %}Reset{{ lucide('x') }}{% endcall %}
       {% endif %}
@@ -84,6 +92,7 @@
       {% if toolbar_actions %}{{ toolbar_actions() }}{% endif %}
     </div>
   </div>
+  {% if search_name %}</form>{% endif %}
   {% endif %}
 
   <div data-slot="table-container" class="overflow-x-auto rounded-md border workbench-table-scroll">

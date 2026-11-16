@@ -1,0 +1,117 @@
+{# The page that lists one type of element: figures for that type, then the element table, server-paged.
+   Context: type_table (see _type_table_context in the routes), layer, element_type. #}
+{% import 'basecoat/index.html' as ui %}
+{% from 'components/element_table.html' import element_table %}
+{% from 'components/list_table.html' import row_actions, row_action %}
+{% from 'components/explained_value.html' import explained_value %}
+{% from 'basecoat/table.html' import table_cell %}
+{% from 'basecoat/native-select.html' import native_select_wrapper, native_select, native_select_option %}
+
+{% set t = type_table %}
+{% set tname = t.type_label %}
+{% set can_write = can_change_model() %}
+{% set keep = {'search': t.search or none, 'source': t.source or none, 'sort': (t.sort if t.sort != 'name' or t.sort_dir == 'desc' else none), 'dir': (t.sort_dir if t.sort_dir == 'desc' else none), 'per_page': (t.per_page if t.per_page != 25 else none)} %}
+{% set sm = t.summary %}
+{% set filtered = t.search or t.source %}
+
+{% macro _link(to, text, testid=none) -%}<a href="{{ to }}" class="font-medium text-foreground underline underline-offset-4 hover:no-underline"{% if testid %} data-testid="{{ testid }}"{% endif %}>{{ text }}</a>{%- endmacro %}
+
+{% macro _sort_to(key, direction) -%}
+{{ url_for('archimate_crud.list_elements', layer=layer, element_type=element_type, **dict(keep, sort=key, dir=direction, page=none)) }}
+{%- endmacro %}
+
+
+{% macro _card(label, value, hint, testid) %}
+{% call ui.card(class='gap-2 py-4', attrs={'data-testid': testid}) %}
+  {% call ui.card_header(class='px-4') %}
+    {% call ui.card_description() %}{{ label }}{% endcall %}
+    {% call ui.card_title(class='text-2xl tabular-nums') %}{{ value }}{% endcall %}
+  {% endcall %}
+  {% call ui.card_content(class='px-4 text-xs text-muted-foreground') %}{{ hint }}{% endcall %}
+{% endcall %}
+{% endmacro %}
+
+{% macro _toolbar_actions() %}
+  {% call native_select_wrapper(class='w-[150px]') %}
+    {% call native_select(size='sm', name='source', attrs={'aria-label': 'Source'}) %}
+      {{ native_select_option(text='All sources', value='', selected=(not t.source)) }}
+      {{ native_select_option(text='Portfolio', value='portfolio', selected=(t.source == 'portfolio')) }}
+      {{ native_select_option(text='Architecture', value='architecture', selected=(t.source == 'architecture')) }}
+    {% endcall %}
+  {% endcall %}
+  {{ ui.button(text='Apply', type='submit', variant='outline', size='sm') }}
+  {% if can_write %}{{ ui.button(text='New ' ~ (tname | lower), href=t.new_href, size='sm', attrs={'data-testid': 'type-table-new'}) }}{% endif %}
+{% endmacro %}
+
+{% macro _empty_action() %}
+  {% if filtered %}{{ ui.button(text='Clear search', href=url_for('archimate_crud.list_elements', layer=layer, element_type=element_type), variant='outline', attrs={'data-testid': 'type-table-clear'}) }}{% endif %}
+  {% if can_write %}{{ ui.button(text='New ' ~ (tname | lower), href=t.new_href) }}{% endif %}
+{% endmacro %}
+
+{% macro _pager() -%}
+<div class="flex flex-wrap items-center justify-between gap-2 px-2" data-slot="data-table-pagination" data-testid="type-table-pages">
+  <p class="flex-1 text-sm text-muted-foreground tabular-nums" data-testid="type-table-count">{% if t.total %}Rows {{ (t.page - 1) * t.per_page + 1 }} to {{ [t.page * t.per_page, t.total]|min }} of {{ t.total }}{% else %}0 rows{% endif %}</p>
+  <div class="flex flex-wrap items-center gap-x-6 gap-y-2">
+    <form method="get" class="flex items-center gap-2">
+      {% for k, v in keep.items() if k != 'per_page' and v is not none %}{{ ui.input(name=k, value=v, type='hidden') }}{% endfor %}
+      {{ ui.label(text='Rows per page', attrs={'for': 'type-table-per-page'}) }}
+      {% call native_select_wrapper(class='w-[72px]') %}
+        {% call native_select(size='sm', name='per_page', id='type-table-per-page') %}
+          {% for opt in t.page_sizes %}{{ native_select_option(text=opt|string, value=opt|string, selected=(opt == t.per_page)) }}{% endfor %}
+        {% endcall %}
+      {% endcall %}
+      {{ ui.button(text='Apply', type='submit', variant='outline', size='sm') }}
+    </form>
+    <div class="flex items-center justify-center text-sm font-medium tabular-nums" data-testid="type-table-page">Page {{ t.page }} of {{ t.pages }}</div>
+    <div class="flex items-center gap-2">
+      {% set _go = [('First page', 1, 'chevrons-left', t.page > 1), ('Previous page', t.page - 1, 'chevron-left', t.page > 1), ('Next page', t.page + 1, 'chevron-right', t.page < t.pages), ('Last page', t.pages, 'chevrons-right', t.page < t.pages)] %}
+      {% for label, target, icon, enabled in _go %}
+        {% if enabled %}{% call ui.button(href=url_for('archimate_crud.list_elements', layer=layer, element_type=element_type, **dict(keep, page=target)), variant='outline', size='icon', class='size-8', attrs={'aria-label': label}) %}{{ lucide(icon) }}{% endcall %}
+        {% else %}{% call ui.button(type='button', variant='outline', size='icon', class='size-8', disabled=true, attrs={'aria-label': label}) %}{{ lucide(icon) }}{% endcall %}{% endif %}
+      {% endfor %}
+    </div>
+  </div>
+</div>
+{%- endmacro %}
+
+<div class="flex flex-col gap-4" data-testid="type-list">
+<section data-testid="figure-cards" class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4" aria-label="{{ tname }} figures">
+  {% set scope = 'matching your search or source' if filtered else 'every ' ~ (tname | lower) ~ ' element' %}
+  {{ _card(tname ~ ' elements', sm.total, 'Counts ' ~ scope ~ ', not the whole layer.', 'type-card-total') }}
+  {{ _card('On the model map', (sm.connected ~ ' of ' ~ sm.total) if sm.relationships_known else 'Not known', 'With at least one relationship.' if sm.relationships_known else 'None of these has been placed on the model map yet.', 'type-card-connected') }}
+  {{ _card('Documented', ((sm.documented * 100 // sm.total) ~ '%') if sm.total else 'Nothing to measure', ('A description that says more than the name: ' ~ sm.documented ~ ' of ' ~ sm.total ~ '.') if sm.total else 'There are no ' ~ (tname | lower) ~ ' elements to measure.', 'type-card-documented') }}
+  {{ _card('From the portfolio', sm.portfolio, 'The rest were drawn on the architecture model.', 'type-card-portfolio') }}
+</section>
+
+{% set name_col = {'label': 'Name', 'class': 'whitespace-normal', 'sorted': (t.sort_dir if t.sort == 'name' else none), 'sort_hrefs': {'asc': _sort_to('name', 'asc')|trim, 'desc': _sort_to('name', 'desc')|trim}} %}
+{% set type_col = {'label': 'Type', 'class': 'whitespace-normal', 'sorted': (t.sort_dir if t.sort == 'type' else none), 'sort_hrefs': {'asc': _sort_to('type', 'asc')|trim, 'desc': _sort_to('type', 'desc')|trim}} %}
+{% set cols = [ type_col, {'label': 'Source', 'class': 'whitespace-normal'}, {'label': 'Documentation', 'class': 'whitespace-normal min-w-[14rem]'}, {'label': 'Relationships', 'class': 'whitespace-normal'} ] %}
+{% if element_type == 'WorkPackage' %}{% set _ = cols.append({'label': 'WSJF', 'class': 'whitespace-normal'}) %}{% endif %}
+{% set _ = cols.append({'label': '', 'class': 'w-12'}) %}
+{% call(row) element_table(rows=t.rows, columns=cols, first=name_col,
+      caption=tname ~ ' elements', testid='type-table', row_testid='type-row', link_testid='type-row-link',
+      page_size=t.per_page, toolbar=true, toolbar_actions=_toolbar_actions, server_pagination=_pager,
+      search_name='search', search_value=t.search, search_hidden=dict(keep, search=none, source=none, page=none),
+      search_placeholder='Search ' ~ (tname | lower) ~ ' elements...', name_class='whitespace-normal break-words min-w-[12rem]',
+      empty_message=('No ' ~ (tname | lower) ~ ' element matches your search. Clear it to see them all.') if filtered else ('There are no ' ~ (tname | lower) ~ ' elements yet.'),
+      empty_action=_empty_action) %}
+  {% call table_cell() %}{% call ui.badge(variant='secondary') %}{{ tname }}{% endcall %}{% endcall %}
+  {% call table_cell(class='whitespace-normal') %}{{ 'Portfolio' if row.source == 'portfolio' else 'Architecture' }}{% endcall %}
+  {% call table_cell(class='whitespace-normal break-words') %}
+    {% if row.own_description %}<span class="line-clamp-2 text-sm text-muted-foreground">{{ row.documentation }}</span>
+    {% else %}{% set a %}{% if can_write %}{{ _link(row.edit_href, 'Add one') }}{% endif %}{% endset %}{{ explained_value(basis='No description yet', action=(a if can_write else none)) }}{% endif %}
+  {% endcall %}
+  {% call table_cell(class='whitespace-normal tabular-nums') %}
+    {% if row.rel_count is none %}{% set a %}{% if can_write %}{{ _link(row.edit_href, 'Add it') }}{% endif %}{% endset %}{{ explained_value(basis='Not on the model map', action=(a if can_write else none)) }}
+    {% elif row.rel_count == 0 %}{% set a %}{% if row.composer_id %}{{ _link(url_for('archimate.composer_page', element=row.composer_id), 'Connect it in the Composer') }}{% endif %}{% endset %}{{ explained_value(basis='No relationships yet', action=(a if row.composer_id else none)) }}
+    {% else %}{{ row.rel_count }}{% endif %}
+  {% endcall %}
+  {% if element_type == 'WorkPackage' %}{% call table_cell(class='whitespace-normal tabular-nums') %}{% if row.wsjf_score is not none %}{{ row.wsjf_score }}{% else %}{% set a %}{{ _link(row.href, 'Score it') }}{% endset %}{{ explained_value(basis='Not scored yet', action=a) }}{% endif %}{% endcall %}{% endif %}
+  {% call table_cell(class='text-right') %}{% call row_actions(label='Actions for ' ~ row.name) %}
+    {{ row_action('View', href=row.href, testid='type-row-view') }}
+    {% if can_write %}{{ row_action('Edit', href=row.edit_href) }}{% endif %}
+    {% if row.composer_id %}{{ row_action('Open in Composer', href=url_for('archimate.composer_page', element=row.composer_id)) }}{% endif %}
+    {% if can_write %}{{ row_action('Delete', action=row.delete_href, destructive=true, confirm='Delete ' ~ row.name ~ '? This cannot be undone.', separator_before=true) }}{% endif %}
+  {% endcall %}{% endcall %}
+{% endcall %}
+</div>

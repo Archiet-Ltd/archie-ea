@@ -1085,19 +1085,31 @@ def api_layer_elements(layer):
 
     Supports: search, element_type filter, pagination, sorting.
     """
-    import math
-
     if layer not in LAYER_CONFIG:
         return jsonify({"success": False, "error": f"Unknown layer: {layer}"}), 404
 
-    search = request.args.get("search", "").strip()
-    type_filter = request.args.get("element_type", "").strip()
-    source_filter = request.args.get("source", "").strip()  # "portfolio", "architecture", or ""
-    kind_filter = request.args.get("kind", "").strip()  # "Epic", "Feature", etc.
-    page = safe_int_arg('page', 1, minimum=1)
-    per_page = safe_int_arg('per_page', 25, minimum=1, maximum=500)
-    sort_by = request.args.get("sort_by", "name")
-    sort_order = request.args.get("sort_order", "asc")
+    return jsonify(
+        _layer_elements_payload(
+            layer,
+            search=request.args.get("search", "").strip(),
+            type_filter=request.args.get("element_type", "").strip(),
+            source_filter=request.args.get("source", "").strip(),  # "portfolio", "architecture", or ""
+            kind_filter=request.args.get("kind", "").strip(),  # "Epic", "Feature", etc.
+            page=safe_int_arg('page', 1, minimum=1),
+            per_page=safe_int_arg('per_page', 25, minimum=1, maximum=500),
+            sort_by=request.args.get("sort_by", "name"),
+            sort_order=request.args.get("sort_order", "asc"),
+        )
+    )
+
+
+def _layer_elements_payload(layer, search="", type_filter="", source_filter="", kind_filter="",
+                            page=1, per_page=25, sort_by="name", sort_order="asc"):
+    """The elements of a layer (or of the types asked for), one page of them, with the total.
+
+    Read by the JSON endpoint above and by the page that lists one type, so both show the same rows.
+    """
+    import math
 
     layer_types = _dashboard_types(layer)
     if type_filter:
@@ -1219,6 +1231,7 @@ def api_layer_elements(layer):
                         "status": status,
                         "layer": layer,
                         "source": "portfolio",
+                        "archimate_element_id": ae_id,
                         "properties": getattr(elem, "properties", None) or "",
                         "plateau": plateau_by_ae_id.get(ae_id) if ae_id else None,
                         # None (not 0) when there is no linked ArchiMateElement at
@@ -1324,7 +1337,7 @@ def api_layer_elements(layer):
             current_app.logger.warning(f"Error supplementing from archimate_elements: {e}")
 
     reverse = sort_order == "desc"
-    if sort_by in ("name", "element_type", "description", "status"):
+    if sort_by in ("name", "element_type", "description", "status", "source"):
         all_elements.sort(key=lambda x: (x.get(sort_by) or "").lower(), reverse=reverse)
 
     # A kind filter narrows the whole list before it is paged, so an Epic on a
@@ -1365,21 +1378,42 @@ def api_layer_elements(layer):
         total = len(all_elements)
         pages = math.ceil(total / per_page) if per_page > 0 else 1
 
-    return jsonify(
-        {
-            "elements": page_elements,
-            "pagination": {
-                "page": page,
-                "pages": pages,
-                "per_page": per_page,
-                "total": total,
-                "has_next": page < pages,
-                "has_prev": page > 1,
-            },
-            "layer": layer,
-            "element_types": layer_types,
-        }
-    )
+    return {
+        "elements": page_elements,
+        "pagination": {
+            "page": page,
+            "pages": pages,
+            "per_page": per_page,
+            "total": total,
+            "has_next": page < pages,
+            "has_prev": page > 1,
+        },
+        "layer": layer,
+        "element_types": layer_types,
+        "summary": {
+            "total": total,
+            "connected": sum(1 for el in all_elements if el.get("rel_count")),
+            "relationships_known": sum(1 for el in all_elements if el.get("rel_count") is not None),
+            "documented": sum(1 for el in all_elements if _has_own_description(el)),
+            "portfolio": sum(1 for el in all_elements if el.get("source") == "portfolio"),
+        },
+    }
+
+
+def _has_own_description(el):
+    """A description that says something: not empty and not the name said again.
+
+    Seeded and imported records carry "Business capability: Backup and Recovery" for a capability of that name;
+    that is the name repeated, not documentation.
+    """
+    text = (el.get("description") or "").strip()
+    if not text:
+        return False
+    name = (el.get("name") or "").strip().lower()
+    body = text.lower()
+    if ":" in body and body.split(":", 1)[1].strip() == name:
+        return False
+    return body != name
 
 
 @archimate_crud.route(f"/{_LAYER_URL_PATTERN}/<element_type>")
@@ -1483,7 +1517,72 @@ def list_elements(layer, element_type):
         initial_layer=initial_layer,
         initial_element_type=initial_element_type,
         element_field_configs=ELEMENT_FIELD_CONFIGS,
+        type_table=_type_table_context(initial_layer, element_type, search),
     )
+
+
+_TYPE_TABLE_PAGE_SIZES = (10, 25, 50, 100)
+_TYPE_TABLE_SORTS = {"name": "name", "type": "element_type", "source": "source"}
+
+
+def _type_table_context(layer, element_type, search):
+    """The rows, figures and addresses for the page that lists one type of element, or None.
+
+    None when the layer cannot be told or the type does not belong to it: the page then shows the layer
+    workspace, as it does without a type.
+    """
+    if layer not in LAYER_CONFIG or element_type not in _dashboard_types(layer):
+        return None
+    source = request.args.get("source", "").strip()
+    if source not in ("portfolio", "architecture"):
+        source = ""
+    sort = request.args.get("sort", "name")
+    if sort not in _TYPE_TABLE_SORTS:
+        sort = "name"
+    sort_dir = "desc" if request.args.get("dir") == "desc" else "asc"
+    per_page = safe_int_arg("per_page", 25, minimum=1, maximum=100)
+    if per_page not in _TYPE_TABLE_PAGE_SIZES:
+        per_page = 25
+    payload = _layer_elements_payload(
+        layer, search=search, type_filter=element_type, source_filter=source,
+        page=safe_int_arg("page", 1, minimum=1), per_page=per_page,
+        sort_by=_TYPE_TABLE_SORTS[sort], sort_order=sort_dir,
+    )
+    rows = []
+    for el in payload["elements"]:
+        record_id = el.get("record_id") or el["id"]
+        scope = {} if el.get("record_id") else {"ae": 1}
+        rows.append({
+            **el,
+            # The element table prints "description" under the name; the page has its own Documentation column.
+            "description": None,
+            "documentation": el.get("description") or "",
+            "href": url_for("archimate_crud.detail_element", layer=layer, element_type=element_type, element_id=record_id, **scope),
+            "edit_href": url_for("archimate_crud.update_element", layer=layer, element_type=element_type, element_id=record_id, **scope),
+            "delete_href": url_for("archimate_crud.delete_element", layer=layer, element_type=element_type, element_id=record_id, **scope),
+            "composer_id": el.get("archimate_element_id") or (el["id"] if el.get("source") == "architecture" else None),
+            "own_description": _has_own_description(el),
+        })
+    pagination = payload["pagination"]
+    return {
+        "rows": rows,
+        "summary": payload["summary"],
+        "page": pagination["page"],
+        "pages": max(pagination["pages"], 1),
+        "per_page": per_page,
+        "total": pagination["total"],
+        "page_sizes": _TYPE_TABLE_PAGE_SIZES,
+        "search": search,
+        "source": source,
+        "sort": sort,
+        "sort_dir": sort_dir,
+        "layer": layer,
+        "element_type": element_type,
+        # The ArchiMate name as a person says it ("Work package"), not the plain-language alias ("Platform" for a Node):
+        # the page lists this type, and the row says so.
+        "type_label": re.sub(r"(?<!^)(?=[A-Z])", " ", element_type).capitalize(),
+        "new_href": url_for("archimate_crud.create_element", layer=layer, element_type=element_type),
+    }
 
 
 def _selected_layer_for(layer):
