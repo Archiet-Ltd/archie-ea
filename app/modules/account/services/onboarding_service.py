@@ -158,6 +158,16 @@ def choices(org) -> Dict[str, Any]:
     }
 
 
+COMPANY_PROFILE_PAGE = "/account/manage"
+
+
+def company_profile(org) -> Optional[Dict[str, Any]]:
+    """The company profile the sign-up recorded (kind, industry), with the page that shows it,
+    or None when nothing is recorded."""
+    values = {key: value for key, value in choices(org).items() if key in ("kind", "industry") and value}
+    return {"values": values, "href": COMPANY_PROFILE_PAGE} if values else None
+
+
 def chosen_canvases(org) -> Optional[List[str]]:
     """The canvases the organisation chose, or None until the person has answered (sign-up then ticks the defaults)."""
     kept = _context(org).get("canvases")

@@ -173,6 +173,40 @@ def get_query_examples():
 # ============================================================================
 
 
+def own_record_questions(org_id):
+    """What an organisation with no applications is first offered: a question about each canvas and
+    framework it picked at sign-up, which the turn answers from those records and cites, and, when no
+    source is connected, a card to the GitHub connector. Read for this organisation only."""
+    from app import db
+    from app.models.organization import Organization
+    from app.modules.account.services import onboarding_service as onboarding
+
+    held = onboarding.loaded_at_sign_up(org_id)
+    org = db.session.get(Organization, org_id)
+    cards = [
+        {"question": "What does our company profile say about us?", "detail": "Recorded at sign-up"}
+    ] if org is not None and onboarding.company_profile(org) else []
+    cards += [
+        {"question": "What does our %s say about the company?" % row["name"],
+         "detail": "%d entries" % row["entries"] if row["entries"] else "Created at sign-up"}
+        for row in held["canvases"]
+    ] + [
+        {"question": "Which %s %ss apply to us?" % (row["name"], row["unit"]), "detail": "%d listed" % row["count"]}
+        for row in held["frameworks"]
+        if row["count"]
+    ]
+    if org is not None and all(s["state"] == "not_given" for s in onboarding.sources(org) if s["key"] != "website"):
+        cards.insert(
+            0,
+            {
+                "question": "Connect GitHub to see who owns what and what breaks",
+                "detail": "Nothing is connected yet",
+                "href": "/admin/connectors/github",
+            },
+        )
+    return cards[:4]
+
+
 @unified_ai_chat_bp.route("/first-questions")
 @login_required
 def get_first_questions():
@@ -206,6 +240,8 @@ def get_first_questions():
             )
         ).scalar_one(),
     )
+    if recorded == 0:
+        return jsonify({"questions": own_record_questions(org_id), "applications": 0, "basis": "records"})
     ends = relationship_ends(org_id)
     if not ends:
         return jsonify({"questions": [], "applications": recorded})

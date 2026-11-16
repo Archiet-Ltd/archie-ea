@@ -530,14 +530,21 @@
             const rows = cardRows(shown);
 
             done(
-                '<div class="grid grid-cols-1 gap-2 sm:gap-3 md:grid-cols-2">' + rows + '</div>' +
+                (offered.basis === 'records' && startupSteps ? '<div data-startup-next-step></div>' : '') +
+                '<div class="mt-4 grid grid-cols-1 gap-2 sm:gap-3 md:grid-cols-2">' + rows + '</div>' +
                 '<p class="mt-3 text-center text-xs text-muted-foreground">' +
-                  (linked.length < 4
+                  (offered.basis === 'records'
+                    ? 'Questions about what you picked at sign-up, then general questions.'
+                    : linked.length < 4
                     ? 'Linked applications first, then general questions.'
                     : 'Questions about your most connected applications') + '</p>'
             );
 
             host._items = shown;
+            if (offered.basis === 'records' && startupSteps) {
+                host.querySelector('[data-startup-next-step]').appendChild(startupSteps.content.cloneNode(true));
+                lockWhileLoading(host.querySelector('[data-sample-form]'));
+            }
         } catch (err) {
             /* An outage must not read as a clean portfolio. The endpoint's own
                500 body carries empty arrays, which is precisely the shape of
@@ -574,6 +581,7 @@
         const host = document.getElementById('portfolio-briefing');
         const picked = host && host._items && host._items[Number(item.dataset.index)];
         if (!picked) return;
+        if (picked.href) { window.location.assign(picked.href); return; }
         const input = document.getElementById('user-input');
         const form = document.getElementById('chat-form');
         if (!input || !form) return;
