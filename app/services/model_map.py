@@ -159,3 +159,34 @@ def build_model_map(layer: Optional[str] = None) -> Dict[str, Any]:
         unconnected = sum(1 for n in nodes if not n["connected"])
     return {**base, "mode": "elements", "nodes": nodes, "edges": edges, "truncated": truncated,
             "shown": len(nodes), "unconnected": unconnected}
+
+
+def list_rows(layer: Optional[str] = None, element_type: Optional[str] = None) -> Dict[str, Any]:
+    """The elements the map draws, as rows for the list view: the same elements as the map for the same layer.
+
+    ``related`` is how many other elements the element is linked to (0 when nothing connects to it). The rows are
+    capped at ``MAX_NODES``, like the map, and ``truncated`` says so.
+    """
+    from app.models.archimate_core import ArchiMateElement as E, ArchiMateRelationship as R
+    from app.services import archimate_viewpoint_service as counting
+    from app.utils.tenant_sql import current_org_id
+
+    wanted = layer if layer in LAYERS else None
+    query = counting.layer_model_query(_counting_layer(wanted), current_org_id()) if wanted else E.query
+    query = query.with_entities(E.id, E.name, E.type, E.layer, E.description)
+    rows = query.order_by(E.name, E.id).all()
+    neighbours: Dict[int, set] = {}
+    for s, t in db.session.execute(db.select(R.source_id, R.target_id)).all():
+        if s is not None and t is not None and s != t:
+            neighbours.setdefault(s, set()).add(t)
+            neighbours.setdefault(t, set()).add(s)
+    out, kinds = [], {}
+    for r in rows:
+        key = layer_key(r.layer, r.type)
+        kinds[r.type or "Element"] = kinds.get(r.type or "Element", 0) + 1
+        if element_type and (r.type or "Element") != element_type:
+            continue
+        out.append({"id": r.id, "name": r.name or "Element %d" % r.id, "type": r.type or "Element", "layer": key,
+                    "layer_label": LAYER_LABELS[key], "description": r.description,
+                    "related": len(neighbours.get(r.id, ())), "href": element_href(r.id, key, r.type)})
+    return {"rows": out[:MAX_NODES], "truncated": len(out) > MAX_NODES, "kinds": sorted(kinds), "total": len(out)}

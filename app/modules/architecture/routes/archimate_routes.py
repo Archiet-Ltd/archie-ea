@@ -7435,9 +7435,16 @@ def model_map_page():
     counts = model_map.layer_counts()
     total = sum(c["count"] for c in counts)
     store_total = None if any(c["total"] is None for c in counts) else sum(c["total"] for c in counts)
+    as_list = request.args.get("view", "").strip().lower() == "list"
+    listing = None
+    if as_list:
+        element_type = request.args.get("type", "").strip() or None
+        listing = model_map.list_rows(layer or None, element_type)
+        listing["type"] = element_type or ""
     return render_template(
         "architecture/impact_graph.html", element=None, decisions=[], model_map=True,
         map_layer=layer, map_counts=counts, map_total=total, map_store_total=store_total,
+        map_listing=listing,
     )
 
 

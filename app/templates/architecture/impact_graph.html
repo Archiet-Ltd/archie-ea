@@ -3,6 +3,10 @@
 {% from "components/page_header.html" import page_header %}
 {% from "components/button.html" import button %}
 {% from 'intelligence/_entity_picker.html' import entity_picker with context %}
+{% from 'components/element_table.html' import element_table %}
+{% from 'basecoat/table.html' import table_cell %}
+{% from 'basecoat/native-select.html' import native_select_wrapper, native_select, native_select_option %}
+{% set as_list = model_map and map_listing is not none %}
 
 {% block title %}{% if model_map %}Model map{% else %}{{ element.name }} — Impact{% endif %}{% endblock %}
 
@@ -13,7 +17,8 @@
       title='Model map' if model_map else 'Impact graph',
       description=('Every element of your model, coloured by ArchiMate layer. Hover an element to see where it came from; click it to open it.' if model_map else 'Blast radius — what depends on this element, and what it depends on.'),
       breadcrumbs=([
-        {'label': 'Model', 'href': '/architecture/elements'},
+        {'label': 'Home', 'href': url_for('main.index')},
+        {'label': 'Model', 'href': url_for('archimate_crud.dashboard')},
         {'label': 'Model map'}
       ] if model_map else [
         {'label': 'ArchiMate elements', 'href': '/archimate/elements'},
@@ -37,16 +42,16 @@
     </div>
   </section>
   {% else %}
-  <div {% if model_map %}x-data="modelMapSearch()"{% endif %}>
+  <div {% if model_map and not as_list %}x-data="modelMapSearch()"{% endif %}>
 
   {# ── Control bar: depth + counts ─────────────────────────────────────── #}
   <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
     {% if model_map %}
     <div class="flex flex-wrap items-center gap-2" role="group" aria-label="Show one layer">
-      {{ button(text='All layers', variant='default' if not map_layer else 'outline', size='sm', href=url_for('archimate.model_map_page'), testid='model-map-all-layers') }}
+      {{ button(text='All layers', variant='default' if not map_layer else 'outline', size='sm', href=url_for('archimate.model_map_page', view='list' if as_list else none), testid='model-map-all-layers') }}
       {% for c in map_counts if c.count or c.total or c.total is none %}
       {% set shown = c.count ~ (', total not known' if c.total is none else (' of ' ~ c.total if c.not_drawn else '')) %}
-      {{ button(text=c.label ~ ' (' ~ shown ~ ')', variant='default' if map_layer == c.layer else 'outline', size='sm', href=(url_for('archimate.model_map_page', layer=c.layer) if c.count else url_for('archimate_crud.dashboard', layer=c.layer)), testid='model-map-layer-' ~ c.layer) }}
+      {{ button(text=c.label ~ ' (' ~ shown ~ ')', variant='default' if map_layer == c.layer else 'outline', size='sm', href=(url_for('archimate.model_map_page', layer=c.layer, view='list' if as_list else none) if c.count else url_for('archimate_crud.dashboard', layer=c.layer)), testid='model-map-layer-' ~ c.layer) }}
       {% endfor %}
     </div>
     {% else %}
@@ -61,13 +66,44 @@
     </div>
     {% endif %}
     <div class="flex items-center gap-3">
-      <div id="impact-counts" class="text-sm text-muted-foreground" aria-live="polite" data-testid="model-map-counts">Loading…</div>
+      <div id="impact-counts" class="text-sm text-muted-foreground" aria-live="polite" data-testid="model-map-counts">{% if as_list %}{% set _row = map_counts | selectattr('layer', 'equalto', map_layer) | first if map_layer else none %}{% set _all = _row.total if _row else map_store_total %}{{ map_listing.total }}{% if not map_listing.type and _all is not none and _all > map_listing.total %} of {{ _all }}{% endif %} element{{ '' if map_listing.total == 1 else 's' }}{% else %}Loading…{% endif %}</div>
       {% if model_map %}
-      {{ button(text='View as list', icon='list', variant='outline', size='sm', href=url_for('architecture_crud.list_elements', layer=map_layer) if map_layer else url_for('architecture_crud.list_elements'), testid='model-map-view-as-list') }}
+      <div class="inline-flex rounded-md border border-border" role="group" aria-label="How to show the model" data-testid="model-map-view-toggle">
+        {{ button(text='Diagram', icon='waypoints', variant='outline' if as_list else 'default', size='sm', href=url_for('archimate.model_map_page', layer=map_layer or none), testid='model-map-view-diagram', aria_label='Show the model as a diagram') }}
+        {{ button(text='List', icon='list', variant='default' if as_list else 'outline', size='sm', href=url_for('archimate.model_map_page', layer=map_layer or none, view='list'), testid='model-map-view-list', aria_label='Show the model as a list') }}
+      </div>
       {% endif %}
     </div>
   </div>
 
+  {% if as_list %}
+  {% macro _list_filters() %}
+  <form method="get" action="{{ url_for('archimate.model_map_page') }}" class="flex flex-wrap items-center gap-2" data-testid="model-map-list-filters">
+    <input type="hidden" name="view" value="list">
+    {% call native_select_wrapper() %}
+      {% call native_select(name='layer', size='sm', attrs={'aria-label': 'Layer', 'data-autosubmit': ''}) %}
+        {{ native_select_option(text='All layers', value='') }}
+        {% for c in map_counts if c.count %}{{ native_select_option(text=c.label, value=c.layer, selected=(c.layer == map_layer)) }}{% endfor %}
+      {% endcall %}
+    {% endcall %}
+    {% call native_select_wrapper() %}
+      {% call native_select(name='type', size='sm', attrs={'aria-label': 'Type', 'data-autosubmit': ''}) %}
+        {{ native_select_option(text='All types', value='') }}
+        {% for t in map_listing.kinds %}{{ native_select_option(text=t, value=t, selected=(t == map_listing.type)) }}{% endfor %}
+      {% endcall %}
+    {% endcall %}
+    <noscript>{{ button(text='Apply', type='submit', variant='outline', size='sm') }}</noscript>
+  </form>
+  {% endmacro %}
+  <div data-testid="model-map-list">
+    {% if map_listing.truncated %}<p class="mb-2 text-xs text-muted-foreground">The first {{ map_listing.rows | length }} of {{ map_listing.total }} elements are listed. Pick a layer or a type to narrow it.</p>{% endif %}
+    {% call(e) element_table(rows=map_listing.rows, columns=[('Type', ''), ('Layer', 'hidden md:table-cell'), ('Related to', '')], caption='Elements of the model', testid='model-map-table', row_testid='model-map-row', link_testid='model-map-element-link', page_size=25, search_placeholder='Filter elements...', toolbar=true, toolbar_actions=_list_filters, empty_message='No elements match these filters.') %}
+      {% call table_cell() %}{{ e.type }}{% endcall %}
+      {% call table_cell(class='hidden md:table-cell') %}{{ e.layer_label }}{% endcall %}
+      {% call table_cell(attrs={'data-sort': e.related}) %}{% if e.related %}{{ e.related }} element{{ '' if e.related == 1 else 's' }}{% else %}<span class="text-muted-foreground">Not connected to anything</span>{% endif %}{% endcall %}
+    {% endcall %}
+  </div>
+  {% else %}
   {% if model_map %}
   <div class="mb-4 max-w-md" data-testid="model-map-find">{{ entity_picker('map', prompt='Find an element by name') }}</div>
   {% endif %}
@@ -114,8 +150,8 @@
         </div>
         <ul id="model-map-legend" class="space-y-1.5 text-sm mt-3 lg:block" :class="open ? '' : 'hidden lg:block'" data-testid="model-map-legend">
           {% for c in map_counts if c.count or c.total or c.total is none %}
-          <li class="flex items-center justify-between gap-2" data-layer="{{ c.layer }}" data-testid="model-map-legend-{{ c.layer }}">
-            <span class="flex items-center gap-2 min-w-0"><span class="inline-block h-3 w-3 shrink-0 rounded-full border-2 bg-notation-{{ c.layer }} border-notation-{{ c.layer }}-stroke"></span><span class="truncate">{{ c.label }}</span></span>
+          <li class="flex items-start justify-between gap-2" data-layer="{{ c.layer }}" data-testid="model-map-legend-{{ c.layer }}">
+            <span class="flex items-start gap-2 min-w-0"><span class="mt-1 inline-block h-3 w-3 shrink-0 rounded-full border-2 bg-notation-{{ c.layer }} border-notation-{{ c.layer }}-stroke"></span><span class="break-words">{{ c.label }}</span></span>
             <span class="tabular-nums whitespace-nowrap text-muted-foreground" data-testid="model-map-count-{{ c.layer }}">{{ c.count }}{% if c.total is none %}, total not known{% elif c.not_drawn %} of {{ c.total }}{% endif %}</span>
           </li>
           {% endfor %}
@@ -184,6 +220,8 @@
     </aside>
   </div>
 
+  {% endif %}{# not as_list #}
+
   {# ── Readable lists of the same answer the graph draws ─────────────── #}
   {% if not model_map %}
   <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
@@ -206,7 +244,7 @@
 {% endblock %}
 
 {% block extra_head_js %}
-{% if model_map %}
+{% if model_map and not as_list %}
 <script src="{{ url_for('static', filename='js/intelligence/core.js') }}"></script>
 <script src="{{ url_for('static', filename='js/intelligence/picker.js') }}"></script>
 <script src="{{ url_for('static', filename='js/model_map_search.js') }}"></script>
@@ -214,7 +252,7 @@
 {% endblock %}
 
 {% block extra_js %}
-{% if not model_map or map_total %}
+{% if not as_list and (not model_map or map_total) %}
 <script src="/static/vendor/d3.min.js"></script>
 <script src="/static/js/impact_graph.js"></script>
 {% endif %}
