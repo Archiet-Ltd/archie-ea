@@ -187,13 +187,15 @@ def _walk_dir():
     return tempfile.gettempdir()
 
 
-def test_connections_list_has_fourteen_rows_each_opening_details(browser, live_server, hub):
+def test_connections_list_has_twelve_rows_each_opening_details(browser, live_server, hub):
     context, page = _open(browser, live_server, hub, 1440, 900, "light")
     try:
         page.locator("#composer-focus-list-toggle").click()
         rows = page.locator("[data-focus-row]")
         expect(rows.first).to_be_visible()
-        assert rows.count() == 14, rows.count()
+        # Twelve: an element reached by a recorded link and a worked-out one is one row (it was fourteen
+        # when each way counted as a row of its own).
+        assert rows.count() == 12, rows.count()
         rows.nth(0).get_by_role("button").first.click()
         panel = page.locator(".detail-panel")
         expect(panel).to_be_visible(timeout=PAGE_TIMEOUT)
