@@ -565,6 +565,7 @@ def api_unified_capabilities():
                         "code": capability.code,
                         "source": capability.discovery_source,
                         "type": "Application",
+                        "capability_type": "business",
                         "level": capability.level,
                         "category": capability.category,
                         "domain": {
@@ -666,6 +667,11 @@ def api_unified_capabilities():
                     # Use pre-fetched lookup instead of query
                     unified_cap = unified_caps_by_id.get(unified_cap_id)
 
+                if unified_cap is None:
+                    # The capability row is not readable by this organisation (another
+                    # organisation's, or gone): listing it would show a stranger's id.
+                    continue
+
                 unified_capabilities.append(
                     {
                         "id": str(
@@ -676,6 +682,8 @@ def api_unified_capabilities():
                         else f"Manufacturing Process {capability.id}",
                         "code": unified_cap.code if unified_cap else f"MFG-{capability.id}",
                         "type": "Manufacturing",
+                        # The id above is a unified capability id, not a business one.
+                        "capability_type": "unified",
                         "level": unified_cap.level
                         if unified_cap
                         else getattr(capability, "level", 1),  # model-safety-ok: polymorphic ManufacturingCapability does not have level
