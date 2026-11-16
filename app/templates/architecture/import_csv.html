@@ -1,6 +1,7 @@
 {# design-block: form #}
 {% extends "layouts/admin_base.html" %}
-{% from 'archimate/_import_shared.html' import import_header, import_form_card with context %}
+{% from 'macros/page_shell.html' import page_shell %}
+{% from 'archimate/_import_shared.html' import import_tabs, import_trail, import_form_card with context %}
 {% from 'components/button.html' import button %}
 {% from 'components/select.html' import native_select %}
 {% from 'components/input.html' import label %}
@@ -11,7 +12,7 @@
 
 {% block content %}
 <div class="p-6 space-y-6" x-data="archimateImport()" @file-selected="onFileSelected($event.detail.files[0])">
-    {{ import_header('File', 'Import a file', 'Create ArchiMate elements from a spreadsheet, an ArchiMate exchange file or a document.') }}
+    {{ page_shell(title='Import a file', subtitle='Create ArchiMate elements from a spreadsheet, an ArchiMate exchange file or a document.', breadcrumb=import_trail + [('Import a file', none)], tabs=import_tabs['File']) }}
 
     {% call import_form_card('import-file', 'File',
             '.csv,.xlsx,.xls,.xml,.archimate,.pdf,.docx,.doc,.pptx,.ppt,.txt,.md,.rtf',

@@ -1,6 +1,7 @@
 {# design-block: form #}
 {% extends "layouts/admin_base.html" %}
-{% from 'archimate/_import_shared.html' import import_header, import_form_card with context %}
+{% from 'macros/page_shell.html' import page_shell %}
+{% from 'archimate/_import_shared.html' import import_tabs, import_trail, import_form_card with context %}
 {% from 'components/button.html' import button %}
 {% from 'components/input.html' import label %}
 {% from 'components/select.html' import native_select %}
@@ -17,7 +18,7 @@
 
 {% block content %}
 <div x-data="diagramImport()" x-cloak @file-selected="file = $event.detail.files[0]; report = null; committed = false">
-    {{ import_header('Diagram', 'Import a diagram', 'Bring in a Lucidchart or Visio drawing and check what it would create before anything is saved.') }}
+    {{ page_shell(title='Import a diagram', subtitle='Bring in a Lucidchart or Visio drawing and check what it would create before anything is saved.', breadcrumb=import_trail + [('Import a diagram', none)], tabs=import_tabs['Diagram']) }}
 
     {# ── Step 1: the file and how to read it ─────────────────────────────── #}
     {% call import_form_card('diagram-file', 'Diagram file',

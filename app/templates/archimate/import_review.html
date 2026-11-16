@@ -1,6 +1,7 @@
 {# design-block: form #}
 {% extends "layouts/admin_base.html" %}
-{% from 'archimate/_import_shared.html' import import_header with context %}
+{% from 'macros/page_shell.html' import page_shell %}
+{% from 'archimate/_import_shared.html' import import_tabs, import_trail with context %}
 {% from 'components/list_table.html' import list_table %}
 {% from 'components/button.html' import button %}
 {% from 'components/select.html' import native_select %}
@@ -37,7 +38,7 @@ Nothing is waiting: everything an import guessed has been reviewed. <a class="un
 
 {% block content %}
 <div class="p-6 space-y-6">
-{{ import_header('Review', 'Review an import', 'Each line below was worked out by the importer rather than stated in the file. Confirming marks it as checked; it changes nothing else.') }}
+{{ page_shell(title='Review an import', subtitle='Each line below was worked out by the importer rather than stated in the file. Confirming marks it as checked; it changes nothing else.', breadcrumb=import_trail + [('Review an import', none)], tabs=import_tabs['Review']) }}
 
 <p id="review-message" class="text-sm text-muted-foreground" role="status" hidden></p>
 

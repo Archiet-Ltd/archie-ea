@@ -1,20 +1,14 @@
 {# The import job's one place: the same trail, the same File / Diagram / Review tabs, the same form card. #}
-{% from 'macros/page_shell.html' import page_shell %}
 {% from 'components/file_upload.html' import file_upload with context %}
 {% import 'components/card.html' as card %}
 
-{% macro import_header(active, title, subtitle, actions=none) -%}
-{{ page_shell(
-    title=title,
-    subtitle=subtitle,
-    breadcrumb=[('Home', url_for('main.index')), ('Composer', url_for('archimate.composer_page')),
-                ('Import', url_for('archimate.import_page')), (title, none)],
-    actions_caller=actions,
-    tabs=[('File', url_for('archimate.import_page'), active == 'File', 'import-tab-file'),
-          ('Diagram', url_for('archimate.import_diagram_page'), active == 'Diagram', 'import-tab-diagram'),
-          ('Review', url_for('archimate.import_review_page'), active == 'Review', 'import-tab-review')]
-) }}
-{%- endmacro %}
+{% set import_tabs = {} %}
+{% for active in ['File', 'Diagram', 'Review'] %}
+{% set _ = import_tabs.update({active: [('File', url_for('archimate.import_page'), active == 'File', 'import-tab-file'),
+    ('Diagram', url_for('archimate.import_diagram_page'), active == 'Diagram', 'import-tab-diagram'),
+    ('Review', url_for('archimate.import_review_page'), active == 'Review', 'import-tab-review')]}) %}
+{% endfor %}
+{% set import_trail = [('Home', url_for('main.index')), ('Composer', url_for('archimate.composer_page')), ('Import', url_for('archimate.import_page'))] %}
 
 {# One card holding the file control; the page's own options and actions go in the call block. #}
 {% macro import_form_card(id, label, accept, accept_label, help) -%}
