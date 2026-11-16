@@ -333,7 +333,7 @@ def get_group_savings(group_id):
     """Get estimated savings for a duplicate group"""
     try:
         group = UnifiedDuplicateGroup.query.get(group_id)
-        if not group:
+        if not group or not group_visible_to_caller(group):
             return jsonify({"success": False, "error": "Group not found"}), 404
         savings = unified_service._estimate_group_savings(group)
         reply = {"success": True, "savings": savings}

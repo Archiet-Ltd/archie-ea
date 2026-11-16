@@ -336,7 +336,7 @@ class UnifiedDuplicateService:
         """
         Get duplicate groups with filtering and pagination.
         """
-        query = UnifiedDuplicateGroup.query
+        query = organisation_groups_query()
 
         if run_id:
             query = query.filter_by(detection_run_id=run_id)

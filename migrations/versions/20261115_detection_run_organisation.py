@@ -5,14 +5,14 @@ unified_detection_runs. Existing runs stay NULL and are shown to nobody.
 Safe to run twice: each piece is checked before it is added.
 
 Revision ID: 20261115_run_organisation
-Revises: 20261115_merge_lmoneypage01b
+Revises: 20261115_motivation_retype
 Create Date: 2026-11-15
 """
 import sqlalchemy as sa
 from alembic import op
 
 revision = "20261115_run_organisation"
-down_revision = "20261115_merge_lmoneypage01b"
+down_revision = "20261115_motivation_retype"
 branch_labels = None
 depends_on = None
 

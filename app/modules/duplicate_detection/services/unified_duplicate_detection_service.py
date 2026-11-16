@@ -92,8 +92,10 @@ def organisation_groups_query():
         .having(sa_func.count(unified_group_members.c.application_id) >= 2)
         .subquery()
     )
+    visible_runs = organisation_runs_query().with_entities(UnifiedDetectionRun.id)
     return UnifiedDuplicateGroup.query.filter(
-        UnifiedDuplicateGroup.id.in_(db.session.query(active.c.group_id))
+        UnifiedDuplicateGroup.id.in_(db.session.query(active.c.group_id)),
+        UnifiedDuplicateGroup.detection_run_id.in_(visible_runs.subquery().select()),
     )
 
 
@@ -1497,7 +1499,7 @@ class UnifiedDuplicateDetectionService:
                 enterprise_data = []
 
             if mode == "simple" or mode == "all":
-                simple_groups = UnifiedDuplicateGroup.query.all()
+                simple_groups = organisation_groups_query().all()
 
                 # Batch-load all group→application mappings to avoid N+1 queries
                 from app.models.unified_duplicate_detection import unified_group_members

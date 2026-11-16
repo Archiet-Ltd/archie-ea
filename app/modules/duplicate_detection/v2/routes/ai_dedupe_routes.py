@@ -12,7 +12,7 @@ from werkzeug.exceptions import HTTPException
 import json
 import logging
 
-from flask import Blueprint, g, jsonify, render_template, request
+from flask import Blueprint, jsonify, render_template, request
 from app.middleware.tenant_decorators import platform_admin_required
 from flask_login import login_required
 
@@ -34,6 +34,9 @@ except ImportError:
 from app.models.unified_duplicate_detection import (
     UnifiedDetectionRun,
     UnifiedDuplicateGroup,
+)
+from app.modules.duplicate_detection.services.unified_duplicate_detection_service import (
+    organisation_runs_query,
 )
 from app.modules.duplicate_detection.services.unified_duplicate_service import (
     UnifiedDuplicateService,
@@ -145,9 +148,8 @@ def ai_analyze():
 def ai_insights(run_id):
     """View AI insights for a specific detection run"""
     try:
-        run = UnifiedDetectionRun.query.filter(
-            UnifiedDetectionRun.id == run_id,
-            UnifiedDetectionRun.organization_id == g.current_org_id,
+        run = organisation_runs_query().filter(
+            UnifiedDetectionRun.id == run_id
         ).first_or_404()
         if (getattr(run, "strategy", "") or "").startswith("ai_"):
             groups = UnifiedDuplicateGroup.query.filter_by(detection_run_id=run_id).all()
@@ -168,7 +170,7 @@ def ai_insights(run_id):
                 if groups
                 else 0,
                 "groups_with_ai_insights": len(
-                    [g for g in groups if g.metadata and "ai_insights" in g.metadata]
+                    [g for g in groups if g.match_details and "ai_insights" in g.match_details]
                 ),
             }
             if groups and groups[0].metadata:

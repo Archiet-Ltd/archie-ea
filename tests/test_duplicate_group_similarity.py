@@ -381,3 +381,104 @@ def test_statistics_count_only_the_organisations_own_groups_and_agree_with_the_l
     body = client.get("/duplicate-detection/simple/api/statistics").get_json()
     listing = client.get("/duplicate-detection/simple/groups").get_json()
     assert body["total_groups"] == len(listing["groups"]) == 1
+
+
+def _pre_column_group(db_session, org):
+    """A group found by a run that predates the run's organisation column."""
+    from app.models.unified_duplicate_detection import UnifiedDetectionRun, UnifiedDuplicateGroup
+    from app import db
+
+    apps = _apps(db_session, org, "Old Ledger", "Old Ledger Copy")
+    run = UnifiedDetectionRun(
+        run_name="Before organisations", strategy="hybrid", status="completed", organization_id=None
+    )
+    db_session.add(run)
+    db_session.flush()
+    group = UnifiedDuplicateGroup(
+        name="Old Ledger", duplicate_type="exact", similarity_score=1.0, detection_run_id=run.id
+    )
+    db_session.add(group)
+    db_session.flush()
+    for app_row in apps:
+        db.session.execute(
+            db.text("INSERT INTO unified_group_members (group_id, application_id) VALUES (:g, :a)"),
+            {"g": group.id, "a": app_row.id},
+        )
+    db_session.flush()
+    return group
+
+
+def test_a_group_from_a_run_the_organisation_cannot_see_is_not_counted(
+    db_session, tenant_ctx, login_as, client, world
+):
+    from app.modules.duplicate_detection.services.unified_duplicate_detection_service import (
+        count_organisation_groups,
+    )
+
+    _pre_column_group(db_session, world["own"])
+    user = _user(db_session, world["own"])
+    db_session.commit()
+    with tenant_ctx(world["own"].id):
+        assert count_organisation_groups() == (0, 0)
+    login_as(client, user)
+    body = client.get("/duplicate-detection/simple/api/statistics").get_json()
+    listing = client.get("/duplicate-detection/simple/groups").get_json()
+    assert body["latest_run"] is None
+    assert (body["total_groups"], body["high_priority_groups"]) == (0, 0)
+    assert len(listing["groups"]) == 0
+
+
+def test_savings_of_another_organisations_group_answers_not_found(
+    db_session, tenant_ctx, login_as, client, world
+):
+    _two_organisations_with_runs(db_session, tenant_ctx, world)
+    own_user = _user(db_session, world["own"])
+    db_session.commit()
+    (own_group,) = _groups_of(world["own"])
+    (other_group,) = _groups_of(world["other"])
+    login_as(client, own_user)
+    assert client.get(f"/duplicate-detection/simple/savings/{own_group.id}").status_code == 200
+    assert client.get(f"/duplicate-detection/simple/savings/{other_group.id}").status_code == 404
+
+
+def test_ai_run_page_shows_only_the_organisations_own_runs_and_nothing_without_one(
+    db_session, tenant_ctx, login_as, client, world
+):
+    from app.models.unified_duplicate_detection import UnifiedDetectionRun
+    from app.modules.duplicate_detection.services.unified_duplicate_detection_service import (
+        organisation_runs_query,
+    )
+
+    _two_organisations_with_runs(db_session, tenant_ctx, world)
+    own_run = UnifiedDetectionRun.query.filter_by(organization_id=world["own"].id).one()
+    other_run = UnifiedDetectionRun.query.filter_by(organization_id=world["other"].id).one()
+    admin = _user(db_session, world["own"])
+    admin.is_org_admin = True
+    admin.is_platform_admin = True
+    db_session.commit()
+    own_id, other_id = own_run.id, other_run.id
+
+    with tenant_ctx(None):
+        assert organisation_runs_query().count() == 0
+    login_as(client, admin)
+    assert client.get(f"/duplicate-detection/ai/insights/{own_id}").status_code == 200
+    assert client.get(f"/duplicate-detection/ai/insights/{other_id}").status_code == 404
+
+
+def test_ai_run_page_without_any_active_organisation_answers_not_found_not_an_error(
+    app, db_session, tenant_ctx, world
+):
+    import inspect
+
+    from werkzeug.exceptions import NotFound
+
+    from app.modules.duplicate_detection.v2.routes import ai_dedupe_routes
+
+    _two_organisations_with_runs(db_session, tenant_ctx, world)
+    view = inspect.unwrap(ai_dedupe_routes.ai_insights)
+    from flask import g
+
+    with app.test_request_context("/"):
+        g.pop("current_org_id", None)  # no organisation was ever set on g
+        with pytest.raises(NotFound):
+            view(1)
