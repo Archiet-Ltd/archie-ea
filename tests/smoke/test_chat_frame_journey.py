@@ -335,7 +335,7 @@ def _footer_journey(browser, two_provider_server, people, app):
         page.locator('[data-testid="first-question-suggestion"]').first.click()
         expect(page.locator("#messages-container")).to_contain_text("teams block each other", timeout=PAGE_TIMEOUT)
         footer = page.locator("#chat-model-name")
-        expect(footer).to_contain_text("Nvidia")
+        expect(footer).to_contain_text("NVIDIA")
         assert "Openrouter" not in footer.inner_text() and "OpenRouter" not in footer.inner_text()
         asked = [h.split("/")[1] for h in _TwoProviders.hits]
         assert asked[0] == "openrouter" and asked[-1] == "nvidia", asked  # the first refused, the second answered
