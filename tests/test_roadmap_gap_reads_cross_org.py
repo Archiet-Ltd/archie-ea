@@ -39,7 +39,7 @@ def _gap(db_session, org, label):
 
     capability = UnifiedCapability(
         name="Capability %s" % label, code="RG%s" % uuid.uuid4().hex[:8], level=1,
-        organization_id=org.id, status="defined",
+        organization_id=org.id, source_org_id=org.id, status="defined",
     )
     db_session.add(capability)
     db_session.flush()
@@ -135,3 +135,122 @@ def test_both_generators_read_a_gap_by_id_only_in_the_callers_organisation(
             engine.generate_work_packages("gap", other.id, {})
         packages = engine.generate_work_packages("gap", own.id, {})
     assert any(own.name in p["name"] for p in packages)
+
+
+def _gap_on(db_session, label, capability=None, application=None, creator=None):
+    from app.models.roadmap_models import ImplementationGap
+
+    gap = ImplementationGap(
+        name="Gap %s %s" % (label, uuid.uuid4().hex[:6]), gap_type="technology", status="open",
+        source_capability_id=capability.id if capability else None,
+        source_application_id=application.id if application else None,
+        created_by=creator.id if creator else None,
+    )
+    db_session.add(gap)
+    db_session.flush()
+    return gap
+
+
+def _capability(db_session, org, label):
+    from app.models.unified_capability import UnifiedCapability
+
+    capability = UnifiedCapability(
+        name="Capability %s" % label, code="RG%s" % uuid.uuid4().hex[:8], level=1,
+        organization_id=org.id if org else None, source_org_id=org.id if org else None,
+        status="defined",
+    )
+    db_session.add(capability)
+    db_session.flush()
+    return capability
+
+
+def _application(db_session, org, label):
+    from app.models.application_portfolio import ApplicationComponent
+
+    application = ApplicationComponent(
+        name="App %s %s" % (label, uuid.uuid4().hex[:6]), organization_id=org.id)
+    db_session.add(application)
+    db_session.flush()
+    return application
+
+
+def _readers(gap, org_a, org_b, tenant_ctx):
+    from app.models.roadmap_models import ImplementationGap
+
+    seen = []
+    for org in (org_a, org_b):
+        with tenant_ctx(org.id):
+            if ImplementationGap.in_organization(org.id).filter_by(id=gap.id).count():
+                seen.append(org.id)
+    return seen
+
+
+def test_a_gap_on_one_organisations_capability_and_anothers_application_is_read_by_the_application_owner(
+    db_session, make_org, tenant_ctx
+):
+    org_a, org_b = make_org("rg-ma"), make_org("rg-mb")
+    gap = _gap_on(db_session, "mixed", capability=_capability(db_session, org_a, "a"),
+                  application=_application(db_session, org_b, "b"))
+    assert _readers(gap, org_a, org_b, tenant_ctx) == [org_b.id]
+
+
+def test_an_unlinked_gap_belongs_to_its_creators_organisation(db_session, make_org, tenant_ctx):
+    org_a, org_b = make_org("rg-ua"), make_org("rg-ub")
+    gap = _gap_on(db_session, "unlinked", creator=_user(db_session, org_a))
+    assert _readers(gap, org_a, org_b, tenant_ctx) == [org_a.id]
+
+
+def test_a_gap_on_one_application_is_read_only_by_its_organisation(db_session, make_org, tenant_ctx):
+    org_a, org_b = make_org("rg-pa"), make_org("rg-pb")
+    gap = _gap_on(db_session, "app", application=_application(db_session, org_a, "a"))
+    assert _readers(gap, org_a, org_b, tenant_ctx) == [org_a.id]
+
+
+def test_the_gap_register_merge_gives_a_gap_the_organisation_that_reads_it(
+    db_session, make_org, tenant_ctx
+):
+    from app.commands.consolidate_gaps import _MERGE_SOURCES
+    from app.models.roadmap_models import ROADMAP_GAP_OWNER_SQL
+
+    sql = _MERGE_SOURCES[0]["insert_sql"]
+    assert ROADMAP_GAP_OWNER_SQL in sql
+
+
+@pytest.mark.parametrize("module", [
+    "app.services.roadmap_automation",
+    "app.modules.solutions_strategic.v2.services.roadmap_automation",
+])
+def test_a_shared_capability_run_does_not_read_another_organisations_gap(
+    db_session, make_org, tenant_ctx, module, monkeypatch
+):
+    import importlib
+
+    engine = importlib.import_module(module).RoadmapAutomationEngine()
+    # The capability path first reads a table named "applications" whose columns no model
+    # creates; stand in an empty answer for that one query so the run reaches the gap read.
+    module_object = importlib.import_module(module)
+    real_text = module_object.text
+    monkeypatch.setattr(module_object, "text", lambda sql: real_text(
+        "SELECT 1 WHERE false" if "FROM applications a" in str(sql) else sql))
+    org_a, org_b = make_org("rg-ca"), make_org("rg-cb")
+    shared = _capability(db_session, None, "shared")
+    _gap_on(db_session, "theirs", capability=shared, creator=_user(db_session, org_b))
+    _gap_on(db_session, "ours", capability=shared, creator=_user(db_session, org_a))
+
+    with tenant_ctx(org_a.id):
+        packages = engine.generate_work_packages("capability", shared.id, {})
+    assert "with 0 applications and 1 gaps" in packages[0]["description"], packages[0]["description"]
+
+
+def test_gap_sync_does_not_credit_user_one_for_the_work_package(db_session, make_org, tenant_ctx):
+    from app.models.roadmap_models import RoadmapWorkPackage
+    from app.modules.solutions_strategic.v2.services.roadmap_sync import RoadmapDataSync
+
+    org_a = make_org("rg-ka")
+    gap = _gap(db_session, org_a, "own")
+
+    with tenant_ctx(org_a.id):
+        RoadmapDataSync().sync_gaps_to_initiatives(org_a.id, None)
+
+    package = RoadmapWorkPackage.query.filter_by(source_type="gap", source_id=gap.id).one()
+    assert package.created_by is None, package.created_by

@@ -539,7 +539,7 @@ class RoadmapDataSync:
             auto_generated=True,
             confidence_score=gap.confidence_score,
             generation_method="gap_sync",
-            created_by=user_id or 1,
+            created_by=user_id,
             last_sync_at=datetime.utcnow(),
             sync_status="synced",
         )

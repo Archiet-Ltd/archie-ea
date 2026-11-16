@@ -338,6 +338,17 @@ class RoadmapDeliverable(TenantMixin, db.Model):
         return False
 
 
+# The one rule for which organisation owns a roadmap gap: the application it was raised against,
+# else the organisation the capability came from, else the organisation of the person who made it.
+# Aliases: s = roadmap_gaps, ac = application_components, uc = unified_capabilities, u = users.
+ROADMAP_GAP_OWNER_JOINS = (
+    "LEFT JOIN application_components ac ON ac.id = s.source_application_id "
+    "LEFT JOIN unified_capabilities uc ON uc.id = s.source_capability_id "
+    "LEFT JOIN users u ON u.id = s.created_by"
+)
+ROADMAP_GAP_OWNER_SQL = "COALESCE(ac.organization_id, uc.source_org_id, u.organization_id)"
+
+
 class RoadmapGap(db.Model):
     """Roadmap Gap model (separate from Gap in implementation_migration.py)"""
 
@@ -394,25 +405,17 @@ class RoadmapGap(db.Model):
     def in_organization(cls, organization_id):
         """Query of the gaps that belong to one organisation.
 
-        The table carries no organisation column, so a gap belongs to the organisation that owns
-        the capability or application it was raised against. A gap tied to neither, a gap tied to
-        a shared capability, and an unknown organisation all read as no gaps.
+        The table carries no organisation column; ROADMAP_GAP_OWNER_SQL names the one rule for
+        which organisation a gap belongs to, and the gap-register merge uses the same text. A gap
+        with no owner by that rule, and an unknown organisation, read as no gaps.
         """
-        from app.models.application_portfolio import ApplicationComponent
-        from app.models.unified_capability import UnifiedCapability
-
         if organization_id is None:
             return cls.query.filter(db.false())
-        own_capabilities = db.select(UnifiedCapability.id).where(
-            UnifiedCapability.organization_id == organization_id)
-        own_applications = db.select(ApplicationComponent.id).where(
-            ApplicationComponent.organization_id == organization_id)
-        return cls.query.filter(
-            db.or_(
-                cls.source_capability_id.in_(own_capabilities),
-                cls.source_application_id.in_(own_applications),
-            )
-        )
+        owned = db.text(
+            "SELECT s.id FROM roadmap_gaps s " + ROADMAP_GAP_OWNER_JOINS
+            + " WHERE " + ROADMAP_GAP_OWNER_SQL + " = :organization_id"
+        ).bindparams(organization_id=organization_id)
+        return cls.query.filter(cls.id.in_(owned))
 
     def to_dict(self):
         """Convert to dictionary"""
