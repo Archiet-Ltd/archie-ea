@@ -221,11 +221,15 @@ class AIProtocolStub:
                 env[provider + '_API_KEY' + suffix] = ''
         env['LLM_API_KEY'] = ''
         env['AZURE_OPENAI_API_KEY'] = ''
+        # Include openai in the provider order so the stub is used
+        env['LLM_PROVIDER_ORDER'] = 'openai,gemini,nvidia'
+        # Set spend ceiling for openai so it's not skipped
+        env['LLM_SPEND_CEILING_USD_OPENAI'] = '10.0'
         env.update(OPENAI_API_KEY=TOKEN, OPENAI_BASE_URL=self.base_url,
                    AI_PAGE_GUIDE_ENABLED='true', REQUIRE_AI_APPROVAL='true',
                    PYTHON_DOTENV_DISABLED='1')
         bypass = ','.join(filter(None, [env.get('NO_PROXY'), env.get('no_proxy'),
-                                       '127.0.0.1,localhost,::1']))
+                                        '127.0.0.1,localhost,::1']))
         env['NO_PROXY'] = env['no_proxy'] = bypass
         return env
 
