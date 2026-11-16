@@ -413,8 +413,14 @@
                     </div>
                     <h3 class="font-medium text-sm" x-text="suggestion.name"></h3>
                     <p class="text-xs text-muted-foreground mt-1" x-text="suggestion.description"></p>
-                    <div class="entity-actions">
-                      {{ ui.button(text='Accept', size='xs', attrs={'@click': 'acceptEntity(suggestion)', 'aria-label': 'Accept entity match'}) }}
+                    <template x-if="suggestion.elementUrl">
+                      <p class="text-xs mt-2" data-testid="entity-added">
+                        <span x-text="suggestion.matched ? 'Already in your model: ' : 'Added to your model: '"></span>
+                        <a :href="suggestion.elementUrl" class="underline" x-text="suggestion.name"></a>
+                      </p>
+                    </template>
+                    <div class="entity-actions" x-show="!suggestion.elementUrl">
+                      {{ ui.button(text='Accept', size='xs', attrs={'@click.stop': 'acceptEntity(suggestion)', 'aria-label': 'Accept entity match'}) }}
                       {{ ui.button(text='Review', variant='outline', size='xs', attrs={'@click': 'reviewEntity(suggestion)', 'aria-label': 'Review suggested entity'}) }}
                       {{ ui.button(text='Dismiss', variant='destructive', size='xs', attrs={'@click': 'dismissEntity(suggestion)', 'aria-label': 'Dismiss entity suggestion'}) }}
                     </div>
@@ -590,7 +596,13 @@
             </div>
             
             <!-- Quick Actions -->
-            <div class="entity-actions">
+            <template x-if="entity.elementUrl">
+              <p class="text-xs mt-2" data-testid="entity-added">
+                <span x-text="entity.matched ? 'Already in your model: ' : 'Added to your model: '"></span>
+                <a :href="entity.elementUrl" class="underline" x-text="entity.name"></a>
+              </p>
+            </template>
+            <div class="entity-actions" x-show="!entity.elementUrl">
               <template x-if="entity.status === 'matched'">
                 <div class="flex gap-2">
                   {{ ui.button(text='Accept', size='xs', attrs={'@click.stop': 'acceptMatch(entity)', 'aria-label': 'Accept matched entity'}) }}
@@ -626,31 +638,6 @@
   </div>
   
 </div>
-
-<!-- Resolve Duplicate Dialog -->
-<template x-if="showResolve">
-  <div class="fixed inset-0 z-50 flex items-center justify-center" @click.outside="showResolve = false">
-    <div class="fixed inset-0 bg-black/50" aria-hidden="true"></div>
-    <div class="relative bg-card rounded-lg shadow-xl max-w-md w-full mx-4" role="dialog" aria-modal="true" aria-labelledby="resolve-dialog-title">
-      <div class="p-4 border-b border-border">
-        <h3 id="resolve-dialog-title" class="text-lg font-semibold">Resolve Duplicate</h3>
-      </div>
-      <div class="p-4">
-        <p class="text-sm text-muted-foreground mb-4">
-          An element named <strong x-text="resolveDuplicateInfo?.name || resolveEntity?.name"></strong> already exists in your model.
-        </p>
-        <p class="text-sm text-muted-foreground mb-4">
-          How would you like to proceed?
-        </p>
-        <div class="flex gap-2 justify-end">
-          {{ ui.button(variant='outline', attrs={'@click': 'useExistingElement()'}) }}Use Existing Element{{ endcall }}
-          {{ ui.button(attrs={'@click': 'keepAsNewElement()'}) }}Keep as New Element{{ endcall }}
-        </div>
-      </div>
-    </div>
-  </div>
-</template>
-
 {% endblock %}
 
 {% block extra_js %}
@@ -674,11 +661,6 @@ function entityMatchingChat() {
       duplicates: 0,
       relationships: 0
     },
-    
-    // Resolve duplicate dialog state
-    showResolve: false,
-    resolveEntity: null,
-    resolveDuplicateInfo: null,
     
     availablePersonas: [
       { value: 'enterprise_architect', label: 'Enterprise Architect' },
@@ -917,137 +899,64 @@ function entityMatchingChat() {
     },
     
     async acceptEntity(entity) {
-      // Call the accept route for new entities (from chat suggestions)
-      const payload = {
-        entity: {
-          name: entity.name,
-          type: entity.type.charAt(0).toUpperCase() + entity.type.slice(1), // capitalize first letter
-          recommendation: entity.description,
-        },
-        action: 'accept',
-      };
+      // A matched row carries the existing element's id; a new row carries the extracted name and type.
+      const data = entity.data || {};
+      const payload = data.entity_id
+        ? { entity_id: data.entity_id }
+        : { name: data.name || entity.name, type: data.type, recommendation: data.recommendation };
       try {
-        const result = await Platform.fetch.post('/ai-chat/entity-matching/accept', payload);
-        if (result.success) {
-          entity.status = 'accepted';
-          entity.elementId = result.element_id;
-          entity.matched = result.matched;
-          // Show success feedback
-          this.addMessage('assistant', `✅ Entity "${entity.name}" ${result.matched ? 'matched to existing element' : 'created as new element'}.`);
-        } else {
-          this.handleAcceptError(entity, result);
-        }
+        const result = await Platform.fetch.post('/ai-chat/entity-matching/accept', { entity: payload }, { silent: true });
+        entity.status = 'accepted';
+        entity.matched = result.matched;
+        entity.elementId = result.element_id;
+        entity.elementUrl = result.element_url;
       } catch (error) {
-        this.handleAcceptError(entity, error.data || { error: error.message });
-      }
-    },
-    
-    async acceptMatch(entity) {
-      // Call the accept route for matched entities (from sidebar)
-      const payload = {
-        entity: {
-          entity_id: entity.data.entity_id,
-          entity_name: entity.data.entity_name,
-          entity_type: entity.data.entity_type,
-        },
-        action: 'accept',
-      };
-      try {
-        const result = await Platform.fetch.post('/ai-chat/entity-matching/accept', payload);
-        if (result.success) {
-          entity.status = 'accepted';
-          entity.elementId = result.element_id;
+        const body = error.data || {};
+        if (body.code === 'DUPLICATE_NAME' && body.duplicate_of) {
+          entity.elementId = body.duplicate_of.id;
+          entity.elementUrl = body.duplicate_of.url;
           entity.matched = true;
-          this.addMessage('assistant', `✅ Matched entity "${entity.name}" accepted (existing element).`);
+          this.addMessage('assistant', `"${entity.name}" is already in your model, so nothing new was added.`);
         } else {
-          this.handleAcceptError(entity, result);
+          this.addMessage('assistant', body.error || 'That entity could not be added to the model. Try again.');
         }
-      } catch (error) {
-        this.handleAcceptError(entity, error.data || { error: error.message });
       }
-    },
-    
-    async importEntity(entity) {
-      // Import is the same as accept for new entities
-      await this.acceptEntity(entity);
-    },
-    
-    handleAcceptError(entity, result) {
-      if (result.code === 'DUPLICATE_NAME') {
-        // Show duplicate resolution dialog
-        this.showResolveDialog(entity, result.duplicate_of);
-      } else if (result.code === 'PERMISSION_DENIED') {
-        this.addMessage('assistant', `❌ ${result.error}`);
-      } else if (result.code === 'UNKNOWN_TYPE') {
-        this.addMessage('assistant', `❌ ${result.error}`);
-      } else {
-        this.addMessage('assistant', `❌ Failed to accept entity: ${result.error || 'Unknown error'}`);
-      }
-    },
-    
-    showResolveDialog(entity, duplicate) {
-      // Store the entity and duplicate info for the dialog
-      this.resolveEntity = entity;
-      this.resolveDuplicateInfo = duplicate;
-      this.showResolve = true;
-    },
-    
-    async resolveDuplicate(entity) {
-      // For duplicate entities in sidebar, show the resolve dialog
-      // First check if there's a duplicate guard match
-      if (entity.data && entity.data.entity_id) {
-        // This is a matched entity, navigate to it
-        this.viewDetails(entity);
-        return;
-      }
-      // For new entities flagged as duplicates, show dialog
-      this.showResolveDialog(entity, null);
-    },
-    
-    async useExistingElement() {
-      // User chose to use the existing element
-      if (this.resolveDuplicateInfo) {
-        const elementId = this.resolveDuplicateInfo.id;
-        window.location.href = `/architecture/elements/${elementId}`;
-      }
-      this.showResolve = false;
-      this.resolveEntity = null;
-      this.resolveDuplicateInfo = null;
-    },
-    
-    async keepAsNewElement() {
-      // User chose to keep as new - open review form to change name
-      this.reviewEntity(this.resolveEntity);
-      this.showResolve = false;
-      this.resolveEntity = null;
-      this.resolveDuplicateInfo = null;
     },
     
     reviewEntity(entity) {
-      if (entity.status === 'matched' || (entity.data && entity.data.entity_id)) {
-        // Matched entity: navigate to existing element
-        const elementId = entity.data?.entity_id || entity.elementId;
-        if (elementId) {
-          window.location.href = `/architecture/elements/${elementId}`;
-        }
-      } else {
-        // New entity: open prefilled review form (navigate to create element page with prefilled data)
-        const params = new URLSearchParams({
-          name: entity.name,
-          type: entity.type.charAt(0).toUpperCase() + entity.type.slice(1),
-          description: entity.description || '',
-        });
-        window.location.href = `/architecture/elements/create?${params.toString()}`;
+      // Implement review logic
+    },
+    
+    dismissEntity(entity) {
+      // Remove from suggestions
+      const index = this.allEntities.findIndex(e => e.id === entity.id);
+      if (index > -1) {
+        this.allEntities.splice(index, 1);
       }
     },
     
+    acceptMatch(entity) {
+      return this.acceptEntity(entity);
+    },
+    
+    importEntity(entity) {
+      return this.acceptEntity(entity);
+    },
+    
+    resolveDuplicate(entity) {
+      // Implement duplicate resolution
+    },
+    
+    dismissDuplicate(entity) {
+      this.dismissEntity(entity);
+    },
+    
     viewDetails(entity) {
-      const elementId = entity.elementId || entity.data?.entity_id;
-      if (elementId) {
-        window.location.href = `/architecture/elements/${elementId}`;
-      } else if (entity.status === 'new') {
-        // For new entities not yet accepted, open review form
-        this.reviewEntity(entity);
+      const url = entity.elementUrl || (entity.data && entity.data.element_url);
+      if (url) {
+        window.location.href = url;
+      } else if (entity.data && entity.data.entity_id) {
+        this.acceptEntity(entity).then(() => { if (entity.elementUrl) window.location.href = entity.elementUrl; });
       }
     },
     

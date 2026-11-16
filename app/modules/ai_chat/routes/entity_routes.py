@@ -363,50 +363,36 @@ def entity_matching_message():
 # ============================================================================
 
 
+def _element_page(element_id):
+    from flask import url_for
+
+    return url_for("architect_ui.element_traceability", element_id=element_id)
+
+
 @unified_ai_chat_bp.route("/entity-matching/accept", methods=["POST"])
 @login_required
 @audit_log("ai_chat_entity_matching_accept")
 def accept_entity_match():
-    """Accept an entity match from the Entity Matching Assistant.
+    """Accept one entity from Match entities into the signed-in organisation's model.
 
-    Expected JSON payload:
-    {
-        "entity": {
-            "name": "Element Name",           # required for new entities
-            "type": "ApplicationComponent",   # required for new entities
-            "recommendation": "...",          # optional, for new entities
-            "entity_id": 123,                 # for matched entities
-            "entity_name": "...",             # for matched entities
-            "entity_type": "..."              # for matched entities
-        },
-        "action": "accept" | "import"         # "import" is alias for new entities
-    }
-
-    For a new entity (no entity_id): creates an ArchiMate element in the
-    signed-in organisation's model. Returns 409 if the name already exists
-    in that organisation. Returns 400 for unknown element types.
-
-    For a matched entity (has entity_id): returns the existing element,
-    creates nothing.
+    A matched entity (``entity_id``) creates nothing and returns the existing
+    element. A new entity (``name`` and ``type``) creates one element, or answers
+    409 naming the element of that name already in the organisation.
     """
     from app.core.auth.permissions import can_change_model
     from app.models.archimate_core import ArchiMateElement
-    from app.services.archimate_backbone import create_backbone_element
+    from app.services.archimate_backbone import ELEMENT_TYPES, create_backbone_element
     from app.utils.duplicate_guard import (
         duplicate_conflict_response,
         find_duplicate_by_name,
         lock_name_for_write,
     )
 
-    data = request.get_json() or {}
-    entity_data = data.get("entity") or {}
-    _action = data.get("action", "accept")  # reserved for future use (import vs accept)
-
-    if not entity_data:
+    org_id = current_user.organization_id
+    entity = (request.get_json(silent=True) or {}).get("entity") or {}
+    if not entity:
         return jsonify({"success": False, "error": "entity is required"}), 400
-
-    # Check write permission
-    if not can_change_model(current_user, current_user.organization_id):
+    if not org_id or not can_change_model(current_user, org_id):
         return jsonify(
             {
                 "success": False,
@@ -415,114 +401,59 @@ def accept_entity_match():
             }
         ), 403
 
-    org_id = current_user.organization_id
-    if not org_id:
-        return jsonify(
-            {"success": False, "error": "No organisation context", "code": "NO_ORG_CONTEXT"}
-        ), 400
-
-    # Determine if this is a matched entity (has entity_id) or new entity
-    entity_id = entity_data.get("entity_id")
-    if entity_id:
-        # Matched entity: return the existing element, create nothing
-        element = db.session.get(ArchiMateElement, entity_id)
-        if not element:
-            return jsonify({"success": False, "error": "Matched element not found"}), 404
-        if element.organization_id != org_id:
-            return jsonify({"success": False, "error": "Element not in your organisation"}), 404
-
+    def _answer(element, matched):
         return jsonify(
             {
                 "success": True,
                 "element_id": element.id,
-                "matched": True,
+                "element_url": _element_page(element.id),
+                "matched": matched,
                 "name": element.name,
                 "type": element.type,
                 "layer": element.layer,
             }
-        ), 200
+        )
 
-    # New entity: create an ArchiMate element
-    name = entity_data.get("name")
-    entity_type = entity_data.get("type")
-    recommendation = entity_data.get("recommendation", "")
+    if entity.get("entity_id"):
+        element = db.session.get(ArchiMateElement, entity["entity_id"])
+        if element is None or element.organization_id != org_id:
+            return jsonify({"success": False, "error": "That element is not in your model."}), 404
+        return _answer(element, True)
 
-    if not name or not isinstance(name, str) or not name.strip():
+    name = entity.get("name")
+    entity_type = entity.get("type")
+    if not isinstance(name, str) or not name.strip():
         return jsonify({"success": False, "error": "Entity name is required"}), 400
-
-    if not entity_type or not isinstance(entity_type, str):
-        return jsonify({"success": False, "error": "Entity type is required"}), 400
-
-    # Map entity type to ArchiMate element type and layer
-    # Using the same mapping as archimate_backbone.ELEMENT_TYPES
-    TYPE_MAPPING = {
-        "ApplicationComponent": ("ApplicationComponent", "Application"),
-        "BusinessCapability": ("Capability", "Strategy"),
-        "VendorContract": ("Contract", "Business"),
-        "ApplicationInterface": ("ApplicationInterface", "Application"),
-        "DataEntity": ("DataObject", "Application"),
-        "Driver": ("Driver", "Motivation"),
-        "Goal": ("Goal", "Motivation"),
-        "Constraint": ("Constraint", "Motivation"),
-        "Requirement": ("Requirement", "Motivation"),
-        "Risk": ("Assessment", "Motivation"),
-        "Metric": ("Assessment", "Motivation"),
-        "Plateau": ("Plateau", "Implementation"),
-        "WorkPackage": ("WorkPackage", "Implementation"),
-        "Gap": ("Gap", "Implementation"),
-    }
-
-    mapping = TYPE_MAPPING.get(entity_type)
+    mapping = ELEMENT_TYPES.get(entity_type) if isinstance(entity_type, str) else None
     if not mapping:
         return jsonify(
             {
                 "success": False,
-                "error": f"Unknown element type '{entity_type}'. Cannot create element.",
+                "error": f"Unknown element type '{entity_type}'. Nothing was added to the model.",
                 "code": "UNKNOWN_TYPE",
             }
         ), 400
 
-    archimate_type, layer = mapping
-
-    # Lock the name for write to prevent TOCTOU race
+    name = name.strip()
     lock_name_for_write(ArchiMateElement, name, organization_id=org_id)
-
-    # Check for exact duplicate in this organisation
-    existing = find_duplicate_by_name(
-        ArchiMateElement, name, name_field="name", organization_id=org_id
-    )
+    existing = find_duplicate_by_name(ArchiMateElement, name, name_field="name", organization_id=org_id)
     if existing:
-        return duplicate_conflict_response("Element", existing, name_field="name")
+        response, status = duplicate_conflict_response("Element", existing, name_field="name")
+        body = response.get_json()
+        body["duplicate_of"]["url"] = _element_page(existing.id)
+        return jsonify(body), status
 
-    # Create the element with provenance
-    try:
-        element = create_backbone_element(
-            element_type=archimate_type,
-            layer=layer,
-            name=name.strip(),
-            description=recommendation or f"Created from entity matching: {name}",
-            organization_id=org_id,
-            provenance={
-                "source_model": "entity_matching",
-                "origin": "entity_matching",
-                "recommendation": recommendation,
-            },
-        )
-    except ValueError as e:
-        return jsonify({"success": False, "error": str(e)}), 400
-
+    recommendation = entity.get("recommendation") or ""
+    element = create_backbone_element(
+        element_type=mapping[0],
+        layer=mapping[1],
+        name=name,
+        description=recommendation or None,
+        organization_id=org_id,
+        provenance={"source_model": "entity_matching", "origin": "entity_matching"},
+    )
     db.session.commit()
-
-    return jsonify(
-        {
-            "success": True,
-            "element_id": element.id,
-            "matched": False,
-            "name": element.name,
-            "type": element.type,
-            "layer": element.layer,
-        }
-    ), 200
+    return _answer(element, False)
 
 
 # ============================================================================

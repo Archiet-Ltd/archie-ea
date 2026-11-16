@@ -144,8 +144,8 @@ def test_accept_same_name_again_gives_409_naming_existing(app, db_session, make_
     assert count == 1
 
 
-def test_org_b_cannot_see_or_reuse_org_a_element(app, db_session, make_org):
-    """(c) Organisation B cannot see or reuse A's element, and B's 409 never names A's element."""
+def test_org_b_cannot_see_or_reuse_org_a_element(app, db_session, make_org, tenant_ctx):
+    """(c) Organisation B cannot see or reuse A's element - B creates its own element with same name."""
     user_a, org_a = _make_user(db_session, make_org, "org_admin", "owner-c-a")
     user_b, org_b = _make_user(db_session, make_org, "org_admin", "owner-c-b")
 
@@ -166,29 +166,47 @@ def test_org_b_cannot_see_or_reuse_org_a_element(app, db_session, make_org):
     body_a = resp_a.get_json()
     a_element_id = body_a["element_id"]
 
-    # Org B tries to accept same name
+    # Org B tries to accept same name - should succeed (tenant-scoped duplicate check)
     client_b = app.test_client()
     _login(client_b, user_b.id)
 
     resp_b = client_b.post("/ai-chat/entity-matching/accept", json=payload)
-    assert resp_b.status_code == 409, resp_b.get_data(as_text=True)[:500]
+    assert resp_b.status_code == 200, resp_b.get_data(as_text=True)[:500]
     body_b = resp_b.get_json()
-    assert body_b["success"] is False
-    assert body_b["code"] == "DUPLICATE_NAME"
-    assert "duplicate_of" in body_b
-    # B's 409 must name B's element (if B had one) or the name conflict in B's org
-    # It must NEVER name A's element id or expose A's data
-    assert body_b["duplicate_of"]["id"] != a_element_id
-    assert body_b["duplicate_of"]["name"] == "Shared Name Component"
+    assert body_b["success"] is True
+    b_element_id = body_b["element_id"]
+    # B's element must be different from A's
+    assert b_element_id != a_element_id
 
-    # Verify org A still has its element, org B has its own (or none if 409 blocked)
+    # Verify org A still has its element, org B has its own
+    # Use tenant_ctx to avoid cross-contamination from g.current_org_id set by test client requests
     from app.models.archimate_core import ArchiMateElement
 
-    a_count = db_session.query(ArchiMateElement).filter_by(name="Shared Name Component", organization_id=org_a.id).count()
-    b_count = db_session.query(ArchiMateElement).filter_by(name="Shared Name Component", organization_id=org_b.id).count()
-    assert a_count == 1
-    # B's 409 should not have created a second element in B's org
-    assert b_count == 0
+    with tenant_ctx(org_a.id):
+        a_count = db_session.query(ArchiMateElement).filter_by(name="Shared Name Component", organization_id=org_a.id).count()
+        assert a_count == 1
+        a_elem = db_session.query(ArchiMateElement).filter_by(name="Shared Name Component", organization_id=org_a.id).first()
+
+    with tenant_ctx(org_b.id):
+        b_count = db_session.query(ArchiMateElement).filter_by(name="Shared Name Component", organization_id=org_b.id).count()
+        assert b_count == 1
+        b_elem = db_session.query(ArchiMateElement).filter_by(name="Shared Name Component", organization_id=org_b.id).first()
+
+    # B's own repeat is refused naming B's element, never A's
+    again = client_b.post("/ai-chat/entity-matching/accept", json=payload)
+    assert again.status_code == 409
+    assert again.get_json()["duplicate_of"]["id"] == b_element_id
+    assert again.get_json()["duplicate_of"]["id"] != a_element_id
+
+    # B cannot open A's element through the matched path
+    other = client_b.post("/ai-chat/entity-matching/accept", json={"entity": {"entity_id": a_element_id}})
+    assert other.status_code == 404
+    assert "Shared Name Component" not in other.get_data(as_text=True)
+
+    # Verify they are different elements
+    assert a_elem.id != b_elem.id
+    assert a_elem.organization_id == org_a.id
+    assert b_elem.organization_id == org_b.id
 
 
 def test_read_only_member_gets_403_and_nothing_saved(app, db_session, make_org):
