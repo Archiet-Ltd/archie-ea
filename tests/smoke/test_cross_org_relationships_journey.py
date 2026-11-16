@@ -10,6 +10,7 @@ Run at 1440 wide in the light scheme and at 390 wide in the dark scheme.
 """
 
 import os
+import re
 import tempfile
 import uuid
 from pathlib import Path
@@ -80,6 +81,14 @@ def _open(page, base, path):
     return page.content()
 
 
+def _assert_nothing_of_the_other_organisation(html, estate):
+    """The other organisation's element is neither named, listed by its number, nor linked to."""
+    foreign = estate["ids"]["foreign"]
+    assert estate["names"]["foreign"] not in html
+    assert "#%d" % foreign not in html, "the crossing row is listed by its far end's number"
+    assert not re.search(r'href="[^"]*/%d(?:[/?#"]|$)' % foreign, html), "a link leads to the other organisation's element"
+
+
 def _element_path(estate):
     return "/architecture/business/BusinessService/%d?ae=1" % estate["ids"]["centre"]
 
@@ -89,7 +98,7 @@ def test_element_page_lists_own_neighbour_and_not_the_other_organisation(page, l
     WALK.mkdir(parents=True, exist_ok=True)
     page.screenshot(path=str(WALK / ("element-%s.png" % page._view)), full_page=True)
     assert estate["names"]["neighbour"] in html
-    assert estate["names"]["foreign"] not in html
+    _assert_nothing_of_the_other_organisation(html, estate)
     link = page.get_by_role("link", name=estate["names"]["neighbour"]).first
     link.click()
     page.wait_for_load_state("domcontentloaded")
@@ -101,7 +110,7 @@ def test_element_page_lists_own_neighbour_and_not_the_other_organisation(page, l
 def test_relationship_lists_show_own_row_and_not_the_other_organisation(page, live_server, estate, path):
     html = _open(page, live_server, path)
     page.screenshot(path=str(WALK / ("%s-%s.png" % (path.strip("/").replace("/", "-"), page._view))), full_page=True)
-    assert estate["names"]["foreign"] not in html
+    _assert_nothing_of_the_other_organisation(html, estate)
     assert estate["names"]["neighbour"] in html or estate["names"]["centre"] in html
 
 
@@ -109,7 +118,7 @@ def test_product_page_lists_own_members_and_not_the_other_organisation(page, liv
     html = _open(page, live_server, "/architecture/business/Product/%d?ae=1" % estate["ids"]["product"])
     page.screenshot(path=str(WALK / ("product-%s.png" % page._view)), full_page=True)
     assert estate["names"]["centre"] in html
-    assert estate["names"]["foreign"] not in html
+    _assert_nothing_of_the_other_organisation(html, estate)
 
 
 def test_other_organisations_element_id_is_not_found(page, live_server, estate):
