@@ -1,9 +1,8 @@
 """
-Tests: _get_primary_capability_for_application returns the
-correct capability name from the application-capability mapping.
-
-These tests verify that the raw SQL querying a non-existent column has been
-replaced with an ORM query using ApplicationCapabilityMapping.
+Tests: _get_primary_capability_for_application, in the older and v2 roadmap
+engines and roadmap syncs, names the capability the application is the primary
+enabler of, falls back only when nothing is mapped, and never answers across
+organisations. The name is read through the one capability-support reader.
 """
 
 import pytest
@@ -296,3 +295,29 @@ class TestCapabilityJoinUsesBusinessCapability:
             assert engine._get_primary_capability_for_application(app_a.id) == "Payments"
         with tenant_ctx(org_b.id):
             assert engine._get_primary_capability_for_application(app_a.id) == "unknown_capability"
+
+
+class TestPrimaryEnablerNamedFirst:
+    """An application mapped to two capabilities is named for the one it is the primary enabler of."""
+
+    @pytest.mark.parametrize(
+        "module",
+        [
+            "app.services.roadmap_automation:RoadmapAutomationEngine",
+            "app.modules.solutions_strategic.v2.services.roadmap_automation:RoadmapAutomationEngine",
+            "app.services.roadmap_sync:RoadmapDataSync",
+            "app.modules.solutions_strategic.v2.services.roadmap_sync:RoadmapDataSync",
+        ],
+    )
+    def test_primary_enabler_wins_over_first_by_name(self, db_session, make_org, tenant_ctx, module):
+        import importlib
+
+        org_a, _ = _org_with_user(db_session, make_org, "a")
+        app_a = _application(db_session, org_a, "Ledger App")
+        _link_app_cap(db_session, org_a, app_a, _capability(db_session, org_a, "Zeta Payments"), is_primary=True)
+        _link_app_cap(db_session, org_a, app_a, _capability(db_session, org_a, "Alpha Billing"), is_primary=False)
+
+        path, cls = module.split(":")
+        engine = getattr(importlib.import_module(path), cls)()
+        with tenant_ctx(org_a.id):
+            assert engine._get_primary_capability_for_application(app_a.id) == "Zeta Payments"

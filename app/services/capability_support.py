@@ -178,6 +178,28 @@ def _application_row(organization_id: int, element, *, flush: bool = True):
 # ---------------------------------------------------------------------------
 # The projector
 # ---------------------------------------------------------------------------
+def _flagged_primary(session, application, rel) -> bool:
+    """Whether the older mapping record for this pair names the application the primary enabler."""
+    from app.models.application_capability import ApplicationCapabilityMapping as Mapping
+    from app.models.business_capabilities import BusinessCapability
+
+    if application.id is None:
+        return False
+    return (
+        session.query(Mapping.id)
+        .join(BusinessCapability, BusinessCapability.id == Mapping.business_capability_id)
+        .filter(
+            Mapping.organization_id == rel.organization_id,
+            Mapping.application_component_id == application.id,
+            Mapping.is_primary_enabler.is_(True),
+            BusinessCapability.organization_id == rel.organization_id,
+            BusinessCapability.archimate_element_id == rel.target_id,
+        )
+        .first()
+        is not None
+    )
+
+
 def _project_relationship(session, rel) -> None:
     """Give a current support relationship its one row; take the row from any other."""
     ApplicationComponent, Element, Relationship, Row, _ = _models()
@@ -237,7 +259,9 @@ def _project_relationship(session, rel) -> None:
         archimate_relationship_id=rel.id,
         unified_capability=capability,
         application=application,
-        support_level="primary" if (rel.type or "").lower() == "realization" else "linked",
+        support_level="primary"
+        if (rel.type or "").lower() == "realization" or _flagged_primary(session, application, rel)
+        else "linked",
         is_active=True,
     )
     session.add(row)
@@ -694,6 +718,7 @@ def support_rows(
             "kind": kind,
             "kind_word": KIND_WORDS[kind],
             "support_level": row.support_level,
+            "is_primary_enabler": row.support_level == "primary",
             "coverage_percentage": row.coverage_percentage,
             "maturity_level": row.maturity_level,
             "is_strategic": bool(row.is_strategic),
@@ -706,9 +731,10 @@ def support_rows(
 
 
 def capabilities_of_application(organization_id: int, application_id: int) -> List[Dict[str, Any]]:
+    """The application's capabilities, the primary enabler first, then by name."""
     return sorted(
         support_rows(organization_id, application_ids=[application_id]),
-        key=lambda r: (r["capability_name"] or "").lower(),
+        key=lambda r: (not r["is_primary_enabler"], (r["capability_name"] or "").lower()),
     )
 
 
