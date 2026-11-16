@@ -184,10 +184,10 @@ def own_record_questions(org_id):
     held = onboarding.loaded_at_sign_up(org_id)
     org = db.session.get(Organization, org_id)
     cards = [
-        {"question": "What does our company profile say about us?", "detail": "Recorded at sign-up"}
+        {"question": "What did we record when we signed up?", "detail": "Recorded at sign-up"}
     ] if org is not None and onboarding.company_profile(org) else []
     cards += [
-        {"question": "What does our %s say about the company?" % row["name"],
+        {"question": "What is on our %s?" % row["name"],
          "detail": "%d entries" % row["entries"] if row["entries"] else "Created at sign-up"}
         for row in held["canvases"]
     ] + [

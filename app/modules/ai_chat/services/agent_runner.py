@@ -1946,11 +1946,11 @@ class AgentRunner:
             with current_app.test_request_context("/"):
                 held = onboarding_service.loaded_at_sign_up(org_id)
             profile = onboarding_service.company_profile(db.session.get(Organization, org_id))
-            if profile and "company profile" in user_message.lower():
-                held["profile"] = [{"key": org_id, "name": "Company profile", "href": profile["href"], "values": profile["values"]}]
+            if profile:
+                held["profile"] = [{"key": org_id, "name": "Company profile", "match": "when we signed up", "href": profile["href"], "values": profile["values"]}]
             for kind, rows in (("company_profile", held.get("profile", [])), ("canvas", held["canvases"]), ("framework", held["frameworks"])):
                 for row in rows:
-                    if row["name"].lower() not in user_message.lower() or len(sources) >= self.MAX_SOURCES:
+                    if row.get("match", row["name"]).lower() not in user_message.lower() or len(sources) >= self.MAX_SOURCES:
                         continue
                     args = {"query": row["name"]}
                     self._emit({"type": "tool_start", "tool": "get_chosen_record", "args": args})

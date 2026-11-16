@@ -44,5 +44,5 @@ def test_company_profile_card_only_for_an_organisation_that_recorded_one(app, db
             mine = [c["question"] for c in own_record_questions(recorded.id)]
         with tenant_ctx(bare.id):
             none = [c["question"] for c in own_record_questions(bare.id)]
-    assert "What does our company profile say about us?" in mine
-    assert "What does our company profile say about us?" not in none
+    assert "What did we record when we signed up?" in mine
+    assert "What did we record when we signed up?" not in none
