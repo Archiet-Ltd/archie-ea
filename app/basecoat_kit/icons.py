@@ -274,4 +274,4 @@ def svg(name, class_name="", **attrs):
         raise KeyError(f"unknown lucide icon: {name}")
     classes = " ".join(c for c in ["lucide", f"lucide-{name}", class_name] if c)
     extra = "".join(f' {k.replace("_", "-")}="{escape(v)}"' for k, v in attrs.items() if v is not None)
-    return Markup(f'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="{classes}"{extra}>{body}</svg>')  # raw-html-ok: the icon body comes from ICONS by name, the classes are fixed words and extra attributes are escaped above
+    return Markup(f'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="{classes}"{extra}>{body}</svg>')  # nosec B704 - body comes from the fixed ICONS table, attribute values pass through escape(); raw-html-ok: the icon body comes from ICONS by name, the classes are fixed words and extra attributes are escaped above

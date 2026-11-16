@@ -130,34 +130,24 @@ def architecture_relationships():
     """
     try:
         from app.middleware.tenant_context import current_org_id
-        from app.modules.intelligence.services.query_service import filter_relationships_by_org
+        from app.modules.intelligence.services.query_service import (
+            RELATIONSHIP_PAGE_SIZES, relationship_sort_args, relationships_page,
+        )
 
-        org_id = current_org_id()
-        rels = ArchiMateRelationship.query.order_by(ArchiMateRelationship.type).all()
-        rels = filter_relationships_by_org(rels, org_id, direction="both")
-
-        element_ids = {
-            eid for rel in rels for eid in (rel.source_id, rel.target_id) if eid is not None
-        }
-        names_by_id = {}
-        if element_ids:
-            names_by_id = dict(
-                db.session.query(ArchiMateElement.id, ArchiMateElement.name)
-                .filter(ArchiMateElement.id.in_(element_ids))
-            )
-        relationships = [
-            {
-                "id": rel.id,
-                "type": rel.type,
-                "source_id": rel.source_id,
-                "target_id": rel.target_id,
-                "source_name": names_by_id.get(rel.source_id),
-                "target_name": names_by_id.get(rel.target_id),
-            }
-            for rel in rels
-        ]
+        page = request.args.get("page", 1, type=int)
+        per_page = request.args.get("per_page", 20, type=int)
+        if per_page not in RELATIONSHIP_PAGE_SIZES:
+            per_page = 20
+        sort, direction = relationship_sort_args(request.args)
+        listing = relationships_page(current_org_id(), max(page, 1), per_page, None, sort, direction)
         return render_template(
-            "architecture/relationships.html", relationships=relationships
+            "architecture/relationships.html",
+            relationship_page_sizes=RELATIONSHIP_PAGE_SIZES,
+            per_page=per_page,
+            focus_id=None,
+            sort=sort,
+            sort_dir=direction,
+            **listing,
         )
     except Exception as e:
         db.session.rollback()
@@ -165,7 +155,7 @@ def architecture_relationships():
         flash("Error loading architecture relationships", "error")
         return render_template(
             "architecture/relationships.html",
-            relationships=[],
+            relationships=[], total=0, page=1, pages=1, per_page=20, focus_id=None,
             load_error="ArchiMate relationships could not be read.",
         )
 
