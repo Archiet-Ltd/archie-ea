@@ -8,6 +8,7 @@ migration, which then sets them to NULL.
 from __future__ import annotations
 
 import json
+import sqlalchemy
 import logging
 import re
 import time
@@ -332,10 +333,20 @@ def test_one_link_reader(db_session, make_org):
 
     foreign_plateau = _plateau(db_session, other, "Foreign")
     svc._ensure_element(foreign_plateau)
-    db_session.add(ArchiMateRelationship(
-        source_id=wp.archimate_element_id, target_id=foreign_plateau.archimate_element_id,
-        type="realization", organization_id=org.id))
-    db_session.flush()
+    from app.models.relationship_guard import CrossOrganisationRelationship
+
+    # The relationship guard refuses to create such a row ...
+    with pytest.raises(CrossOrganisationRelationship):
+        with db_session.begin_nested():
+            db_session.add(ArchiMateRelationship(
+                source_id=wp.archimate_element_id, target_id=foreign_plateau.archimate_element_id,
+                type="realization", organization_id=org.id))
+            db_session.flush()
+    # ... so the row is inserted below the guard, and the readers still ignore it.
+    db_session.execute(sqlalchemy.text(
+        "INSERT INTO archimate_relationships (source_id, target_id, type, organization_id) "
+        "VALUES (:source, :target, 'realization', :org)"),
+        {"source": wp.archimate_element_id, "target": foreign_plateau.archimate_element_id, "org": org.id})
     assert svc.plateau_and_gap_links([wp], org.id)[wp.id]["plateau_ids"] == [plateau.id]
 
     # Linking without an organisation is refused.

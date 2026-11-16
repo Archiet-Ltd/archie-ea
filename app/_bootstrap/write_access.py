@@ -125,9 +125,18 @@ ANSWERS_FOR_ITSELF = {
     "solution_design.delete_solution_stakeholder": "Looks the solution up in the caller's organisation, then asks the write rule.",
 }
 
+ROADMAP_READ_ONLY = "Your role may read the roadmap but not change it."
+
 # A refusal on these screens gives the screen's own reason instead of the general one.
 READ_ONLY_REASONS = (
-    ("capability_map.api_roadmap_", "Your role may read the roadmap but not change it."),
+    ("capability_map.api_roadmap_", ROADMAP_READ_ONLY),
+    ("roadmap_api.", ROADMAP_READ_ONLY),
+    ("main.create_capability", ROADMAP_READ_ONLY),
+    ("main.update_capability_work_package", ROADMAP_READ_ONLY),
+    ("main.delete_capability_work_package", ROADMAP_READ_ONLY),
+    ("main.create_work_package_", ROADMAP_READ_ONLY),
+    ("main.update_work_package_", ROADMAP_READ_ONLY),
+    ("main.delete_work_package_", ROADMAP_READ_ONLY),
 )
 
 GENERAL_REASON = "Your role is read-only, so it cannot make this change."
