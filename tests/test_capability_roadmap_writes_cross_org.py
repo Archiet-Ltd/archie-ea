@@ -130,3 +130,16 @@ def test_viewer_is_refused_every_write_in_the_roadmap(
     response = getattr(client, method)(url, json=body) if body is not None else getattr(client, method)(url)
     assert response.status_code == 403, (url, response.status_code)
     assert "may read the roadmap but not change it" in response.get_data(as_text=True)
+
+
+def test_other_read_only_refusals_keep_the_general_sentence(db_session, make_org, client, login_as):
+    org_a = make_org("cr-gen-a")
+    viewer = _user(db_session, org_a, "viewer")
+    login_as(client, viewer)
+
+    from app._bootstrap.write_access import GENERAL_REASON, _reason_for
+
+    assert _reason_for("roadmap_api.update_work_package") != GENERAL_REASON
+    assert _reason_for("main.create_capability_work_package") != GENERAL_REASON
+    assert _reason_for("applications.create_application") == GENERAL_REASON
+    assert _reason_for(None) == GENERAL_REASON
