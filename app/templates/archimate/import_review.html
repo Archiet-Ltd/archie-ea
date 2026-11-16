@@ -41,7 +41,7 @@ Nothing is waiting: everything an import guessed has been reviewed. <a class="un
 
 <p id="review-message" class="text-sm text-muted-foreground" role="status" hidden></p>
 
-{% call(item) list_table(rows=items, columns=[{'label': _select_all(), 'class': 'w-10', 'sortable': false}, 'Item', {'label': 'Kind', 'class': 'whitespace-nowrap'}, {'label': 'Type', 'class': 'whitespace-nowrap'}, 'Why it needs review'],
+{% call(item) list_table(rows=items, columns=[{'label': _select_all(), 'class': 'w-10', 'sortable': false}, ('Item', ''), ('Kind', 'whitespace-nowrap'), ('Type', 'whitespace-nowrap'), ('Why it needs review', '')],
                          caption='Items an import guessed', testid='review-table', row_testid='review-row', toolbar=true, toolbar_actions=_bulk,
                          search_placeholder='Filter items...', footer_count=_count, empty_message=_none()) %}
   {% call table_cell(class='w-10') %}

@@ -21,7 +21,7 @@
 {%- set options = caller -%}
 {% call card.card(class='border-border mx-auto w-full max-w-3xl') %}
   {% call card.card_content(class='pt-6 space-y-6') %}
-    {{ file_upload(id=id, name='file', label=label, accept=accept, accept_label=accept_label, description=help, max_size='25MB') }}
+    {{ file_upload(id=id, name='file', label=label, accept=accept, accept_label=accept_label ~ ', ', description=help, max_size='25MB') }}
     {{ options() }}
   {% endcall %}
 {% endcall %}
