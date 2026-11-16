@@ -184,8 +184,9 @@ def test_a_team_beside_a_member_person_in_code_owners_shows_no_owner_from_codeow
     from app.models.connector_config import ConnectorConfig
 
     tag = uuid.uuid4().hex[:6]
-    org = create_fresh_org("cto")
+    org = create_fresh_org("cto", extra_roles=("application_manager",))
     email = org["emails"]["cto"]
+    other = org["emails"]["application_manager"]
     with create_app("testing").app_context():
         db.session.add(ConnectorConfig(organization_id=org["org_id"], connector_type="github", name="GitHub",
                                        status="active", config={"organization": "acme"}))
@@ -194,7 +195,7 @@ def test_a_team_beside_a_member_person_in_code_owners_shows_no_owner_from_codeow
     repository = "acme/teamed-%s" % tag
     app_id = _import(org, "Teamed %s" % tag, repository, ["@acme/platform", "@ada-roe"])
     commits = []
-    for login, address, count in (("ada-roe", email, 3), ("zed", "zed@users.example.org", 3)):
+    for login, address, count in (("ada-roe", email, 3), ("sam-lee", other, 3)):
         for _ in range(count):
             n = len(commits)
             commits.append({"sha": "%07xabc" % n, "author": {"login": login},
@@ -216,9 +217,10 @@ def test_a_team_beside_a_member_person_in_code_owners_shows_no_owner_from_codeow
         sign_in(page, live_server, email)
         page.goto("%s/applications/%s" % (live_server, app_id), wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
         expect(page.locator("main").get_by_text("No owner recorded").first).to_be_visible(timeout=PAGE_TIMEOUT)
-        expect(page.get_by_test_id("application-owner")).not_to_contain_text("Named by GitHub: code owner")
-        expect(page.get_by_test_id("application-owner")).not_to_contain_text("ada-roe")
+        assert page.get_by_test_id("application-owner").count() == 0
+        assert "Named by GitHub: code owner" not in page.locator("main").inner_text()
         reason = page.get_by_test_id("need-owner-reason")
-        expect(reason).to_contain_text("GitHub names no single code owner", timeout=PAGE_TIMEOUT)
+        expect(reason).to_contain_text(
+            "GitHub names @acme/platform, @ada-roe as code owner", timeout=PAGE_TIMEOUT)
     finally:
         context.close()
