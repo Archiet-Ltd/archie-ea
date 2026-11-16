@@ -1,6 +1,7 @@
 {# design-block: record-detail #}
 {% extends 'layouts/admin_base.html' %}
 {% import 'basecoat/index.html' as ui %}
+{% from 'macros/page_shell.html' import page_shell %}
 {% from 'components/fact_list.html' import fact_list %}
 {% from 'basecoat/table.html' import table, table_header, table_body, table_row, table_head, table_cell %}
 {% from 'basecoat/native-select.html' import native_select_wrapper, native_select, native_select_option %}
@@ -30,24 +31,12 @@
 {% endcall %}
 {% endmacro %}
 
-{% block breadcrumb %}
-{% call ui.breadcrumb(attrs={'aria-label': 'Breadcrumb', 'class': 'mb-3'}) %}{% call ui.breadcrumb_list() %}
-  {% call ui.breadcrumb_item() %}{{ ui.breadcrumb_link(text='Home', attrs={'href': url_for('main.index')}) }}{% endcall %}{{ ui.breadcrumb_separator() }}
-  {% call ui.breadcrumb_item() %}{{ ui.breadcrumb_link(text='Architecture', attrs={'href': url_for('archimate_crud.dashboard')}) }}{% endcall %}{{ ui.breadcrumb_separator() }}
-  {% call ui.breadcrumb_item() %}{{ ui.breadcrumb_link(text='Decision tables', attrs={'href': url_for('decision_tables.index')}) }}{% endcall %}{{ ui.breadcrumb_separator() }}
-  {% call ui.breadcrumb_item() %}{{ ui.breadcrumb_page(text=decision.name) }}{% endcall %}
-{% endcall %}{% endcall %}
-{% endblock %}
-
 {% block content %}
 <div class="space-y-6" x-data="decisionTable()" data-testid="decision-page">
-<div class="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
-  <div class="min-w-0">
-    <h1 class="text-3xl font-bold tracking-tight text-foreground">{{ decision.name }}</h1>
-    <p class="mt-1 text-sm text-muted-foreground">{{ decision.description or 'No description yet. Say what this decision decides.' }}</p>
-  </div>
-  <div class="flex flex-wrap items-center gap-2 xl:shrink-0">{{ _actions() }}</div>
-</div>
+{{ page_shell(title=decision.name,
+    subtitle=decision.description or 'No description yet. Say what this decision decides.',
+    breadcrumb=[('Home', url_for('main.index')), ('Decision tables', url_for('decision_tables.index')), (decision.name, None)],
+    actions_caller=_actions) }}
 
 {# The decision table, drawn the way DMN draws it: hit policy top left, input columns, a double rule, output columns, then the annotation. #}
 {% call ui.card(attrs={'data-testid': 'decision-card'}) %}

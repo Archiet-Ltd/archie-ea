@@ -265,6 +265,12 @@ _LAYER_EXTRAS = {
                           job="1", owns=("business_architecture.process_",),
                           aliases=("Process diagrams", "Process diagram", "BPMN", "Process flows", "Process maps", "Drawn processes")),
 }
+# Entries filed after a layer's last-listed extra: the decision tables the business processes apply.
+_LAYER_EXTRAS_AFTER = {
+    "BusinessProcess": _l("decision_tables", "Decision tables", "decision_tables.index", "table-properties", job="1",
+                          owns=("decision_tables.",),
+                          aliases=("Decision table", "DMN", "Business rules", "Rules", "Hit policy", "Decision model")),
+}
 
 
 def _layer_children(layer_key: str, types: tuple) -> tuple:
@@ -273,6 +279,8 @@ def _layer_children(layer_key: str, types: tuple) -> tuple:
         children.append(_element_link(layer_key, t))
         if t in _LAYER_EXTRAS:
             children.append(_LAYER_EXTRAS[t])
+        if t in _LAYER_EXTRAS_AFTER:
+            children.append(_LAYER_EXTRAS_AFTER[t])
     return tuple(children)
 
 
