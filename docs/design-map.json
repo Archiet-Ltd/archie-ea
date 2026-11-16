@@ -4914,7 +4914,9 @@
     "page-shell",
     "field",
     "input",
-    "native-select"
+    "native-select",
+    "fact-list",
+    "list-table"
    ],
    "confidence": "high",
    "controls": {
@@ -14624,7 +14626,8 @@
     "item",
     "fact-list",
     "field",
-    "select"
+    "select",
+    "list-table"
    ],
    "confidence": "high",
    "controls": {
@@ -20182,7 +20185,8 @@
     "pagination",
     "select",
     "table",
-    "input-group"
+    "input-group",
+    "list-table"
    ],
    "confidence": "high",
    "controls": {
@@ -20216,7 +20220,7 @@
     "P23-status-badge"
    ],
    "persona": "enterprise_architect",
-   "reason": "Relationships list.",
+   "reason": "Relationships list: every relationship as a row in the list table, with sort, filter and pagination.",
    "reference": {
     "shadcn": {
      "name": "shadcn examples: tasks",
@@ -37933,7 +37937,9 @@
     "pagination",
     "select",
     "table",
-    "card"
+    "card",
+    "figures",
+    "list-table"
    ],
    "confidence": "high",
    "controls": {
@@ -37962,7 +37968,7 @@
     "P23-status-badge"
    ],
    "persona": "portfolio_manager",
-   "reason": "Blocked work packages.",
+   "reason": "Blocked work packages: headline figures for the blockage, then each blocked package beside its blocker in the list table.",
    "reference": {
     "shadcn": {
      "name": "shadcn examples: tasks",
