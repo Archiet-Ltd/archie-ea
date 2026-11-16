@@ -93,3 +93,34 @@ def test_the_answer_to_a_canvas_card_reads_what_is_on_that_canvas(app, db_sessio
         found = AgentRunner(user_id=user.id)._look_up_chosen_records("What is on our Lean Canvas?", sources)
     assert "Recorded " in found, found[:400]
     assert [s["type"] for s in sources] == ["canvas"]
+
+
+def test_a_card_is_offered_exactly_when_the_answer_cites_an_entry_in_any_box(app, db_session, make_org, tenant_ctx):
+    """One entry in one box of each canvas kind: the card appears and the canvas answer cites that entry."""
+    from app.config.archimate_viewpoints import CANVAS_TEMPLATES
+    from app.modules.business_model_canvas import model_service
+    from app.modules.intelligence.services.query_catalogue import _canvas_box_entries
+
+    for key in ("lean_canvas", "business_model_canvas"):
+        org = make_org("one-%s" % key)
+        onboarding.save_choices(org, None, [], "startup", [key])
+        onboarding.run_starter_data(org.id)
+        with app.test_request_context("/"):
+            with tenant_ctx(org.id):
+                from app.models.business_model import BusinessModelCanvas
+
+                canvas = BusinessModelCanvas.query.filter_by(organization_id=org.id).first()
+                assert not any("canvas" in c["question"].lower() for c in own_record_questions(org.id))
+                # one entry in each element box in turn, removed before the next
+                for box in model_service.element_boxes(canvas):
+                    kind = model_service.zones(canvas)[box]["element_types"][0]
+                    element = ArchiMateElement(name="Only %s %s" % (key, box), type=kind, layer="business", organization_id=org.id)
+                    db.session.add(element)
+                    db.session.flush()
+                    model_service.place(canvas, box, element)
+                    cards = own_record_questions(org.id)
+                    assert any(c["question"].startswith("What is on our") and c["detail"] == "1 entry" for c in cards), (box, cards)
+                    answer = _canvas_box_entries(org.id, None, show_costs=True)
+                    assert [r["name"] for r in answer["rows"]] == [element.name], (box, answer["reason"])
+                    assert any(c["type"] == "element" and c["id"] == element.id for c in answer["citations"])
+                    model_service.remove_entry(canvas, box, element.id)

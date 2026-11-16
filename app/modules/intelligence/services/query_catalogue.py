@@ -1209,7 +1209,7 @@ def _canvas_box_entries(organization_id: int, box: Optional[str] = None, show_co
 
     box = box if box in CANVAS_BOX_QUESTIONS else None
     title, box_title = CANVAS_BOX_QUESTIONS[box] if box else ("What is on our canvas?", "any box")
-    found = model_service.box_across_canvases(organization_id, [box] if box else list(CANVAS_BOX_QUESTIONS))
+    found = model_service.box_across_canvases(organization_id, [box] if box else None)
 
     rows: List[Dict[str, Any]] = []
     citations: List[Dict[str, Any]] = []

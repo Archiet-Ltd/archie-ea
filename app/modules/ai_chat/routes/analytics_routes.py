@@ -188,11 +188,11 @@ def own_record_questions(org_id):
     ] if org is not None and onboarding.signup_answers(org) else []
     cards += [
         {"question": "What is on our %s?" % row["name"],
-         "detail": "%d entries" % row["entries"]}
+         "detail": "%d %s" % (row["entries"], "entry" if row["entries"] == 1 else "entries")}
         for row in held["canvases"]
         if row["entries"]
     ] + [
-        {"question": "Which %s %ss apply to us?" % (row["name"], row["unit"]), "detail": "%d listed" % row["count"]}
+        {"question": "Which %s %s apply to us?" % (row["name"], row["unit"] + "s"), "detail": "%d listed" % row["count"]}
         for row in held["frameworks"]
         if row["count"]
     ]

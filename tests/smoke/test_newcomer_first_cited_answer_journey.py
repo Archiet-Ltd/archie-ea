@@ -96,7 +96,8 @@ def _shot(page, name, size):
 
 
 def _record_on_a_canvas(app, email):
-    """Record one element of the first box's type for the person's organisation and place it on its canvas."""
+    """Record one element in a box the single-box questions do not ask about (a Lean Canvas Problem line), for the
+    person's organisation, and place it on its canvas: the card that follows must still lead to that entry."""
     from app.models import ArchiMateElement
     from app.models.business_model import BusinessModelCanvas
     from app.models.user import User
@@ -113,7 +114,7 @@ def _record_on_a_canvas(app, email):
                 break
             time.sleep(3)
         assert canvas is not None, "the sign-up canvases have not loaded"
-        box = next(b for b in model_service.element_boxes(canvas) if b in CANVAS_BOX_QUESTIONS)
+        box = next(b for b in model_service.element_boxes(canvas) if b not in CANVAS_BOX_QUESTIONS)
         name = "Journey entry %d" % org_id
         element = ArchiMateElement(
             name=name, type=model_service.zones(canvas)[box]["element_types"][0], layer="business", organization_id=org_id

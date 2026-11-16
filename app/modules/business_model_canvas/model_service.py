@@ -547,18 +547,20 @@ def organisation_canvas(organization_id, key=TEMPLATE_KEY):
 
 def box_across_canvases(organization_id, box_keys):
     """Every canvas of the organisation that has one of these boxes, most recently updated first, each with
-    that box's slice of ``canvas_contents``: ``[{"canvas": <contents without boxes>, "box": <box>}]``."""
+    that box's slice of ``canvas_contents``: ``[{"canvas": <contents without boxes>, "box": <box>}]``.
+    ``box_keys=None`` asks for every box the canvas shows, so a whole-canvas question reads the same boxes
+    the canvas page counts as entries."""
     from app.models.business_model import BusinessModelCanvas
 
-    wanted = set(box_keys)
+    wanted = None if box_keys is None else set(box_keys)
     found = []
     for canvas in BusinessModelCanvas.query.filter(
         BusinessModelCanvas.organization_id == organization_id
     ).order_by(BusinessModelCanvas.updated_at.desc(), BusinessModelCanvas.id.desc()).all():
-        if not wanted & set(zones(canvas)):
+        if wanted is not None and not wanted & set(zones(canvas)):
             continue
         contents = canvas_contents(organization_id, canvas.id)
         for box in contents["boxes"]:
-            if box["key"] in wanted:
+            if wanted is None or box["key"] in wanted:
                 found.append({"canvas": {k: v for k, v in contents.items() if k != "boxes"}, "box": box})
     return found
