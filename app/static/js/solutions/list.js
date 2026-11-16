@@ -56,9 +56,8 @@ window.deleteSolution = async function(solutionId, solutionName) {
             ]
         });
         Platform.modal.open(modalId);
-    } else {
-        if ((await window.confirm('Delete "' + solutionName + '"? This cannot be undone.'))) doDelete();
     }
+    // Without the page's dialog there is no way to ask first, so nothing is deleted.
 };
 
 // Server-side filtering — navigate to URL with filter params so all pages are filtered
