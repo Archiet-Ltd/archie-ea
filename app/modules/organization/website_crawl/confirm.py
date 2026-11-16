@@ -298,10 +298,9 @@ def confirm(org, user, decisions: List[Dict[str, Any]]) -> Dict[str, int]:
     org.settings = settings
     flag_modified(org, "settings")
     if named:
-        org.name = named  # the confirmed company name is the organisation's name wherever it is shown
-        from app.modules.organization.public_signals import tidy
+        from app.services.organisation_rename import rename_organisation
 
-        tidy(org.id, org)  # nothing stored under the stand-in name survives the confirmation
+        rename_organisation(org, named, user)  # the confirmed company name is the organisation's name wherever it is shown
     db.session.commit()
     return {"confirmed": kept, "corrected": corrected_count, "left_out": closed}
 

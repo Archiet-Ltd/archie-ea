@@ -1,5 +1,6 @@
 {# design-block: data-table #}
 {% extends 'layouts/admin_base.html' %}
+{% import 'basecoat/index.html' as ui %}
 {% from 'macros/page_shell.html' import page_shell %}
 {% block title %}Command Center{% endblock %}
 
@@ -22,6 +23,28 @@
     {# HEADER                                                                    #}
     {# ════════════════════════════════════════════════════════════════════════ #}
     {{ page_shell(title='Command Center', breadcrumb=[('Home', '/'), ('Command Center', none)], subtitle='Enterprise Architecture Administration') }}
+
+    {% if workspace and (current_user.is_org_admin or is_platform_administrator()) %}
+    {% call ui.card(class='max-w-2xl', id='workspace-name') %}
+      <form method="post" action="{{ url_for('admin.organization_rename', org_id=workspace.id) }}" data-testid="workspace-name-form">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        {% call ui.card_header() %}
+          {{ ui.card_title(text='Workspace name') }}
+          {{ ui.card_description(text='The name people see in the header, the workspace switcher, the sidebar and invitation emails. Its web address does not change.') }}
+        {% endcall %}
+        {% call ui.card_content() %}
+          {% call ui.field() %}
+            {{ ui.field_label(text='Name', attrs={'for': 'workspace-name-input'}) }}
+            {{ ui.input(id='workspace-name-input', name='name', type='text', value=workspace_name_value, required=true, autocomplete='off', attrs={'maxlength': 200, 'aria-invalid': 'true' if workspace_name_error else 'false'}) }}
+            {% if workspace_name_error %}{{ ui.field_error(text=workspace_name_error, attrs={'data-testid': 'workspace-name-error', 'role': 'alert'}) }}{% endif %}
+          {% endcall %}
+        {% endcall %}
+        {% call ui.card_footer() %}
+          {% call ui.button(type='submit') %}Save name{% endcall %}
+        {% endcall %}
+      </form>
+    {% endcall %}
+    {% endif %}
 
     {# ════════════════════════════════════════════════════════════════════════ #}
     {# SYSTEM HEALTH ROW                                                         #}

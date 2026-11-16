@@ -22,12 +22,14 @@ from werkzeug.utils import secure_filename
 
 from flask import (
     Blueprint,
+    abort,
     flash,
     g,
     jsonify,
     redirect,
     render_template,
     request,
+    session,
     url_for,
 )
 from flask_login import current_user, login_required
@@ -340,7 +342,45 @@ def index():
     ctx["total_users"] = total_users
     ctx["unconfirmed_users"] = unconfirmed
 
+    from app.middleware.tenant_context import current_org
+
+    workspace = current_org()
+    ctx["workspace"] = workspace
+    error, submitted = session.pop("workspace_name_error", (None, None))
+    ctx["workspace_name_error"] = error
+    ctx["workspace_name_value"] = submitted if error else getattr(workspace, "name", "")
+
     return render_template("admin/index.html", **ctx)
+
+
+@admin_bp_v2.route("/organizations/<int:org_id>/rename", methods=["POST"])
+@timed_route
+@login_required
+def organization_rename(org_id):
+    """An organisation's administrator (or a platform administrator) renames their workspace."""
+    from app._bootstrap.write_access import GENERAL_REASON
+    from app.middleware.tenant_context import accessible_organizations
+    from app.middleware.tenant_decorators import is_platform_admin
+    from app.services.organisation_rename import InvalidOrganisationName, rename_organisation
+    from app.services.rbac_service import rbac_service
+
+    org = db.session.get(Organization, org_id)
+    platform = is_platform_admin(current_user)
+    if org is None or not (platform or any(o.id == org.id for o in accessible_organizations(current_user))):
+        abort(404)
+    if not (platform or rbac_service.is_org_admin(current_user, org.id)):
+        from app.utils.plain_errors import render_plain_error
+
+        return render_plain_error(403, title="You can view this, but not change it", message=GENERAL_REASON)
+    try:
+        rename_organisation(org, request.form.get("name"), current_user)
+    except InvalidOrganisationName as error:
+        db.session.rollback()
+        session["workspace_name_error"] = (str(error), request.form.get("name", "")[:400])
+        return redirect(url_for("admin.index") + "#workspace-name")
+    db.session.commit()
+    flash("The workspace is now called %s." % org.name, "success")
+    return redirect(url_for("admin.index"))
 
 
 @admin_bp_v2.route("/dashboard")
@@ -5665,7 +5705,16 @@ def organization_edit(org_id):
     org = Organization.query.get_or_404(org_id)
 
     if request.method == "POST":
-        org.name = request.form.get("name", "").strip() or org.name
+        from app.services.organisation_rename import InvalidOrganisationName, rename_organisation
+
+        submitted = request.form.get("name", "").strip()
+        if submitted:
+            try:
+                rename_organisation(org, submitted, current_user)
+            except InvalidOrganisationName as error:
+                db.session.rollback()
+                flash(str(error), "error")
+                return _organization_form(org)
         new_slug = request.form.get("slug", "").strip()
         if new_slug and new_slug != org.slug:
             existing = Organization.query.filter_by(slug=new_slug).first()
