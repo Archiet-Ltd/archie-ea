@@ -1945,19 +1945,28 @@ class AgentRunner:
 
             with current_app.test_request_context("/"):
                 held = onboarding_service.loaded_at_sign_up(org_id)
-            profile = onboarding_service.company_profile(db.session.get(Organization, org_id))
+            profile = onboarding_service.signup_answers(db.session.get(Organization, org_id))
             if profile:
-                held["profile"] = [{"key": org_id, "name": "Company profile", "match": "when we signed up", "href": profile["href"], "values": profile["values"]}]
+                held["profile"] = [{"key": org_id, "name": "Your sign-up answers", "match": "when we signed up", "href": profile["href"], "values": profile["values"]}]
             for kind, rows in (("company_profile", held.get("profile", [])), ("canvas", held["canvases"]), ("framework", held["frameworks"])):
                 for row in rows:
                     if row.get("match", row["name"]).lower() not in user_message.lower() or len(sources) >= self.MAX_SOURCES:
                         continue
-                    args = {"query": row["name"]}
-                    self._emit({"type": "tool_start", "tool": "get_chosen_record", "args": args})
-                    result = {"success": True, "result": [{"id": row["key"], "name": row["name"], "kind": kind, "entries": row.get("entries", row.get("count")), "values": row.get("values")}]}
-                    self._note_lookup("get_chosen_record", result, args, for_question=True)
+                    tool = "get_canvas" if kind == "canvas" else "get_chosen_record"
+                    args = {"canvas_type": "business_model", "canvas_id": row["id"]} if kind == "canvas" else {"query": row["name"]}
+                    self._emit({"type": "tool_start", "tool": tool, "args": args})
+                    if kind == "canvas":
+                        # What is on the canvas comes from the chat's own canvas reader, not a count of it.
+                        from app.modules.ai_chat.tools.route_read_tools import ROUTE_READ_HANDLERS
+
+                        result = ROUTE_READ_HANDLERS["get_canvas"]({"canvas_type": "business_model", "canvas_id": row["id"]})
+                        if not result.get("success"):
+                            continue
+                    else:
+                        result = {"success": True, "result": [{"id": row["key"], "name": row["name"], "kind": kind, "entries": row.get("entries", row.get("count")), "values": row.get("values")}]}
+                    self._note_lookup(tool, result, args, for_question=True)
                     sources.append({"type": kind, "id": row["key"], "name": row["name"], "url": row["href"]})
-                    self._emit({"type": "tool_result", "tool": "get_chosen_record", "result": result})
+                    self._emit({"type": "tool_result", "tool": tool, "result": result})
                     blocks.append(fence_untrusted("LOOKUP " + kind + " " + row["name"], json.dumps(result, default=str)))
         except Exception:
             logger.warning("AgentRunner: chosen-record lookup failed", exc_info=True)

@@ -161,8 +161,8 @@ def choices(org) -> Dict[str, Any]:
 COMPANY_PROFILE_PAGE = "/account/manage"
 
 
-def company_profile(org) -> Optional[Dict[str, Any]]:
-    """The company profile the sign-up recorded (kind, industry), with the page that shows it,
+def signup_answers(org) -> Optional[Dict[str, Any]]:
+    """The answers the sign-up recorded (kind, industry), with the page that shows it,
     or None when nothing is recorded."""
     values = {key: value for key, value in choices(org).items() if key in ("kind", "industry") and value}
     return {"values": values, "href": COMPANY_PROFILE_PAGE} if values else None
@@ -964,7 +964,7 @@ def loaded_at_sign_up(org_id: int) -> Dict[str, List[Dict[str, Any]]]:
         if row is None:
             continue
         filled = sum(len(model_service.entries(row, box)) for box in model_service.element_boxes(row))
-        canvases.append({"key": key, "name": row.name, "entries": filled, "href": url_for("business_model.detail", canvas_id=row.id)})
+        canvases.append({"key": key, "id": row.id, "name": row.name, "entries": filled, "href": url_for("business_model.detail", canvas_id=row.id)})
     frameworks = []
     labels = dict((k, label) for k, label, _n in FRAMEWORKS)
     for key in chosen["frameworks"]:

@@ -10,10 +10,13 @@ Set NEWCOMER_SHOTS to save screenshots.
 import json
 import os
 import threading
+import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 import pytest
 from playwright.sync_api import expect
+
+from app.extensions import db
 
 from .conftest import PAGE_TIMEOUT, boot_live_server
 from .test_connect_github_to_cited_answer_journey import _SITECUSTOMIZE
@@ -92,6 +95,36 @@ def _shot(page, name, size):
         page.screenshot(path=os.path.join(SHOTS, "%s-%s.png" % (name, size)), full_page=True)
 
 
+def _record_on_a_canvas(app, email):
+    """Record one element of the first box's type for the person's organisation and place it on its canvas."""
+    from app.models import ArchiMateElement
+    from app.models.business_model import BusinessModelCanvas
+    from app.models.user import User
+    from app.modules.business_model_canvas import model_service
+    from app.modules.intelligence.services.query_catalogue import CANVAS_BOX_QUESTIONS
+
+    with app.app_context():
+        org_id = User.query.filter_by(email=email).one().organization_id
+        canvas = None
+        for _ in range(40):
+            db.session.rollback()
+            canvas = BusinessModelCanvas.query.filter_by(organization_id=org_id).order_by(BusinessModelCanvas.id).first()
+            if canvas is not None:
+                break
+            time.sleep(3)
+        assert canvas is not None, "the sign-up canvases have not loaded"
+        box = next(b for b in model_service.element_boxes(canvas) if b in CANVAS_BOX_QUESTIONS)
+        name = "Journey entry %d" % org_id
+        element = ArchiMateElement(
+            name=name, type=model_service.zones(canvas)[box]["element_types"][0], layer="business", organization_id=org_id
+        )
+        db.session.add(element)
+        db.session.flush()
+        model_service.place(canvas, box, element)
+        db.session.commit()
+        return name
+
+
 @pytest.mark.parametrize("name,viewport", SIZES, ids=[s[0] for s in SIZES])
 def test_first_card_gives_a_cited_answer_and_connect_github_lands_on_the_connector(
     browser, live_server, people, app, name, viewport
@@ -103,26 +136,34 @@ def test_first_card_gives_a_cited_answer_and_connect_github_lands_on_the_connect
         page.goto(live_server + "/ai-chat", wait_until="networkidle", timeout=PAGE_TIMEOUT)
         cards = page.get_by_test_id("first-question-suggestion")
         expect(cards.first).to_be_visible(timeout=PAGE_TIMEOUT)
-        # the canvases load in the background: wait for a card about one, then reload to read them
+        # the sign-up canvases load in the background and start empty: no card asks about an empty page
         for _ in range(20):
-            texts = cards.all_inner_texts()
-            if any("Canvas" in t for t in texts):
+            if any("signed up" in t for t in cards.all_inner_texts()):
                 break
             page.wait_for_timeout(3000)
             page.reload(wait_until="networkidle")
             expect(cards.first).to_be_visible(timeout=PAGE_TIMEOUT)
         texts = cards.all_inner_texts()
-        assert any("Connect GitHub to see who owns what and what breaks" in t for t in texts), texts
         assert any("signed up" in t for t in texts), texts
-        assert any("Canvas" in t for t in texts), texts
+        assert not any("Canvas" in t for t in texts), texts
+        assert not any("Company profile" in t for t in texts), texts
+        assert "then general questions" not in page.locator("#portfolio-briefing").inner_text()
+        # Connect GitHub is offered once, as the button, and lands on the connector page
+        assert page.get_by_test_id("chat-first-connect").count() == 1
+        assert not any("Connect GitHub" in t for t in texts), texts
         _shot(page, "chat-fresh", name)
-
-        # the Connect GitHub card lands on the connector page, which has content
-        cards.filter(has_text="Connect GitHub").click()
+        page.get_by_test_id("chat-first-connect").click()
         page.wait_for_url("**/admin/connectors/github", timeout=PAGE_TIMEOUT)
         expect(page.get_by_role("heading", name="GitHub").first).to_be_visible()
+
+        # once a canvas holds an entry it is offered as a card
+        entry = _record_on_a_canvas(app, email)
         page.goto(live_server + "/ai-chat", wait_until="networkidle", timeout=PAGE_TIMEOUT)
         expect(cards.first).to_be_visible(timeout=PAGE_TIMEOUT)
+        canvas_card = cards.filter(has_text="Canvas")
+        expect(canvas_card.first).to_be_visible(timeout=PAGE_TIMEOUT)
+        canvas_question = canvas_card.first.inner_text().splitlines()[0]
+        _shot(page, "chat-with-canvas", name)
 
         card = cards.filter(has_text="signed up")
         card.click()
@@ -138,7 +179,7 @@ def test_first_card_gives_a_cited_answer_and_connect_github_lands_on_the_connect
         assert "No lookup ran" not in feed, feed
         assert "record cited" in feed or "records cited" in feed, feed
         _shot(page, "cited-answer", name)
-        links = page.locator("#messages-container a[href]").filter(has_text="Company profile")
+        links = page.locator("#messages-container a[href]").filter(has_text="Your sign-up answers")
         links.first.wait_for(state="attached", timeout=PAGE_TIMEOUT)
         assert links.count() >= 1
         for href in {links.nth(i).get_attribute("href") for i in range(links.count())}:
@@ -147,5 +188,21 @@ def test_first_card_gives_a_cited_answer_and_connect_github_lands_on_the_connect
             body = page.locator("main").inner_text()
             assert "Startup" in body, body[:300]
             assert "404" not in page.title()
+
+        # the canvas card's question is answered from what is on the canvas, and links to the canvas
+        page.goto(live_server + "/ai-chat", wait_until="networkidle", timeout=PAGE_TIMEOUT)
+        page.fill("#user-input", canvas_question)
+        page.press("#user-input", "Enter")
+        try:
+            page.wait_for_function(
+                "(entry) => document.querySelector('#messages-container').innerText.includes(entry)", arg=entry, timeout=60000
+            )
+        except Exception:
+            raise AssertionError("the canvas answer does not quote an entry: " + page.locator("#messages-container").inner_text()[-800:])
+        _shot(page, "canvas-answer", name)
+        canvas_link = page.locator("#messages-container a[href*='/business-model/']").first
+        canvas_link.wait_for(state="attached", timeout=PAGE_TIMEOUT)
+        page.goto(live_server + canvas_link.get_attribute("href"), wait_until="networkidle", timeout=PAGE_TIMEOUT)
+        assert entry in page.locator("main").inner_text()
     finally:
         context.close()

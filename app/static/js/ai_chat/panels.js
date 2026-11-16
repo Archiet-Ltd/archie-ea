@@ -454,7 +454,10 @@
             /* Platform.fetch.get throws on a non-ok response, so an outage reaches the error below. */
             const offered = await Platform.fetch.get('/ai-chat/first-questions', {}, { silent: true });
             const linked = Array.isArray(offered && offered.questions) ? offered.questions : [];
-            const questions = linked.slice(0, 4);
+            /* The next-step button below already offers the GitHub connector; the same offer is not made twice. */
+            const nextStep = document.getElementById('startup-first-steps');
+            const connectShown = !!(nextStep && nextStep.content.querySelector('[data-testid="chat-first-connect"]'));
+            const questions = linked.filter((item) => !(connectShown && item.href)).slice(0, 4);
             /* The general questions fit the organisation's own kind: a startup is asked what to write
                down first, a larger company how it governs and rationalises what it already holds. */
             const startup = host.getAttribute('data-company-kind') !== 'enterprise';
@@ -469,7 +472,7 @@
                 { question: 'When does a monolith stop being enough?', detail: '' },
                 { question: 'What should an architecture review cover?', detail: '' }
             ];
-            if (questions.length > 0) {
+            if (questions.length > 0 && !(offered && offered.basis === 'records')) {
                 general.forEach((item) => {
                     if (questions.length < 4) questions.push(item);
                 });
@@ -534,7 +537,7 @@
                 '<div class="mt-4 grid grid-cols-1 gap-2 sm:gap-3 md:grid-cols-2">' + rows + '</div>' +
                 '<p class="mt-3 text-center text-xs text-muted-foreground">' +
                   (offered.basis === 'records'
-                    ? 'Questions about what you picked at sign-up, then general questions.'
+                    ? 'Questions about what you picked at sign-up.'
                     : linked.length < 4
                     ? 'Linked applications first, then general questions.'
                     : 'Questions about your most connected applications') + '</p>'

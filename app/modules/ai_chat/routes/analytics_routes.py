@@ -185,11 +185,12 @@ def own_record_questions(org_id):
     org = db.session.get(Organization, org_id)
     cards = [
         {"question": "What did we record when we signed up?"}
-    ] if org is not None and onboarding.company_profile(org) else []
+    ] if org is not None and onboarding.signup_answers(org) else []
     cards += [
         {"question": "What is on our %s?" % row["name"],
-         "detail": "%d entries" % row["entries"] if row["entries"] else ""}
+         "detail": "%d entries" % row["entries"]}
         for row in held["canvases"]
+        if row["entries"]
     ] + [
         {"question": "Which %s %ss apply to us?" % (row["name"], row["unit"]), "detail": "%d listed" % row["count"]}
         for row in held["frameworks"]
