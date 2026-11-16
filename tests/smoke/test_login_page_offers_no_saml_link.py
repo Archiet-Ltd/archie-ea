@@ -11,6 +11,8 @@ This still loads the page from the running application and checks that it
 renders and that no such direct link exists.
 """
 
+import html
+
 import pytest
 import requests
 
@@ -21,6 +23,6 @@ def test_login_page_renders_without_a_direct_saml_sign_in_button(live_server):
     response = requests.get(live_server + "/account/login", timeout=60)
 
     assert response.status_code == 200
-    assert "Don't have an account?" in response.text
+    assert "Don't have an account?" in html.unescape(response.text)
     assert "Sign in with SAML" not in response.text
     assert "/account/saml" not in response.text
