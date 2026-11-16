@@ -143,11 +143,13 @@ class AIProtocolStub:
                 if not isinstance(messages, list) or not messages or not isinstance(messages[-1], dict):
                     self._reject(400, 'A final user message is required.', model=MODEL)
                     return
-                with owner._lock:
-                    owner._sent_text.append(' '.join(
-                        str(m.get('content')) for m in messages if isinstance(m, dict)))
                 last = messages[-1]
                 content = last.get('content')
+                is_lookup = (last.get('role') == 'user' and isinstance(content, str)
+                             and content.startswith(CATALOGUE_LOOKUP) and body.get('stream', False) is False)
+                text = ' '.join(str(m.get('content')) for m in messages if isinstance(m, dict))
+                with owner._lock:
+                    (owner._lookups if is_lookup else owner._sent_text).append(text)
                 refused = [(name, r) for name, r in REFUSALS.items()
                            if isinstance(content, str) and r['marker'] in content]
                 if last.get('role') == 'user' and len(refused) == 1:
@@ -156,12 +158,10 @@ class AIProtocolStub:
                                  stream=bool(body.get('stream', False)))
                     self._json(refusal['status'], refusal['body'])
                     return
-                if (last.get('role') == 'user' and isinstance(content, str)
-                        and content.startswith(CATALOGUE_LOOKUP) and body.get('stream', False) is False):
+                if is_lookup:
                     # The chat first asks which catalogue entry a question fits; the fixture says none
                     # fits, so the question goes on to the reply being tested. It is not a chat request.
-                    with owner._lock:
-                        owner._lookups.append(owner._sent_text.pop())
+                    self._record(200, scenario='catalogue_lookup', model=MODEL)
                     self._json(200, {'id': 'chatcmpl-ci-lookup', 'created': 0, 'model': MODEL,
                                      'object': 'chat.completion', 'choices': [{
                                          'index': 0, 'finish_reason': 'stop', 'message': {

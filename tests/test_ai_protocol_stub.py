@@ -9,7 +9,7 @@ import httpx
 from openai import AuthenticationError, BadRequestError, OpenAI
 import pytest
 
-from tests.smoke.ai_protocol_stub import AIProtocolStub, CHAT, GUIDE, MODEL, TOKEN
+from tests.smoke.ai_protocol_stub import AIProtocolStub, CATALOGUE_LOOKUP, CHAT, GUIDE, MODEL, TOKEN
 
 
 def test_sdk_nonstreaming_guide_response_and_usage_cross_loopback():
@@ -161,3 +161,15 @@ def test_server_environment_leaves_the_stub_token_as_the_organisations_own_key(a
         allowed, reason = LLMService.platform_call_allowed('openai')
     assert allowed is False
     assert 'not in the provider order' in reason
+
+
+def test_catalogue_lookup_is_its_own_scenario_and_never_a_chat_request():
+    with AIProtocolStub() as stub:
+        with OpenAI(api_key=TOKEN, base_url=stub.base_url, max_retries=0,
+                    http_client=httpx.Client(trust_env=False)) as client:
+            client.chat.completions.create(model=MODEL, messages=[
+                {'role': 'user', 'content': CATALOGUE_LOOKUP + ' for jane.doe@acme-corp.example'}])
+            client.chat.completions.create(model=MODEL, messages=[{'role': 'user', 'content': GUIDE['prompt']}])
+        assert [record['scenario'] for record in stub.records] == ['catalogue_lookup', 'guide']
+        assert len(stub.lookups) == 1 and 'jane.doe@acme-corp.example' in stub.lookups[0]
+        assert len(stub.sent_text) == 1 and GUIDE['marker'] in stub.sent_text[0]
