@@ -53,7 +53,7 @@ WORK_CHILDREN = {
 LAYER_TYPES = {
     "Strategy": ["Capability", "Value stream", "Resource", "Course of action"],
     "Business": ["Business actor", "Business role", "Business collaboration", "Business interface",
-                 "Business process", "Business processes",
+                 "Business process", "Business processes", "Decision tables",
                  "Business function", "Business interaction", "Business event",
                  "Business service", "Business object", "Contract", "Representation", "Product"],
     "Application": ["Application component", "Application collaboration", "Application interface",
