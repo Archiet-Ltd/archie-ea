@@ -56,6 +56,11 @@ def _own_and_sentence(page, base, path, testid_root):
     lens = page.locator("#capability-lens")
     if lens.count():
         lens.select_option("unified")
+    if "enterprise/capability-map" in path:
+        # The headline figure is refreshed by the page's own request; it must settle on the same own number.
+        page.wait_for_load_state("networkidle", timeout=PAGE_TIMEOUT)
+        headline = int(page.locator("#unified-cap-count").inner_text())
+        assert headline == int(re.match(r"(\d+)", page.get_by_test_id(testid_root + "-own").inner_text()).group(1))
     own = page.get_by_test_id(testid_root + "-own").first
     expect(own).to_be_visible(timeout=PAGE_TIMEOUT)
     catalogue = page.get_by_test_id(testid_root + "-catalogue").first
@@ -77,11 +82,12 @@ def test_every_capability_count_agrees_before_and_after_adding_one(browser, live
     try:
         sign_in(page, live_server, org["emails"]["enterprise_architect"])
 
-        seen = [_own_and_sentence(page, live_server, path, root) for path, root in PAGES]
+        seen = []
+        for path, root in PAGES:
+            seen.append(_own_and_sentence(page, live_server, path, root))
+            _shot(page, path.strip("/").replace("/", "-"), viewport, scheme)
         assert {own for own, _ in seen} == {0}, seen
         assert len({shared for _, shared in seen}) == 1 and seen[0][1] >= CATALOGUE, seen
-        for path, root in PAGES:
-            _shot(page, path.strip("/").replace("/", "-") or "root", viewport, scheme)
 
         # With none of its own, the page names the next step, and the step lands on a page that can add one.
         page.goto(live_server + "/capability-map/", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
@@ -95,6 +101,8 @@ def test_every_capability_count_agrees_before_and_after_adding_one(browser, live
                                   timeout=PAGE_TIMEOUT) as created:
             page.locator('[data-action="submitCap"]').click()
         assert created.value.status < 400
+        # The page reloads itself once the capability is saved; wait for it before moving on.
+        expect(page.locator(".cap-card", has_text="Own capability %s" % org["suffix"])).to_be_visible(timeout=PAGE_TIMEOUT)
 
         after = [_own_and_sentence(page, live_server, path, root) for path, root in PAGES]
         assert {own for own, _ in after} == {1}, after

@@ -1,7 +1,6 @@
 {% extends "layouts/admin_base.html" %}
 {% from 'macros/page_shell.html' import page_shell %}
 {% import 'components/breadcrumb.html' as breadcrumb %}
-{% from 'components/capability_scope.html' import capability_scope_line %}
 
 {% block title %}Capability Hierarchy - Capability Map{% endblock %}{% block content %}
 <div class="space-y-6" x-data="hierarchyView()">
@@ -56,7 +55,7 @@
         gate is server-side and Jinja-rendered (not Alpine x-show) so both
         states are directly testable without executing JS. #}
     <div class="bg-card rounded-lg border border-border px-4 py-2 flex items-center gap-4 text-sm">
-        <span class="font-medium text-foreground">{% if capability_scope %}{{ capability_scope_line(capability_scope) }}{% else %}{{ total_capabilities|dash }} capabilities{% endif %}</span>
+        <span class="font-medium text-foreground">{% if capability_scope %}<span data-testid="capability-scope-own">{{ capability_scope.own_sentence }}</span>{% if capability_scope.catalogue_sentence %}; <span data-testid="capability-scope-catalogue">{{ capability_scope.catalogue_sentence }}</span>{% endif %}{% if not capability_scope.own %}. <a class="underline" href="{{ url_for('unified_low_priority.capability_map_capabilities') }}" data-testid="capability-scope-next">Add your first capability</a>{% endif %}{% else %}{{ total_capabilities|dash }} capabilities{% endif %}</span>
         <span class="text-muted-foreground">|</span>
         {% if has_coverage_data %}
         <span class="text-muted-foreground">App coverage shown per capability below</span>

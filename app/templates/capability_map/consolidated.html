@@ -9,7 +9,6 @@
 {% from 'macros/page_shell.html' import page_shell %}
 {% from 'components/button.html' import button %}
 {% import 'basecoat/index.html' as ui %}
-{% from 'components/capability_scope.html' import capability_scope_line %}
 
 {% block title %}Capability Map{% endblock %}
 
@@ -40,7 +39,7 @@
     <!-- Controls: Lens ToggleGroup, View ToggleGroup, Search -->
     <div class="p-6 space-y-4">
         {% if capability_scope %}
-        <p class="text-sm text-muted-foreground" data-testid="capability-total">{{ capability_scope_line(capability_scope) }}</p>
+        <p class="text-sm text-muted-foreground" data-testid="capability-total"><span data-testid="capability-scope-own">{{ capability_scope.own_sentence }}</span>{% if capability_scope.catalogue_sentence %}; <span data-testid="capability-scope-catalogue">{{ capability_scope.catalogue_sentence }}</span>{% endif %}{% if not capability_scope.own %}. <a class="underline" href="{{ url_for('unified_low_priority.capability_map_capabilities') }}" data-testid="capability-scope-next">Add your first capability</a>{% endif %}</p>
         {% endif %}
         {% if costs_withheld %}
         <p class="text-sm text-muted-foreground" data-testid="capability-costs-withheld" role="status">{{ costs_withheld_sentence }}</p>

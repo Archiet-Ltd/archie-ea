@@ -1,6 +1,5 @@
 {% extends "layouts/admin_base.html" %}
 {% from 'components/modal.html' import modal %}
-{% from 'components/capability_scope.html' import capability_scope_line %}
 {% from 'components/form_field.html' import form_group, form_footer %}
 {% from 'components/dense_table.html' import dense_table %}
 {# smoke-coverage-ok: CSP inline style fix (removed style="width:0%"); covered by tests/test_capability_map_a11y_csp.py #}
@@ -181,7 +180,7 @@
                         icon_color='green',
                         value=('<span id="unified-cap-count">' ~ ((capability_scope.own if capability_scope else total_capabilities)|dash) ~ '</span>') | safe,
                         label='Your capabilities',
-                        subtitle=(capability_scope_line(capability_scope, 'dashboard-capability-scope') if capability_scope else 'All types')
+                        subtitle=(('<span data-testid="dashboard-capability-scope-own">' ~ capability_scope.own_sentence ~ '</span>' ~ ('; <span data-testid="dashboard-capability-scope-catalogue">' ~ capability_scope.catalogue_sentence ~ '</span>' if capability_scope.catalogue_sentence else '') ~ ('. <a class="underline" href="' ~ url_for('unified_low_priority.capability_map_capabilities') ~ '" data-testid="dashboard-capability-scope-next">Add your first capability</a>' if not capability_scope.own else ''))|safe if capability_scope else 'All types')
                     ) }}
                     {{ data_card(
                         icon='link',

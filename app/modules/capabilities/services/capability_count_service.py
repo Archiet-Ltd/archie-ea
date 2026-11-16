@@ -74,6 +74,8 @@ def capability_scope(organization_id=None):
         organization_id = current_org_id()
     totals = capability_totals(organization_id)
     shared = totals["shared"]
+    own = totals["own"]
+    totals["own_sentence"] = f"{own} {'capability' if own == 1 else 'capabilities'} of your own"
     totals["catalogue_sentence"] = (
         f"{shared} from the shared catalogue, not yet adopted" if shared else None
     )

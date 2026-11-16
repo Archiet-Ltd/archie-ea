@@ -210,8 +210,10 @@ class InvestmentPrioritizationService:
             "own_capabilities": totals["own"],
             "shared_capabilities": totals["shared"],
         })
+        scope = capability_scope(org_id)
         portfolio_metrics.update({"own": totals["own"], "shared": totals["shared"],
-                                  "catalogue_sentence": capability_scope(org_id)["catalogue_sentence"]})
+                                  "own_sentence": scope["own_sentence"],
+                                  "catalogue_sentence": scope["catalogue_sentence"]})
 
         # Generate investment recommendations
         recommendations = self._generate_investment_recommendations(capability_scores)

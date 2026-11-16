@@ -1281,7 +1281,7 @@ async function loadBusinessDomainCards() {
         if (data.success) {
             // Update statistics
             document.getElementById('unified-domain-count').textContent = data.domain_count || 0;
-            document.getElementById('unified-cap-count').textContent = data.total_capabilities || 0;
+            document.getElementById('unified-cap-count').textContent = data.own_capabilities ?? data.total_capabilities ?? 0;
             document.getElementById('unified-mapped-count').textContent = data.mapped_count || 0;
             document.getElementById('unified-coverage').textContent = Platform.figure.percent(data.coverage);
 

@@ -4,7 +4,6 @@
 <link rel="stylesheet" href="{{ url_for('static', filename='css/basecoat_components.css') }}">
 {% endblock %}
 {% from 'components/page_header.html' import page_header %}
-{% from 'components/capability_scope.html' import capability_scope_line %}
 
 {% from 'components/card.html' import card, card_header, card_title, card_content %}
 {% from 'components/badge.html' import badge %}
@@ -45,7 +44,7 @@ const INVESTMENT_CAPABILITIES = {{ capability_scores | tojson }}.map(c => ({ ...
             {% if not scores_error %}
             <div class="px-6 pb-4 text-sm text-muted-foreground" data-testid="total-capabilities-scope">
                 {%- if portfolio_metrics.shared_capabilities or not portfolio_metrics.own_capabilities -%}
-                {{ capability_scope_line(portfolio_metrics, 'investment-capability-scope') }}
+                <span data-testid="investment-capability-scope-own">{{ portfolio_metrics.own_sentence }}</span>{% if portfolio_metrics.catalogue_sentence %}; <span data-testid="investment-capability-scope-catalogue">{{ portfolio_metrics.catalogue_sentence }}</span>{% endif %}{% if not portfolio_metrics.own %}. <a class="underline" href="{{ url_for('unified_low_priority.capability_map_capabilities') }}" data-testid="investment-capability-scope-next">Add your first capability</a>{% endif %}
                 {%- else -%}
                 Your organisation's capabilities
                 {%- endif -%}

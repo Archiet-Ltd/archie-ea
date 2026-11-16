@@ -38,6 +38,7 @@ def api_unified_domains():
         from app.models.application_capability import ApplicationCapabilityMapping
         from app.models.business_capabilities import BusinessCapability
         from app.modules.capabilities.services.capability_count_service import (
+            capability_scope,
             count_business_capabilities,
         )
 
@@ -159,6 +160,7 @@ def api_unified_domains():
                     "success": True,
                     "domain_count": len(domains),
                     "total_capabilities": total_capabilities,
+                    "own_capabilities": capability_scope()["own"],
                     "mapped_count": mapped_count,
                     "coverage": coverage,
                     "domains": domain_list,
