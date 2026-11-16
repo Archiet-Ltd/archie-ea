@@ -286,6 +286,19 @@ def compute_gap_signals(capability_type_filter="business", gap_type_filter=None)
             else []
         )
         gap_unified_caps_by_id = {c.id: c for c in biz_caps}
+        # A parent outside the live set (for example retired) is read once for all rows, so its
+        # path names the store its id belongs to without a query per gap.
+        outside_parent_ids = {
+            c.parent_capability_id for c in biz_caps
+            if c.parent_capability_id and c.parent_capability_id not in gap_unified_caps_by_id
+        }
+        if outside_parent_ids and org_id is not None:
+            gap_unified_caps_by_id.update({
+                c.id: c for c in UnifiedCapability.query.filter(
+                    UnifiedCapability.id.in_(outside_parent_ids),
+                    UnifiedCapability.organization_id == org_id,
+                ).all()
+            })
 
         support_by_cap = {}
         for row in support_rows(org_id) if org_id is not None else []:
@@ -307,7 +320,12 @@ def compute_gap_signals(capability_type_filter="business", gap_type_filter=None)
             # The two id sequences overlap, so the type must say which store the id belongs to.
             return "business" if _from_business(unified) else "unified"
 
+        from app.services.gap_archimate_service import gap_archimate_service
+
         for cap in biz_caps:
+            # A capability whose gap is already recorded is not also listed as not recorded.
+            if gap_archimate_service.find_existing_gap(_gap_capability_type(cap), _gap_capability_id(cap)):
+                continue
             apps = [apps_by_id[aid] for aid in support_by_cap.get(cap.id, []) if aid in apps_by_id]
             app_count = len(apps)
 
@@ -1108,7 +1126,7 @@ def api_roadmap_add_from_capability():
             )
 
         # Validate capability_type
-        valid_capability_types = ["business", "technical", "process"]
+        valid_capability_types = ["business", "technical", "process", "unified"]
         if data.get("capability_type") not in valid_capability_types:
             return (
                 jsonify(
@@ -1120,10 +1138,10 @@ def api_roadmap_add_from_capability():
                 400,
             )
 
-        if data.get("capability_type") == "business" and not str(data.get("capability_id")).isdigit():
+        if data.get("capability_type") in ("business", "unified") and not str(data.get("capability_id")).isdigit():
             return jsonify({"success": False, "error": "Capability not found"}), 404
-        if data.get("capability_type") == "business" and _derived_capability_name(
-                "business", int(data.get("capability_id"))) is None:
+        if data.get("capability_type") in ("business", "unified") and _derived_capability_name(
+                data.get("capability_type"), int(data.get("capability_id"))) is None:
             return jsonify({"success": False, "error": "Capability not found"}), 404
 
         # Check if gap already exists for this capability
@@ -1262,7 +1280,7 @@ def api_roadmap_delete_gap(gap_id):
         return jsonify({"success": False, "error": "An internal error occurred"}), 500
 
 
-@capability_map.route("/api/roadmap/gaps/<int:gap_id>/work-packages", methods=["POST"])
+@capability_map.route("/api/roadmap/gaps/<gap_id>/work-packages", methods=["POST"])
 @login_required
 @rate_limit(30, "1m")
 @audit_log("roadmap_work_package_create")
@@ -1283,13 +1301,16 @@ def api_roadmap_create_work_package(gap_id):
     if refusal:
         return refusal
     try:
-        from app.models.implementation_migration import Gap
         from app.services.gap_archimate_service import gap_archimate_service
 
         # A query, not .get(): .get() answers from the session's identity map
         # without SQL, which would skip the organisation filter on a cache hit.
-        gap = Gap.query.filter_by(id=gap_id).first()
-        if not gap:
+        # A stored gap id, or a derived "{type}-{id}" one (including "unified-N")
+        # that the roadmap list offers: the one resolver turns either into a row.
+        gap, gap_error = _resolve_roadmap_gap_id(gap_id)
+        if gap_error is not None:
+            return gap_error
+        if gap is None:
             return jsonify({"success": False, "error": "Gap not found"}), 404
 
         data = request.get_json() or {}
@@ -1499,7 +1520,7 @@ def _resolve_roadmap_gap_id(raw_gap_id):
     # Otherwise it should be a derived "{type}-{id}" composite.
     text = str(raw_gap_id)
     capability_type, _, capability_ref = text.partition("-")
-    valid_types = ("business", "technical", "process")
+    valid_types = ("business", "technical", "process", "unified")
     if capability_type not in valid_types or not capability_ref.isdigit():
         return None, (
             jsonify({
@@ -1549,6 +1570,14 @@ def _derived_capability_name(capability_type, capability_id):
         from app.models.business_capabilities import BusinessCapability
 
         row = load_entity_in_active_org(BusinessCapability, capability_id)
+    elif capability_type == "unified":
+        from app.models.unified_capability import UnifiedCapability
+
+        # Explicit organisation predicate: a unified id from another organisation is not found.
+        row = UnifiedCapability.query.filter(
+            UnifiedCapability.id == capability_id,
+            UnifiedCapability.organization_id == current_org_id(),
+        ).first()
     elif capability_type == "technical":
         from app.models.technical_capability import TechnicalCapability
 
