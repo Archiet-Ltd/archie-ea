@@ -96,10 +96,17 @@ class RoadmapAutomationEngine:
         self, capability_id: int, options: GenerationOptions
     ) -> List[Dict[str, Any]]:
         """Generate work packages from business capability"""
-        capability = UnifiedCapability.query.get_or_404(capability_id)
+        from app.utils.route_guards import require_entity
+        from app.utils.tenant_sql import current_org_id
 
-        # Get organization_id from capability for tenant scoping
-        organization_id = capability.organization_id
+        capability = require_entity(UnifiedCapability, capability_id)
+
+        # The signed-in organisation scopes everything read from here on
+        organization_id = current_org_id()
+        if capability.organization_id not in (None, organization_id):
+            from flask import abort
+
+            abort(404, description=f"UnifiedCapability {capability_id} not found")
 
         # Get related applications using canonical reader
         from app.services.capability_support import applications_of_capability
