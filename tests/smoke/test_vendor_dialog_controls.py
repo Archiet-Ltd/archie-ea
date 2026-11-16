@@ -33,6 +33,9 @@ def test_vendor_create_dialog_dismisses_without_write(browser, live_server, seed
             page.keyboard.press('Escape')
         else:
             dialog.get_by_role('button', name=dismissal, exact=True).click()
+        ask = page.get_by_role('dialog', name='Discard what you typed?')
+        expect(ask).to_be_visible()
+        ask.get_by_role('button', name='Discard', exact=True).click()
         expect(dialog).not_to_be_visible()
         expect(trigger).to_be_focused()
         assert writes == [], 'Dismissing an unsaved vendor form must not write vendor data'

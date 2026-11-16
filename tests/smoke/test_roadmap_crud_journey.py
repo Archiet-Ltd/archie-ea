@@ -48,7 +48,7 @@ def _open_roadmap(page, url):
     page.goto(url, wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
     # the page streams data in after paint; wait for the primary control to settle
     expect(
-        page.get_by_role("button", name=re.compile("Add Work Package", re.I))
+        page.get_by_role("button", name=re.compile("Add Work Package", re.I)).first
     ).to_be_visible(timeout=PAGE_TIMEOUT)
 
 
@@ -76,9 +76,11 @@ def test_roadmap_work_package_create_edit_delete(browser, live_server, seeded):
     try:
         _login(page, live_server, seeded["emails"]["application_manager"])
         _open_roadmap(page, roadmap_url)
+        # the work packages table sits behind the List tab; the timeline opens first
+        page.get_by_role("tab", name=re.compile("List", re.I)).click()
 
         # ---- CREATE (POST) ------------------------------------------------
-        page.get_by_role("button", name=re.compile("Add Work Package", re.I)).click()
+        page.get_by_role("button", name=re.compile("Add Work Package", re.I)).first.click()
         expect(page.locator(NAME_INPUT).first).to_be_visible(timeout=PAGE_TIMEOUT)
         _fill_required(page, "Smoke CRUD WP")
         with page.expect_response(
@@ -87,7 +89,7 @@ def test_roadmap_work_package_create_edit_delete(browser, live_server, seeded):
         ) as created:
             page.get_by_role("button", name=re.compile("Create Work Package", re.I)).click()
         assert created.value.status < 400, f"create POST failed: {created.value.status}"
-        expect(page.get_by_text("Smoke CRUD WP", exact=False)).to_be_visible(timeout=PAGE_TIMEOUT)
+        expect(page.locator("tr", has_text="Smoke CRUD WP").first).to_be_visible(timeout=PAGE_TIMEOUT)
 
         # ---- EDIT (PUT) ---------------------------------------------------
         row = page.locator("tr", has_text="Smoke CRUD WP")
@@ -102,7 +104,7 @@ def test_roadmap_work_package_create_edit_delete(browser, live_server, seeded):
         ) as edited:
             page.get_by_role("button", name=re.compile("Save Changes", re.I)).click()
         assert edited.value.status < 400, f"edit failed: {edited.value.status}"
-        expect(page.get_by_text("Smoke CRUD WP EDITED", exact=False)).to_be_visible(timeout=PAGE_TIMEOUT)
+        expect(page.locator("tr", has_text="Smoke CRUD WP EDITED").first).to_be_visible(timeout=PAGE_TIMEOUT)
 
         # ---- DELETE (DELETE) ----------------------------------------------
         row = page.locator("tr", has_text="Smoke CRUD WP EDITED")
