@@ -35,7 +35,7 @@ from flask import current_app, jsonify, request
 from flask_login import current_user, login_required
 from app.core.auth.permissions import can, can_change_model
 from app.middleware.tenant_context import current_org_id
-from app.utils.route_guards import load_entity
+from app.utils.route_guards import load_entity_in_active_org
 
 from app.decorators import audit_log, require_roles
 from app.services.rate_limiter import rate_limit
@@ -1548,7 +1548,7 @@ def _derived_capability_name(capability_type, capability_id):
     if capability_type == "business":
         from app.models.business_capabilities import BusinessCapability
 
-        row = load_entity(BusinessCapability, capability_id)
+        row = load_entity_in_active_org(BusinessCapability, capability_id)
     elif capability_type == "technical":
         from app.models.technical_capability import TechnicalCapability
 
@@ -2299,7 +2299,7 @@ def api_capability_traceability(capability_id):
         from app.models.unified_capability import UnifiedCapability
         from app.services.capability_support import applications_of_capability
 
-        capability = load_entity(BusinessCapability, capability_id)
+        capability = load_entity_in_active_org(BusinessCapability, capability_id)
         if not capability:
             return jsonify({"success": False, "error": "Capability not found"}), 404
 

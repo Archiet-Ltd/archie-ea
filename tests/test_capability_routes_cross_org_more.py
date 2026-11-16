@@ -151,3 +151,19 @@ def test_own_capability_still_answers(db_session, client, login_as, world):
         f"/capability-map/api/capabilities/{world['cap_a'].id}/processes").status_code == 200
     assert client.get(
         f"/capability-map/api/capabilities/{world['cap_a'].id}/archimate-mappings").status_code == 200
+
+
+def test_own_capability_refused_when_no_active_organisation(db_session, client, login_as, world, monkeypatch):
+    """With no active organisation known, a capability route answers 404 instead of every organisation's row."""
+    cap = world["cap_a"]
+    login_as(client, world["admin_a"])
+    monkeypatch.setattr("app.middleware.tenant_context.current_org_id", lambda: None)
+    for url in (f"/enterprise/capabilities/{cap.id}", f"/enterprise/capabilities/{cap.id}/fact-sheet"):
+        assert client.get(url).status_code == 404, url
+    resp = client.put(f"/enterprise/capabilities/{cap.id}", json={"name": "Renamed with no organisation"})
+    assert resp.status_code == 404
+    resp = client.post("/capability-map/api/roadmap/gaps/add-from-capability", json={
+        "capability_id": cap.id, "capability_type": "business", "capability_name": "No org"})
+    assert resp.status_code == 404
+    db_session.expire_all()
+    assert cap.name != "Renamed with no organisation"
