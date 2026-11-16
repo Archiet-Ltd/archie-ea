@@ -11,7 +11,7 @@ import uuid
 
 from tests.smoke.fresh_org import create_fresh_org, sign_in
 from tests.smoke.test_investment_matrix_scores_journey import (  # noqa: F401
-    PAGE_TIMEOUT, _cells, _row, _seed_org, two_orgs,
+    PAGE_TIMEOUT, _cells, _row, _seed_org,
 )
 
 MATRIX = "/strategic/investment-matrix"
@@ -31,7 +31,23 @@ def cto_org(live_server):
     return {"mine": mine, "names": names}
 
 
-def _open(browser, live_server, orgs, width=1440, height=900, role="enterprise_architect"):
+@pytest.fixture(scope="module")
+def two_orgs(live_server):
+    """Two organisations, each with a chief technology officer: the cost rule withholds amounts and the
+    ROI calculator from an enterprise architect, so the people who read costs are the ones who open it."""
+    from app import create_app
+
+    tag = uuid.uuid4().hex[:6]
+    mine = create_fresh_org("cto")
+    other = create_fresh_org("cto")
+    app = create_app("testing")
+    with app.app_context():
+        names = _seed_org(app, mine["org_id"], "m" + tag, costed=True)
+        foreign = _seed_org(app, other["org_id"], "f" + tag, costed=True)
+    return {"mine": mine, "names": names, "foreign": foreign}
+
+
+def _open(browser, live_server, orgs, width=1440, height=900, role="cto"):
     page = browser.new_context(ignore_https_errors=True, viewport={"width": width, "height": height}).new_page()
     sign_in(page, live_server, orgs["mine"]["emails"][role])
     return page
@@ -105,7 +121,7 @@ def test_roi_on_an_unestimated_capability_shows_no_invented_zero(browser, live_s
 
 @pytest.fixture(scope="module")
 def empty_org(live_server):
-    return {"mine": create_fresh_org("enterprise_architect")}
+    return {"mine": create_fresh_org("cto")}
 
 
 @pytest.mark.smoke
