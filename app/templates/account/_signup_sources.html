@@ -13,6 +13,15 @@
             {% call card_description() %}Give {{ config.APP_NAME }} a source and it starts reading in the background. You can carry on straight away, and every fact it finds names where it came from. Each one is optional.{% endcall %}
         {% endcall %}
         {% call card_content(class='space-y-6') %}
+            {% if may_load_sample_company %}
+            <form method="post" action="{{ url_for('architect_ui.load_sample_company') }}" data-sample-form
+                  class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between" data-testid="signup-sample-form">
+                {{ input(type='hidden', name='csrf_token', value=csrf_token()) }}
+                <p class="text-sm text-muted-foreground">Nothing to connect yet? Look around a sample company first. You can remove it later.</p>
+                {{ button(text='See a sample company', type='submit', variant='outline', size='sm', testid='signup-sample') }}
+                <p class="text-sm text-muted-foreground sm:basis-full" role="status" hidden data-sample-busy data-testid="signup-sample-busy">Loading the sample company. This takes a few seconds.</p>
+            </form>
+            {% endif %}
             <div class="space-y-3" data-testid="signup-website">
                 <h2 class="text-sm font-semibold">Company website</h2>
                 <div class="space-y-1.5">
