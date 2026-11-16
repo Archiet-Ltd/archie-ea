@@ -32,6 +32,7 @@ from app.models.application_duplicate_detection import (  # dead-code-ok
     DuplicateGroup,
 )
 from app.models.unified_duplicate_detection import (
+    AI_STRATEGIES,
     UnifiedDetectionRun,
     UnifiedDuplicateGroup,
     unified_group_members,
@@ -346,7 +347,7 @@ def get_simple_statistics():
     try:
         latest_run = (
             UnifiedDetectionRun.query.filter(
-                UnifiedDetectionRun.strategy.in_(["fast", "hybrid"]),
+                UnifiedDetectionRun.strategy.in_(["fast", "hybrid", *AI_STRATEGIES]),
                 UnifiedDetectionRun.status == "completed",
             )
             .order_by(UnifiedDetectionRun.created_at.desc())

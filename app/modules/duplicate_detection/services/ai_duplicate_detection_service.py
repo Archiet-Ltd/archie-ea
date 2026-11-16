@@ -18,8 +18,6 @@ from datetime import datetime
 from difflib import SequenceMatcher
 from typing import Any, Dict, List
 
-from flask import has_app_context
-
 # Heavy ML libraries are imported lazily (inside functions) to avoid adding
 # ~50 seconds to application startup time on every boot.
 # They are only loaded when the AI duplicate-detection feature is actually used.
@@ -77,7 +75,9 @@ except ImportError:
     cache = None
 
 from app.models.application_portfolio import ApplicationComponent
-from app.models.business_capabilities import BusinessCapability
+from app.modules.duplicate_detection.services.unified_duplicate_detection_service import (
+    UnifiedDuplicateDetectionService,
+)
 from app.models.unified_duplicate_detection import (
     DetectionStrategy,
     DuplicateType,
@@ -91,15 +91,10 @@ logger = logging.getLogger(__name__)
 
 
 def _persisted_strategy(strategy: str) -> str:
-    """A value the model's @validates will accept.
+    """The strategy stored on the run: always an "ai_" value, so the insights
+    page recognises the run as an AI run."""
+    return strategy if strategy.startswith("ai_") else f"ai_{strategy}"
 
-    detect_duplicates() advertises "ai_enhanced", which is not a
-    DetectionStrategy and so raised ValueError on every run. The AI provenance
-    is not lost by mapping it -- algorithm_version records "ai_v1.0".
-    """
-    if strategy in {s.value for s in DetectionStrategy}:
-        return strategy
-    return DetectionStrategy.ENHANCED.value
 
 class SemanticDetectionEngine:
     """Advanced semantic similarity detection using transformer models"""
@@ -170,62 +165,24 @@ class SemanticDetectionEngine:
 
 
 class BusinessContextEngine:
-    """Business context and organizational intelligence engine"""
+    """Scores how alike two applications are in what they do for the business."""
 
     def __init__(self):
-        self.capability_mappings = {}
-        self.org_hierarchy = {}
-        # Defer loading until an application context is available
-        if has_app_context():
-            self._load_business_context()
-
-    def _load_business_context(self):
-        """Load business capabilities and organizational context"""
-        try:
-            # Load business capabilities
-            if not has_app_context():
-                logger.info(
-                    "Deferring business-context load until app context is available"
-                )
-                return
-            capabilities = BusinessCapability.query.all()
-            self.capability_mappings = {
-                cap.name.lower(): {
-                    "id": cap.id,
-                    "level": cap.level,
-                    "domain": cap.domain,
-                    "description": cap.description,
-                }
-                for cap in capabilities
-            }
-            logger.info(f"Loaded {len(self.capability_mappings)} business capabilities")
-        except Exception as e:
-            logger.error(f"Failed to load business context: {e}")
+        self._capability_scorer = UnifiedDuplicateDetectionService()
 
     def calculate_business_similarity(self, app1: Dict, app2: Dict) -> float:
-        """How alike two applications are in what they do for the business.
+        """Overlap of the business capabilities the two applications are mapped to.
 
-        Two facts count: the same business domain, and the same known business
-        capability named in the application's name or description. Only the
-        facts both applications have are scored; with none, the answer is 0.0
-        rather than an invented figure.
+        Uses the portfolio's existing capability overlap. An application with no
+        mapped capability scores 0.0 rather than an invented figure; a shared
+        business domain alone says nothing about duplication.
         """
-        scores = []
-
-        domain1 = (app1.get("business_domain") or "").strip().lower()
-        domain2 = (app2.get("business_domain") or "").strip().lower()
-        if domain1 and domain2:
-            scores.append(1.0 if domain1 == domain2 else 0.0)
-
-        def named_capabilities(app: Dict) -> set:
-            text = f"{app.get('name', '')} {app.get('description', '')}".lower()
-            return {name for name in self.capability_mappings if name and name in text}
-
-        caps1, caps2 = named_capabilities(app1), named_capabilities(app2)
-        if caps1 and caps2:
-            scores.append(len(caps1 & caps2) / len(caps1 | caps2))
-
-        return sum(scores) / len(scores) if scores else 0.0
+        component1, component2 = app1.get("component"), app2.get("component")
+        if component1 is None or component2 is None:
+            return 0.0
+        return self._capability_scorer._calculate_capability_similarity(
+            component1, component2
+        )
 
 
 class AdaptiveLearningEngine:
@@ -418,6 +375,7 @@ class AIDuplicateDetectionService:
             applications_data.append(
                 {
                     "id": app.id,
+                    "component": app,
                     "name": app.name or "",
                     "description": app.description or "",
                     "component_type": app.component_type or "",
@@ -780,7 +738,6 @@ class AIDuplicateDetectionService:
             estimated_savings=sum(
                 d.get("business_impact", {}).get("cost_savings", 0) for d in duplicates
             ),
-            config={"algorithm_version": "ai_v1.0"},
         )
 
         db.session.add(run)

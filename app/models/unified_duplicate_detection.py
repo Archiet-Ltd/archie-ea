@@ -26,6 +26,11 @@ class DetectionStrategy(str, Enum):
     ENHANCED = "enhanced"
 
 
+# Strategies the AI runs store. Every one starts with "ai_" so the insights page
+# can tell an AI run from the others.
+AI_STRATEGIES = ("ai_enhanced", "ai_semantic_only", "ai_business_aware")
+
+
 class DuplicateType(str, Enum):
     """Types of duplicates detected"""
 
@@ -129,7 +134,7 @@ class UnifiedDetectionRun(db.Model):
 
     @validates("strategy")
     def validate_strategy(self, key, value):
-        valid_strategies = [s.value for s in DetectionStrategy]
+        valid_strategies = [s.value for s in DetectionStrategy] + list(AI_STRATEGIES)
         if value not in valid_strategies:
             raise ValueError(f"Invalid strategy: {value}. Must be one of {valid_strategies}")
         return value

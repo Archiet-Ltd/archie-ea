@@ -9,7 +9,6 @@ URL prefix: /ai (nested under /duplicate-detection via register())
 """
 
 from werkzeug.exceptions import HTTPException
-import json
 import logging
 
 from flask import Blueprint, jsonify, render_template, request
@@ -148,36 +147,16 @@ def ai_insights(run_id):
         run = UnifiedDetectionRun.query.get_or_404(run_id)
         if (getattr(run, "strategy", "") or "").startswith("ai_"):
             groups = UnifiedDuplicateGroup.query.filter_by(detection_run_id=run_id).all()
-            ai_insights_data = {
-                "algorithm_version": getattr(run, "strategy", None),
-                "total_groups": len(groups),
-                "high_confidence_groups": len(
-                    [g for g in groups if g.similarity_score > 0.8]
-                ),
-                "medium_confidence_groups": len(
-                    [g for g in groups if 0.6 <= g.similarity_score <= 0.8]
-                ),
-                "low_confidence_groups": len(
-                    [g for g in groups if g.similarity_score < 0.6]
-                ),
-                "average_confidence": sum(g.similarity_score for g in groups)
-                / len(groups)
-                if groups
-                else 0,
-                "groups_with_ai_insights": len(
-                    [g for g in groups if g.metadata and "ai_insights" in g.metadata]
-                ),
-            }
-            if groups and groups[0].metadata:
-                try:
-                    metadata = json.loads(groups[0].metadata)
-                    if "ai_insights" in metadata:
-                        ai_insights_data["global_insights"] = metadata["ai_insights"]
-                except (json.JSONDecodeError, TypeError, KeyError):
-                    logger.exception("Failed to JSON parsing")
-                    pass
+            ai_insights_data = [
+                {
+                    "title": g.name,
+                    "description": g.description or "",
+                    "confidence": round((g.similarity_score or 0) * 100),
+                }
+                for g in groups
+            ]
         else:
-            ai_insights_data = {"error": "Not an AI detection run"}
+            ai_insights_data = []
         return render_template(
             "dedupe/ai_insights.html", run=run, ai_insights=ai_insights_data
         )
@@ -191,6 +170,7 @@ def ai_insights(run_id):
 @ai_dedupe_bp_v2.route("/api/detect", methods=["POST"])
 @timed_route
 @login_required
+@platform_admin_required
 def api_ai_detect():
     """Run AI-powered duplicate detection."""
     try:
