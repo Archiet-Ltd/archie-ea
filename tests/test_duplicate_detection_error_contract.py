@@ -40,7 +40,7 @@ INTERNAL_LEAK_MARKERS = (
 @pytest.fixture
 def dedupe_client(app, db_session, make_org, login_as):
     """A logged-in client; ``login_as`` runs before each request (see conftest)."""
-    from app.models.user import User
+    from app.models.user import Role, User
 
     org = make_org("dedupe")
     user = User(
@@ -53,7 +53,10 @@ def dedupe_client(app, db_session, make_org, login_as):
         confirmed=True,
     )
     if hasattr(user, "enterprise_role"):
-        user.enterprise_role = "enterprise_architect"
+        user.enterprise_role = "platform_admin"
+    # Starting an AI run needs a platform administrator.
+    user.is_platform_admin = True
+    user.role = Role.query.filter_by(name="Administrator").first() or user.role
     db_session.add(user)
     db_session.flush()
 
