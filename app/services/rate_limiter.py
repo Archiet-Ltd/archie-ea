@@ -716,8 +716,8 @@ def violation_page(*, organization_id=None, address=None, user=None, since=None,
         # tenancy-ok: scoped through clause, which carries v.organization_id = :org
         # when an organisation is given; platform scope is set above otherwise.
         total = connection.execute(
-            text(  # nosec B608 - clause is built from fixed fragments, values are bound
-                "SELECT COUNT(*) FROM rate_limit_violations v "
+            text(
+                "SELECT COUNT(*) FROM rate_limit_violations v "  # nosec B608 - clause is built from fixed fragments, values are bound
                 "LEFT JOIN users u ON u.id = v.user_id WHERE " + clause
             ),
             params,
@@ -725,8 +725,8 @@ def violation_page(*, organization_id=None, address=None, user=None, since=None,
         # tenancy-ok: scoped through clause, which carries v.organization_id = :org
         # when an organisation is given; platform scope is set above otherwise.
         rows = connection.execute(
-            text(  # nosec B608 - clause is built from fixed fragments, values are bound
-                "SELECT v.id, v.created_at, v.address, u.email, v.route, v.rule "
+            text(
+                "SELECT v.id, v.created_at, v.address, u.email, v.route, v.rule "  # nosec B608 - clause is built from fixed fragments, values are bound
                 "FROM rate_limit_violations v LEFT JOIN users u ON u.id = v.user_id WHERE "
                 + clause + " ORDER BY v.created_at DESC, v.id DESC LIMIT :lim OFFSET :off"
             ),
