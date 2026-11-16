@@ -888,6 +888,13 @@ def page_trail(user, endpoint: str | None, args=None) -> list:
     so every breadcrumb reads the way the sidebar is laid out. A section such as Spend has no
     page of its own, so it carries no link. Empty for Home and for pages the sidebar does not hold.
     """
+    # Impact Analysis page: conceptually sits under the Strategy layer of the model,
+    # so its breadcrumb reads Home > Strategy Layer > Impact Analysis.
+    if endpoint == "strategic.impact_analysis":
+        from flask import url_for
+        strategy_layer_url = url_for("archimate_crud.dashboard", layer="strategy")
+        return [("Strategy Layer", strategy_layer_url), ("Impact analysis", None)]
+
     # A filtered view of a shared page (a layer of the model) sits where the sidebar item with that
     # filter sits, not under the entry that owns the unfiltered page.
     if args:
