@@ -269,6 +269,13 @@ def _made_since(commit: Any, start: datetime) -> bool:
         return True
 
 
+def _is_bot(item: Any) -> bool:
+    """Whether a GitHub commit record was made by an automation account, not a person."""
+    account = (item.get("author") if isinstance(item, dict) else None) or {}
+    return (str(account.get("login") or "").strip().lower().endswith("[bot]")
+            or str(account.get("type") or "").strip().lower() == "bot")
+
+
 def summarise_commits(org_id, repository: str, commits: List[dict]) -> Dict[str, Any]:
     """Who of this organisation made the recent commits of a repository.
 
@@ -285,9 +292,13 @@ def summarise_commits(org_id, repository: str, commits: List[dict]) -> Dict[str,
     login_shown: Dict[str, str] = {}
     login_total: Dict[str, int] = {}
     stamps: List[Tuple[str, str]] = []
+    bot_commits = 0
     for item in commits or []:
         detail = item.get("commit") if isinstance(item, dict) else None
         author = (detail or {}).get("author") or {}
+        if _is_bot(item):
+            bot_commits += 1
+            continue
         email = str(author.get("email") or "").strip().lower()
         login = str(((item.get("author") if isinstance(item, dict) else None) or {}).get("login") or "").strip().lower()
         if login:
@@ -328,7 +339,7 @@ def summarise_commits(org_id, repository: str, commits: List[dict]) -> Dict[str,
         if matched:
             logins[login] = {"commits": tally[""], "members": matched}
     # The one GitHub account behind more than half of all the commits read, member or not.
-    total = len(commits or [])
+    total = len(commits or []) - bot_commits
     leader_login = None
     if login_total:
         top = max(login_total, key=lambda k: (login_total[k], k))
@@ -352,6 +363,13 @@ def code_owner_handles(element) -> List[str]:
     entry = (getattr(element, "acm_properties", None) or {}).get("github_code_owners")
     owners = entry.get("value") if isinstance(entry, dict) else None
     return [o for o in (owners or []) if isinstance(o, str) and o.startswith("@") and "/" not in o and len(o) > 1]
+
+
+def code_owner_count(element) -> int:
+    """How many owners (teams, people, addresses) CODEOWNERS names for an application."""
+    entry = (getattr(element, "acm_properties", None) or {}).get("github_code_owners")
+    owners = entry.get("value") if isinstance(entry, dict) else None
+    return len([o for o in (owners or []) if isinstance(o, str) and o])
 
 
 def handle_owner(org_id, summary: Dict[str, Any], handles: List[str]) -> Tuple[Optional[Dict[str, Any]], Optional[str]]:
@@ -427,7 +445,7 @@ def commit_limit_reason(repository: str) -> str:
     )
 
 
-def code_owner_provenance(element, handle: str) -> str:
+def code_owner_provenance(element) -> str:
     """The words that say a person was named by the repository's CODEOWNERS file."""
     try:
         ref = json.loads(element.source_ref or "")
@@ -489,8 +507,8 @@ def apply_commit_history(org_id, element, component, summary: Dict[str, Any], as
 
         _member(match["user_id"], handle_provenance(summary, match, db.session.get(User, match["user_id"])))
         written = True
-    elif len(handles) == 1 and component is not None and not owned:
-        _named(handles[0], code_owner_provenance(element, handles[0]))
+    elif len(handles) == 1 and code_owner_count(element) == 1 and component is not None and not owned:
+        _named(handles[0], code_owner_provenance(element))
         written = True
     elif leader is not None and component is not None and not owned:
         _member(leader["user_id"], commit_provenance(summary, leader))

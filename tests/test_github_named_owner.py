@@ -182,3 +182,53 @@ def test_the_same_login_in_two_organisations_gives_each_its_own_owner(db_session
     assert [(r.person_name, r.organization_id) for r in rows_b] == [("@Anioko", org_b.id)]
     assert rows_a[0].id != rows_b[0].id
     assert ApplicationOwner.query.filter_by(organization_id=org_a.id, application_id=component_b.id).count() == 0
+
+
+def test_a_bot_that_made_most_commits_is_never_the_named_owner(db_session, make_org):
+    from app.connectors import github
+
+    org = make_org("gh-named-bot")
+    element, component = make_application(db_session, org)
+    summary = github.summarise_commits(org.id, REPOSITORY, commits_by(
+        ("dependabot[bot]", "d@example.org", 8), ("alice", "a@example.org", 2)))
+
+    assert github.apply_commit_history(org.id, element, component, summary) is True
+
+    assert named(db_session, component) == [("@alice", None, "github_connector")]
+    assert source(element)["text"].endswith("(2 of 2)")
+
+
+def test_a_person_under_half_of_the_human_commits_is_not_named_beside_a_bot(db_session, make_org):
+    from app.connectors import github
+
+    org = make_org("gh-named-bot-split")
+    element, component = make_application(db_session, org)
+    summary = github.summarise_commits(org.id, REPOSITORY, commits_by(
+        ("github-actions[bot]", "g@example.org", 6), ("alice", "a@example.org", 2), ("bob", "b@example.org", 2)))
+
+    assert github.apply_commit_history(org.id, element, component, summary) is False
+    assert named(db_session, component) == []
+
+
+def test_a_repository_only_bots_committed_to_names_no_owner(db_session, make_org):
+    from app.connectors import github
+
+    org = make_org("gh-named-only-bots")
+    element, component = make_application(db_session, org)
+    summary = github.summarise_commits(org.id, REPOSITORY, commits_by(
+        ("dependabot[bot]", "d@example.org", 5), ("renovate[bot]", "r@example.org", 3)))
+
+    assert github.apply_commit_history(org.id, element, component, summary) is False
+    assert named(db_session, component) == []
+
+
+def test_a_team_beside_a_person_in_code_owners_names_no_single_owner(db_session, make_org):
+    from app.connectors import github
+
+    org = make_org("gh-named-team-beside")
+    element, component = make_application(db_session, org)
+    with_code_owners(element, ["@acme/platform", "@alice"])
+    summary = github.summarise_commits(org.id, REPOSITORY, commits_by(("zed", "z@example.org", 4), ("alice", "a@example.org", 1)))
+
+    assert github.apply_commit_history(org.id, element, component, summary) is True
+    assert named(db_session, component) == [("@zed", None, "github_connector")]
