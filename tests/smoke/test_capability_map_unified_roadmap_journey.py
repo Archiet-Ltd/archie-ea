@@ -126,6 +126,7 @@ def test_cto_adds_two_selected_capabilities_to_the_roadmap_in_one_step(page, liv
     page.goto(live_server + "/capability-roadmap", wait_until="networkidle", timeout=PAGE_TIMEOUT)
     for name in (NAME, SECOND_NAME):
         expect(page.locator("main")).to_contain_text(name, timeout=PAGE_TIMEOUT)
+    page.get_by_test_id("roadmap-wp-link").filter(has_text=SECOND_NAME).first.scroll_into_view_if_needed()
     _shot(page, "unified-bulk-1440-light")
     # What was just recorded is not also offered as a gap that is not recorded.
     signals = page.request.get(live_server + "/capability-map/api/roadmap/gaps?capability_type=business")
@@ -136,6 +137,7 @@ def test_cto_adds_two_selected_capabilities_to_the_roadmap_in_one_step(page, liv
     page.goto(live_server + "/capability-roadmap", wait_until="networkidle", timeout=PAGE_TIMEOUT)
     page.evaluate("document.documentElement.classList.add('dark');")
     expect(page.locator("main")).to_contain_text(NAME, timeout=PAGE_TIMEOUT)
+    page.get_by_test_id("roadmap-wp-link").filter(has_text=SECOND_NAME).first.scroll_into_view_if_needed()
     _shot(page, "unified-bulk-390-dark")
 
     page.context.clear_cookies()
