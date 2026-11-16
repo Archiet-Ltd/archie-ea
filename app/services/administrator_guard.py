@@ -55,7 +55,7 @@ WHERE (
           AND r.permissions IS NOT NULL AND (r.permissions & {_ADMINISTER}) = {_ADMINISTER}
       )
 ORDER BY o.id
-"""
+"""  # nosec B608 - only _MEMBER and _ADMINISTER, module constants, are interpolated
 
 _EARLIEST_HOME_MEMBER_SQL = f"""
 SELECT u.id, u.email, u.role_id, COALESCE(u.is_org_admin, FALSE) AS flag, r.name AS role_name
@@ -63,7 +63,7 @@ FROM users u LEFT JOIN roles r ON r.id = u.role_id
 WHERE u.organization_id = :org AND {_MEMBER}
 ORDER BY u.id
 LIMIT 1
-"""
+"""  # nosec B608 - only _MEMBER, a module constant, is interpolated
 
 _EARLIEST_ORG_ROLE_MEMBER_SQL = """
 SELECT u.id, u.email, m.role AS org_role

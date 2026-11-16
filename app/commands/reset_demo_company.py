@@ -101,13 +101,13 @@ def retire_organisation(org_id: int, now: dt.datetime | None = None) -> dict:
         for column in connection.execute(db.text(_UNIQUE_TEXT_COLUMNS)).all():
             table, name, max_length = column.table_name, column.column_name, column.max_length
             held = connection.execute(db.text(  # tenancy-ok: counts the retired organisation's own rows
-                "SELECT count(*) FROM %s WHERE organization_id = :org AND %s IS NOT NULL"
+                "SELECT count(*) FROM %s WHERE organization_id = :org AND %s IS NOT NULL"  # nosec B608 - names come from the database catalogue and pass through _quote; values are bound
                 % (_quote(table), _quote(name))), {"org": org_id}).scalar()
             if not held:
                 continue
             keep = "left(%s, %d)" % (_quote(name), max_length - len(suffix)) if max_length else _quote(name)
             statement = db.text(  # tenancy-ok: limited to the retired organisation's rows
-                "UPDATE %s SET %s = %s || :suffix WHERE organization_id = :org AND %s IS NOT NULL"
+                "UPDATE %s SET %s = %s || :suffix WHERE organization_id = :org AND %s IS NOT NULL"  # nosec B608 - names come from the database catalogue and pass through _quote; values are bound
                 % (_quote(table), _quote(name), keep, _quote(name)))
             if table in guarded:
                 # a guard may allow this update (it protects certain columns of certain rows) or refuse it:
