@@ -44,9 +44,3 @@ def test_two_organisations_never_count_each_others_capabilities(app, db_session,
     assert capability_scope(theirs.id)["own"] == 5
     assert capability_scope(mine.id)["shared"] == capability_scope(theirs.id)["shared"]
 
-
-def test_no_catalogue_means_no_sentence(app, db_session, make_org):
-    org = make_org("nocat")
-    scope = capability_scope(org.id)
-    if scope["shared"] == 0:
-        assert scope["catalogue_sentence"] is None

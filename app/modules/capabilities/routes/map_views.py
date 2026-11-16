@@ -198,7 +198,6 @@ def _hierarchy_context():
     the header in the same response, cache hit or not.
     """
     from app.modules.capabilities.services.capability_count_service import (
-        capability_scope,
         count_capabilities,
     )
 
@@ -247,7 +246,6 @@ def _hierarchy_context():
         return {
             "catalog": catalog,
             "total_capabilities": total_capabilities,
-            "capability_scope": capability_scope(),
             "has_coverage_data": mapping_counts is not None,
             "load_error": None,
         }
@@ -262,7 +260,6 @@ def _hierarchy_context():
         return {
             "catalog": {"children": []},
             "total_capabilities": total_capabilities,
-            "capability_scope": None,
             "has_coverage_data": False,
             "load_error": "The capability hierarchy could not be read.",
         }
@@ -272,6 +269,8 @@ def _hierarchy_context():
 @login_required
 def hierarchy():
     """Capability hierarchy visualization — uses real UnifiedCapability data."""
+    from app.modules.capabilities.services.capability_count_service import capability_scope
+
     context = _hierarchy_context()
     if context["load_error"]:
         flash("Error loading the capability hierarchy. Please try again.", "error")
@@ -279,7 +278,8 @@ def hierarchy():
         "capability_map/hierarchy.html",
         catalog=context["catalog"],
         total_capabilities=context["total_capabilities"],
-        capability_scope=context["capability_scope"],
+        # read fresh: the cached context above may be minutes old, and a count must not lag an add
+        capability_scope=capability_scope() if not context["load_error"] else None,
         has_coverage_data=context["has_coverage_data"],
         load_error=context["load_error"],
     )
