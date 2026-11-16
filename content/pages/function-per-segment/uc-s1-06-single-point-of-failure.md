@@ -42,8 +42,7 @@ whose head has been the system of record until now.
 Start from what you already use — a Business Model Canvas, or nothing written down
 at all. The underlying model notation is never shown unless you choose to open it. If your canvas
 already lives in Miro or Notion, keep it there: Entelim's own version is the Business Model Canvas,
-where each box has a “Suggest for” button that proposes entries from the other boxes you have filled in
-and your own model, so you start from something real instead of a blank box.
+where each box holds entries you add from your model — existing elements or new names — and each entry appears on all the canvases and views that show it.
 
 ## Related
 

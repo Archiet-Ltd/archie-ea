@@ -14,7 +14,7 @@ icon: layout-template
 
 **For startup founders and early operators.**
 
-Open Canvases, click New Canvas and Entelim gives you the nine boxes of the Business Model Canvas on one page. Each box saves on its own when you click out of it, so changing one box never means redoing the others. A sparkle button on each box, “Suggest for” followed by the box name, proposes entries for you to accept.
+Open Canvases, click New Canvas and Entelim gives you the nine boxes of the Business Model Canvas on one page. Each box is a real part of your organisation's model: an entry you add is a record that all the other canvases, maps and answers see, and renaming it once renames it everywhere.
 
 ## The question
 
@@ -26,9 +26,7 @@ The **Canvases** page lists each canvas in your organisation as a card: the name
 
 **New Canvas** opens a short form with three fields: a name (required), an optional description, and an **Operating Model Archetype** chosen from Coordination, Unification, Replication and Diversification, or left as "Not set". Click **Create Canvas** and the canvas opens.
 
-The canvas page shows nine boxes in the classic layout: Customer Segments, Value Propositions, Channels, Customer Relationships, Revenue Streams, Key Activities, Key Resources, Key Partnerships and Cost Structure. Each box has the prompt "One idea per line…". When you click out of a box it saves, and a small "Saved" appears under it. Changing the archetype saves straight away and confirms with "Operating model updated".
-
-Each box that takes entries also has a sparkle button, named for example “Suggest for Key Partners”. It opens a panel of proposed entries written by AI from the other boxes you have already filled in and the elements already in your model. Each proposal says where it came from. You can accept it, change its name first, or dismiss it; an accepted entry is added to the box as an element of your model.
+The canvas page shows nine boxes in the classic layout: Customer Segments, Value Propositions, Channels, Customer Relationships, Revenue Streams, Key Activities, Key Resources, Key Partnerships and Cost Structure. Each box has an "Add to ..." button and an "(i)" About popover. To fill a box, click "Add to ..." and pick an existing element from your model or type a new name — either way it becomes a record in your model, not free text on this page alone. Each entry on the canvas carries Edit and Remove: Edit opens a dialog to rename it, and renaming once renames it on all the canvases and views that show it; Remove takes it off this canvas but leaves it in your model.
 
 An **Export & share** panel offers **Export as image**, and **Download file** in Mermaid, Lucidchart or Archi format. Once the canvas has a saved diagram, a **Share** link appears that opens it for people inside your organisation.
 
@@ -40,8 +38,8 @@ A founder or head of operations who has to show the business model at a board me
 
 1. Open **Canvases** from the sidebar.
 2. Click **New Canvas**, enter a name, pick an archetype if you know yours, and click **Create Canvas**.
-3. Start with Customer Segments and Value Propositions. Type one idea per line and click out of the box. Wait for "Saved".
-4. For a box you are stuck on, click “Suggest for” that box, change a proposal’s name if you want, and click Accept.
+3. Start with Customer Segments and Value Propositions. Click "Add to ..." on a box, pick an existing element or type a new name, and it becomes part of your model.
+4. To change an entry, click Edit on it; the new name shows on all the canvases and views that use it. Click Remove to take it off this canvas only.
 5. When the board or an investor asks, use **Export as image**, which shows the completed canvas.
 6. Return when something changes. Edit only the box that moved.
 
@@ -51,7 +49,6 @@ Most teams use a slide, a Miro board or a Notion page. They work on the day they
 
 ## Limits
 
-- Suggestions need AI switched on for your workspace; with it off, the panel says so and the box is left as it was.
 - Creating, editing and deleting a canvas is limited to administrators, architects and business architects. Other roles can open and read canvases.
 - Deleting a canvas cannot be undone. Entelim asks you to confirm first.
 
@@ -61,9 +58,9 @@ Most teams use a slide, a Miro board or a Notion page. They work on the day they
 
 Type or paste each box. Pasting a list of lines works, because each line is one idea.
 
-### Do the AI suggestions change my canvas on their own?
+### Does the AI chat know about my canvas entries?
 
-No. Proposals appear in a panel for you to read. Nothing is added until you click Accept.
+Yes. The AI chat can answer about the elements on your canvas, because each one is a record in your model.
 
 ## Related questions and modules
 
