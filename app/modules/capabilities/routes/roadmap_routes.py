@@ -384,6 +384,13 @@ def compute_gap_signals(capability_type_filter="business", gap_type_filter=None)
                 # Get parent info for hierarchy filtering (use prefetched lookup)
                 parent_id = cap.parent_capability_id
                 parent_cap = gap_unified_caps_by_id.get(parent_id) if parent_id else None
+                if parent_id and parent_cap is None:
+                    # The parent is outside the live set (for example retired): read its real
+                    # row so the path names the store its id belongs to.
+                    parent_cap = UnifiedCapability.query.filter(
+                        UnifiedCapability.id == parent_id,
+                        UnifiedCapability.organization_id == org_id,
+                    ).first()
                 gap_cap_id = _gap_capability_id(cap)
                 parent_gap_id = _gap_capability_id(parent_cap) if parent_cap else parent_id
 
@@ -1107,7 +1114,7 @@ def api_roadmap_add_from_capability():
             )
 
         # Validate capability_type
-        valid_capability_types = ["business", "technical", "process"]
+        valid_capability_types = ["business", "technical", "process", "unified"]
         if data.get("capability_type") not in valid_capability_types:
             return (
                 jsonify(
@@ -1118,6 +1125,12 @@ def api_roadmap_add_from_capability():
                 ),
                 400,
             )
+
+        if data.get("capability_type") == "unified" and (
+            not str(data.get("capability_id")).isdigit()
+            or _derived_capability_name("unified", int(data.get("capability_id"))) is None
+        ):
+            return jsonify({"success": False, "error": "Capability not found"}), 404
 
         # Check if gap already exists for this capability
         existing_gap = gap_archimate_service.find_existing_gap(
@@ -1492,7 +1505,7 @@ def _resolve_roadmap_gap_id(raw_gap_id):
     # Otherwise it should be a derived "{type}-{id}" composite.
     text = str(raw_gap_id)
     capability_type, _, capability_ref = text.partition("-")
-    valid_types = ("business", "technical", "process")
+    valid_types = ("business", "technical", "process", "unified")
     if capability_type not in valid_types or not capability_ref.isdigit():
         return None, (
             jsonify({
@@ -1542,6 +1555,14 @@ def _derived_capability_name(capability_type, capability_id):
         from app.models.business_capabilities import BusinessCapability
 
         row = BusinessCapability.query.get(capability_id)
+    elif capability_type == "unified":
+        from app.models.unified_capability import UnifiedCapability
+
+        # Explicit organisation predicate: a unified id from another organisation is not found.
+        row = UnifiedCapability.query.filter(
+            UnifiedCapability.id == capability_id,
+            UnifiedCapability.organization_id == current_org_id(),
+        ).first()
     elif capability_type == "technical":
         from app.models.technical_capability import TechnicalCapability
 
