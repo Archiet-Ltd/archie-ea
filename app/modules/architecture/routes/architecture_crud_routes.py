@@ -710,6 +710,25 @@ def api_list_relationships():
     )
 
 
+def _relationships_for_drawer(relationships):
+    """Relationships as the element drawer reads them: the type and both ends by name and layer."""
+    ids = {r.source_id for r in relationships} | {r.target_id for r in relationships}
+    ends = {}
+    if ids:
+        ends = {e.id: e for e in ArchitectureElement.query.filter(ArchitectureElement.id.in_(ids)).all()}
+    rows = []
+    for r in relationships:
+        row = _relationship_to_dict(r)
+        source, target = ends.get(r.source_id), ends.get(r.target_id)
+        row["relationship_type"] = r.type
+        row["source_name"] = source.name if source else None
+        row["source_layer"] = source.layer if source else None
+        row["target_name"] = target.name if target else None
+        row["target_layer"] = target.layer if target else None
+        rows.append(row)
+    return rows
+
+
 @architecture_crud_bp.route(
     "/api/elements/<int:element_id>/relationships", methods=["GET"]
 )
@@ -734,8 +753,8 @@ def api_element_relationships(element_id):
     return jsonify(
         {
             "status": "success",
-            "incoming": [_relationship_to_dict(r) for r in incoming_rels],
-            "outgoing": [_relationship_to_dict(r) for r in outgoing_rels],
+            "incoming": _relationships_for_drawer(incoming_rels),
+            "outgoing": _relationships_for_drawer(outgoing_rels),
         }
     )
 
