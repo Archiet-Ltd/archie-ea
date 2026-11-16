@@ -1126,10 +1126,10 @@ def api_roadmap_add_from_capability():
                 400,
             )
 
-        if data.get("capability_type") == "unified" and (
-            not str(data.get("capability_id")).isdigit()
-            or _derived_capability_name("unified", int(data.get("capability_id"))) is None
-        ):
+        if data.get("capability_type") in ("business", "unified") and not str(data.get("capability_id")).isdigit():
+            return jsonify({"success": False, "error": "Capability not found"}), 404
+        if data.get("capability_type") in ("business", "unified") and _derived_capability_name(
+                data.get("capability_type"), int(data.get("capability_id"))) is None:
             return jsonify({"success": False, "error": "Capability not found"}), 404
 
         # Check if gap already exists for this capability
@@ -1555,6 +1555,8 @@ def _derived_capability_name(capability_type, capability_id):
         from app.models.business_capabilities import BusinessCapability
 
         row = BusinessCapability.query.get(capability_id)
+        if row is not None and row.organization_id != current_org_id():
+            row = None
     elif capability_type == "unified":
         from app.models.unified_capability import UnifiedCapability
 
@@ -2314,7 +2316,7 @@ def api_capability_traceability(capability_id):
         from app.services.capability_support import applications_of_capability
 
         capability = BusinessCapability.query.get(capability_id)
-        if not capability:
+        if not capability or capability.organization_id != current_org_id():
             return jsonify({"success": False, "error": "Capability not found"}), 404
 
         org_id = current_org_id()
