@@ -43,8 +43,13 @@ def _shot(page, name, width, theme):
         page.screenshot(path=os.path.join(WALK_DIR, "%s-%s-%d.png" % (name, theme, width)))
 
 
+def _fail_500(route):
+    route.fulfill(status=500, content_type="application/json", body=json.dumps({"error": "boom"}))
+
+
+@pytest.mark.parametrize("failure", ["server_error", "network_abort"])
 @pytest.mark.parametrize("width,dark", [(1440, False), (390, True)])
-def test_failed_solution_create_tells_the_person(browser, live_server, seeded, width, dark):
+def test_failed_solution_create_tells_the_person(browser, live_server, seeded, width, dark, failure):
     context = _context(browser, width, dark)
     page = context.new_page()
     theme = "dark" if dark else "light"
@@ -57,16 +62,25 @@ def test_failed_solution_create_tells_the_person(browser, live_server, seeded, w
                                "domain": "Application", "usage_count": 2}]}))
 
         page.route("**/solutions/templates", templates)
-        page.route("**/architecture-journey/start-from-template", lambda route: route.abort())
+        page.route("**/architecture-journey/start-from-template",
+                   _fail_500 if failure == "server_error" else (lambda route: route.abort()))
         page.goto(live_server + "/solutions/", wait_until="networkidle", timeout=PAGE_TIMEOUT)
 
         page.locator('[data-testid="btn-new-from-template"]').first.dispatch_event("click")
         page.get_by_text(TEMPLATE_NAME).first.wait_for(state="visible", timeout=PAGE_TIMEOUT)
         page.get_by_role("button", name="Use template").first.click()
 
-        error = page.get_by_text("The solution could not be created")
-        error.first.wait_for(state="visible", timeout=PAGE_TIMEOUT)
-        _shot(page, "solution-create-failed", width, theme)
+        page.get_by_text("The solution could not be created").first.wait_for(
+            state="visible", timeout=PAGE_TIMEOUT)
+        page.wait_for_timeout(1000)
+        # The screen-reader live region is also role=alert but is clipped to one pixel: only
+        # messages with a real on-screen box are ones a person can see.
+        alerts = [a for a in page.locator('[role="alert"]').all()
+                  if a.is_visible() and (a.bounding_box() or {}).get("height", 0) > 8]
+        texts = [a.inner_text() for a in alerts]
+        assert len(alerts) == 1, "expected exactly one error message, saw %r" % texts
+        assert "connection" not in texts[0].lower(), texts[0]
+        _shot(page, "solution-create-failed-%s" % failure, width, theme)
         assert "/solutions" in page.url
     finally:
         context.close()
@@ -89,7 +103,8 @@ def test_enter_in_change_request_form_keeps_the_typed_title(browser, live_server
 
         assert page.evaluate("window.__noReload") == "still the same page", "Enter reloaded the page"
         assert field.input_value() == title
-        assert page.locator("body").inner_text().strip()
+        page.get_by_text("Describe the change, why it is needed", exact=False).first.wait_for(
+            state="visible", timeout=PAGE_TIMEOUT)
         _shot(page, "change-request-enter", width, theme)
     finally:
         context.close()

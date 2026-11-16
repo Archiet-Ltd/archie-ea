@@ -56,8 +56,10 @@ window.deleteSolution = async function(solutionId, solutionName) {
             ]
         });
         Platform.modal.open(modalId);
+    } else if (window.Platform && Platform.toast) {
+        // Without the dialog there is no way to ask first, so nothing is deleted; say so.
+        Platform.toast.error('The delete confirmation could not open. Reload the page and try again.');
     }
-    // Without the page's dialog there is no way to ask first, so nothing is deleted.
 };
 
 // Server-side filtering — navigate to URL with filter params so all pages are filtered
