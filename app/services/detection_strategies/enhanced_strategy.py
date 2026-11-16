@@ -123,6 +123,7 @@ class EnhancedDetectionStrategy(DetectionStrategy):
                     "duplicate_type": dup_type,
                     "match_details": {
                         "strategy": "enhanced",
+                        "pair_count": len(similarity_scores),
                         "match_reasons": list(set(match_reasons)),
                         "threshold": self.threshold,
                         "member_count": len(similar_apps),

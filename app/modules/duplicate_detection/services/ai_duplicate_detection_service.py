@@ -755,7 +755,7 @@ class AIDuplicateDetectionService:
             estimated_savings=sum(
                 d.get("business_impact", {}).get("cost_savings", 0) for d in duplicates
             ),
-            algorithm_version="ai_v1.0",
+            config={"algorithm_version": "ai_v1.0"},
         )
 
         db.session.add(run)
@@ -777,6 +777,7 @@ class AIDuplicateDetectionService:
                 status=GroupStatus.PENDING.value,
                 match_details={
                     "detection_algorithm": duplicate["detection_algorithm"],
+                    "pair_count": 1,  # one scored pair per AI group
                     "similarity_scores": duplicate["similarity_scores"],
                     "ai_insights": duplicate.get("ai_insights", {}),
                     "business_impact": duplicate.get("business_impact", {}),

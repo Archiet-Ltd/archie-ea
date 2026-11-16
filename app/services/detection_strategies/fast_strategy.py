@@ -86,6 +86,7 @@ class FastDetectionStrategy(DetectionStrategy):
                     "duplicate_type": "exact" if is_exact else "fuzzy",
                     "match_details": {
                         "strategy": "fast",
+                        "pair_count": len(similarity_scores),
                         "threshold": self.threshold,
                         "member_count": len(similar_apps),
                     },

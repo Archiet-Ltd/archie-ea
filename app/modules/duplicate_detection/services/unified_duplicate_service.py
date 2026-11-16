@@ -90,6 +90,17 @@ class UnifiedDuplicateService:
     }
 
     @classmethod
+    def get_strategy(
+        cls, strategy: str, threshold: float, config: Optional[Dict] = None
+    ) -> DetectionStrategy:
+        """The detector registered under a strategy name."""
+        if strategy not in cls.STRATEGIES:
+            raise ValueError(
+                f"Invalid strategy: {strategy}. Must be one of {sorted(cls.STRATEGIES)}"
+            )
+        return cls.STRATEGIES[strategy](threshold=threshold, config=config)
+
+    @classmethod
     @with_retry(max_retries=3)
     def run_detection(
         cls,

@@ -13,6 +13,7 @@ from difflib import SequenceMatcher
 
 from flask import (  # dead-code-ok
     Blueprint,
+    abort,
     current_app,
     jsonify,
     redirect,
@@ -568,6 +569,8 @@ def simple_group_detail(group_id):
     try:
         from config import CurrencyConfig
         group = UnifiedDuplicateGroup.query.get_or_404(group_id)
+        if not group_visible_to_caller(group):
+            abort(404)
         currency_symbol = CurrencyConfig.get_currency_config()["symbol"]
         match_details = group.match_details if isinstance(group.match_details, dict) else {}
 

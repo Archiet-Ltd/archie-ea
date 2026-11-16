@@ -482,3 +482,119 @@ def test_ai_run_page_without_any_active_organisation_answers_not_found_not_an_er
         g.pop("current_org_id", None)  # no organisation was ever set on g
         with pytest.raises(NotFound):
             view(1)
+
+
+# --- every way of making a group records how its figure was worked out ---------------
+
+_BEFORE_PAIR_COUNTS = "Worked out before pair counts were recorded"
+
+
+def _group_page_basis(client, login_as, user, group_id):
+    login_as(client, user)
+    page = client.get(f"/duplicate-detection/simple/group/{group_id}")
+    assert page.status_code == 200
+    html = page.get_data(as_text=True)
+    return html.split('data-testid="similarity-basis">')[1].split("<")[0]
+
+
+@pytest.mark.parametrize("strategy", ["fast", "hybrid", "enhanced"])
+def test_group_made_by_each_strategy_says_it_is_an_average_of_measured_pairs(
+    app, db_session, tenant_ctx, login_as, client, world, strategy
+):
+    from types import SimpleNamespace
+
+    from app.modules.duplicate_detection.services.unified_duplicate_service import (
+        UnifiedDuplicateService,
+    )
+
+    _apps(db_session, world["own"], "Ledger Core", "Ledger Core Copy")
+    user = _user(db_session, world["own"])
+    strategy_class = UnifiedDuplicateService.STRATEGIES[strategy]
+    with tenant_ctx(world["own"].id):
+        with mock.patch.object(
+            strategy_class,
+            "calculate_similarity",
+            side_effect=lambda *a, **k: SimpleNamespace(overall_score=0.62, details={}, match_reasons=[]),
+        ):
+            result = UnifiedDuplicateService.run_detection(
+                strategy=strategy, threshold=0.5, cleanup_first=False
+            )
+    assert result["success"], result
+    (group,) = _groups_of(world["own"])
+    assert group.duplicate_type == "fuzzy"
+    db_session.commit()
+
+    assert _group_page_basis(client, login_as, user, group.id) == "Average of 1 pair"
+
+
+def test_group_made_by_the_ai_service_says_it_is_an_average_of_measured_pairs(
+    app, db_session, tenant_ctx, login_as, client, world
+):
+    from app.modules.duplicate_detection.services.ai_duplicate_detection_service import (
+        AIDuplicateDetectionService,
+    )
+
+    first, second = _apps(db_session, world["own"], "Ledger Core", "Ledger Core Copy")
+    user = _user(db_session, world["own"])
+    duplicate = {
+        "app1_id": first.id,
+        "app2_id": second.id,
+        "app1_name": first.name,
+        "app2_name": second.name,
+        "confidence": 0.74,
+        "detection_algorithm": "semantic",
+        "similarity_scores": {"semantic": 0.74},
+        "business_impact": {},
+    }
+    with tenant_ctx(world["own"].id):
+        AIDuplicateDetectionService()._create_detection_run("hybrid", 0.5, [duplicate])
+    (group,) = _groups_of(world["own"])
+    assert group.duplicate_type == "fuzzy"
+    db_session.commit()
+
+    basis = _group_page_basis(client, login_as, user, group.id)
+    assert basis == "Average of 1 pair" and basis != _BEFORE_PAIR_COUNTS
+
+
+# --- the AI insights page shows what the run found ---------------------------------
+
+def test_ai_insights_page_shows_the_findings_stored_on_the_run_groups(
+    db_session, tenant_ctx, login_as, client, world
+):
+    from app.models.unified_duplicate_detection import UnifiedDetectionRun
+
+    _two_organisations_with_runs(db_session, tenant_ctx, world)
+    run = UnifiedDetectionRun.query.filter_by(organization_id=world["own"].id).one()
+    run.config = {"algorithm_version": "ai_v1.0"}
+    (group,) = _groups_of(world["own"])
+    group.match_details = {
+        "pair_count": 1,
+        "ai_insights": {"risk_level": "high", "automation_potential": "medium"},
+    }
+    admin = _user(db_session, world["own"])
+    admin.is_org_admin = True
+    admin.is_platform_admin = True
+    db_session.commit()
+
+    login_as(client, admin)
+    page = client.get(f"/duplicate-detection/ai/insights/{run.id}")
+    assert page.status_code == 200
+    html = page.get_data(as_text=True)
+    assert 'data-testid="ai-insight-facts"' in html
+    assert "Risk level" in html and "high" in html
+    assert "Automation potential" in html and "medium" in html
+
+
+# --- the group page answers not found for another organisation's group -------------
+
+def test_group_page_of_another_organisation_answers_not_found_even_with_members(
+    db_session, tenant_ctx, login_as, client, world
+):
+    _two_organisations_with_runs(db_session, tenant_ctx, world)
+    own_user = _user(db_session, world["own"])
+    db_session.commit()
+    (own_group,) = _groups_of(world["own"])
+    (other_group,) = _groups_of(world["other"])
+    login_as(client, own_user)
+    assert client.get(f"/duplicate-detection/simple/group/{own_group.id}").status_code == 200
+    assert client.get(f"/duplicate-detection/simple/group/{other_group.id}").status_code == 404

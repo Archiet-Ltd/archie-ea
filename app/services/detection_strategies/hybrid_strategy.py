@@ -131,6 +131,7 @@ class HybridDetectionStrategy(DetectionStrategy):
                     "match_details": {
                         "strategy": "hybrid",
                         "phase": "fuzzy",
+                        "pair_count": len(similarity_scores),
                         "threshold": self.threshold,
                         "member_count": len(similar_apps),
                     },

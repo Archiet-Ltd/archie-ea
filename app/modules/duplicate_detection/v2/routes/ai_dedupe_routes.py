@@ -151,7 +151,10 @@ def ai_insights(run_id):
         run = organisation_runs_query().filter(
             UnifiedDetectionRun.id == run_id
         ).first_or_404()
-        if (getattr(run, "strategy", "") or "").startswith("ai_"):
+        # An AI run is stored under a strategy the model accepts; the AI
+        # provenance is the algorithm version recorded in its config.
+        run_config = run.config if isinstance(run.config, dict) else {}
+        if str(run_config.get("algorithm_version") or "").startswith("ai_"):
             groups = UnifiedDuplicateGroup.query.filter_by(detection_run_id=run_id).all()
             ai_insights_data = {
                 "algorithm_version": getattr(run, "strategy", None),
@@ -173,14 +176,18 @@ def ai_insights(run_id):
                     [g for g in groups if g.match_details and "ai_insights" in g.match_details]
                 ),
             }
-            if groups and groups[0].metadata:
+            first_details = groups[0].match_details if groups else None
+            if isinstance(first_details, str):
                 try:
-                    metadata = json.loads(groups[0].metadata)
-                    if "ai_insights" in metadata:
-                        ai_insights_data["global_insights"] = metadata["ai_insights"]
-                except (json.JSONDecodeError, TypeError, KeyError):
-                    logger.exception("Failed to JSON parsing")
-                    pass
+                    first_details = json.loads(first_details)
+                except json.JSONDecodeError:
+                    first_details = None
+            if isinstance(first_details, dict) and "ai_insights" in first_details:
+                ai_insights_data["global_insights"] = first_details["ai_insights"]
+                ai_insights_data["insight_facts"] = [
+                    {"label": str(key).replace("_", " ").capitalize(), "key": str(key), "value": value}
+                    for key, value in first_details["ai_insights"].items()
+                ] if isinstance(first_details["ai_insights"], dict) else []
         else:
             ai_insights_data = {"error": "Not an AI detection run"}
         return render_template(
