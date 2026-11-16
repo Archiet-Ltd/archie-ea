@@ -84,7 +84,7 @@ def default_type_sql(category_column: str, level_column: str) -> str:
 
 
 BACKFILL_SQL = (
-    "UPDATE unified_capabilities SET capability_type = "
+    "UPDATE unified_capabilities SET capability_type = "  # nosec B608 - columns are literals and the CASE values come from the fixed default tables
     + default_type_sql("category", "level")
     + " WHERE capability_type IS NULL OR trim(capability_type) = ''"
 )
