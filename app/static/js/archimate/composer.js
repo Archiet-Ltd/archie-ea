@@ -3468,32 +3468,37 @@ function composerApp() {
             self._lastSelectedElementId = nextCell.id;
             let view = self.paper.findViewByModel(nextCell);
             if (view) self._highlightCell(view);
-            /* Bring the element into view whenever any edge of it has left the visible drawing. The box is
-               read from the drawn element, after layout, so what the person sees is what is measured; the
-               check runs again on the next frame in case the drawing settled after the first move. */
+            /* Bring the element into view whenever any edge of it has left the visible drawing. */
             self._revealCell(nextCell);
-            if (window.requestAnimationFrame) window.requestAnimationFrame(function() { self._revealCell(nextCell); });
             self.statusText = (nextCell.get('elName') || 'Element') + ', ' + (neighbors.length > 0 ? (self._tabCycleIndex + 1) + ' of ' + neighbors.length + ' connected' : 'no connections');
             self._announceSelection(nextCell);
         },
 
-        /* Shift the drawing so the whole drawn box of the cell lies inside the visible drawing. */
+        /* Shift the drawing so the whole box of the cell lies inside the visible drawing. The target is worked out
+           from the cell's own position, size and the drawing's scale and offset, never from a box read off the
+           screen: the drawing eases to a new position, and a box read part-way through would give a wrong shift. */
         _revealCell: function(cell) {
             let canvasEl = document.getElementById('composer-canvas');
-            let view = this.paper && this.paper.findViewByModel(cell);
-            if (!canvasEl || !view) return;
-            let r = view.el.getBoundingClientRect();
-            let c = canvasEl.getBoundingClientRect();
+            if (!canvasEl || !this.paper) return;
+            let pos = cell.position();
+            let size = cell.size();
+            let scale = this.paper.scale();
+            let t = this.paper.translate();
+            let w = canvasEl.clientWidth;
+            let h = canvasEl.clientHeight;
+            /* The drawn element is a little larger than its box (outline and selection ring), so keep a margin. */
+            let pad = 12;
+            let left = pos.x * scale.sx + t.tx - pad;
+            let top = pos.y * scale.sy + t.ty - pad;
+            let boxW = size.width * scale.sx + 2 * pad;
+            let boxH = size.height * scale.sy + 2 * pad;
             let dx = 0;
             let dy = 0;
-            if (r.width > c.width) dx = c.left - r.left;
-            else if (r.left < c.left) dx = c.left - r.left;
-            else if (r.right > c.right) dx = c.right - r.right;
-            if (r.height > c.height) dy = c.top - r.top;
-            else if (r.top < c.top) dy = c.top - r.top;
-            else if (r.bottom > c.bottom) dy = c.bottom - r.bottom;
+            if (boxW >= w || left < 0) dx = -left;
+            else if (left + boxW > w) dx = w - (left + boxW);
+            if (boxH >= h || top < 0) dy = -top;
+            else if (top + boxH > h) dy = h - (top + boxH);
             if (!dx && !dy) return;
-            let t = this.paper.translate();
             this.paper.translate(Math.round(t.tx + dx), Math.round(t.ty + dy));
         },
 
