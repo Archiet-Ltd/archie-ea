@@ -162,6 +162,8 @@ def answer_catalogue_question(message: str, organization_id: int, time_limit: Op
         count = row.get("depends_on_count")
         if count:
             record["dependents"] = "%d %s" % (count, "thing depends on it" if count == 1 else "things depend on it")
+        if row.get("type"):
+            record["type_label"] = row["type"]
         if row.get("source_line"):
             record["source_line"] = row["source_line"]
         elif citation.get("source_line"):

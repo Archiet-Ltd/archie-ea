@@ -53,8 +53,10 @@
                     <span class="min-w-0">{{ record.name }}</span>
                 </a>
                 {% if record.detail %}<p class="mt-1 text-xs text-muted-foreground" data-catalogue-detail>{{ record.detail }}</p>{% endif %}
-                {% if record.dependents or record.source_line %}
+                {% if record.type_label or record.dependents or record.source_line %}
                 <p class="mt-1 text-xs text-muted-foreground">
+                    {% if record.type_label %}<span class="font-medium text-foreground" data-catalogue-type>{{ record.type_label|capitalize }}</span>{% endif %}
+                    {% if record.type_label and (record.dependents or record.source_line) %}<span aria-hidden="true"> · </span>{% endif %}
                     {% if record.dependents %}<span class="font-medium text-foreground" data-catalogue-count>{{ record.dependents }}</span>{% endif %}
                     {% if record.dependents and record.source_line %}<span aria-hidden="true"> · </span>{% endif %}
                     {% if record.source_line %}<span data-catalogue-source>{{ record.source_line }}</span>{% endif %}
