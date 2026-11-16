@@ -15,7 +15,7 @@ def test_composition_editor_open_cancel_and_escape(browser, live_server, seeded)
     page = browser.new_page()
     try:
         _login(page, live_server, seeded["emails"]["platform_admin"])
-        response = page.goto(live_server + "/solutions/" + str(seeded["ids"]["solution"]), timeout=PAGE_TIMEOUT)
+        response = page.goto(live_server + "/solutions/" + str(seeded["ids"]["solution"]) + "?edit=blueprint", timeout=PAGE_TIMEOUT)
         assert response.status == 200
         page.locator('#application_cooperation').get_by_role(
             'button', name=re.compile(r'^5\. Application Cooperation')
@@ -50,7 +50,7 @@ def test_composition_add_edit_and_delete_survive_reload(browser, live_server, se
     created_id = None
     try:
         _login(page, live_server, seeded["emails"]["platform_admin"])
-        assert page.goto(url, timeout=PAGE_TIMEOUT).status == 200
+        assert page.goto(url + "?edit=blueprint", timeout=PAGE_TIMEOUT).status == 200
         page.locator('#application_cooperation').get_by_role(
             'button', name=re.compile(r'^5\. Application Cooperation')
         ).click()

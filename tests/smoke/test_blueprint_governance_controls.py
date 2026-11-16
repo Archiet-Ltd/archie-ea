@@ -14,7 +14,7 @@ def test_governance_editor_open_cancel_and_escape(browser, live_server, seeded, 
     page = browser.new_page()
     try:
         _login(page, live_server, seeded["emails"]["platform_admin"])
-        response = page.goto(live_server + "/solutions/" + str(seeded["ids"]["solution"]), timeout=PAGE_TIMEOUT)
+        response = page.goto(live_server + "/solutions/" + str(seeded["ids"]["solution"]) + "?edit=blueprint", timeout=PAGE_TIMEOUT)
         assert response.status == 200
         trigger = page.get_by_role("button", name=label, exact=True)
         trigger.click()
@@ -57,7 +57,7 @@ def test_governance_editor_saves_to_real_api_and_survives_reload(
     created_id = None
     try:
         _login(page, live_server, seeded["emails"]["platform_admin"])
-        response = page.goto(live_server + "/solutions/" + str(seeded["ids"]["solution"]), timeout=PAGE_TIMEOUT)
+        response = page.goto(live_server + "/solutions/" + str(seeded["ids"]["solution"]) + "?edit=blueprint", timeout=PAGE_TIMEOUT)
         assert response.status == 200
         page.get_by_role("button", name=label, exact=True).click()
         dialog = page.get_by_role("dialog")
