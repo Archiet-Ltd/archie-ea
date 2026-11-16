@@ -18,6 +18,7 @@ pytestmark = [pytest.mark.smoke, pytest.mark.journey]
 
 PERSONA = "cto"
 NAME = "Plant scheduling"
+SECOND_NAME = "Line changeover"
 WALK = os.environ.get("CAPABILITY_MAP_UNIFIED_ROADMAP_WALK_DIR")
 
 
@@ -48,6 +49,7 @@ def orgs():
     first = fresh_org.create_fresh_org(PERSONA, org_admin=False)
     second = fresh_org.create_fresh_org(PERSONA, org_admin=False)
     _seed(first["org_id"], NAME)
+    _seed(first["org_id"], SECOND_NAME)
     return first, second
 
 
@@ -106,27 +108,61 @@ def test_the_same_journey_works_at_phone_width_in_dark(page, live_server, orgs):
     _shot(page, "unified-roadmap-390-dark")
 
 
-def test_adding_a_unified_gap_from_the_roadmap_form_resolves_its_id(page, live_server, orgs):
-    """The roadmap's own form posts the derived id of a unified gap; it must become planned work."""
-    first, _ = orgs
-    from app import create_app, db
-    from app.models.unified_capability import UnifiedCapability
-
-    app = create_app("testing")
-    with app.app_context():
-        cap_id = UnifiedCapability.query.filter_by(organization_id=first["org_id"], name=NAME).first().id
-        db.session.remove()
+def test_cto_adds_two_selected_capabilities_to_the_roadmap_in_one_step(page, live_server, orgs):
+    """Select two capabilities, press Add selected to roadmap, and find each under its own name."""
+    first, second = orgs
     page.set_viewport_size({"width": 1440, "height": 900})
     fresh_org.sign_in(page, live_server, first["emails"][PERSONA])
+    page.goto(live_server + "/capability-map/dashboard", wait_until="networkidle", timeout=PAGE_TIMEOUT)
+    page.locator("#capability-lens").select_option("unified")
+    for name in (NAME, SECOND_NAME):
+        expect(page.locator("tr[data-cap-name]").filter(has_text=name).first).to_be_visible(timeout=PAGE_TIMEOUT)
+        page.locator("#unified-table-body").get_by_label("Select " + name).check()
+    bulk = page.locator("#unified-bulk-add-btn")
+    expect(bulk).to_be_enabled()
+    with page.expect_response(lambda r: "gaps/add-from-capability" in r.url):
+        bulk.click()
+    expect(page.get_by_text("Added 2 capabilities to roadmap").first).to_be_visible(timeout=PAGE_TIMEOUT)
     page.goto(live_server + "/capability-roadmap", wait_until="networkidle", timeout=PAGE_TIMEOUT)
-    token = page.evaluate("document.querySelector('meta[name=csrf-token]')?.content || ''")
-    reply = page.evaluate(
-        """async ([id, token]) => {
-            const r = await fetch('/capability-map/api/roadmap/gaps/unified-' + id + '/work-packages', {
-                method: 'POST', headers: {'Content-Type': 'application/json', 'X-CSRFToken': token},
-                body: JSON.stringify({name: 'Schedule the plant', start_date: '2026-12-01', target_date: '2027-03-01'})});
-            return {status: r.status, body: await r.text()};
-        }""", [cap_id, token])
-    assert reply["status"] in (200, 201), reply
-    links = _roadmap_links(page, live_server)
-    expect(links.filter(has_text="Schedule the plant").first).to_be_visible(timeout=PAGE_TIMEOUT)
+    for name in (NAME, SECOND_NAME):
+        expect(page.locator("main")).to_contain_text(name, timeout=PAGE_TIMEOUT)
+    _shot(page, "unified-bulk-1440-light")
+    # What was just recorded is not also offered as a gap that is not recorded.
+    signals = page.request.get(live_server + "/capability-map/api/roadmap/gaps?capability_type=business")
+    assert NAME not in signals.text() and SECOND_NAME not in signals.text(), signals.text()[:400]
+
+    page.set_viewport_size({"width": 390, "height": 844})
+    page.evaluate("document.documentElement.classList.add('dark');")
+    page.goto(live_server + "/capability-roadmap", wait_until="networkidle", timeout=PAGE_TIMEOUT)
+    page.evaluate("document.documentElement.classList.add('dark');")
+    expect(page.locator("main")).to_contain_text(NAME, timeout=PAGE_TIMEOUT)
+    _shot(page, "unified-bulk-390-dark")
+
+    page.context.clear_cookies()
+    fresh_org.sign_in(page, live_server, second["emails"][PERSONA])
+    page.goto(live_server + "/capability-roadmap", wait_until="networkidle", timeout=PAGE_TIMEOUT)
+    expect(page.locator("main")).not_to_contain_text(NAME)
+
+
+def test_adding_planned_work_with_the_roadmap_form_links_it_to_the_unified_gap(page, live_server):
+    """An architect fills the roadmap's Add Work Package form, links the capability's gap, and sees the work."""
+    architect = "enterprise_architect"
+    first = fresh_org.create_fresh_org(architect, org_admin=False)
+    _seed(first["org_id"], NAME)
+    page.set_viewport_size({"width": 1440, "height": 900})
+    fresh_org.sign_in(page, live_server, first["emails"][architect])
+    _add_from_map(page, live_server)
+    page.goto(live_server + "/capability-roadmap", wait_until="networkidle", timeout=PAGE_TIMEOUT)
+    page.get_by_role("button", name="Add Work Package").click()
+    page.locator("#rdm-wp-name").wait_for(state="visible", timeout=PAGE_TIMEOUT)
+    modal = page.locator("#rdm-create-wp-modal")
+    page.fill("#rdm-wp-name", "Schedule the plant")
+    page.fill("#rdm-wp-start", "2026-12-01")
+    page.fill("#rdm-wp-target", "2027-03-01")
+    page.get_by_test_id("wp-modal-gap-input").fill(NAME)
+    modal.get_by_role("button", name=NAME).first.click()
+    with page.expect_response(lambda r: "/work-packages" in r.url and r.request.method == "POST") as sent:
+        modal.get_by_role("button", name="Create Work Package").click()
+    assert sent.value.status in (200, 201), sent.value.text()
+    page.goto(live_server + "/capability-roadmap", wait_until="networkidle", timeout=PAGE_TIMEOUT)
+    expect(_roadmap_links(page, live_server).filter(has_text="Schedule the plant").first).to_be_visible(timeout=PAGE_TIMEOUT)

@@ -4591,7 +4591,7 @@
                     method: 'POST',
                     body: {
                         capability_id: parseInt(capabilityId),
-                        capability_type: 'business',
+                        capability_type: item.capability_type || 'business',
                         capability_name: capabilityName,
                         level: parseInt(level),
                         gap_type: 'coverage',
@@ -4599,7 +4599,7 @@
                         start_date: today.toISOString().split('T')[0],
                         end_date: endDate.toISOString().split('T')[0],
                         color: tokenHex('muted-foreground'),
-                        create_work_packages: false
+                        create_work_packages: true
                     },
                     silent: true
                 }).catch(() => ({ success: false }));

@@ -319,7 +319,12 @@ def compute_gap_signals(capability_type_filter="business", gap_type_filter=None)
             # The two id sequences overlap, so the type must say which store the id belongs to.
             return "business" if _from_business(unified) else "unified"
 
+        from app.services.gap_archimate_service import gap_archimate_service
+
         for cap in biz_caps:
+            # A capability whose gap is already recorded is not also listed as not recorded.
+            if gap_archimate_service.find_existing_gap(_gap_capability_type(cap), _gap_capability_id(cap)):
+                continue
             apps = [apps_by_id[aid] for aid in support_by_cap.get(cap.id, []) if aid in apps_by_id]
             app_count = len(apps)
 
@@ -1295,7 +1300,6 @@ def api_roadmap_create_work_package(gap_id):
     if refusal:
         return refusal
     try:
-        from app.models.implementation_migration import Gap
         from app.services.gap_archimate_service import gap_archimate_service
 
         # A query, not .get(): .get() answers from the session's identity map

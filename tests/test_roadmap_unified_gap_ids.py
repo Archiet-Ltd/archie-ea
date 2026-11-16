@@ -101,3 +101,24 @@ def test_hierarchy_path_names_the_real_type_of_a_parent_outside_the_live_set(
     mine = [g for g in rows if g["capability_id"] == child.id and g["capability_type"] == "unified"]
     assert mine, [g["id"] for g in rows]
     assert mine[0]["hierarchy_path"] == "unified-%d,unified-%d" % (retired.id, child.id)
+
+
+def test_a_recorded_gap_is_never_also_listed_as_not_recorded(db_session, world, client, login_as):  # noqa: F811
+    cap = _capability(db_session, world["a"], "Recorded once")
+    other = _capability(db_session, world["a"], "Still a signal")
+    db_session.commit()
+    login_as(client, world["editor_a"])
+
+    def listed():
+        body = client.get(f"{BASE}/gaps?capability_type=business").get_json()
+        text = str(body)
+        return "Recorded once" in text, "Still a signal" in text
+
+    assert listed() == (True, True)
+    resp = client.post(
+        f"{BASE}/gaps/add-from-capability",
+        json={"capability_id": cap.id, "capability_type": "unified", "capability_name": cap.name},
+    )
+    assert resp.status_code == 200, resp.get_json()
+    assert listed() == (False, True)
+    assert other.id
