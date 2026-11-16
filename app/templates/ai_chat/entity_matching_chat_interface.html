@@ -879,17 +879,15 @@ function entityMatchingChat() {
     processMatchingResults(result) {
       if (!result.matching_results) return;
       
-      // Update match statistics
+      // Update entities list, then count the rows shown so the statistics agree with the tabs
+      this.allEntities = this.extractEntitySuggestions(result);
       const summary = result.matching_results.summary || {};
       this.matchStats = {
-        matches: summary.total_matches || 0,
-        new: summary.total_new_entities || 0,
-        duplicates: summary.total_duplicates || 0,
+        matches: this.matchedEntities.length,
+        new: this.newEntities.length,
+        duplicates: this.duplicateEntities.length,
         relationships: summary.total_relationship_suggestions || 0
       };
-      
-      // Update entities list
-      this.allEntities = this.extractEntitySuggestions(result);
     },
     
     selectPersona(persona) {

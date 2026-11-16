@@ -83,6 +83,8 @@ def test_accept_then_details(browser, live_server, seeded, ai_protocol_stub, app
         added = _tab(page, "New").get_by_test_id("entity-added")
         added.wait_for(state="visible", timeout=PAGE_TIMEOUT)
         assert "Added to your model" in added.inner_text()
+        stats = page.locator(".sidebar-content .grid").first.inner_text()
+        assert re.search(r"New:\s*1\b", stats), stats
         _shot(page, "accept-done-" + label)
         ids = _portal_elements(app, org_id)
         assert len(ids) == 1
