@@ -1,7 +1,6 @@
 {# design-block: dashboard #}
 {% extends 'layouts/admin_base.html' %}
 {% import 'basecoat/index.html' as ui %}
-{% from 'macros/page_shell.html' import page_shell %}
 {% from 'components/figures.html' import stat_cards, section with context %}
 {% from 'components/fact_list.html' import fact_list %}
 {% from 'components/list_table.html' import list_table %}
@@ -19,10 +18,22 @@
 </div>
 {% endmacro %}
 
+{% block breadcrumb %}
+{% call ui.breadcrumb(attrs={'aria-label': 'Breadcrumb'}) %}{% call ui.breadcrumb_list() %}
+  {% call ui.breadcrumb_item() %}{% call ui.breadcrumb_link(href=url_for('main.index')) %}Home{% endcall %}{% endcall %}
+  {% call ui.breadcrumb_separator() %}{{ lucide('chevron-right') }}{% endcall %}
+  {% call ui.breadcrumb_item() %}{% call ui.breadcrumb_link(href=url_for('procurement.spend_analytics')) %}Spend{% endcall %}{% endcall %}
+  {% call ui.breadcrumb_separator() %}{{ lucide('chevron-right') }}{% endcall %}
+  {% call ui.breadcrumb_item() %}{% call ui.breadcrumb_page() %}Money{% endcall %}{% endcall %}
+{% endcall %}{% endcall %}
+{% endblock %}
+
 {% block content %}
 <div class="p-6 space-y-6">
-{{ page_shell(title='Money', subtitle='Cash, outgoings and revenue as figures you state, each with its date and where it came from',
-              breadcrumb=[('Home', url_for('main.index')), ('Spend', url_for('procurement.spend_analytics')), ('Money', none)]) }}
+<header class="flex flex-col gap-2">
+  <h1 class="text-3xl font-bold tracking-tight text-foreground">Money</h1>
+  <p class="text-sm text-muted-foreground">Cash, outgoings and revenue as figures you state, each with its date and where it came from</p>
+</header>
 
 {% if withheld %}
   {% call ui.card(attrs={'data-testid': 'money-withheld'}) %}
