@@ -29,11 +29,14 @@ def index():
         return guard
     org_id = g.current_org_id
     exposure_rows = svc.end_of_support_exposure(org_id)
+    agreement = svc.store_agreement_findings(org_id)
     return render_template(
         "architecture/cto_scorecard.html",
         versions=svc.supported_version_share(org_id),
         exceptions=svc.open_exceptions(org_id),
-        agreement=svc.store_agreement_findings(org_id),
+        agreement=agreement,
+        disagreements=svc.disagreement_rows(agreement["findings"]),
+        annual_cost=svc.annual_cost_statement(org_id, current_user),
         exposure=exposure_rows,
         exposure_window_months=svc.lead_months_for(org_id),
     )

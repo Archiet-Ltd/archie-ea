@@ -242,7 +242,7 @@ Budget: scripts/check_sidebar_links.py renders this per role and counts its link
     {% if nav.secondary %}
     <div class="{{ '' if show_connect_card else 'mt-auto' }}" data-testid="nav-secondary">
     {% call sidebar_group() %}
-        {% call sidebar_menu() %}{% for item in nav.secondary %}{{ _entry(item) }}{% endfor %}{% endcall %}
+        {% call sidebar_menu() %}{% for item in nav.secondary %}{% if item.toggle %}{{ _toggle(item) }}{% else %}{{ _entry(item) }}{% endif %}{% endfor %}{% endcall %}
     {% endcall %}
     </div>
     {% endif %}

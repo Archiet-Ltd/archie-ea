@@ -1,87 +1,134 @@
 {# design-block: dashboard #}
+{# smoke-coverage-ok: covered by tests/smoke/test_cto_scorecard_journey.py #}
 {% extends 'layouts/admin_base.html' %}
-{% from 'macros/page_shell.html' import page_shell, empty_state %}
+{% import 'basecoat/index.html' as ui %}
+{% from 'macros/page_shell.html' import page_shell %}
+{% from 'components/list_table.html' import list_table %}
+{% from 'components/explained_value.html' import explained_value %}
+{% from 'components/empty_state.html' import empty_state %}
+{% set apps_href = url_for('unified_applications.application_list') %}
 
 {% block title %}CTO Scorecard — {{ config.APP_NAME }}{% endblock %}
 
+{#- One headline figure: value (or the words saying why there is none), what it means, and where to look. -#}
+{% macro stat(testid, icon, label, value, sentence, href, action=none) %}
+<a href="{{ href }}" class="block rounded-xl outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50" data-testid="{{ testid }}">
+  {% call ui.card(class='h-full') %}
+    {% call ui.card_header() %}<span class="flex size-10 items-center justify-center rounded-lg bg-muted text-primary [&_svg]:size-4">{{ lucide(icon) }}</span>{% endcall %}
+    {% call ui.card_content(class='mt-auto flex flex-col gap-1 min-w-0') %}
+      {% if value is not none %}
+      <span class="text-2xl font-semibold tabular-nums" data-testid="{{ testid }}-value">{{ value }}</span>
+      <span class="text-sm font-medium">{{ label }}</span>
+      <span class="text-sm text-muted-foreground break-words" data-testid="{{ testid }}-sentence">{{ sentence }}</span>
+      {% else %}
+      <span class="text-lg font-semibold">{{ label }}</span>
+      {{ explained_value(basis=sentence, action=action, testid=testid ~ '-sentence') }}
+      {% endif %}
+    {% endcall %}
+  {% endcall %}
+</a>
+{% endmacro %}
+
 {% block content %}
-<div class="flex-1 overflow-auto p-6">
+<div class="p-6 space-y-6">
   {{ page_shell(
       title='CTO Scorecard',
-      subtitle='Supported estate, open exceptions and where surfaces disagree.',
-      breadcrumb=[('Home', url_for('main.index')), ('CTO Scorecard', None)]
+      subtitle='Supported estate, open exceptions and where screens disagree.',
+      breadcrumb=[('Home', url_for('main.index')), ('Reports', None), ('CTO Scorecard', None)]
   ) }}
 
-  <div class="grid gap-6 lg:grid-cols-2">
-    <div class="rounded-lg border border-border bg-card p-4" data-testid="supported-version-share">
-      <h2 class="text-sm font-semibold text-muted-foreground mb-2">Supported estate</h2>
-      {% if versions.total %}
-      <p class="text-3xl font-bold text-foreground">{{ versions.share_pct }}%</p>
-      <p class="text-sm text-muted-foreground mt-1">{{ versions.supported }} of {{ versions.total }} applications on a supported technology version.</p>
-      {% else %}
-      <p class="text-sm text-muted-foreground">No application has a vendor product recorded yet — &mdash;</p>
-      {% endif %}
+  {% set open_count = exceptions | length %}
+  {% set screens = disagreements | length %}
+  <div class="grid grid-cols-1 gap-4 md:gap-6 sm:grid-cols-2 xl:grid-cols-4" data-testid="scorecard-cards">
+    <div data-testid="supported-version-share" class="contents">
+    {% if versions.total %}
+      {{ stat('card-supported', 'shield-check', 'Supported estate', versions.share_pct ~ '%',
+              versions.supported ~ ' of ' ~ versions.total ~ ' applications are on a supported technology version.', apps_href) }}
+    {% else %}
+      {{ stat('card-supported', 'shield-check', 'Supported estate', none,
+              'No application has a vendor product recorded yet, so no share can be worked out.', apps_href,
+              'Open an application and record its vendor product.') }}
+    {% endif %}
     </div>
-
-    <div class="rounded-lg border border-border bg-card p-4" data-testid="open-exceptions">
-      <h2 class="text-sm font-semibold text-muted-foreground mb-2">Open exceptions</h2>
-      {% if exceptions %}
-      <ul class="divide-y divide-border text-sm">
-        {% for exc in exceptions[:2] %}
-        <li class="py-2 flex items-center justify-between gap-2" data-testid="exception-{{ exc.id }}">
-          <div>
-            <p class="font-medium text-foreground">{{ exc.title }}</p>
-            <p class="text-muted-foreground">{{ exc.acr_reference }} — {{ exc.age_days if exc.age_days is not none else '—' }} days open</p>
-          </div>
-          {% if exc.escalated_at %}
-          <span class="text-xs rounded-full bg-warning/10 text-warning-emphasis px-2 py-1" data-testid="escalated-badge">Escalated</span>
-          {% else %}
-          <form method="post" action="{{ url_for('cto_scorecard.escalate_exception', change_request_id=exc.id) }}">
-            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-            <button type="submit" class="text-xs rounded-md border border-border px-2 py-1 hover:bg-muted transition-colors">Escalate</button>
-          </form>
-          {% endif %}
-        </li>
-        {% endfor %}
-      </ul>
-      {% if exceptions|length > 2 %}
-      <p class="text-xs text-muted-foreground mt-2">{{ exceptions|length - 2 }} more open exception(s) not shown — the oldest two only.</p>
-      {% endif %}
-      {% else %}
-      {{ empty_state(icon='shield-check', headline='No open exceptions', body='Every architecture change request is on its standard path.') }}
-      {% endif %}
-    </div>
-  </div>
-
-  <div class="mt-6 rounded-lg border border-border bg-card p-4" data-testid="end-of-support-exposure">
-    <h2 class="text-sm font-semibold text-muted-foreground mb-2">End-of-support exposure, next {{ exposure_window_months }} months</h2>
+    {% if open_count %}
+      {{ stat('card-exceptions', 'triangle-alert', 'Open exceptions', open_count,
+              exceptions[0].acr_reference ~ ' is the oldest, ' ~ ('raised today.' if exceptions[0].age_days == 0 else ('raised 1 day ago.' if exceptions[0].age_days == 1 else ('raised ' ~ exceptions[0].age_days ~ ' days ago.' if exceptions[0].age_days is not none else 'with no raised date recorded.'))), '#open-exceptions') }}
+    {% else %}
+      {{ stat('card-exceptions', 'triangle-alert', 'Open exceptions', none,
+              'No architecture change is running as an exception.', '#open-exceptions',
+              'Every change request is on its standard path.') }}
+    {% endif %}
     {% if exposure %}
-    <ul class="divide-y divide-border text-sm">
-      {% for row in exposure %}
-      <li class="py-2" data-testid="exposure-row-{{ row.application_id }}">
-        <p class="font-medium text-foreground">{{ row.product_name }} — {{ row.end_of_life_date|format_date }}</p>
-        <p class="text-muted-foreground">{{ row.application_name }} — owner: {{ row.owners }}</p>
-      </li>
-      {% endfor %}
-    </ul>
+      {{ stat('card-exposure', 'calendar-days', 'End-of-support exposure', exposure | length,
+              exposure[0].product_name ~ ' is first to reach end of support: ' ~ (exposure[0].end_of_life_date | format_date) ~ '. Window: next ' ~ exposure_window_months ~ ' months.', '#end-of-support') }}
     {% else %}
-    {{ empty_state(icon='calendar-x', headline='Nothing reaches end of support in the next ' ~ exposure_window_months ~ ' months', body='No technology product this organisation depends on ends support inside the window.') }}
+      {{ stat('card-exposure', 'calendar-days', 'End-of-support exposure', none,
+              'No technology product in use ends support in the next ' ~ exposure_window_months ~ ' months.', '#end-of-support',
+              'Record end-of-support dates on vendor products to keep this current.') }}
+    {% endif %}
+    {% if agreement.error %}
+      {{ stat('card-disagree', 'arrow-left-right', 'Screens that disagree', none,
+              'The comparison could not run: ' ~ agreement.error, '#disagreements', 'Reload the page to try again.') }}
+    {% elif screens %}
+      {{ stat('card-disagree', 'arrow-left-right', 'Screens that disagree', screens,
+              'Screens answer the same question with different counts.', '#disagreements') }}
+    {% else %}
+      {{ stat('card-disagree', 'arrow-left-right', 'Screens that disagree', none,
+              'Every screen checked gives the same count for the same question.', '#disagreements',
+              'Nothing to reconcile.') }}
     {% endif %}
   </div>
 
-  <div class="mt-6 rounded-lg border border-border bg-card p-4" data-testid="store-agreement-panel">
-    <h2 class="text-sm font-semibold text-muted-foreground mb-2">Surfaces disagreeing</h2>
+  <p class="text-sm" data-testid="annual-cost">
+    <span class="font-medium">Annual run cost:</span>
+    <span class="text-muted-foreground" data-testid="annual-cost-text">{% if annual_cost.value %}<span class="tabular-nums text-foreground">{{ annual_cost.value }}</span>. {% endif %}{{ annual_cost.sentence }}</span>
+  </p>
+
+  <section id="open-exceptions" class="space-y-2" data-testid="open-exceptions">
+    <h2 class="text-lg font-semibold">Open exceptions</h2>
+    {% call(exc) list_table(rows=exceptions, columns=[('Reference', ''), ('Exception', ''), ('Days open', 'text-right'), ('Status', '')],
+                            caption='Open architecture exceptions, oldest first', testid='exceptions-table', row_testid='exception-row',
+                            empty_message='No architecture change is running as an exception. Every change request is on its standard path.') %}
+      {% call ui.table_cell(class='tabular-nums', attrs={'data-testid': 'exception-' ~ exc.id}) %}{{ exc.acr_reference }}{% endcall %}
+      {% call ui.table_cell(class='') %}{{ exc.title }}{% endcall %}
+      {% call ui.table_cell(class='text-right tabular-nums') %}{{ exc.age_days if exc.age_days is not none else 'Not recorded' }}{% endcall %}
+      {% call ui.table_cell(class='') %}
+        {% if exc.escalated_at %}
+        {{ ui.badge(text='Escalated', variant='outline', attrs={'data-testid': 'escalated-badge'}) }}
+        {% else %}
+        <form method="post" action="{{ url_for('cto_scorecard.escalate_exception', change_request_id=exc.id) }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          {% call ui.button(type='submit', variant='outline', size='sm') %}Escalate{% endcall %}
+        </form>
+        {% endif %}
+      {% endcall %}
+    {% endcall %}
+  </section>
+
+  <section id="end-of-support" class="space-y-2" data-testid="end-of-support-exposure">
+    <h2 class="text-lg font-semibold">End of support in the next {{ exposure_window_months }} months</h2>
+    {% call(row) list_table(rows=exposure, columns=[('Product', ''), ('Ends support', ''), ('Application', ''), ('Owner', '')],
+                            caption='Applications depending on a product that reaches end of support', testid='exposure-table', row_testid='exposure-row',
+                            empty_message='No technology product this organisation depends on ends support inside the window.') %}
+      {% call ui.table_cell(class='font-medium') %}{{ row.product_name }}{% endcall %}
+      {% call ui.table_cell(class='tabular-nums') %}{{ row.end_of_life_date | format_date }}{% endcall %}
+      {% call ui.table_cell(class='') %}<a class="underline-offset-4 hover:underline" href="{{ url_for('unified_applications.application_fact_sheet', id=row.application_id) }}">{{ row.application_name }}</a>{% endcall %}
+      {% call ui.table_cell(class='') %}{{ row.owners }}{% endcall %}
+    {% endcall %}
+  </section>
+
+  <section id="disagreements" class="space-y-2" data-testid="store-agreement-panel">
+    <h2 class="text-lg font-semibold">Where screens disagree</h2>
     {% if agreement.error %}
-    <p class="text-sm text-destructive">Could not compare surfaces: {{ agreement.error }}</p>
-    {% elif agreement.findings %}
-    <ul class="text-sm font-mono space-y-1">
-      {% for finding in agreement.findings %}
-      <li class="text-foreground">{{ finding }}</li>
-      {% endfor %}
-    </ul>
-    {% else %}
-    {{ empty_state(icon='check-circle', headline='No disagreement found', body='Every surface checked answers the same question with the same number.') }}
+    <p class="text-sm text-destructive">The comparison could not run. Reload the page to try again.</p>
     {% endif %}
-  </div>
+    {% call(d) list_table(rows=disagreements, columns=[('Question', ''), ('Screen', ''), ('Answer', '')],
+                          caption='Screens giving different answers to one question', testid='disagreements-table', row_testid='disagreement-row',
+                          empty_message='Every screen checked gives the same count for the same question.') %}
+      {% call ui.table_cell(class='') %}{{ d.question }}{% endcall %}
+      {% call ui.table_cell(class='') %}{{ d.screen }}{% endcall %}
+      {% call ui.table_cell(class='tabular-nums') %}{{ d.answer }}{% endcall %}
+    {% endcall %}
+  </section>
 </div>
 {% endblock %}

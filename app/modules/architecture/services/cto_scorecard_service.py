@@ -171,3 +171,81 @@ def end_of_support_exposure(
             }
         )
     return rows
+
+
+# The surfaces the comparison names, in the words a person uses for them.
+_SCREEN_NAMES = {
+    "dashboard": "Overview",
+    "api/v1": "Programme interface",
+    "BusinessCapability": "Business capabilities",
+    "UnifiedCapability": "Capability catalogue",
+    "ApplicationComponent": "Applications list",
+    "ApplicationCost": "Cost records",
+    "CostFact": "Cost facts",
+    "ApplicationOwner": "Owner records",
+    "ApplicationOwnership": "Ownership by unit",
+    "UnifiedWorkPackage": "Work package catalogue",
+}
+_COST_QUESTION = "applications with a recorded annual cost"
+
+
+def _plain_screen(surface: str) -> str:
+    """One surface name as a person would say it: no model class, no route, no prefix."""
+    import re
+
+    name = re.sub(r"\(.*?\)", "", surface).strip()
+    for known, plain in _SCREEN_NAMES.items():
+        if known in name:
+            return plain
+    name = re.sub(r"^(orm|call|http):", "", name).replace("GET ", "").strip("/ ")
+    name = name.split(".")[-1].split("/")[-1]
+    words = re.sub(r"(?<=[a-z])(?=[A-Z])", " ", name).replace("_", " ").replace("-", " ").strip()
+    return words[:1].upper() + words[1:].lower() if words else "Another screen"
+
+
+def disagreement_rows(findings: List[str]) -> List[Dict[str, Any]]:
+    """The comparison's findings as table rows: Question, Screen, Answer.
+
+    The annual-cost question is left out: the Overview owns that answer and
+    annual_cost_statement() repeats it, so no count of recorded costs is shown
+    here that the Overview does not give.
+    """
+    import re
+
+    rows: List[Dict[str, Any]] = []
+    for finding in findings:
+        question = finding.strip().split(" [", 1)[0].strip()
+        if question == _COST_QUESTION:
+            continue
+        question = question[:1].upper() + question[1:]
+        pairs = re.findall(r"([^\s,:][^,=:]*?)=(\d+)", finding.split("shown to the user:", 1)[-1])
+        if "[store-disagreement]" in finding and pairs:
+            for name, count in pairs:
+                rows.append({"question": question, "screen": _plain_screen(name), "answer": "%s recorded" % count})
+        else:
+            rows.append({"question": question, "screen": "Several screens",
+                         "answer": "These screens read different stores, so their counts differ."})
+    return rows
+
+
+def annual_cost_statement(organization_id: int, user) -> Dict[str, Any]:
+    """The Overview's own annual run cost answer: its figure and the sentence under it."""
+    from app.decorators.requires_role import may_see_spend_pages
+    from app.modules.dashboard.services.overview_figures import build_overview
+
+    if not may_see_spend_pages(user):
+        return {"value": None, "sentence": "Annual run cost is shown to people who may see spend."}
+    cost = build_overview(organization_id, user, with_cost=True)["run_cost"]
+    if cost["total"] is None:
+        contracts = cost["contracts"]
+        sentence = ("Appears here once a contract states its annual cost." if not contracts else
+                    "%d active %s no annual cost yet." % (
+                        contracts, "contract states" if contracts == 1 else "contracts state"))
+        return {"value": None, "sentence": sentence}
+    top = cost.get("top")
+    sentence = cost["basis"].capitalize() + "."
+    if top:
+        sentence = "%s. %s is %s%% of it." % (cost["basis"].capitalize(), top["name"], top["percent"])
+    if cost.get("difference"):
+        sentence += " " + cost["difference"]
+    return {"value": cost["total_short"], "sentence": sentence}
