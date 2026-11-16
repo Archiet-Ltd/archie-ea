@@ -78,6 +78,11 @@ def effective_severity(gap) -> Optional[str]:
     return getattr(gap, "severity", None)
 
 
+def set_severity(gap, value: Optional[str]) -> None:
+    """Write a gap's severity column. Every writer of a gap's rating uses this."""
+    gap.severity = value
+
+
 def effective_severity_expr():
     """`effective_severity` as a SQL expression, for filters, grouping and ordering."""
     return case((func.lower(func.trim(Gap.priority)) == "critical", "critical"), else_=Gap.severity)
