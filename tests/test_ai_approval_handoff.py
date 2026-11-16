@@ -242,6 +242,12 @@ def test_two_independent_sessions_cannot_claim_the_same_pending_approval(app):
                         User.id.in_([requester_id, first_reviewer_id, second_reviewer_id])
                     ).delete(synchronize_session=False)
                 if org_id is not None:
+                    # The audit trail outlives the organisation: detach its entries first,
+                    # as the organisation delete route does.
+                    cleanup.execute(
+                        db.text("UPDATE soc2_audit_log SET organization_id = NULL WHERE organization_id = :org_id"),
+                        {"org_id": org_id},
+                    )
                     cleanup.query(Organization).filter_by(id=org_id).delete()
                 cleanup.commit()
             finally:
@@ -359,6 +365,12 @@ def test_two_sessions_rejection_cannot_overwrite_a_durable_claim(app):
                         synchronize_session=False
                     )
                 if org_id is not None:
+                    # The audit trail outlives the organisation: detach its entries first,
+                    # as the organisation delete route does.
+                    cleanup.execute(
+                        db.text("UPDATE soc2_audit_log SET organization_id = NULL WHERE organization_id = :org_id"),
+                        {"org_id": org_id},
+                    )
                     cleanup.query(Organization).filter_by(id=org_id).delete()
                 cleanup.commit()
             finally:

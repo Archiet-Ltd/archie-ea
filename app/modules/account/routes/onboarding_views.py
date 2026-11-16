@@ -43,6 +43,7 @@ def add_routes(bp, access) -> None:
     @access
     def welcome():
         from app.connectors import github_app
+        from app.utils.role_access import may_load_sample_company
 
         org = _org()
         step = request.args.get("step", type=int)
@@ -52,6 +53,7 @@ def add_routes(bp, access) -> None:
             "account/register.html",
             form=None,
             github_app_install_url=github_app.install_url(org.id, return_to="welcome"),
+            may_load_sample_company=may_load_sample_company(current_user),
             step=step,
             org=org,
             kinds=onboarding.KINDS,

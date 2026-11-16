@@ -61,6 +61,23 @@ def _rel(db_session, org_id, source_id, target_id, type_="Serving", **extra):
     return row
 
 
+def _crossing_rel(db_session, org_id, source_id, target_id, type_="Flow"):
+    """A row whose far end belongs to another organisation, as legacy data holds them.
+
+    The ORM guard refuses to save such a row, so it is written with plain SQL, the same
+    way the other relationship isolation suites seed one.
+    """
+    rel_id = db_session.execute(
+        text(
+            "INSERT INTO archimate_relationships "
+            "(organization_id, source_id, target_id, type, source_kind, created_at, updated_at) "
+            "VALUES (:org, :s, :t, :type, 'manual', now(), now()) RETURNING id"
+        ),
+        {"org": org_id, "s": source_id, "t": target_id, "type": type_},
+    ).scalar_one()
+    return db_session.get(ArchiMateRelationship, rel_id)
+
+
 def _publish(db_session):
     """Commit pending work and move the outbox rows into the event log."""
     db_session.commit()
@@ -93,8 +110,8 @@ def graph(db_session):
     b = {name: _element(db_session, org_b.id, f"B-{name}") for name in "xyz"}
     _rel(db_session, org_b.id, b["x"].id, b["y"].id)
     # Foreign rows that point at the CALLER's (A's) element ids.
-    foreign_into_a = _rel(db_session, org_b.id, b["y"].id, a["a"].id, type_="Flow")
-    foreign_out_of_a = _rel(db_session, org_b.id, a["g"].id, b["z"].id, type_="Flow")
+    foreign_into_a = _crossing_rel(db_session, org_b.id, b["y"].id, a["a"].id)
+    foreign_out_of_a = _crossing_rel(db_session, org_b.id, a["g"].id, b["z"].id)
     db_session.commit()
     return {"A": org_a, "B": org_b, "a": a, "b": b, "rels": rels,
             "foreign_into_a": foreign_into_a, "foreign_out_of_a": foreign_out_of_a}
@@ -337,7 +354,7 @@ def test_events_of_another_organisation_never_change_this_projection(db_session,
     before = projection_a.fingerprint()
     # B changes after A's projection was taken.
     extra = _element(db_session, graph["B"].id, "late B element")
-    _rel(db_session, graph["B"].id, extra.id, graph["a"]["a"].id)
+    _crossing_rel(db_session, graph["B"].id, extra.id, graph["a"]["a"].id)
     _publish(db_session)
     gp.catch_up(projection_a)
     assert projection_a.fingerprint() == before
@@ -518,6 +535,17 @@ def _history(db_session, org_id, table, record_id, snapshot, valid_from, valid_t
     return row
 
 
+def _audit(db_session, org_id, table, record_id, action, at, snapshot, before=None):
+    """The audit row the history service replays, for the same change the entity history records."""
+    from app.models.audit_log import AuditLog
+
+    row = AuditLog(organization_id=org_id, table_name=table, record_id=record_id, action=action,
+                   created_at=at, old_value=before, new_value=snapshot)
+    db_session.add(row)
+    db_session.flush()
+    return row
+
+
 def _relational_as_of_depths(db_session, org_id, root_id, depth, direction, when):
     """The history service's answer, walked breadth-first in plain Python."""
     from app.modules.intelligence.services.history_service import HistoryService
@@ -565,6 +593,16 @@ def timeline(db_session):
     _history(db_session, org.id, "archimate_relationships", rm.id, snap(ids["c"], gone.id), t1)
     for e in list(names.values()) + [gone]:
         _history(db_session, org.id, "archimate_elements", e.id, {"name": e.name, "type": e.type, "layer": e.layer}, t0)
+    # The history service answers from the audit rows, so the same changes are recorded there too.
+    for e in list(names.values()) + [gone]:
+        _audit(db_session, org.id, "archimate_elements", e.id, "create", t0,
+               {"name": e.name, "type": e.type, "layer": e.layer})
+    _audit(db_session, org.id, "archimate_relationships", ab.id, "create", t0, snap(ids["a"], ids["b"]))
+    _audit(db_session, org.id, "archimate_relationships", bc.id, "create", t1, snap(ids["b"], ids["c"]))
+    _audit(db_session, org.id, "archimate_relationships", bc.id, "update", t3, {"target_id": ids["e"]},
+           before={"target_id": ids["c"]})
+    _audit(db_session, org.id, "archimate_relationships", ad.id, "create", t2, snap(ids["a"], ids["d"]))
+    _audit(db_session, org.id, "archimate_relationships", rm.id, "create", t1, snap(ids["c"], gone.id))
     # Another organisation's history for the same record ids must never leak in.
     _history(db_session, other.id, "archimate_relationships", ab.id, snap(ids["a"], ids["e"]), t0)
     db_session.commit()

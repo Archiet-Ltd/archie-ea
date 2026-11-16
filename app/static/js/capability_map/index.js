@@ -71,10 +71,10 @@
         'bulk-delete':           ()   => executeBulkDelete(),
         'save-dependency':       (el) => saveDependency(el.dataset.itemId),
         'quick-add-roadmap':     (el) => quickAddToRoadmap(el.dataset.capId, el.dataset.capName,
-                                            'business', parseInt(el.dataset.capLevel, 10) || 1,
+                                            el.dataset.capType || 'business', parseInt(el.dataset.capLevel, 10) || 1,
                                             el.dataset.capPriority),
         'add-to-roadmap':        (el) => addToRoadmap(el.dataset.capId, el.dataset.capName,
-                                            'business', parseInt(el.dataset.capLevel, 10) || 1,
+                                            el.dataset.capType || 'business', parseInt(el.dataset.capLevel, 10) || 1,
                                             el.dataset.capPriority),
         'open-mapping-modal':    (el) => openMappingModal(el.dataset.capId, el.dataset.capName),
         'toggle-row-selection':  (el) => {
@@ -714,6 +714,7 @@
                 data-cap-name="${capabilityName}"
                 data-tab-type="${tabType}"
                 data-cap-level="${item.level || 1}"
+                data-cap-type="${escapeAttr(item.capability_type || 'business')}"
                 data-cap-priority="${priority}"
                 draggable="true">
                 <td class="px-6 py-4 whitespace-nowrap" data-no-row-click="true">
@@ -798,7 +799,7 @@
                                 <i data-lucide="layers" class="h-4 w-4 text-orange-600"></i> Map to ArchiMate
                             </button>
                             <hr class="my-1 border-border">
-                            <button data-action="add-roadmap" data-cap-id="${capabilityId}" data-cap-name="${capabilityName}" data-cap-type="business" data-cap-level="${item.level || 1}" data-cap-importance="${item.strategic_importance || 'medium'}" class="w-full text-left px-4 py-2 text-sm hover:bg-purple-50 flex items-center gap-2 ${item.on_roadmap ? 'opacity-50' : ''}">
+                            <button data-action="add-roadmap" data-cap-id="${capabilityId}" data-cap-name="${capabilityName}" data-cap-type="${escapeAttr(item.capability_type || 'business')}" data-cap-level="${item.level || 1}" data-cap-importance="${item.strategic_importance || 'medium'}" class="w-full text-left px-4 py-2 text-sm hover:bg-purple-50 flex items-center gap-2 ${item.on_roadmap ? 'opacity-50' : ''}">
                                 <i data-lucide="map" class="h-4 w-4 text-primary"></i> ${item.on_roadmap ? 'Already on Roadmap' : 'Add to Roadmap'}
                             </button>
                         </div>
@@ -4407,6 +4408,7 @@
         // Set capability type badge
         const typeLabels = {
             'business': 'Business Capability',
+            'unified': 'Capability',
             'technical': 'Technical (ACM)',
             'process': 'Process (APQC)'
         };
@@ -4589,7 +4591,7 @@
                     method: 'POST',
                     body: {
                         capability_id: parseInt(capabilityId),
-                        capability_type: 'business',
+                        capability_type: item.capability_type || 'business',
                         capability_name: capabilityName,
                         level: parseInt(level),
                         gap_type: 'coverage',
@@ -4597,7 +4599,7 @@
                         start_date: today.toISOString().split('T')[0],
                         end_date: endDate.toISOString().split('T')[0],
                         color: tokenHex('muted-foreground'),
-                        create_work_packages: false
+                        create_work_packages: true
                     },
                     silent: true
                 }).catch(() => ({ success: false }));
@@ -4702,7 +4704,7 @@
                             <span class="px-2 py-0.5 rounded bg-primary/10 text-primary text-xs">L${level}</span>
                         </div>
                     </div>
-                    <button type="button" data-cm-action="quick-add-roadmap" data-cap-id="${escapeAttr(capId)}" data-cap-name="${escapeAttr(capName)}" data-cap-level="${escapeAttr(level)}" data-cap-priority="${escapeAttr(priority)}" aria-label="Add ${escapeAttr(capName)} to roadmap"
+                    <button type="button" data-cm-action="quick-add-roadmap" data-cap-id="${escapeAttr(capId)}" data-cap-type="${escapeAttr(cap.capability_type || 'business')}" data-cap-name="${escapeAttr(capName)}" data-cap-level="${escapeAttr(level)}" data-cap-priority="${escapeAttr(priority)}" aria-label="Add ${escapeAttr(capName)} to roadmap"
                             class="px-3 py-1.5 bg-primary text-primary-foreground text-sm rounded-md hover:bg-purple-700">
                         <i data-lucide="plus" class="w-4 h-4 inline mr-1"></i>
                         Add
@@ -4890,7 +4892,7 @@
                 <i data-lucide="layout-grid" class="w-4 h-4 text-primary"></i>
                 <span>Map to Applications</span>
             </button>
-            <button type="button" data-cm-action="add-to-roadmap" data-cap-id="${escapeAttr(capabilityId)}" data-cap-name="${escapeAttr(capabilityName)}" data-cap-level="${escapeAttr(level)}" data-cap-priority="${escapeAttr(priority)}"
+            <button type="button" data-cm-action="add-to-roadmap" data-cap-id="${escapeAttr(capabilityId)}" data-cap-type="${escapeAttr(item?.capability_type || 'business')}" data-cap-name="${escapeAttr(capabilityName)}" data-cap-level="${escapeAttr(level)}" data-cap-priority="${escapeAttr(priority)}"
                     class="w-full text-left px-4 py-2 hover:bg-accent flex items-center gap-2">
                 <i data-lucide="map" class="w-4 h-4 text-primary"></i>
                 <span>Add to Roadmap</span>
