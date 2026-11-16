@@ -1148,6 +1148,8 @@ def open_nav_group(page, group_key):
     group is opened. This helper clicks the group's toggle button if it is
     closed, and waits for the sub-items to be visible.
     """
+    from playwright.sync_api import expect
+
     toggle = page.locator('[data-nav-toggle="%s"]' % group_key).first
     if toggle.count() and toggle.get_attribute("aria-expanded") != "true":
         toggle.click()
