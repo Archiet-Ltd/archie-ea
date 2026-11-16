@@ -284,11 +284,22 @@ def work_package_detail(work_package_id):
         from app.models.user import Permission
 
         capability = None
-        if getattr(work_package, "capability_id", None):
+        capability_id = getattr(work_package, "capability_id", None)
+        if not capability_id and work_package.source_table == "roadmap_work_packages" and work_package.source_id:
+            # A package generated for an application is for the capability that application is the
+            # primary enabler of: the same reader the generator names it from. The application is
+            # recorded on the roadmap row the package was made from.
+            from app.models.roadmap_models import RoadmapWorkPackage
+            from app.services.capability_support import capabilities_of_application
+
+            made_from = db.session.get(RoadmapWorkPackage, int(work_package.source_id))
+            if made_from is not None and made_from.source_type == "application" and made_from.source_id:
+                supported = capabilities_of_application(org_id, int(made_from.source_id))
+                capability_id = supported[0]["capability_id"] if supported else None
+        if capability_id:
             from app.models.unified_capability import UnifiedCapability
 
-            capability = UnifiedCapability.query.filter_by(
-                id=work_package.capability_id, organization_id=org_id).first()
+            capability = UnifiedCapability.query.filter_by(id=capability_id, organization_id=org_id).first()
         # The capability's own page is the strategy-layer record the unified
         # capability was projected from; without that record, the coverage view.
         capability_url = None
