@@ -558,19 +558,50 @@ def test_group_made_by_the_ai_service_says_it_is_an_average_of_measured_pairs(
 
 # --- the AI insights page shows what the run found ---------------------------------
 
-def test_ai_insights_page_shows_the_findings_stored_on_the_run_groups(
+def _ai_run_with_pairs(db_session, org, pairs):
+    """An AI run in the organisation: one group per (first, second, confidence)."""
+    from app import db
+    from app.models.unified_duplicate_detection import UnifiedDetectionRun, UnifiedDuplicateGroup
+
+    run = UnifiedDetectionRun(
+        run_name="AI run", strategy="hybrid", status="completed",
+        organization_id=org.id, config={"algorithm_version": "ai_v1.0"},
+    )
+    db_session.add(run)
+    db_session.flush()
+    for first, second, confidence in pairs:
+        apps = _apps(db_session, org, first, second)
+        group = UnifiedDuplicateGroup(
+            name=first, duplicate_type="fuzzy", similarity_score=confidence, detection_run_id=run.id,
+            match_details={
+                "pair_count": 1,
+                "ai_insights": {
+                    "detection_confidence": confidence,
+                    "primary_similarity_factor": "semantic",
+                    "risk_level": "low",
+                    "automation_potential": "high",
+                },
+            },
+        )
+        db_session.add(group)
+        db_session.flush()
+        for app_row in apps:
+            db.session.execute(
+                db.text("INSERT INTO unified_group_members (group_id, application_id) VALUES (:g, :a)"),
+                {"g": group.id, "a": app_row.id},
+            )
+    db_session.commit()
+    return run
+
+
+def test_ai_insights_page_names_every_pair_with_its_confidence_highest_first(
     db_session, tenant_ctx, login_as, client, world
 ):
-    from app.models.unified_duplicate_detection import UnifiedDetectionRun
-
-    _two_organisations_with_runs(db_session, tenant_ctx, world)
-    run = UnifiedDetectionRun.query.filter_by(organization_id=world["own"].id).one()
-    run.config = {"algorithm_version": "ai_v1.0"}
-    (group,) = _groups_of(world["own"])
-    group.match_details = {
-        "pair_count": 1,
-        "ai_insights": {"risk_level": "high", "automation_potential": "medium"},
-    }
+    # Listed lower confidence first, so the page has to sort rather than echo.
+    run = _ai_run_with_pairs(
+        db_session, world["own"],
+        [("Billing Hub", "Billing Hub Copy", 0.72), ("Ledger Core", "Ledger Core Copy", 0.8734)],
+    )
     admin = _user(db_session, world["own"])
     admin.is_org_admin = True
     admin.is_platform_admin = True
@@ -580,9 +611,12 @@ def test_ai_insights_page_shows_the_findings_stored_on_the_run_groups(
     page = client.get(f"/duplicate-detection/ai/insights/{run.id}")
     assert page.status_code == 200
     html = page.get_data(as_text=True)
-    assert 'data-testid="ai-insight-facts"' in html
-    assert "Risk level" in html and "high" in html
-    assert "Automation potential" in html and "medium" in html
+    assert 'data-testid="ai-insight-findings"' in html
+    first = html.index("Ledger Core and Ledger Core Copy")
+    second = html.index("Billing Hub and Billing Hub Copy")
+    assert first < second
+    assert "87%" in html and "72%" in html
+    assert ">0.8734<" not in html
 
 
 # --- the group page answers not found for another organisation's group -------------

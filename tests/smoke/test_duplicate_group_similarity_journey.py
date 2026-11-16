@@ -231,3 +231,66 @@ def test_the_dashboard_statistics_name_my_run_and_an_older_exact_group_reads_as_
         expect(card.get_by_test_id("similarity-basis")).to_have_text("Names match exactly")
     finally:
         context.close()
+
+
+def _ai_run(org_id, app_ids):
+    """A completed AI run with two scored pairs, listed lower confidence first."""
+    from app import create_app, db
+    from app.models.unified_duplicate_detection import (
+        UnifiedDetectionRun, UnifiedDuplicateGroup, unified_group_members)
+
+    with create_app("testing").app_context():
+        run = UnifiedDetectionRun(run_name="AI run", strategy="hybrid", status="completed", groups_found=2,
+                                  applications_analyzed=len(app_ids), organization_id=org_id,
+                                  config={"algorithm_version": "ai_v1.0"})
+        db.session.add(run)
+        db.session.flush()
+        for confidence, pair in zip((0.72, 0.8734), (app_ids[0:2], app_ids[2:4])):
+            group = UnifiedDuplicateGroup(name="AI pair", similarity_score=confidence, similarity_threshold=0.6,
+                                          detection_run_id=run.id, status="pending", duplicate_type="fuzzy",
+                                          match_details={"pair_count": 1, "ai_insights": {
+                                              "detection_confidence": confidence,
+                                              "primary_similarity_factor": "semantic",
+                                              "risk_level": "low", "automation_potential": "high"}})
+            db.session.add(group)
+            db.session.flush()
+            for app_id in pair:
+                db.session.execute(unified_group_members.insert().values(group_id=group.id, application_id=app_id))
+        db.session.commit()
+        return run.id
+
+
+@pytest.fixture(scope="module")
+def insights_world(live_server):
+    from app import create_app, db
+    from app.models.user import User
+
+    mine = create_fresh_org("platform_admin", org_admin=True, platform_role="Administrator")
+    with create_app("testing").app_context():
+        user = db.session.get(User, mine["user_ids"]["platform_admin"])
+        user.is_platform_admin = True
+        db.session.commit()
+    mine["app_ids"] = _seed(["Billing Hub", "Billing Hub Copy", "Ledger Core", "Ledger Core Copy"], mine["org_id"])
+    mine["run_id"] = _ai_run(mine["org_id"], mine["app_ids"])
+    yield mine
+    _drop(mine["app_ids"])
+
+
+@pytest.mark.parametrize("width,scheme", SIZES)
+def test_the_insights_page_names_each_pair_with_its_confidence_as_a_percentage(
+        browser, live_server, insights_world, width, scheme):
+    context, page = open_page(browser, live_server, insights_world["emails"]["platform_admin"], width, scheme)
+    try:
+        page.goto(live_server + "/duplicate-detection/ai/insights/%d" % insights_world["run_id"],
+                  wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        rows = page.get_by_test_id("ai-insight-finding")
+        expect(rows).to_have_count(2, timeout=PAGE_TIMEOUT)
+        # highest confidence first, each pair named by its two records
+        expect(rows.nth(0)).to_contain_text("Ledger Core and Ledger Core Copy")
+        expect(rows.nth(0)).to_contain_text("87%")
+        expect(rows.nth(1)).to_contain_text("Billing Hub and Billing Hub Copy")
+        expect(rows.nth(1)).to_contain_text("72%")
+        assert "0.8734" not in shown_text(page)
+        shot(page, "insights-pairs", width, scheme)
+    finally:
+        context.close()

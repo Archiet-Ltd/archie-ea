@@ -1,7 +1,8 @@
 {# design-block: data-table #}
 {% extends "layouts/admin_base.html" %}
 {% from 'macros/page_shell.html' import page_shell %}
-{% from 'components/fact_list.html' import fact_list %}
+{% from 'components/list_table.html' import list_table %}
+{% from 'basecoat/table.html' import table_cell %}
 
 {% block title %}AI Dedupe Insights{% endblock %}
 
@@ -23,11 +24,16 @@
         {{ page_shell(title='AI Deduplication Insights', breadcrumb=[('Home', '/'), ('AI Deduplication Insights', none)], subtitle='Run #' ~ (run.id if run else '—')) }}
     </div>
 
-    {% if ai_insights and ai_insights.insight_facts %}
-    <div data-slot="card" class="rounded-lg border border-border bg-card p-5">
-        <h3 class="font-medium text-foreground mb-3">What the review found</h3>
-        {% call(p) fact_list(items=ai_insights.insight_facts, testid='ai-insight-facts') %}{{ p.value if p.value is not none else '—' }}{% endcall %}
-    </div>
+    {% if ai_insights and ai_insights.findings %}
+    {% call(f) list_table(rows=ai_insights.findings,
+                          columns=[('Pair', ''), ('Confidence', ''), ('Main similarity factor', ''), ('Risk level', ''), ('Automation potential', '')],
+                          caption='What the review found, highest confidence first', testid='ai-insight-findings', row_testid='ai-insight-finding') %}
+        {% call table_cell(class='font-medium') %}{{ f.pair }}{% endcall %}
+        {% call table_cell(attrs={'data-sort': f.confidence}) %}{{ (((f.confidence * 100) | round | int) ~ '%') if f.confidence is not none else '—' }}{% endcall %}
+        {% call table_cell() %}{{ f.factor | replace('_', ' ') | capitalize if f.factor else '—' }}{% endcall %}
+        {% call table_cell() %}{{ f.risk | capitalize if f.risk else '—' }}{% endcall %}
+        {% call table_cell() %}{{ f.automation | capitalize if f.automation else '—' }}{% endcall %}
+    {% endcall %}
     {% else %}
     <div data-slot="card" class="rounded-lg border border-border bg-card p-8 text-center text-muted-foreground">
         No AI insights available for this run.

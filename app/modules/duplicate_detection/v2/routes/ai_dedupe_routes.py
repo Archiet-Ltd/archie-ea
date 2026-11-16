@@ -176,18 +176,34 @@ def ai_insights(run_id):
                     [g for g in groups if g.match_details and "ai_insights" in g.match_details]
                 ),
             }
-            first_details = groups[0].match_details if groups else None
-            if isinstance(first_details, str):
-                try:
-                    first_details = json.loads(first_details)
-                except json.JSONDecodeError:
-                    first_details = None
-            if isinstance(first_details, dict) and "ai_insights" in first_details:
-                ai_insights_data["global_insights"] = first_details["ai_insights"]
-                ai_insights_data["insight_facts"] = [
-                    {"label": str(key).replace("_", " ").capitalize(), "key": str(key), "value": value}
-                    for key, value in first_details["ai_insights"].items()
-                ] if isinstance(first_details["ai_insights"], dict) else []
+            # The run's findings across all its groups: highest confidence
+            # first, then by group id so the order never wobbles. Each pair is
+            # named by its two records.
+            findings = []
+            for group in sorted(groups, key=lambda g: (-(g.similarity_score or 0), g.id)):
+                details = group.match_details
+                if isinstance(details, str):
+                    try:
+                        details = json.loads(details)
+                    except json.JSONDecodeError:
+                        details = None
+                insights = details.get("ai_insights") if isinstance(details, dict) else None
+                if not isinstance(insights, dict):
+                    continue
+                names = sorted(a.name for a in group.applications.all())
+                confidence = insights.get("detection_confidence")
+                if not isinstance(confidence, (int, float)):
+                    confidence = group.similarity_score
+                findings.append(
+                    {
+                        "pair": " and ".join(names) if names else f"Group {group.id}",
+                        "confidence": confidence,
+                        "factor": insights.get("primary_similarity_factor"),
+                        "risk": insights.get("risk_level"),
+                        "automation": insights.get("automation_potential"),
+                    }
+                )
+            ai_insights_data["findings"] = findings
         else:
             ai_insights_data = {"error": "Not an AI detection run"}
         return render_template(
