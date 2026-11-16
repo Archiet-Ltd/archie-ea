@@ -817,22 +817,38 @@ class RoadmapAutomationEngine:
 
     def _get_primary_capability_for_application(self, application_id: int) -> str:
         """Get primary business capability for application"""
-        result = db.session.execute(  # tenant-filtered: scoped via application_id FK
-            text(
-                """
-            -- application_capability_mapping names its capability FK
-            -- business_capability_id; there is no capability_id column on that
-            -- table, so this join raised UndefinedColumn.
-            SELECT uc.name FROM unified_capabilities uc
-            JOIN application_capability_mapping acm ON uc.id = acm.business_capability_id
-            WHERE acm.application_id = :app_id
-            LIMIT 1
-        """
-            ),
-            {"app_id": application_id},
-        ).fetchone()
+        from app.models.application_capability import ApplicationCapabilityMapping
+        from app.models.business_capabilities import BusinessCapability
+        from app.utils.tenant import current_organization_id
 
-        return result[0] if result else "unknown_capability"
+        org_id = current_organization_id()
+        mapping = (
+            ApplicationCapabilityMapping.query.filter(
+                ApplicationCapabilityMapping.organization_id == org_id,
+                ApplicationCapabilityMapping.application_component_id == application_id,
+                ApplicationCapabilityMapping.is_primary_enabler == True,
+            )
+            .join(BusinessCapability, BusinessCapability.id == ApplicationCapabilityMapping.business_capability_id)
+            .first()
+        )
+
+        if mapping and mapping.business_capability:
+            return mapping.business_capability.name
+
+        # Fallback: get any capability for this application
+        mapping = (
+            ApplicationCapabilityMapping.query.filter(
+                ApplicationCapabilityMapping.organization_id == org_id,
+                ApplicationCapabilityMapping.application_component_id == application_id,
+            )
+            .join(BusinessCapability, BusinessCapability.id == ApplicationCapabilityMapping.business_capability_id)
+            .first()
+        )
+
+        if mapping and mapping.business_capability:
+            return mapping.business_capability.name
+
+        return "unknown_capability"
 
     def _estimate_assessment_cost(self, application: Any) -> float:
         """Estimate cost for application assessment"""
