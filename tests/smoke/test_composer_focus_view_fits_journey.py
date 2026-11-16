@@ -518,7 +518,18 @@ def test_walking_brings_the_whole_element_into_the_drawing(browser, live_server,
             before = page.evaluate("""() => { const a = Alpine.$data(document.querySelector('[x-data^="composerApp"]'));
                 return a.paper.translate(); }""")
             page.keyboard.press("ArrowDown")
-            page.wait_for_timeout(120)
+            inside = """() => {
+                const a = Alpine.$data(document.querySelector('[x-data^="composerApp"]'));
+                const cell = a._selectedCells[0];
+                if (!cell) return false;
+                const r = a.paper.findViewByModel(cell).el.getBoundingClientRect();
+                const c = document.querySelector('#composer-canvas').getBoundingClientRect();
+                return Math.min(r.left - c.left, r.top - c.top, c.right - r.right, c.bottom - r.bottom) >= -1;
+            }"""
+            try:
+                page.wait_for_function(inside, timeout=3000)
+            except Exception:
+                pass  # the assertion below reports the measured box
             box = page.evaluate("""() => {
                 const a = Alpine.$data(document.querySelector('[x-data^="composerApp"]'));
                 const cell = a._selectedCells[0];
