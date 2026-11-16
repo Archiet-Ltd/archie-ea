@@ -1,144 +1,50 @@
 {# design-block: data-table #}
 {# shadcn-reference: example:tasks@e55b60b #}
 {% extends "layouts/admin_base.html" %}
-{% from "components/page_header.html" import page_header %}
-{% from "components/table.html" import table, table_header, table_body, table_row, table_head, table_cell, table_empty_state %}
-{% from "components/input.html" import input %}
-{% from "components/button.html" import button %}
-{% from "components/empty_state.html" import empty_state %}
-{% from "components/badge.html" import badge %}
-{% from "components/tabs.html" import tabs %}
+{% import 'basecoat/index.html' as ui %}
+{% from 'macros/page_shell.html' import page_shell %}
+{% from 'components/list_table.html' import list_table %}
+{% from 'basecoat/table.html' import table_cell %}
+{% from 'architecture_decisions/_views.html' import views, status_badge with context %}
 
 {% block title %}Architecture Decisions{% endblock %}
 
+{% macro _new() %}{{ ui.button(text='New decision', href=(url_for('arch_decisions.create_decision', element_id=filter_element.id) if filter_element else url_for('arch_decisions.create_decision')), attrs={'data-testid': 'new-decision'}) }}{% endmacro %}
+{% macro _toolbar() %}{{ views(status_filter or 'all', phase_filter) }}{% endmacro %}
+
 {% block content %}
-<meta name="shadcn-nearest" content="dashboard-01">
-<div class="@container/main flex flex-1 flex-col gap-2">
-    <div class="flex flex-col gap-4 py-4 md:gap-6 md:py-6">
-        <div class="px-4 lg:px-6">
-            {{ page_header(
-                title='Architecture Decisions',
-                description='Enterprise architecture decisions linked to ArchiMate elements and ARB sessions',
-                actions=[
-                    {'text': 'New Decision', 'icon': 'plus', 'href': url_for('arch_decisions.create_decision', element_id=filter_element.id) if filter_element else url_for('arch_decisions.create_decision'), 'variant': 'default'}
-                ]
-            ) }}
-        </div>
+<div class="p-6 space-y-6">
+  {{ page_shell(title='Decisions', subtitle='The architecture decisions your organisation has made, linked to the model elements and review boards they concern',
+                breadcrumb=[('Home', url_for('main.index')), ('Decisions', none)], actions_caller=_new) }}
 
-        {% if element_filter is not none %}
-        <div class="px-4 lg:px-6">
-            <div class="mb-4 flex flex-wrap items-center gap-2 text-sm" data-element-filter>
-                {% if filter_element %}
-                <span class="text-muted-foreground">Decisions recorded against</span>
-                <a href="{{ url_for('archimate.element_impact_graph_page', element_id=filter_element.id) }}"
-                   class="font-medium text-primary hover:underline break-words">{{ filter_element.name }}</a>
-                {% else %}
-                <span class="text-foreground">That element is not recorded in your organisation.</span>
-                {% endif %}
-                <a href="{{ url_for('arch_decisions.list_decisions') }}"
-                   class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-8 px-2.5">
-                    <i data-lucide="x" class="h-3 w-3" aria-hidden="true"></i>Show all decisions
-                </a>
-            </div>
-        </div>
-        {% endif %}
+  {% if element_filter is not none %}
+  <p class="flex flex-wrap items-center gap-2 text-sm" data-element-filter>
+    {% if filter_element %}
+    <span class="text-muted-foreground">Decisions recorded against</span>
+    <a href="{{ url_for('archimate.element_impact_graph_page', element_id=filter_element.id) }}" class="font-medium text-foreground hover:underline break-words">{{ filter_element.name }}</a>
+    {% else %}
+    <span>That element is not recorded in your organisation.</span>
+    {% endif %}
+    {{ ui.button(text='Show all decisions', href=url_for('arch_decisions.list_decisions'), variant='ghost', size='sm') }}
+  </p>
+  {% endif %}
 
-        <!-- Status Filter Pills -->
-        <div class="px-4 lg:px-6">
-            <div class="flex flex-wrap gap-2 mb-6">
-                <a href="{{ url_for('arch_decisions.list_decisions') }}"
-                   class="inline-flex items-center px-3 py-1.5 rounded-full text-sm font-medium transition-colors
-                   {% if not status_filter %}bg-primary text-primary-foreground{% else %}bg-muted text-muted-foreground hover:bg-accent{% endif %}">
-                    All
-                </a>
-                {% for s, label in [('proposed','Proposed'),('accepted','Accepted'),('deprecated','Deprecated'),('superseded','Superseded')] %}
-                <a href="{{ url_for('arch_decisions.list_decisions', status=s, phase=phase_filter, element_id=element_filter) }}"
-                   class="inline-flex items-center px-3 py-1.5 rounded-full text-sm font-medium transition-colors
-                   {% if status_filter == s %}bg-primary text-primary-foreground{% else %}bg-muted text-muted-foreground hover:bg-accent{% endif %}">
-                    {{ label }}
-                </a>
-                {% endfor %}
-                {% if phase_filter %}
-                <span class="inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-sm font-medium bg-secondary text-secondary-foreground">
-                    Phase {{ phase_filter }}
-                    <a href="{{ url_for('arch_decisions.list_decisions', status=status_filter) }}" class="ml-1 hover:text-destructive-emphasis">
-                        <i data-lucide="x" class="h-3 w-3"></i>
-                    </a>
-                </span>
-                {% endif %}
-            </div>
-        </div>
-
-        <!-- Decisions Table -->
-        <div class="px-4 lg:px-6">
-            <div class="bg-card border border-border rounded-lg overflow-hidden">
-                {% if decisions %}
-                {% call table() %}
-                    {% call table_header() %}
-                        <tr>
-                            {% call table_head() %}Decision ID{% endcall %}
-                            {% call table_head() %}Title{% endcall %}
-                            {% call table_head() %}Status{% endcall %}
-                            {% call table_head() %}ADM Phase{% endcall %}
-                            {% call table_head() %}Elements{% endcall %}
-                            {% call table_head() %}Created{% endcall %}
-                        </tr>
-                    {% endcall %}
-                    {% call table_body() %}
-                        {% for d in decisions %}
-                        {% call table_row(attrs_dict={'data-decision-row': d.id}) %}
-                            {% call table_cell() %}
-                                <a href="{{ url_for('arch_decisions.view_decision', decision_id=d.id) }}"
-                                   class="font-mono text-primary hover:underline font-semibold">
-                                    {{ d.decision_id }}
-                                </a>
-                            {% endcall %}
-                            {% call table_cell() %}
-                                <a href="{{ url_for('arch_decisions.view_decision', decision_id=d.id) }}"
-                                   class="text-foreground hover:text-primary font-medium">
-                                    {{ d.title }}
-                                </a>
-                            {% endcall %}
-                            {% call table_cell() %}
-                                {% set status_map = {'proposed': 'warning', 'accepted': 'success', 'deprecated': 'neutral', 'superseded': 'danger'} %}
-                                {% call badge(variant=status_map.get(d.status, 'neutral')) %}{{ d.status|title }}{% endcall %}
-                            {% endcall %}
-                            {% call table_cell() %}
-                                {% if d.adm_phase %}
-                                <a href="{{ url_for('arch_decisions.list_decisions', status=status_filter, phase=d.adm_phase) }}"
-                                   class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4">
-                                    Phase {{ d.adm_phase }}
-                                </a>
-                                {% else %}
-                                <span class="text-muted-foreground"></span>
-                                {% endif %}
-                            {% endcall %}
-                            {% call table_cell() %}
-                                <span class="text-muted-foreground">
-                                    {{ (d.archimate_element_ids or [])|length }}
-                                </span>
-                            {% endcall %}
-                            {% call table_cell() %}
-                                <span class="text-muted-foreground text-xs">
-                                    {{ d.created_at.strftime('%Y-%m-%d') if d.created_at else '' }}
-                                </span>
-                            {% endcall %}
-                        {% endcall %}
-                        {% endfor %}
-                    {% endcall %}
-                {% endcall %}
-                {% else %}
-                {{ empty_state(
-                    icon='file-text',
-                    title=('No decisions recorded against this element' if filter_element else 'No Architecture Decisions'),
-                    description=('Record a decision and choose this element as one it affects.' if filter_element else 'Record your first enterprise architecture decision.'),
-                    cta_text='New Decision',
-                    cta_icon='plus',
-                    cta_href=url_for('arch_decisions.create_decision', element_id=filter_element.id) if filter_element else url_for('arch_decisions.create_decision')
-                ) }}
-                {% endif %}
-            </div>
-        </div>
-    </div>
+  {% macro _first() %}{{ ui.button(text='Record the first decision', href=url_for('arch_decisions.create_decision')) }}{% endmacro %}
+  {% call(d) list_table(rows=decisions, page_size=10, caption='Architecture decisions', testid='decisions-table', row_testid='decision-row',
+                        search_placeholder='Search decisions...', toolbar=true, toolbar_actions=_toolbar,
+                        columns=[{'label': 'Decision', 'class': 'hidden sm:table-cell'}, ('Title', ''), ('Status', ''), {'label': 'Phase', 'class': 'hidden md:table-cell'}, {'label': 'Elements', 'class': 'hidden lg:table-cell'}, {'label': 'Created', 'class': 'hidden md:table-cell'}],
+                        empty_message=('No decision is recorded against this element. Record one and choose this element as one it affects.' if filter_element else 'No decisions match this view. Record a decision to start the register.'),
+                        empty_action=_first) %}
+    {% call table_cell(class='font-mono hidden sm:table-cell') %}<a href="{{ url_for('arch_decisions.view_decision', decision_id=d.id) }}" class="font-medium text-foreground hover:underline">{{ d.decision_id }}</a>{% endcall %}
+    {% call table_cell(class='whitespace-normal min-w-[12rem]') %}<a href="{{ url_for('arch_decisions.view_decision', decision_id=d.id) }}" class="font-medium text-foreground hover:underline">{{ d.title }}</a><span class="block font-mono text-xs text-muted-foreground sm:hidden">{{ d.decision_id }}</span>{% endcall %}
+    {% call table_cell() %}{{ status_badge(d.status) }}{% endcall %}
+    {% call table_cell(class='hidden md:table-cell') %}
+      {% if d.adm_phase %}<a href="{{ url_for('arch_decisions.list_decisions', status=status_filter, phase=d.adm_phase) }}" class="hover:underline">Phase {{ d.adm_phase }}</a>
+      {% else %}<span class="text-muted-foreground">Not set. Edit the decision to place it in a phase.</span>{% endif %}
+    {% endcall %}
+    {% call table_cell(class='hidden lg:table-cell text-muted-foreground') %}{{ (d.archimate_element_ids or [])|length }}{% endcall %}
+    {% call table_cell(class='hidden md:table-cell text-muted-foreground', attrs={'data-sort': d.created_at.isoformat() if d.created_at else ''}) %}{{ d.created_at.strftime('%d %b %Y') if d.created_at else 'Not recorded' }}{% endcall %}
+  {% endcall %}
+  {% if phase_filter %}<p class="text-sm text-muted-foreground">Showing phase {{ phase_filter }} only. {{ ui.button(text='Show every phase', href=url_for('arch_decisions.list_decisions', status=status_filter), variant='ghost', size='sm') }}</p>{% endif %}
 </div>
 {% endblock %}

@@ -185,7 +185,7 @@ WORK: tuple = (
                requires="roles:admin,architect,compliance_officer",
               aliases=("Policy monitoring", "Policies", "Policy", "Standards")),
            _l("risks", "Risks", "risk.risk_register", job="5", aliases=("Risk register", "Risk")),
-           _l("decisions", "Decisions", "arch_decisions.list_decisions", job="5",
+           _l("decisions", "Decisions", "arch_decisions.list_decisions", job="5", owns=("arch_decisions.",),
               aliases=("Architecture decisions", "ADRs", "Decision log", "Board decisions")),
            _l("review_board", "Review board", "arb.dashboard", job="5",
               aliases=("ARB", "Architecture review board", "ARB dashboard", "Reviews", "Sessions")),

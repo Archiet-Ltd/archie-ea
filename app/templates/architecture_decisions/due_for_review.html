@@ -1,64 +1,40 @@
 {# design-block: dashboard #}
+{# shadcn-reference: example:tasks@e55b60b #}
 {% extends "layouts/admin_base.html" %}
-{% from "components/page_header.html" import page_header %}
+{% import 'basecoat/index.html' as ui %}
+{% from 'macros/page_shell.html' import page_shell %}
+{% from 'components/list_table.html' import list_table, row_actions, row_action %}
+{% from 'basecoat/table.html' import table_cell %}
+{% from 'architecture_decisions/_views.html' import views, status_badge with context %}
 
-{% block title %}Decisions Due For Review{% endblock %}
+{% block title %}Decisions due for review{% endblock %}
+
+{% macro _toolbar() %}{{ views('due') }}{% endmacro %}
+{% macro _next() %}
+{% if sample %}{{ ui.button(text='Set a review date on ' ~ sample.decision_id, href=url_for('arch_decisions.edit_decision', decision_id=sample.id), attrs={'data-testid': 'set-review-date'}) }}
+{% else %}{{ ui.button(text='Record a decision', href=url_for('arch_decisions.create_decision')) }}{% endif %}
+{% endmacro %}
 
 {% block content %}
-<div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-    {{ page_header(
-        title='Decisions Due For Review',
-        description='Decisions whose review date has arrived, with no outcome recorded yet',
-        breadcrumbs=[
-            {'label': 'Dashboard', 'href': url_for('main.index')},
-            {'label': 'Governance'},
-            {'label': 'Architecture Decisions', 'href': url_for('arch_decisions.list_decisions')},
-            {'label': 'Due For Review'}
-        ]
-    ) }}
-
-    <div class="bg-card border border-border rounded-lg overflow-hidden">
-        {% if decisions %}
-        <table class="dense-table w-full text-sm">
-            <thead class="bg-muted/50 border-b border-border">
-                <tr>
-                    <th class="text-left px-4 py-3 font-medium text-muted-foreground">Decision ID</th>
-                    <th class="text-left px-4 py-3 font-medium text-muted-foreground">Title</th>
-                    <th class="text-left px-4 py-3 font-medium text-muted-foreground">Review Date</th>
-                    <th class="text-left px-4 py-3 font-medium text-muted-foreground">Status</th>
-                    <th class="text-right px-4 py-3 font-medium text-muted-foreground">Action</th>
-                </tr>
-            </thead>
-            <tbody class="divide-y divide-border">
-                {% for d in decisions %}
-                <tr class="hover:bg-muted/30 transition-colors">
-                    <td class="px-4 py-3">
-                        <a href="{{ url_for('arch_decisions.view_decision', decision_id=d.id) }}"
-                           class="font-mono text-primary hover:underline text-sm font-semibold">{{ d.decision_id }}</a>
-                    </td>
-                    <td class="px-4 py-3">
-                        <a href="{{ url_for('arch_decisions.view_decision', decision_id=d.id) }}"
-                           class="text-foreground hover:text-primary font-medium">{{ d.title }}</a>
-                    </td>
-                    <td class="px-4 py-3 text-destructive-emphasis font-medium">{{ d.review_date.isoformat() }}</td>
-                    <td class="px-4 py-3 text-muted-foreground">{{ d.status|title }}</td>
-                    <td class="px-4 py-3 text-right">
-                        <a href="{{ url_for('arch_decisions.record_outcome', decision_id=d.id) }}"
-                           class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
-                            Record Outcome
-                        </a>
-                    </td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-        {% else %}
-        <div class="text-center py-16">
-            <i data-lucide="check-circle-2" class="h-10 w-10 text-success-emphasis mx-auto mb-3" aria-hidden="true"></i>
-            <h3 class="text-lg font-semibold text-foreground mb-1">Nothing is due for review</h3>
-            <p class="text-sm text-muted-foreground">Every decision with a review date is either in the future or already reviewed.</p>
-        </div>
-        {% endif %}
-    </div>
+<div class="p-6 space-y-6">
+  {{ page_shell(title='Due for review', subtitle='Decisions whose review date has arrived with no outcome recorded yet',
+                breadcrumb=[('Home', url_for('main.index')), ('Decisions', url_for('arch_decisions.list_decisions')), ('Due for review', none)]) }}
+  {% call(d) list_table(rows=decisions, page_size=10, caption='Decisions due for review', testid='due-table', row_testid='due-row',
+                        search_placeholder='Search decisions...', toolbar=true, toolbar_actions=_toolbar,
+                        columns=[{'label': 'Decision', 'class': 'hidden sm:table-cell'}, ('Title', ''), ('Status', ''), {'label': 'Review date', 'class': 'hidden md:table-cell'}, {'label': '', 'class': 'w-12', 'sortable': false}],
+                        empty_title=('Nothing is due for review' if has_review_dates else 'No decision has a review date'),
+                        empty_message=('Every decision with a review date is dated in the future or already reviewed.' if has_review_dates else 'Decisions only appear here once they carry a review date. Set one on a decision to start the queue.'),
+                        empty_action=_next) %}
+    {% call table_cell(class='font-mono hidden sm:table-cell') %}<a href="{{ url_for('arch_decisions.view_decision', decision_id=d.id) }}" class="font-medium text-foreground hover:underline">{{ d.decision_id }}</a>{% endcall %}
+    {% call table_cell(class='whitespace-normal min-w-[10rem]') %}<a href="{{ url_for('arch_decisions.view_decision', decision_id=d.id) }}" class="font-medium text-foreground hover:underline">{{ d.title }}</a><span class="block font-mono text-xs text-muted-foreground sm:hidden">{{ d.decision_id }}</span>{% endcall %}
+    {% call table_cell() %}{{ status_badge(d.status) }}{% endcall %}
+    {% call table_cell(class='hidden md:table-cell', attrs={'data-sort': d.review_date.isoformat()}) %}{{ d.review_date.strftime('%d %b %Y') }}{% endcall %}
+    {% call table_cell(class='text-right') %}
+      {% call row_actions(label='Actions for ' ~ d.decision_id) %}
+        {{ row_action('Record outcome', href=url_for('arch_decisions.record_outcome', decision_id=d.id), testid='record-outcome') }}
+        {{ row_action('Open decision', href=url_for('arch_decisions.view_decision', decision_id=d.id)) }}
+      {% endcall %}
+    {% endcall %}
+  {% endcall %}
 </div>
 {% endblock %}

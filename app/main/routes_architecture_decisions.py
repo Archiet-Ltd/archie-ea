@@ -289,8 +289,16 @@ def due_for_review():
     rather than relying on memory.
     """
     decisions = ArchitectureDecision.due_for_review(_org_id())
+    has_review_dates = (
+        ArchitectureDecision.query.filter(ArchitectureDecision.review_date.isnot(None)).first()
+        is not None
+    )
+    sample = None if has_review_dates else ArchitectureDecision.query.order_by(ArchitectureDecision.id).first()
     return render_template(
-        "architecture_decisions/due_for_review.html", decisions=decisions
+        "architecture_decisions/due_for_review.html",
+        decisions=decisions,
+        has_review_dates=has_review_dates,
+        sample=sample,
     )
 
 

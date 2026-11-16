@@ -1,0 +1,19 @@
+{#- The views of the decisions register: every status, and the review queue, as links to the same table. -#}
+{% macro views(current, phase=none) %}
+<nav aria-label="Decision views" class="flex flex-wrap items-center gap-1" data-testid="decision-views">
+  {% for key, label, href in [
+      ('all', 'All', url_for('arch_decisions.list_decisions', phase=phase)),
+      ('proposed', 'Proposed', url_for('arch_decisions.list_decisions', status='proposed', phase=phase)),
+      ('accepted', 'Accepted', url_for('arch_decisions.list_decisions', status='accepted', phase=phase)),
+      ('deprecated', 'Deprecated', url_for('arch_decisions.list_decisions', status='deprecated', phase=phase)),
+      ('superseded', 'Superseded', url_for('arch_decisions.list_decisions', status='superseded', phase=phase)),
+      ('due', 'Due for review', url_for('arch_decisions.due_for_review'))] %}
+  {{ ui.button(text=label, href=href, variant=('secondary' if current == key else 'ghost'), size='sm', attrs=({'aria-current': 'page'} if current == key else {})) }}
+  {% endfor %}
+</nav>
+{% endmacro %}
+
+{% macro status_badge(status) -%}
+{%- set variant = {'proposed': 'outline', 'accepted': 'default', 'deprecated': 'secondary', 'superseded': 'destructive'}.get(status, 'outline') -%}
+{{ ui.badge(text=(status or 'unknown')|title, variant=variant, attrs={'data-testid': 'decision-status'}) }}
+{%- endmacro %}
