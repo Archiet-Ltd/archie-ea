@@ -1,15 +1,15 @@
 {% extends 'layouts/admin_base.html' %}
 {# design-block: data-table #}
+{% import 'basecoat/index.html' as ui %}
 {% from 'macros/page_shell.html' import page_shell %}
 {% from 'components/button.html' import button %}
-{% from 'components/badge.html' import badge %}
-{% from 'components/input.html' import input %}
-{% from 'components/select.html' import native_select %}
-{% from 'components/form_field.html' import form_group %}
+{% from 'components/list_table.html' import list_table, row_actions, row_action %}
+{% from 'components/explained_value.html' import explained_value %}
 {% from 'components/empty_state.html' import empty_state %}
-{% from 'components/table.html' import table, table_header, table_body, table_row, table_head, table_cell %}
+{% from 'basecoat/table.html' import table_cell %}
+{% from 'basecoat/native-select.html' import native_select_wrapper, native_select, native_select_option %}
 
-{% block title %}Data objects — {{ config.APP_NAME }}{% endblock %}{% block content %}
+{% block title %}Data register — {{ config.APP_NAME }}{% endblock %}{% block content %}
 {% set filtered = search or classification or entity_type or domain_id %}
 {% set page_tabs = [('List', url_for('data_architecture.data_entity_catalog'), true), ('Diagram', url_for('data_architecture.data_entity_diagram', domain_id=domain_id or none), false)] %}
 {% set classification_options = [('', 'All'), ('public', 'Public'), ('internal', 'Internal'), ('confidential', 'Confidential'), ('restricted', 'Restricted')] %}
@@ -21,7 +21,7 @@
     {% macro _actions() %}
     {{ button(text='Create entity', icon='plus', href=url_for('data_architecture.create_data_entity')) }}
     {% endmacro %}
-    {{ page_shell(title='Data objects', subtitle=(total_count|string) ~ (' data entity' if total_count == 1 else ' data entities') ~ ' across the enterprise', tabs=page_tabs, actions_caller=_actions) }}
+    {{ page_shell(title='Data register', subtitle=(total_count|string) ~ (' data entity' if total_count == 1 else ' data entities') ~ ' across the enterprise', tabs=page_tabs, actions_caller=_actions) }}
 
     <div class="grid grid-cols-2 gap-4 md:grid-cols-4">
         {% for label, value in [('Total entities', total_count), ('Domains', domains|length), ('PII entities', entities|selectattr('contains_pii')|list|length), ('Classifications', classification_dist.keys()|select|list|length)] %}
@@ -32,79 +32,43 @@
         {% endfor %}
     </div>
 
-    <div class="rounded-lg border border-border bg-card p-4">
-    <form method="get" action="{{ url_for('data_architecture.data_entity_catalog') }}" class="flex flex-wrap items-end gap-3">
-        {% call form_group(id='catalog-search', label='Search', class='min-w-[200px] flex-1') %}
-            {{ input(id='catalog-search', name='search', value=search, placeholder='Search entities…', aria_label='Search') }}
-        {% endcall %}
-        {% call form_group(id='catalog-classification', label='Classification') %}
-            {{ native_select(id='catalog-classification', name='classification', options=classification_options, selected=classification) }}
-        {% endcall %}
-        {% call form_group(id='catalog-type', label='Type') %}
-            {{ native_select(id='catalog-type', name='entity_type', options=type_options, selected=entity_type) }}
-        {% endcall %}
-        {% call form_group(id='catalog-domain', label='Domain') %}
-            {{ native_select(id='catalog-domain', name='domain_id', options=domain_options, selected=domain_id) }}
-        {% endcall %}
-        {{ button(text='Filter', type='submit') }}
-        {% if filtered %}{{ button(text='Clear', variant='outline', href=url_for('data_architecture.data_entity_catalog')) }}{% endif %}
-    </form>
-    </div>
-
-    {% if entities %}
-    <div class="rounded-lg border border-border bg-card overflow-hidden">
-    {% call table() %}
-        {% call table_header() %}{% call table_row() %}
-            {% call table_head() %}#{% endcall %}
-            {% call table_head() %}Entity{% endcall %}
-            {% call table_head() %}Type{% endcall %}
-            {% call table_head() %}Classification{% endcall %}
-            {% call table_head() %}PII{% endcall %}
-            {% call table_head() %}Quality{% endcall %}
-            {% call table_head() %}System of record{% endcall %}
-            {% call table_head() %}Applications{% endcall %}
-            {% call table_head() %}Steward{% endcall %}
-            {% call table_head() %}Flow{% endcall %}
-            {% call table_head(class='text-right') %}Actions{% endcall %}
-        {% endcall %}{% endcall %}
-        {% call table_body() %}
-        {% for entity in entities %}
-            {% set flow_row = flows.get(entity.id) %}
-            {% call table_row(attrs_dict={'data-testid': 'data-entity-row-' ~ entity.id}) %}
-                {% call table_cell(class='text-muted-foreground') %}{{ loop.index }}{% endcall %}
-                {% call table_cell() %}
-                    <a href="{{ url_for('data_architecture.data_entity_detail', entity_id=entity.id) }}" class="text-sm font-medium text-foreground hover:underline">{{ entity.name }}</a>
-                    {% if entity.business_name and entity.business_name != entity.name %}<div class="text-xs text-muted-foreground">{{ entity.business_name }}</div>{% endif %}
-                    {% if entity.description %}<div class="line-clamp-1 text-xs text-muted-foreground">{{ entity.description[:80] }}</div>{% endif %}
-                {% endcall %}
-                {% call table_cell() %}{% if entity.entity_type %}{% call badge('info' if entity.entity_type == 'master' else ('success' if entity.entity_type == 'transactional' else ('warning' if entity.entity_type == 'reference' else 'neutral'))) %}{{ entity.entity_type }}{% endcall %}{% else %}—{% endif %}{% endcall %}
-                {% call table_cell() %}{% if entity.data_classification %}{% call badge('danger' if entity.data_classification == 'restricted' else ('warning' if entity.data_classification == 'confidential' else ('info' if entity.data_classification == 'internal' else 'success'))) %}{{ entity.data_classification }}{% endcall %}{% else %}—{% endif %}{% endcall %}
-                {% call table_cell() %}{% if entity.contains_pii %}{% call badge('danger') %}PII{% endcall %}{% else %}—{% endif %}{% endcall %}
-                {% call table_cell() %}{% if entity.data_quality_score is not none %}{{ entity.data_quality_score }}%{% else %}—{% endif %}{% endcall %}
-                {% call table_cell(class='text-muted-foreground') %}
-                    {% if entity.system_of_record_application %}{{ entity.system_of_record_application.name }}{% elif entity.system_of_record %}{{ entity.system_of_record }} (legacy label){% else %}—{% endif %}
-                {% endcall %}
-                {% call table_cell(class='min-w-56') %}
-                    {% if flow_row and flow_row.applications %}
-                    <ul class="space-y-1">
-                        {% for app in flow_row.applications %}
-                        <li><span class="font-medium text-foreground">{{ app.name }}</span> <span class="text-muted-foreground">{{ app.access | join(', ') }}</span></li>
-                        {% endfor %}
-                    </ul>
-                    {% else %}
-                    <span class="text-muted-foreground">Not recorded</span>
-                    {% endif %}
-                {% endcall %}
-                {% call table_cell(class='text-muted-foreground') %}{{ (flow_row.steward if flow_row else none) or 'Not recorded' }}{% endcall %}
-                {% call table_cell() %}{% if flow_row and flow_row.applications and flow_row.element_id %}<a class="text-primary underline underline-offset-2 whitespace-nowrap" data-testid="data-entity-flow-link" href="{{ url_for('data_architecture.data_architecture_dashboard', entity=entity.id) }}#data-flow">See where it flows</a>{% else %}<span class="text-muted-foreground">Nothing recorded yet</span>{% endif %}{% endcall %}
-                {% call table_cell(class='text-right') %}{{ button(text='Edit', variant='outline', size='sm', href=url_for('data_architecture.edit_data_entity', entity_id=entity.id)) }}{% endcall %}
+    {% macro _filters() %}
+    <form method="get" action="{{ url_for('data_architecture.data_entity_catalog') }}" class="flex w-full flex-wrap items-center gap-2 sm:w-auto" data-testid="register-filters">
+        {% for field_id, name, label, options, current in [('register-classification', 'classification', 'Classification', classification_options, classification), ('register-type', 'entity_type', 'Type', type_options, entity_type), ('register-domain', 'domain_id', 'Domain', domain_options, domain_id)] %}
+        {% call native_select_wrapper(class='w-full sm:w-auto') %}
+            {% call native_select(size='sm', id=field_id, attrs={'name': name, 'aria-label': label}) %}
+                {% for value, text in options %}{{ native_select_option(text=(('All domains' if name == 'domain_id' else 'All ' ~ label|lower ~ 's') if value == '' else text), value=value, selected=(value == (current or ''))) }}{% endfor %}
             {% endcall %}
-        {% endfor %}
         {% endcall %}
+        {% endfor %}
+        {{ button(text='Apply', type='submit', variant='outline', size='sm') }}
+        {% if filtered %}{{ button(text='Clear', variant='ghost', size='sm', href=url_for('data_architecture.data_entity_catalog')) }}{% endif %}
+    </form>
+    {% endmacro %}
+    {% set columns = [{'label': 'Entity', 'class': 'whitespace-normal'}, {'label': 'Type', 'class': 'hidden md:table-cell'}, {'label': 'Classification'}, {'label': 'PII', 'class': 'hidden md:table-cell'}, {'label': 'Quality', 'class': 'hidden md:table-cell'}, {'label': 'System of record', 'class': 'hidden lg:table-cell'}, {'label': 'Applications', 'class': 'hidden 2xl:table-cell'}, {'label': 'Steward', 'class': 'hidden 2xl:table-cell'}, {'label': '', 'class': 'w-12'}] %}
+    {% if entities or filtered %}
+    {% call(entity) list_table(rows=entities, columns=columns, caption='Data entities', testid='register-table', row_testid='data-entity-row', search_placeholder='Filter entities...', toolbar=true, toolbar_actions=_filters, empty_title='No data entities match these filters', empty_message='Nothing in the register fits these filters. Clear them to see every entity.') %}
+        {% set flow_row = flows.get(entity.id) %}
+        {% call table_cell(attrs={'data-sort': entity.name}) %}
+            <a href="{{ url_for('data_architecture.data_entity_detail', entity_id=entity.id) }}" class="text-sm font-medium text-foreground hover:underline">{{ entity.name }}</a>
+            {% if entity.business_name and entity.business_name != entity.name %}<div class="text-xs text-muted-foreground">{{ entity.business_name }}</div>{% endif %}
+        {% endcall %}
+        {% call table_cell(class='hidden md:table-cell') %}{% if entity.entity_type %}{{ ui.badge(text=entity.entity_type, variant='secondary') }}{% else %}{{ explained_value(basis='No type set') }}{% endif %}{% endcall %}
+        {% call table_cell() %}{% if entity.data_classification %}{{ ui.badge(text=entity.data_classification, variant=('destructive' if entity.data_classification == 'restricted' else ('outline' if entity.data_classification == 'public' else 'secondary'))) }}{% else %}{{ explained_value(basis='Not classified', action='Set it in Edit') }}{% endif %}{% endcall %}
+        {% call table_cell(class='hidden md:table-cell') %}{% if entity.contains_pii %}{{ ui.badge(text='PII', variant='destructive') }}{% else %}<span class="text-muted-foreground">No personal data</span>{% endif %}{% endcall %}
+        {% call table_cell(class='hidden md:table-cell') %}{% if entity.data_quality_score is not none %}{{ entity.data_quality_score }}%{% else %}{{ explained_value(basis='Not measured yet') }}{% endif %}{% endcall %}
+        {% call table_cell(class='hidden lg:table-cell') %}{% if entity.system_of_record_application %}{{ entity.system_of_record_application.name }}{% elif entity.system_of_record %}{{ entity.system_of_record }} (legacy label){% else %}{{ explained_value(basis='No system of record', action='Name it in Edit') }}{% endif %}{% endcall %}
+        {% call table_cell(class='hidden min-w-56 2xl:table-cell') %}
+            {% if flow_row and flow_row.applications %}
+            <ul class="space-y-1">{% for app in flow_row.applications %}<li><span class="font-medium text-foreground">{{ app.name }}</span> <span class="text-muted-foreground">{{ app.access | join(', ') }}</span></li>{% endfor %}</ul>
+            {% else %}<span class="text-muted-foreground">No application records it</span>{% endif %}
+        {% endcall %}
+        {% call table_cell(class='hidden text-muted-foreground 2xl:table-cell') %}{{ (flow_row.steward if flow_row else none) or 'No steward named' }}{% endcall %}
+        {% call table_cell(class='w-12 text-right') %}{% call row_actions(label='Actions for ' ~ entity.name) %}
+            {{ row_action('Edit', href=url_for('data_architecture.edit_data_entity', entity_id=entity.id), testid='data-entity-edit') }}
+            {% if flow_row and flow_row.applications and flow_row.element_id %}{{ row_action('See where it flows', href=url_for('data_architecture.data_architecture_dashboard', entity=entity.id) ~ '#data-flow', testid='data-entity-flow-link') }}{% endif %}
+        {% endcall %}{% endcall %}
     {% endcall %}
-    </div>
-    {% elif filtered %}
-    {{ empty_state(icon='search-x', title='No data entities match these filters', description='Nothing in the catalog fits the search and filters above. Clear them to see every entity.', cta_text='Clear the filters', cta_href=url_for('data_architecture.data_entity_catalog')) }}
     {% else %}
     {{ empty_state(icon='database', title='No data entities yet', description='Data entities are the business data objects, such as Customer, Order or Product, that your enterprise manages. Create the first one to start the catalog.', cta_text='Create an entity', cta_href=url_for('data_architecture.create_data_entity'), cta_icon='plus') }}
     {% endif %}

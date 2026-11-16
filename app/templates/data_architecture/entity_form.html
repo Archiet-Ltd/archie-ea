@@ -1,124 +1,79 @@
 {# design-block: form #}
 {% extends 'layouts/admin_base.html' %}
+{% import 'basecoat/index.html' as ui %}
 {% from 'macros/page_shell.html' import page_shell %}
 {% from 'data_governance/_app_picker.html' import app_picker, app_picker_script with context %}
 
-{% block title %}{{ 'Edit' if entity else 'Create' }} Data Entity — {{ config.APP_NAME }}{% endblock %}{% block content %}
-<div class="max-w-2xl mx-auto space-y-6">
+{% macro _select(id, name, options, placeholder, current) %}
+{% call ui.native_select_wrapper(class='w-full') %}{% call ui.native_select(id=id, attrs={'name': name}) %}
+{{ ui.native_select_option(text=placeholder, value='') }}
+{% for value, text in options %}{{ ui.native_select_option(text=text, value=value, selected=(value == (current or ''))) }}{% endfor %}
+{% endcall %}{% endcall %}
+{% endmacro %}
+{% macro _text(id, label, value, placeholder, required=false) %}
+{% call ui.field() %}
+  {% call ui.field_label(attrs={'for': id}) %}{{ label }}{% if required %} <span class="text-destructive-emphasis">*</span>{% endif %}{% endcall %}
+  {{ ui.input(id=id, attrs={'name': id, 'value': value or '', 'placeholder': placeholder, 'required': required}) }}
+{% endcall %}
+{% endmacro %}
+
+{% set domain_choices = [] %}{% for d in domains %}{% set _ = domain_choices.append((d.id|string, d.name)) %}{% endfor %}
+{% block title %}{{ 'Edit data entity' if entity else 'New data entity' }} — {{ config.APP_NAME }}{% endblock %}{% block content %}
+<div class="mx-auto w-full max-w-2xl space-y-6">
     {{ page_shell(
-        title=('Edit' if entity else 'Create') ~ ' Data Entity',
-        subtitle=('Update this data entity definition.' if entity else 'Define a new business data entity in the catalog.')
+        title=('Edit data entity' if entity else 'New data entity'),
+        subtitle=('Update this data entity definition.' if entity else 'Define a new business data entity in the register.')
     ) }}
 
-    <form method="post" action="{{ request.path }}" class="space-y-6">
-        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <form method="post" action="{{ request.path }}" class="space-y-6" data-testid="data-entity-form">
+        {{ ui.input(type='hidden', name='csrf_token', value=csrf_token()) }}
 
-        <div class="rounded-lg border border-border bg-card p-6 space-y-4">
-            <h2 class="text-sm font-semibold text-foreground uppercase tracking-wide">Identity</h2>
+        {% call ui.card() %}{% call ui.card_header() %}{% call ui.card_title() %}Identity{% endcall %}{% endcall %}
+        {% call ui.card_content(class='space-y-4') %}
+            {{ _text('name', 'Name', entity.name if entity, 'e.g. Customer master, Sales order', true) }}
+            {{ _text('business_name', 'Business name', entity.business_name if entity, 'Business-friendly name') }}
+            {% call ui.field() %}
+              {% call ui.field_label(attrs={'for': 'description'}) %}Description{% endcall %}
+              {{ ui.textarea(id='description', text=(entity.description if entity and entity.description else ''), attrs={'name': 'description', 'rows': 3, 'placeholder': 'What this data entity represents and how it is used'}) }}
+            {% endcall %}
+        {% endcall %}{% endcall %}
 
-            <div>
-                <label for="name" class="block text-sm font-medium text-muted-foreground mb-1">Name <span class="text-destructive-emphasis">*</span></label>
-                <input type="text" id="name" name="name" required value="{{ entity.name if entity else '' }}"
-                    class="w-full h-9 px-3 text-sm rounded-md border border-input bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-                    placeholder="e.g., Customer Master, Sales Order, Product Catalog">
-            </div>
-
-            <div>
-                <label for="business_name" class="block text-sm font-medium text-muted-foreground mb-1">Business Name</label>
-                <input type="text" id="business_name" name="business_name" value="{{ entity.business_name if entity else '' }}"
-                    class="w-full h-9 px-3 text-sm rounded-md border border-input bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-                    placeholder="Business-friendly name">
-            </div>
-
-            <div>
-                <label for="description" class="block text-sm font-medium text-muted-foreground mb-1">Description</label>
-                <textarea id="description" name="description" rows="3"
-                    class="w-full px-3 py-2 text-sm rounded-md border border-input bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-                    placeholder="Describe what this data entity represents and how it's used">{{ entity.description if entity else '' }}</textarea>
-            </div>
-        </div>
-
-        <div class="rounded-lg border border-border bg-card p-6 space-y-4">
-            <h2 class="text-sm font-semibold text-foreground uppercase tracking-wide">Classification</h2>
-
-            <div class="grid grid-cols-1 gap-4">
-                <div>
-                    <label for="domain_id" class="block text-sm font-medium text-muted-foreground mb-1">Domain</label>
-                    <select id="domain_id" name="domain_id"
-                        class="w-full h-9 px-3 text-sm rounded-md border border-input bg-background text-foreground">
-                        <option value="">Select domain...</option>
-                        {% for d in domains %}
-                        <option value="{{ d.id }}" {{ 'selected' if entity and entity.domain_id == d.id }}>{{ d.name }}</option>
-                        {% endfor %}
-                    </select>
-                </div>
-
-                <div>
-                    <label for="entity_type" class="block text-sm font-medium text-muted-foreground mb-1">Entity Type</label>
-                    <select id="entity_type" name="entity_type"
-                        class="w-full h-9 px-3 text-sm rounded-md border border-input bg-background text-foreground">
-                        <option value="">Select type...</option>
-                        <option value="master" {{ 'selected' if entity and entity.entity_type == 'master' }}>Master Data</option>
-                        <option value="transactional" {{ 'selected' if entity and entity.entity_type == 'transactional' }}>Transactional</option>
-                        <option value="reference" {{ 'selected' if entity and entity.entity_type == 'reference' }}>Reference Data</option>
-                        <option value="derived" {{ 'selected' if entity and entity.entity_type == 'derived' }}>Derived / Analytical</option>
-                    </select>
-                </div>
-            </div>
-
-            <div class="grid grid-cols-1 gap-4">
-                <div>
-                    <label for="data_classification" class="block text-sm font-medium text-muted-foreground mb-1">Data Classification</label>
-                    <select id="data_classification" name="data_classification"
-                        class="w-full h-9 px-3 text-sm rounded-md border border-input bg-background text-foreground">
-                        <option value="">Select classification...</option>
-                        <option value="public" {{ 'selected' if entity and entity.data_classification == 'public' }}>Public</option>
-                        <option value="internal" {{ 'selected' if entity and entity.data_classification == 'internal' }}>Internal</option>
-                        <option value="confidential" {{ 'selected' if entity and entity.data_classification == 'confidential' }}>Confidential</option>
-                        <option value="restricted" {{ 'selected' if entity and entity.data_classification == 'restricted' }}>Restricted</option>
-                    </select>
-                </div>
-
-                <div class="space-y-3">
-                    {{ app_picker(
-                        'system-of-record-application',
-                        current_system_of_record_application.name if current_system_of_record_application else None,
-                        current_system_of_record_application.id if current_system_of_record_application else None,
-                        false
-                    ) }}
-                    {% if entity and entity.system_of_record and not entity.system_of_record_application_id %}
-                    <div class="rounded-md border border-border bg-muted/30 p-3">
-                        <p class="text-xs font-medium uppercase tracking-wide text-muted-foreground">Legacy label</p>
-                        <p class="mt-1 text-sm text-foreground">{{ entity.system_of_record }}</p>
-                        <p class="mt-1 text-xs text-muted-foreground">Shown read-only until it can be linked to an application.</p>
-                    </div>
-                    {% endif %}
-                </div>
-            </div>
-
-            <div class="flex gap-6">
-                <label class="flex items-center gap-2 text-sm">
-                    <input type="checkbox" name="contains_pii" {{ 'checked' if entity and entity.contains_pii }}
-                        class="h-4 w-4 rounded border-input">
-                    Contains PII
-                </label>
-                <label class="flex items-center gap-2 text-sm">
-                    <input type="checkbox" name="is_master_data" {{ 'checked' if entity and entity.is_master_data }}
-                        class="h-4 w-4 rounded border-input">
-                    Master Data
-                </label>
-            </div>
-        </div>
+        {% call ui.card() %}{% call ui.card_header() %}{% call ui.card_title() %}Classification{% endcall %}{% endcall %}
+        {% call ui.card_content(class='space-y-4') %}
+            {% call ui.field() %}
+              {% call ui.field_label(attrs={'for': 'domain_id'}) %}Domain{% endcall %}
+              {{ _select('domain_id', 'domain_id', domain_choices, 'Select domain...', (entity.domain_id|string) if entity and entity.domain_id else '') }}
+            {% endcall %}
+            {% call ui.field() %}
+              {% call ui.field_label(attrs={'for': 'entity_type'}) %}Entity type{% endcall %}
+              {{ _select('entity_type', 'entity_type', [('master', 'Master data'), ('transactional', 'Transactional'), ('reference', 'Reference data'), ('derived', 'Derived / analytical')], 'Select type...', entity.entity_type if entity) }}
+            {% endcall %}
+            {% call ui.field() %}
+              {% call ui.field_label(attrs={'for': 'data_classification'}) %}Data classification{% endcall %}
+              {{ _select('data_classification', 'data_classification', [('public', 'Public'), ('internal', 'Internal'), ('confidential', 'Confidential'), ('restricted', 'Restricted')], 'Select classification...', entity.data_classification if entity) }}
+            {% endcall %}
+            {{ app_picker(
+                'system-of-record-application',
+                current_system_of_record_application.name if current_system_of_record_application else None,
+                current_system_of_record_application.id if current_system_of_record_application else None,
+                false
+            ) }}
+            {% if entity and entity.system_of_record and not entity.system_of_record_application_id %}
+            <p class="text-sm text-muted-foreground">Legacy label: {{ entity.system_of_record }}. Shown read-only until it can be linked to an application.</p>
+            {% endif %}
+            {% call ui.field(attrs={'data-orientation': 'horizontal'}) %}
+              {{ ui.checkbox(id='contains_pii', attrs={'name': 'contains_pii', 'checked': (true if entity and entity.contains_pii else false)}) }}
+              {% call ui.field_label(attrs={'for': 'contains_pii'}) %}Contains personal data (PII){% endcall %}
+            {% endcall %}
+            {% call ui.field(attrs={'data-orientation': 'horizontal'}) %}
+              {{ ui.checkbox(id='is_master_data', attrs={'name': 'is_master_data', 'checked': (true if entity and entity.is_master_data else false)}) }}
+              {% call ui.field_label(attrs={'for': 'is_master_data'}) %}Master data{% endcall %}
+            {% endcall %}
+        {% endcall %}{% endcall %}
 
         <div class="flex items-center justify-between">
-            <a href="{{ url_for('data_architecture.data_entity_catalog') }}"
-               class="px-4 py-2 text-sm font-medium rounded-md border border-input bg-background hover:bg-accent transition-colors">
-                Cancel
-            </a>
-            <button type="submit"
-                class="px-4 py-2 text-sm font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors">
-                {{ 'Save Changes' if entity else 'Create Entity' }}
-            </button>
+            {{ ui.button(text='Cancel', variant='outline', href=url_for('data_architecture.data_entity_catalog')) }}
+            {{ ui.button(text=('Save changes' if entity else 'Create entity'), type='submit') }}
         </div>
     </form>
 

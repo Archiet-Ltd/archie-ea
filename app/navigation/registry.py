@@ -115,7 +115,9 @@ WORK: tuple = (
                        "Consolidation", "Savings", "Gap findings"),
               owns=("unified_applications.rationalization_",)),
            _l("data_register", "Data register", "data_architecture.data_entity_catalog", job="1",
-              aliases=("Data entities", "Data catalogue", "Data objects", "Data model")),
+              aliases=("Data entities", "Data catalogue", "Data objects", "Data model"),
+              owns=("data_architecture.data_entity_", "data_architecture.create_data_entity",
+                    "data_architecture.edit_data_entity")),
            _l("interfaces", "Interfaces", "interface_register.index", job="1", requires="section:data_integration",
               aliases=("Interface register", "Integrations register")),
            _l("tech_radar", "Technology radar", "tech_radar.index", job="1", aliases=("Tech radar", "Radar")),
@@ -571,6 +573,13 @@ def _here(link: NavLink, endpoint: str | None, values: dict | None) -> bool:
     return all(str(values.get(k)) == str(v) for k, v in link.values.items())
 
 
+def _listed_twice(child: NavLink, endpoint: str | None) -> bool:
+    """A model type page that a Systems entry also holds (Application > Data object, Systems > Data
+    register) is marked on the Systems entry only: one page lights one entry."""
+    return endpoint is not None and child.key.startswith("type_") and any(
+        _holds(c, endpoint) for top in WORK if top.toggle for c in top.children)
+
+
 def _item(user, link: NavLink, role: str, endpoint: str | None, current_entry: NavLink | None,
           values: dict | None = None, remembered: dict | None = None):
     if link.toggle:
@@ -579,9 +588,10 @@ def _item(user, link: NavLink, role: str, endpoint: str | None, current_entry: N
             child_link = resolve(user, child, role)
             child_url = href(child_link) if child_link else None
             if child_url:
-                here = _here(child_link, endpoint, values)
+                twice = _listed_twice(child, endpoint)
+                here = _here(child_link, endpoint, values) and not twice
                 # a page the item holds (a Portfolio tab) lights the item; only its own page is current
-                held = bool(child.owns) and endpoint is not None and _holds(child, endpoint)
+                held = bool(child.owns) and endpoint is not None and _holds(child, endpoint) and not twice
                 children.append(SidebarItem(child_link.key, child_link.label, child_url, None, child.job,
                                             active=here or held, current=here))
         if not children:

@@ -14,7 +14,7 @@
       <span class="font-medium text-foreground tabular-nums" data-testid="finder-count" x-text="finderRows.length"></span>
       <span x-text="finderFilter ? ('of ' + finderItems.length + ' {{ noun_plural }} match') : (finderItems.length === 1 ? '{{ noun }} in this view' : '{{ noun_plural }} in this view')"></span>
     </p>
-    {{ input(type='search', placeholder='Find ' ~ ('an ' if noun == 'element' else 'a ') ~ noun ~ ' in this view', aria_label='Find ' ~ ('an ' if noun == 'element' else 'a ') ~ noun ~ ' in this view', class='h-8', attrs_dict={'x-model': 'finderFilter', 'data-testid': 'finder-search'}) }}
+    {{ input(type='search', placeholder='Find ' ~ ('an ' if noun[:1] in 'aeiou' else 'a ') ~ noun ~ ' in this view', aria_label='Find ' ~ ('an ' if noun[:1] in 'aeiou' else 'a ') ~ noun ~ ' in this view', class='h-8', attrs_dict={'x-model': 'finderFilter', 'data-testid': 'finder-search'}) }}
   </div>
   <ul class="min-h-0 flex-1 overflow-y-auto p-2" data-testid="finder-list">
     <template x-for="row in finderRows" :key="row.id">

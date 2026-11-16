@@ -41,20 +41,20 @@ def test_data_architect_entity_create_filter_edit_cancel_delete(browser, live_se
     try:
         _login(page, live_server, seeded["emails"]["data_architect"])
         assert page.goto(live_server + CATALOG, timeout=PAGE_TIMEOUT).status == 200
-        page.get_by_role("link", name="Create Entity", exact=True).click()
-        expect(page.get_by_role("heading", name="Create Data Entity", exact=True)).to_be_visible()
-        assert page.locator('input[name="csrf_token"]').input_value()
+        page.get_by_role("link", name="Create entity", exact=True).click()
+        expect(page.get_by_role("heading", name="New data entity", exact=True)).to_be_visible()
+        assert page.get_by_test_id("data-entity-form").locator('input[name="csrf_token"]').input_value()
         page.locator("#name").fill(marker)
-        page.get_by_label("Business Name", exact=True).fill("Synthetic lifecycle fixture")
+        page.get_by_label("Business name", exact=True).fill("Synthetic lifecycle fixture")
         page.get_by_label("Description", exact=True).fill("Created by an isolated browser qualification run.")
         # Use the shared synthetic domain: never cause the form's implicit General seed.
         page.get_by_label("Domain", exact=True).select_option(str(seeded["ids"]["data_domain"]))
-        page.get_by_label("Entity Type", exact=True).select_option("master")
-        page.get_by_label("Data Classification", exact=True).select_option("confidential")
-        page.get_by_label("Contains PII", exact=True).check()
-        page.get_by_label("Master Data", exact=True).check()
+        page.get_by_label("Entity type", exact=True).select_option("master")
+        page.get_by_label("Data classification", exact=True).select_option("confidential")
+        page.get_by_label("Contains personal data (PII)", exact=True).check()
+        page.get_by_label("Master data", exact=True).check()
         attempted_create = True
-        _submit(page, page.get_by_role("button", name="Create Entity", exact=True), live_server + CATALOG + "/create")
+        _submit(page, page.get_by_role("button", name="Create entity", exact=True), live_server + CATALOG + "/create")
         rows = _owned_entities(page, live_server, marker)
         assert len(rows) == 1
         created_id = rows[0]["id"]
@@ -62,25 +62,26 @@ def test_data_architect_entity_create_filter_edit_cancel_delete(browser, live_se
         assert rows[0]["data_classification"] == "confidential"
         assert rows[0]["contains_pii"] is True
 
-        page.get_by_role("textbox", name="Search", exact=True).fill(marker)
+        page.goto(live_server + CATALOG, timeout=PAGE_TIMEOUT)
         page.get_by_label("Classification", exact=True).select_option("restricted")
-        page.get_by_role("button", name="Filter", exact=True).click()
-        expect(page.get_by_role("heading", name="No data entities found", exact=True)).to_be_visible()
+        page.get_by_role("button", name="Apply", exact=True).click()
+        expect(page.get_by_role("heading", name="No data entities match these filters", exact=True)).to_be_visible()
         page.get_by_label("Classification", exact=True).select_option("confidential")
         page.get_by_label("Type", exact=True).select_option("master")
-        page.get_by_role("button", name="Filter", exact=True).click()
+        page.get_by_role("button", name="Apply", exact=True).click()
         row = page.get_by_role("row").filter(has=page.get_by_text(marker, exact=True))
         expect(row).to_have_count(1)
-        row.get_by_role("link", name="Edit", exact=True).click()
+        row.get_by_role("button", name=re.compile("^Actions for ")).click()
+        page.get_by_role("menuitem", name="Edit", exact=True).click()
         edit_url = live_server + CATALOG + f"/{created_id}/edit"
         expect(page).to_have_url(edit_url)
         expect(page.locator("#name")).to_have_value(marker)
         page.locator("#name").fill(marker + " edited")
-        page.get_by_label("Business Name", exact=True).fill("Synthetic fixture revised")
-        page.get_by_label("Entity Type", exact=True).select_option("reference")
-        page.get_by_label("Data Classification", exact=True).select_option("internal")
-        page.get_by_label("Contains PII", exact=True).uncheck()
-        _submit(page, page.get_by_role("button", name="Save Changes", exact=True), edit_url)
+        page.get_by_label("Business name", exact=True).fill("Synthetic fixture revised")
+        page.get_by_label("Entity type", exact=True).select_option("reference")
+        page.get_by_label("Data classification", exact=True).select_option("internal")
+        page.get_by_label("Contains personal data (PII)", exact=True).uncheck()
+        _submit(page, page.get_by_role("button", name="Save changes", exact=True), edit_url)
         assert page.reload(timeout=PAGE_TIMEOUT).status == 200
         rows = _owned_entities(page, live_server, marker)
         assert len(rows) == 1
@@ -93,10 +94,11 @@ def test_data_architect_entity_create_filter_edit_cancel_delete(browser, live_se
         row = page.get_by_role("row").filter(has=page.get_by_text(marker + " edited", exact=True))
         expect(row.get_by_role("cell", name="reference", exact=True)).to_be_visible()
         expect(row.get_by_role("cell", name="internal", exact=True)).to_be_visible()
-        row.get_by_role("link", name="Edit", exact=True).click()
+        row.get_by_role("button", name=re.compile("^Actions for ")).click()
+        page.get_by_role("menuitem", name="Edit", exact=True).click()
         assert page.reload(timeout=PAGE_TIMEOUT).status == 200
         expect(page.locator("#name")).to_have_value(marker + " edited")
-        expect(page.get_by_label("Contains PII", exact=True)).not_to_be_checked()
+        expect(page.get_by_label("Contains personal data (PII)", exact=True)).not_to_be_checked()
 
         delete_url = live_server + CATALOG + f"/{created_id}/delete"
         deletes = []

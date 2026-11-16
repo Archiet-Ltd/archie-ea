@@ -16,7 +16,7 @@
 {% from 'components/diagram/legend.html' import diagram_legend with context %}
 {% from 'components/diagram/status_line.html' import diagram_status_line with context %}
 
-{% block title %}Data objects: diagram — {{ config.APP_NAME }}{% endblock %}{% block content %}
+{% block title %}Data register: diagram — {{ config.APP_NAME }}{% endblock %}{% block content %}
 {% set page_tabs = [('List', url_for('data_architecture.data_entity_catalog'), false), ('Diagram', url_for('data_architecture.data_entity_diagram'), true)] %}
 
 {% macro _actions() %}
@@ -32,11 +32,11 @@
 
 {% if not domain %}
 {# duplicate-breadcrumb-ok: two page_shell() calls in mutually exclusive if/else branches; only one renders #}
-  {{ page_shell(title='Data objects', subtitle='The entities of your data model, and how they relate.', tabs=page_tabs) }}
+  {{ page_shell(title='Data register', subtitle='The entities of your data model, and how they relate.', tabs=page_tabs) }}
   {{ empty_state(icon='database', title='No data domains yet', description='A data domain groups the entities of one subject area, such as Customer or Finance. Add your first data entity and its domain is created with it.', cta_text='Add a data entity', cta_href=url_for('data_architecture.create_data_entity'), cta_icon='plus') }}
 {% else %}
 <div x-data="erdApp()" class="relative" data-testid="erd-page">
-  {{ page_shell(title='Data objects', subtitle=domain.name ~ ': the entities of this domain, their attributes and how they relate.', tabs=page_tabs, actions_caller=_actions) }}
+  {{ page_shell(title='Data register', subtitle=domain.name ~ ': the entities of this domain, their attributes and how they relate.', tabs=page_tabs, actions_caller=_actions) }}
   {% call card(class='flex h-[calc(100svh-17rem)] min-h-[520px] flex-col overflow-hidden [&>nav]:mb-0') %}
     {{ diagram_toolbar(menus=false, history=false, export_items=[{'text': 'SVG image', 'icon': 'image', 'onclick': 'exportSvg()'}]) }}
     <div class="relative flex min-h-0 flex-1">
