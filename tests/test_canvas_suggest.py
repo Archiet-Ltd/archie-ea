@@ -177,8 +177,11 @@ def test_the_pages_name_the_control_as_the_canvas_labels_it(client, login_as, wo
     assert prefix == {"Suggest"}
     for page in PAGES:
         text = page.read_text(encoding="utf-8")
-        assert "“Suggest for" in text or '"Suggest for' in text, page.name
+        assert "“Suggest for" not in text and '"Suggest for' not in text, page.name
         assert "Draft Revenue Streams with AI" not in text, page.name
+        assert "sparkle" not in text.lower(), page.name
+        assert "one idea per line" not in text.lower(), page.name
+        assert "click out" not in text.lower(), page.name
 
 
 def test_the_prompt_holds_none_of_another_organisations_names(app, world, monkeypatch):
