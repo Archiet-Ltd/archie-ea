@@ -280,7 +280,7 @@ def notify_subscribers(incident, resolved: bool) -> int:
         if not mail_available():
             return 0
         users = (
-            User.query.join(UserPreference, UserPreference.user_id == User.id)
+            User.query.join(UserPreference, UserPreference.user_id == User.id)  # tenant-scoping-ok: an incident is platform-wide, so every subscriber in every organisation is told
             .filter(UserPreference.notify_on_service_status.is_(True), User.disabled_at.is_(None))
             .all()
         )
