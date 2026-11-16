@@ -1141,6 +1141,20 @@ def type_and_wait(page, prefix, term):
     return box
 
 
+def open_nav_group(page, group_key):
+    """Open a collapsible sidebar group by its key (e.g. 'systems', 'changes').
+
+    The new sidebar keeps a closed group's links inside a <template> until the
+    group is opened. This helper clicks the group's toggle button if it is
+    closed, and waits for the sub-items to be visible.
+    """
+    toggle = page.locator('[data-nav-toggle="%s"]' % group_key).first
+    if toggle.count() and toggle.get_attribute("aria-expanded") != "true":
+        toggle.click()
+        page.wait_for_timeout(150)
+    expect(toggle).to_have_attribute("aria-expanded", "true")
+
+
 # Every enterprise role the product defines. The scope contract below prevents
 # a new or promoted persona from silently disappearing from browser coverage.
 ARCHETYPES = [

@@ -264,7 +264,7 @@ def test_04b_changes_opens_onto_its_pages_in_the_briefed_order(walk, seeded):
     names = walk.page.locator('a[data-slot="sidebar-menu-sub-button"]:visible').evaluate_all(
         "(links) => links.filter((a) => a.closest('[data-nav-item=\"changes\"]')).map((a) => a.innerText.trim())"
     )
-    assert names == ["Gaps", "Solutions", "Options analysis", "Business cases", "Work packages", "Roadmap",
+    assert names == ["Gaps", "Solutions", "Options analysis", "Scenarios", "Business cases", "Work packages", "Roadmap",
                      "Programmes"], names
     walk.shot("changes-open")
 
