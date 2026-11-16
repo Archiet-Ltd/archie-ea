@@ -855,7 +855,7 @@ class RoadmapDataSync:
     def _get_primary_capability_for_application(self, application_id: int) -> str:
         """Get primary capability for application using ORM"""
         from app.models.application_capability import ApplicationCapabilityMapping
-        from app.models.unified_capability import UnifiedCapability
+        from app.models.business_capabilities import BusinessCapability
 
         org_id = current_organization_id()
         mapping = (
@@ -864,7 +864,7 @@ class RoadmapDataSync:
                 ApplicationCapabilityMapping.application_component_id == application_id,
                 ApplicationCapabilityMapping.is_primary_enabler == True,
             )
-            .join(UnifiedCapability, UnifiedCapability.id == ApplicationCapabilityMapping.business_capability_id)
+            .join(BusinessCapability, BusinessCapability.id == ApplicationCapabilityMapping.business_capability_id)
             .first()
         )
 
@@ -877,7 +877,7 @@ class RoadmapDataSync:
                 ApplicationCapabilityMapping.organization_id == org_id,
                 ApplicationCapabilityMapping.application_component_id == application_id,
             )
-            .join(UnifiedCapability, UnifiedCapability.id == ApplicationCapabilityMapping.business_capability_id)
+            .join(BusinessCapability, BusinessCapability.id == ApplicationCapabilityMapping.business_capability_id)
             .first()
         )
 
