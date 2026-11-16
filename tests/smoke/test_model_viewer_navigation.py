@@ -23,7 +23,7 @@ def test_empty_model_viewer_back_returns_to_assistant(browser, live_server, seed
             'No architecture assistant data found. Please run the assistant first.', exact=True
         )).to_be_visible()
         with page.expect_navigation(wait_until='domcontentloaded', timeout=PAGE_TIMEOUT) as navigation:
-            page.get_by_role('button', name='Back to Architecture Assistant', exact=True).click()
+            page.get_by_role('button', name='Back to Assistant', exact=True).click()
         assert navigation.value.status == 200
         expect(page).to_have_url(live_server + '/architecture-assistant/')
         expect(page.get_by_role('heading', name='Architecture Assistant', exact=True, level=1)).to_be_visible()
