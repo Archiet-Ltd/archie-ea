@@ -184,11 +184,11 @@ def own_record_questions(org_id):
     held = onboarding.loaded_at_sign_up(org_id)
     org = db.session.get(Organization, org_id)
     cards = [
-        {"question": "What did we record when we signed up?", "detail": "Recorded at sign-up"}
+        {"question": "What did we record when we signed up?"}
     ] if org is not None and onboarding.company_profile(org) else []
     cards += [
         {"question": "What is on our %s?" % row["name"],
-         "detail": "%d entries" % row["entries"] if row["entries"] else "Created at sign-up"}
+         "detail": "%d entries" % row["entries"] if row["entries"] else ""}
         for row in held["canvases"]
     ] + [
         {"question": "Which %s %ss apply to us?" % (row["name"], row["unit"]), "detail": "%d listed" % row["count"]}
@@ -200,7 +200,6 @@ def own_record_questions(org_id):
             0,
             {
                 "question": "Connect GitHub to see who owns what and what breaks",
-                "detail": "Nothing is connected yet",
                 "href": "/admin/connectors/github",
             },
         )
