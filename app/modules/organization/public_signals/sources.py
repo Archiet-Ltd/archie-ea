@@ -21,7 +21,6 @@ from __future__ import annotations
 import os
 import re
 import time
-import xml.etree.ElementTree as ET
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from email.utils import parsedate_to_datetime
@@ -29,6 +28,8 @@ from typing import Any, Callable, Dict, List, Optional
 from urllib.parse import quote, urlparse
 
 import requests
+
+from app.utils import safe_xml
 
 SOURCE_COMMIT = "cbc6a9e"
 USER_AGENT = "Entelim/1.0 (public company signals; contact via the organisation's workspace)"
@@ -564,7 +565,7 @@ def rss(http: Http, query: str, ctx: Dict[str, Any]) -> List[Item]:
     and an item is kept when it names the company."""
     items: List[Item] = []
     for feed in ctx.get("rss_feeds") or []:
-        root = ET.fromstring(http.text(feed, pause=0.5, headers={"User-Agent": USER_AGENT}))
+        root = safe_xml.fromstring(http.text(feed, pause=0.5, headers={"User-Agent": USER_AGENT}))
         for node in root.iter():
             tag = node.tag.rsplit("}", 1)[-1]
             if tag not in ("item", "entry"):

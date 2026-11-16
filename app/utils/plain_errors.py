@@ -118,7 +118,7 @@ def render_plain_error(status: int, standalone_template: str | None = None, *, t
             "errors/standalone_error.html",
             error_status=status, error_title=title, error_message=message,
             # fixed constants above, no user data
-            error_icon_paths=Markup(ICON_PATHS[icon]),
+            error_icon_paths=Markup(ICON_PATHS[icon]),  # nosec B704 - ICON_PATHS is a fixed table of icon markup
             offer_links=offer_links,
             next_label=next_step[0] if next_step else "Go to the dashboard",
             next_href=next_step[1] if next_step else "/dashboard/overview",
