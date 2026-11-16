@@ -339,15 +339,48 @@ def data_lineage_view():
         traced_ids.add(edge.target_id)
     untraced = [o for o in data_objects if o.id not in traced_ids]
 
+    # A flow's "see where it flows" link goes to the data entity at either end that has applications.
+    traceable = {
+        row["element_id"]: row["id"] for row in overview["entities"] if row["applications"] and row["element_id"]
+    }
+    flows = []
+    for row in grounded_lineage:
+        flows.append({
+            "from": row.archimate_element.name if row.archimate_element else None,
+            "to": row.target_archimate_element.name if row.target_archimate_element else None,
+            "kind": "Copy" + (" (%s)" % row.lineage_type if row.lineage_type else ""),
+            "entity_id": traceable.get(row.target_archimate_element_id) or traceable.get(row.archimate_element_id),
+        })
+    for edge in relationship_edges:
+        flows.append({
+            "from": edge.source.name if edge.source else None,
+            "to": edge.target.name if edge.target else None,
+            "kind": _relationship_kind(edge),
+            "entity_id": traceable.get(edge.target_id) or traceable.get(edge.source_id),
+        })
+    for item in suggestions:
+        sim = item["similarity"]
+        item["strength"] = "Strong" if sim >= 0.75 else "Fair" if sim >= 0.65 else "Weak"
+
     return render_template(
         "enterprise/data_lineage.html",
         data_objects=data_objects,
-        grounded_lineage=grounded_lineage,
-        relationship_edges=relationship_edges,
+        flows=flows,
         suggestions=suggestions,
         untraced=untraced,
         overview=overview,
     )
+
+
+def _relationship_kind(edge) -> str:
+    """A recorded relationship between a data object and what touches it, in plain words."""
+    from app.modules.architecture.services.data_architecture_service import _is_access
+    from app.modules.intelligence.services.query_service import _access_words, _words
+
+    if _is_access(edge):
+        return _words(_access_words(edge)).capitalize()
+    kind = (edge.type or "").strip()
+    return {"Flow": "Flows to", "Triggering": "Triggers"}.get(kind, kind or "Related")
 
 
 @data_architecture_bp.route("/data-lineage/create", methods=["POST"])

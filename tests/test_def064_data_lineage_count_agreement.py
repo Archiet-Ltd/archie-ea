@@ -41,7 +41,7 @@ def test_dashboard_flow_count_includes_relationship_edges(app, db_session, make_
             assert lineage_resp.status_code == 200
             lineage_html = lineage_resp.get_data(as_text=True)
             m = re.search(
-                r'data-testid="lineage-edge-count">\s*(\d+)', lineage_html
+                r'data-testid="lineage-edge-count-value">\s*(\d+)', lineage_html
             )
             assert m is not None
             lineage_page_count = int(m.group(1))

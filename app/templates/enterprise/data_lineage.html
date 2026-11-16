@@ -1,185 +1,138 @@
 {# design-block: dashboard #}
 {% extends "layouts/admin_base.html" %}
-{% from 'components/page_header.html' import page_header %}
+{% import 'basecoat/index.html' as ui %}
+{% from 'macros/page_shell.html' import page_shell %}
+{% from 'components/list_table.html' import list_table %}
+{% from 'components/figures.html' import stat_cards %}
 {% from 'components/empty_state.html' import empty_state %}
+{% from 'basecoat/table.html' import table_cell %}
+{% from 'basecoat/native-select.html' import native_select_wrapper, native_select, native_select_option %}
 
-{% block title %}Data Lineage — {{ config.APP_NAME }}{% endblock %}
+{% block title %}Data lineage — {{ config.APP_NAME }}{% endblock %}
+
+{% macro _object_select(field, label) %}
+{% call ui.field() %}
+  {% call ui.field_label(attrs={'for': 'lineage-' ~ field}) %}{{ label }}{% endcall %}
+  {% call native_select_wrapper() %}
+    {% call native_select(name=field ~ '_id', attrs={'id': 'lineage-' ~ field, 'required': ''}) %}
+      {{ native_select_option(text='Choose a data object', value='', selected=true, disabled=true) }}
+      {% for o in data_objects %}{{ native_select_option(text=o.name, value=o.id) }}{% endfor %}
+    {% endcall %}
+  {% endcall %}
+{% endcall %}
+{% endmacro %}
+
+{% macro _record_form() %}
+<form method="post" action="{{ url_for('data_architecture.create_data_lineage') }}" class="space-y-4" data-testid="lineage-create-form">
+  {{ ui.input(type='hidden', name='csrf_token', value=csrf_token()) }}
+  {{ _object_select('source', 'Flows from') }}
+  {{ _object_select('target', 'Flows to') }}
+  {% call ui.field() %}
+    {% call ui.field_label(attrs={'for': 'lineage-type'}) %}How it moves{% endcall %}
+    {% call native_select_wrapper() %}
+      {% call native_select(name='lineage_type', attrs={'id': 'lineage-type'}) %}
+        {{ native_select_option(text='Not set', value='') }}
+        {% for kind in ['ETL', 'ELT', 'Real-time', 'Batch'] %}{{ native_select_option(text=kind, value=kind) }}{% endfor %}
+      {% endcall %}
+    {% endcall %}
+  {% endcall %}
+  {{ ui.button(text='Record flow', type='submit', attrs={'data-testid': 'lineage-create-submit'}) }}
+</form>
+{% endmacro %}
+
+{% macro _actions() %}
+{{ ui.button(text='Record a flow', type='button', attrs={'data-fb-open': 'lineage-dialog', 'data-testid': 'lineage-record'}) }}
+{% call ui.dialog() %}
+{{ ui.dialog_overlay() }}
+{% call ui.dialog_content(id='lineage-dialog') %}
+  {% call ui.dialog_header() %}
+    {{ ui.dialog_title(text='Record a flow') }}
+    {{ ui.dialog_description(text='Both ends must be data objects already in the model.') }}
+  {% endcall %}
+  {{ _record_form() }}
+  {% call ui.dialog_close(class='absolute top-4 right-4', attrs={'aria-label': 'Close'}) %}{{ lucide('x') }}{% endcall %}
+{% endcall %}
+{% endcall %}
+{% endmacro %}
+
+{% macro _confirm(s) %}
+<form method="post" action="{{ url_for('data_architecture.create_data_lineage') }}">
+  {{ ui.input(type='hidden', name='csrf_token', value=csrf_token()) }}
+  {{ ui.input(type='hidden', name='source_id', value=s.a.id) }}
+  {{ ui.input(type='hidden', name='target_id', value=s.b.id) }}
+  {{ ui.button(text='Record as a flow', type='submit', variant='outline', size='sm', attrs={'data-testid': 'lineage-confirm-' ~ s.a.id ~ '-' ~ s.b.id}) }}
+</form>
+{% endmacro %}
 
 {% block content %}
 <div class="space-y-6">
-    {{ page_header(
-        title='Data Lineage',
-        description='Where data is mastered, copied and consumed across DataObjects already in the ArchiMate model — every row here traces back to a real modelled element, never a free-text label.',
-        breadcrumbs=[
-            {'label': 'Home', 'href': url_for('main.index')},
-            {'label': 'Data Architecture', 'href': url_for('data_architecture.data_architecture_dashboard')},
-            {'label': 'Data Lineage'}
-        ]
-    ) }}
+{{ page_shell(title='Data lineage', subtitle='Where each data entity is used, copied and read across your applications',
+              breadcrumb=[('Home', url_for('main.index')), ('Data architecture', url_for('data_architecture.data_architecture_dashboard')), ('Data lineage', none)],
+              actions_caller=(_actions if data_objects else none)) }}
 
-    {% if overview and overview.entities %}
-    <section class="space-y-2" aria-labelledby="lineage-flows-heading" data-testid="lineage-flows">
-        <h2 id="lineage-flows-heading" class="text-lg font-semibold">Flows by entity</h2>
-        <p class="text-sm text-muted-foreground">{{ overview.entity_count }} {{ 'entity' if overview.entity_count == 1 else 'entities' }}: how many applications use each and how many copies are recorded below.</p>
-        <ul class="divide-y divide-border rounded-lg border border-border bg-card">
-            {% for row in overview.entities %}
-            <li class="flex flex-col gap-1 px-4 py-3 text-sm sm:flex-row sm:items-center sm:justify-between">
-                <span class="font-medium text-foreground">{{ row.name }}</span>
-                <span class="flex items-center gap-4 text-muted-foreground">
-                    <span class="tabular-nums">{{ row.applications | length }} {{ 'application' if row.applications | length == 1 else 'applications' }}, {{ row.copies }} {{ 'copy' if row.copies == 1 else 'copies' }}</span>
-                    {% if row.applications and row.element_id %}<a class="text-primary underline underline-offset-2" href="{{ url_for('data_architecture.data_architecture_dashboard', entity=row.id) }}#data-flow">See where it flows</a>{% endif %}
-                </span>
-            </li>
-            {% endfor %}
-        </ul>
-    </section>
-    {% endif %}
+{% if data_objects | length == 0 %}
+{{ empty_state(
+    icon='git-branch',
+    title='No data objects modelled yet',
+    description='Flows are recorded between data objects. Once data objects exist, from the data stewardship review, an import or the model editor, you can connect them here.',
+    cta_text=None
+) }}
+{% else %}
 
-    {% if data_objects | length == 0 %}
-    {{ empty_state(
-        icon='git-merge',
-        title='No data objects modelled yet',
-        description='Lineage is traced between DataObject elements in the ArchiMate Application layer. Once data objects exist — from the Data Stewardship review, an import, or the ArchiMate composer — they can be connected here.',
-        cta_text=None
-    ) }}
-    {% else %}
+{{ stat_cards([
+    {'label': 'Data entities', 'value': overview.entity_count if overview else none, 'icon': 'database',
+     'sentence': 'The same count as the data register', 'testid': 'lineage-stat-entities'},
+    {'label': 'Recorded flows', 'value': flows | length, 'icon': 'git-branch',
+     'sentence': 'Copies and application access recorded between data objects', 'testid': 'lineage-edge-count'},
+    {'label': 'Not yet traced', 'value': untraced | length, 'icon': 'circle-help',
+     'sentence': ('No flow recorded for these, so their impact cannot be traced' if untraced else 'Every data object has a recorded flow'),
+     'testid': 'lineage-untraced-count'},
+]) }}
 
-    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div class="rounded-lg border-2 border-input bg-background p-4">
-            <p class="text-xs font-medium text-muted-foreground uppercase tracking-wide">Data objects</p>
-            <p class="text-2xl font-semibold mt-1">{{ data_objects | length }}</p>
-        </div>
-        <div class="rounded-lg border-2 border-input bg-background p-4">
-            <p class="text-xs font-medium text-muted-foreground uppercase tracking-wide">Recorded lineage edges</p>
-            <p class="text-2xl font-semibold mt-1" data-testid="lineage-edge-count">{{ grounded_lineage | length + relationship_edges | length }}</p>
-        </div>
-        <div class="rounded-lg border-2 border-input bg-background p-4">
-            <p class="text-xs font-medium text-muted-foreground uppercase tracking-wide">Not yet traced</p>
-            <p class="text-2xl font-semibold mt-1" data-testid="lineage-untraced-count">{{ untraced | length }}</p>
-        </div>
-    </div>
+{% macro _flow_empty() %}<p class="text-sm text-muted-foreground">Use Record a flow, or record one of the possible matches below.</p>{% endmacro %}
+<section class="space-y-3" aria-labelledby="lineage-flows-heading" data-testid="lineage-recorded">
+  <h2 id="lineage-flows-heading" class="text-lg font-semibold">Recorded flows</h2>
+  {% call(row) list_table(rows=flows, columns=[{'label': 'From', 'sortable': true}, {'label': 'To', 'sortable': true}, ('Kind', ''), {'label': 'Trace', 'class': 'hidden sm:table-cell'}],
+                          caption='Recorded flows', testid='lineage-flows-table', row_testid='lineage-flow-row', page_size=10,
+                          search_placeholder='Search flows...', toolbar=true,
+                          empty_message='No flow is recorded yet.', empty_action=_flow_empty) %}
+    {% call table_cell(class='font-medium') %}{{ row.from or 'Unnamed' }}{% endcall %}
+    {% call table_cell(class='font-medium') %}{{ row.to or 'Unnamed' }}{% endcall %}
+    {% call table_cell() %}{{ ui.badge(text=row.kind, variant='secondary') }}{% endcall %}
+    {% call table_cell(class='hidden sm:table-cell') %}{% if row.entity_id %}<a class="text-primary underline underline-offset-2" href="{{ url_for('data_architecture.data_architecture_dashboard', entity=row.entity_id) }}#data-flow">See where it flows</a>{% else %}<span class="text-muted-foreground">No application uses it yet</span>{% endif %}{% endcall %}
+  {% endcall %}
+</section>
 
-    <div class="rounded-xl border-2 border-input bg-background overflow-hidden">
-        <div class="p-4 border-b border-input bg-muted/30">
-            <h2 class="text-lg font-semibold">Record a lineage flow</h2>
-            <p class="text-xs text-muted-foreground mt-1">Both endpoints must be existing data objects — this cannot create a lineage row against a system that isn't modelled.</p>
-        </div>
-        <form method="POST" action="{{ url_for('data_architecture.create_data_lineage') }}" class="p-4 grid grid-cols-1 gap-3 items-end" data-testid="lineage-create-form">
-            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-            <div>
-                <label for="lineage-source" class="block text-sm font-medium text-muted-foreground mb-1">Source data object</label>
-                <select id="lineage-source" name="source_id" required
-                    class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm">
-                    <option value="" selected disabled>Select…</option>
-                    {% for o in data_objects %}
-                    <option value="{{ o.id }}">{{ o.name }}</option>
-                    {% endfor %}
-                </select>
-            </div>
-            <div>
-                <label for="lineage-target" class="block text-sm font-medium text-muted-foreground mb-1">Target data object</label>
-                <select id="lineage-target" name="target_id" required
-                    class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm">
-                    <option value="" selected disabled>Select…</option>
-                    {% for o in data_objects %}
-                    <option value="{{ o.id }}">{{ o.name }}</option>
-                    {% endfor %}
-                </select>
-            </div>
-            <div>
-                <label for="lineage-type" class="block text-sm font-medium text-muted-foreground mb-1">Flow type</label>
-                <select id="lineage-type" name="lineage_type"
-                    class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm">
-                    <option value="">Not set</option>
-                    <option value="ETL">ETL</option>
-                    <option value="ELT">ELT</option>
-                    <option value="Real-time">Real-time</option>
-                    <option value="Batch">Batch</option>
-                </select>
-            </div>
-            <button type="submit" data-testid="lineage-create-submit"
-                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
-                Record lineage
-            </button>
-        </form>
-    </div>
+{% macro _untraced_empty() %}<p class="text-sm text-muted-foreground">Every data object has at least one recorded flow.</p>{% endmacro %}
+<section class="space-y-3" aria-labelledby="lineage-untraced-heading" data-testid="lineage-untraced">
+  <div>
+    <h2 id="lineage-untraced-heading" class="text-lg font-semibold">Not yet traced</h2>
+    <p class="text-sm text-muted-foreground">Data objects with no recorded flow. Record one to see what depends on them.</p>
+  </div>
+  {% call(row) list_table(rows=untraced, columns=[{'label': 'Data object', 'sortable': true}],
+                          caption='Data objects with no recorded flow', testid='lineage-untraced-table', row_testid='lineage-untraced-row', page_size=10,
+                          search_placeholder='Search data objects...', toolbar=true,
+                          empty_message='Nothing to trace.', empty_action=_untraced_empty) %}
+    {% call table_cell(class='font-medium') %}{{ row.name }}{% endcall %}
+  {% endcall %}
+</section>
 
-    <div class="rounded-xl border-2 border-input bg-background overflow-hidden" data-testid="lineage-recorded">
-        <div class="p-4 border-b border-input bg-muted/30">
-            <h2 class="text-lg font-semibold">Recorded lineage</h2>
-        </div>
-        {% if grounded_lineage or relationship_edges %}
-        <ul class="divide-y divide-input">
-            {% for row in grounded_lineage %}
-            <li class="px-4 py-3 text-sm">
-                <span class="font-medium">{{ row.archimate_element.name if row.archimate_element else '—' }}</span>
-                <span class="text-muted-foreground"> → </span>
-                <span class="font-medium">{{ row.target_archimate_element.name if row.target_archimate_element else '—' }}</span>
-                {% if row.lineage_type %}<span class="text-xs text-muted-foreground ml-2">({{ row.lineage_type }})</span>{% endif %}
-            </li>
-            {% endfor %}
-            {% for edge in relationship_edges %}
-            <li class="px-4 py-3 text-sm">
-                <span class="font-medium">{{ edge.source.name if edge.source else '—' }}</span>
-                <span class="text-muted-foreground"> → </span>
-                <span class="font-medium">{{ edge.target.name if edge.target else '—' }}</span>
-                <span class="text-xs text-muted-foreground ml-2">(ArchiMate relationship, {{ edge.type or 'unspecified' }})</span>
-            </li>
-            {% endfor %}
-        </ul>
-        {% else %}
-        <p class="px-4 py-6 text-sm text-muted-foreground">No lineage recorded yet — use the form above, or confirm a suggestion below.</p>
-        {% endif %}
-    </div>
+<section class="space-y-3" aria-labelledby="lineage-suggestions-heading" data-testid="lineage-suggestions">
+  <div>
+    <h2 id="lineage-suggestions-heading" class="text-lg font-semibold">Possible matches</h2>
+    <p class="text-sm text-muted-foreground">Data objects with similar names. Nothing here is a flow until you record it.</p>
+  </div>
+  {% call(row) list_table(rows=suggestions, columns=[{'label': 'One', 'sortable': true}, {'label': 'Other', 'sortable': true}, ('Match', ''), ('', '')],
+                          caption='Possible matches', testid='lineage-suggestions-table', row_testid='lineage-suggestion-row', page_size=10,
+                          search_placeholder='Search matches...', toolbar=true,
+                          empty_message='No data objects have similar names right now.') %}
+    {% call table_cell(class='font-medium') %}{{ row.a.name }}{% endcall %}
+    {% call table_cell(class='font-medium') %}{{ row.b.name }}{% endcall %}
+    {% call table_cell() %}{{ ui.badge(text=row.strength, variant='outline') }}{% endcall %}
+    {% call table_cell(class='text-right') %}{{ _confirm(row) }}{% endcall %}
+  {% endcall %}
+</section>
 
-    <div class="rounded-xl border-2 border-input bg-background overflow-hidden" data-testid="lineage-untraced">
-        <div class="p-4 border-b border-input bg-muted/30">
-            <h2 class="text-lg font-semibold">Not yet traced</h2>
-            <p class="text-xs text-muted-foreground mt-1">Data objects with no recorded lineage edge. Impact analysis for these cannot be grounded in the model.</p>
-        </div>
-        {% if untraced %}
-        <ul class="divide-y divide-input">
-            {% for o in untraced %}
-            <li class="px-4 py-3 text-sm">{{ o.name }}</li>
-            {% endfor %}
-        </ul>
-        {% else %}
-        <p class="px-4 py-6 text-sm text-muted-foreground">Every data object has at least one recorded lineage edge.</p>
-        {% endif %}
-    </div>
-
-    <div class="rounded-xl border-2 border-input bg-background overflow-hidden" data-testid="lineage-suggestions">
-        <div class="p-4 border-b border-input bg-muted/30">
-            <h2 class="text-lg font-semibold">Suggested links (semantic similarity — unconfirmed)</h2>
-            <p class="text-xs text-muted-foreground mt-1">Name-similarity matches from the Data Stewardship module's embedding engine. Nothing here is asserted as lineage — confirm it to record a real edge.</p>
-        </div>
-        {% if suggestions %}
-        <ul class="divide-y divide-input">
-            {% for s in suggestions %}
-            <li class="px-4 py-3 flex items-center justify-between gap-4">
-                <p class="text-sm">
-                    <span class="font-medium">{{ s.a.name }}</span>
-                    <span class="text-muted-foreground"> ~ </span>
-                    <span class="font-medium">{{ s.b.name }}</span>
-                    <span class="text-xs text-muted-foreground">(similarity {{ s.similarity }})</span>
-                </p>
-                <form method="POST" action="{{ url_for('data_architecture.create_data_lineage') }}" class="shrink-0">
-                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                    <input type="hidden" name="source_id" value="{{ s.a.id }}">
-                    <input type="hidden" name="target_id" value="{{ s.b.id }}">
-                    <button type="submit" data-testid="lineage-confirm-{{ s.a.id }}-{{ s.b.id }}"
-                        class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
-                        Confirm as lineage
-                    </button>
-                </form>
-            </li>
-            {% endfor %}
-        </ul>
-        {% else %}
-        <p class="px-4 py-6 text-sm text-muted-foreground">No semantic candidates above the match threshold right now.</p>
-        {% endif %}
-    </div>
-
-    {% endif %}
+{% endif %}
 </div>
 {% endblock %}
