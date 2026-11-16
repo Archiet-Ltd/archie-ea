@@ -13,6 +13,27 @@ from wtforms.validators import Email, EqualTo, InputRequired, Length
 from app.models import User
 
 
+class PlainEmail(Email):
+    """Email check that says why a reserved domain is refused.
+
+    Same acceptance as the standard validator: it runs it, then only rewords the
+    refusal when the library's own reason is that the domain is reserved.
+    """
+
+    def __call__(self, form, field):
+        try:
+            super().__call__(form, field)
+        except ValidationError as refusal:
+            reason = str(refusal.__cause__ or "")
+            if self.message is None and "special-use or reserved name" in reason:
+                domain = (field.data or "").rsplit("@", 1)[-1].strip()
+                raise ValidationError(
+                    "This address's domain ({}) is reserved and cannot receive email. "
+                    "Use an address you can open.".format(domain)
+                ) from refusal.__cause__
+            raise
+
+
 class LoginForm(FlaskForm):
     email = EmailField("Email", validators=[InputRequired(), Length(1, 64), Email()])
     password = PasswordField("Password", validators=[InputRequired()],
@@ -25,7 +46,7 @@ class LoginForm(FlaskForm):
 class RegistrationForm(FlaskForm):
     first_name = StringField("First name", validators=[InputRequired(), Length(1, 64)])
     last_name = StringField("Last name", validators=[InputRequired(), Length(1, 64)])
-    email = EmailField("Email", validators=[InputRequired(), Length(1, 64), Email()])
+    email = EmailField("Email", validators=[InputRequired(), Length(1, 64), PlainEmail()])
     password = PasswordField(
         "Password", validators=[InputRequired(), EqualTo("password2", "Passwords must match")]
     ,

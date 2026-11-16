@@ -275,7 +275,7 @@ def test_a_code_owner_account_becomes_the_member_whose_email_its_own_commits_car
     assert primaries(db_session, other_component) == []
 
 
-def test_a_code_owner_account_whose_commits_use_no_member_email_gives_the_plain_reason(
+def test_a_code_owner_account_whose_commits_use_no_member_email_becomes_a_named_owner(
     db_session, make_org, tenant_ctx, github, app
 ):
     from app.connectors.github_gaps import application_gaps
@@ -290,14 +290,12 @@ def test_a_code_owner_account_whose_commits_use_no_member_email_gives_the_plain_
 
     read(db_session, tenant_ctx, org, cfg)
 
-    reason = ("No owner was set: GitHub names @Anioko as code owner, and none of that account's commits "
-              "in the last 90 days use the e-mail of a member of this organisation.")
-    assert primaries(db_session, component) == []
-    assert fact(db_session, element, "github_owner_source")["text"] == reason
+    assert [(r.person_name, r.user_id) for r in primaries(db_session, component)] == [("@Anioko", None)]
+    source = fact(db_session, element, "github_owner_source")
+    assert source["user_id"] is None and source["text"].startswith("Named by GitHub: code owner in acme/archie-ea CODEOWNERS")
     with app.test_request_context():
-        owner_gap = [g for g in application_gaps(org.id, [component])[component.id]["gaps"] if g["key"] == "owner"][0]
-    assert owner_gap["note"].startswith(reason)
-    assert "Pick the person here" not in owner_gap["note"]
+        gaps = application_gaps(org.id, [component]).get(component.id, {"gaps": []})["gaps"]
+    assert [g for g in gaps if g["key"] == "owner"] == []
 
 
 def test_a_team_is_never_turned_into_a_person(db_session, make_org, tenant_ctx, github):
@@ -333,7 +331,8 @@ def test_a_named_owner_with_nobody_to_pick_gives_a_reason_and_no_prompt(db_sessi
     team_el, team_comp = imported_application(db_session, org)
     cfg = connect(db_session, tenant_ctx, org)
     github.codeowners = "* @acme/platform\n"
-    github.commits = account_commits("platform", ("a@vendor.example", 3))
+    # two accounts share the commits evenly, so no one author leads them
+    github.commits = account_commits("platform", ("a@vendor.example", 3)) + account_commits("other", ("b@vendor.example", 3))
     read(db_session, tenant_ctx, org, cfg)
     with app.test_request_context():
         note = [g for g in application_gaps(org.id, [team_comp])[team_comp.id]["gaps"] if g["key"] == "owner"][0]["note"]
@@ -344,12 +343,12 @@ def test_a_named_owner_with_nobody_to_pick_gives_a_reason_and_no_prompt(db_sessi
     make_user(db_session, org2, "Bo", "Ray")
     element, component = imported_application(db_session, org2)
     cfg2 = connect(db_session, tenant_ctx, org2)
-    github.codeowners = "* @Anioko\n"
+    github.codeowners = "* @Anioko @Bea\n"
     github.commit_status = 403
     read(db_session, tenant_ctx, org2, cfg2)
     with app.test_request_context():
         note = [g for g in application_gaps(org2.id, [component])[component.id]["gaps"] if g["key"] == "owner"][0]["note"]
-    assert note.startswith("No owner was set: GitHub names @Anioko as code owner")
+    assert note.startswith("No owner was set: GitHub names @Anioko, @Bea as code owner")
     assert "could not be read" in note
     assert "Pick the person" not in note
 
