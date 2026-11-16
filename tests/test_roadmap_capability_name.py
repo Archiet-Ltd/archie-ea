@@ -225,3 +225,74 @@ class TestGetPrimaryCapabilityForApplication:
 
         assert v1_result == "unknown_capability", f"V1 expected fallback, got '{v1_result}'"
         assert v2_result == "unknown_capability", f"V2 expected fallback, got '{v2_result}'"
+
+def _mapping_whose_id_matches_another_unified_capability(db_session, org):
+    """An application mapped to business capability 'Payments' whose id equals
+    the id of an unrelated unified capability named 'Decoy'."""
+    from sqlalchemy import func
+    from app.models.application_capability import ApplicationCapabilityMapping
+    from app.models.business_capabilities import BusinessCapability
+    from app.models.unified_capability import UnifiedCapability
+    import uuid
+
+    shared_id = (
+        max(
+            db_session.query(func.coalesce(func.max(UnifiedCapability.id), 0)).scalar(),
+            db_session.query(func.coalesce(func.max(BusinessCapability.id), 0)).scalar(),
+        )
+        + 1000
+    )
+    db_session.add(
+        UnifiedCapability(
+            id=shared_id, name="Decoy", code=f"DEC{uuid.uuid4().hex[:6].upper()}",
+            level=1, scope="tenant", organization_id=org.id, strategic_importance="high",
+        )
+    )
+    db_session.add(
+        BusinessCapability(
+            id=shared_id, name="Payments", code=f"BIZ{uuid.uuid4().hex[:6].upper()}",
+            level=1, category="core", business_domain="test", organization_id=org.id,
+            strategic_importance="high",
+        )
+    )
+    db_session.flush()
+    app_a = _application(db_session, org, "Payment App")
+    db_session.add(
+        ApplicationCapabilityMapping(
+            organization_id=org.id, application_component_id=app_a.id,
+            business_capability_id=shared_id, is_primary_enabler=True,
+            support_level="full", coverage_percentage=100,
+        )
+    )
+    db_session.commit()
+    return app_a
+
+
+class TestCapabilityJoinUsesBusinessCapability:
+    """The mapping's business_capability_id points at business capabilities, so a
+    unified capability that happens to share the number must not be returned."""
+
+    @pytest.mark.parametrize(
+        "module",
+        [
+            "app.services.roadmap_automation:RoadmapAutomationEngine",
+            "app.modules.solutions_strategic.v2.services.roadmap_automation:RoadmapAutomationEngine",
+            "app.services.roadmap_sync:RoadmapDataSync",
+            "app.modules.solutions_strategic.v2.services.roadmap_sync:RoadmapDataSync",
+        ],
+    )
+    def test_name_comes_from_business_capability_in_every_copy(
+        self, db_session, make_org, tenant_ctx, module
+    ):
+        import importlib
+
+        org_a, _ = _org_with_user(db_session, make_org, "a")
+        org_b, _ = _org_with_user(db_session, make_org, "b")
+        app_a = _mapping_whose_id_matches_another_unified_capability(db_session, org_a)
+
+        path, cls = module.split(":")
+        engine = getattr(importlib.import_module(path), cls)()
+        with tenant_ctx(org_a.id):
+            assert engine._get_primary_capability_for_application(app_a.id) == "Payments"
+        with tenant_ctx(org_b.id):
+            assert engine._get_primary_capability_for_application(app_a.id) == "unknown_capability"
