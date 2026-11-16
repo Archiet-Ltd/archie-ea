@@ -9,3 +9,31 @@ a7e65b340340b779bfe5c61372f467bddcba15f5:tests/test_connector_sync_mode_derivati
 # commit that first committed the literal value, before the line carried a
 # `# gitleaks:allow` comment.
 34c13deff589a96efaa3e4ee1f05805c20d28883:config.py:generic-api-key:235
+
+# Scrub and change-review tests: secret-shaped strings to prove the scrubber removes them.
+2d8791e34db5147c6c20ef1c31e275bdc8067083:tests/test_change_review_gaps.py:stripe-access-token:369
+49915319a2d2abc5bbd3bd9cf5bf3657ec8bfe3c:tests/test_change_review_stop_writes_and_scrub.py:github-pat:183
+49915319a2d2abc5bbd3bd9cf5bf3657ec8bfe3c:tests/test_change_review_stop_writes_and_scrub.py:jwt:185
+49915319a2d2abc5bbd3bd9cf5bf3657ec8bfe3c:tests/test_change_review_stop_writes_and_scrub.py:stripe-access-token:181
+8b835f693753bee889a72af640a3eba9bee8ac36:tests/test_scrub_text_pass.py:curl-auth-header:77
+8b835f693753bee889a72af640a3eba9bee8ac36:tests/test_scrub_text_pass.py:gcp-api-key:36
+8b835f693753bee889a72af640a3eba9bee8ac36:tests/test_scrub_text_pass.py:generic-api-key:118
+8b835f693753bee889a72af640a3eba9bee8ac36:tests/test_scrub_text_pass.py:generic-api-key:21
+8b835f693753bee889a72af640a3eba9bee8ac36:tests/test_scrub_text_pass.py:generic-api-key:80
+
+# Settings journeys: values beginning "journey".
+338789d113dab0813ed2768dc9fa043987c75d7a:tests/smoke/test_vendor_pricing_upload_plain_error_and_phone_journey.py:generic-api-key:18
+676d7d309bf3df5ae0d2f67b533776dd88d546c3:tests/smoke/test_slack_integration_settings_journey.py:generic-api-key:21
+7d43a33f5d9698cce3d71742666323ef7a578959:tests/smoke/test_genome_cited_answer_journey.py:generic-api-key:34
+7f6a7446cdaa2a524b94a219a9a7c4e4121feea8:tests/smoke/test_salesforce_integration_settings_journey.py:generic-api-key:23
+7f6a7446cdaa2a524b94a219a9a7c4e4121feea8:tests/smoke/test_salesforce_integration_settings_journey.py:generic-api-key:24
+e6636164651d8972ab66cc467525d030d0961186:tests/smoke/test_webhook_settings_journey.py:generic-api-key:21
+
+# SharePoint fixture: value begins "fabr".
+615efb48d94d2acaa1e25d3802a1ecdf8482b35c:tests/fixtures/sharepoint_contoso.json:generic-api-key:64
+
+# Connector approval test: value is "distinctive on purpose" so a leak check cannot match by coincidence.
+6843292e87db75c52eebc24a16fa8ef61ca78d8a:tests/test_connector_approval_flow.py:generic-api-key:509
+
+# Recording harness: test TOTP secret that decodes to "TestSecret".
+ae38a7db073a7efb10b3096b4bfd67f634a43a22:tests/smoke/test_recording_harness.py:generic-api-key:245
