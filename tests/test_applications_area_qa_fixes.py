@@ -22,14 +22,14 @@ import pytest
 pytestmark = pytest.mark.usefixtures("db_session")
 
 
-def _make_user(db_session, org_id):
+def _make_user(db_session, org_id, enterprise_role="enterprise_architect"):
     from app.models.user import User
 
     user = User(
         email=f"apps-qa-{uuid.uuid4().hex[:10]}@example.test",
         organization_id=org_id,
         confirmed=True,
-        enterprise_role="enterprise_architect",
+        enterprise_role=enterprise_role,
     )
     db_session.add(user)
     db_session.flush()
@@ -107,7 +107,8 @@ def test_export_csv_respects_selection(db_session, make_org, client, login_as):
 def test_enrich_roundtrips_to_candidates(db_session, make_org, client, login_as):
     """Save cost/owner/criticality, then confirm the reload endpoint returns them."""
     org = make_org("enrich")
-    user = _make_user(db_session, org.id)
+    # A portfolio manager is one of the roles the cost rule lets record a cost.
+    user = _make_user(db_session, org.id, enterprise_role="portfolio_manager")
     app_row = _make_app(db_session, org.id, "Enrich Target")
 
     login_as(client, user)
