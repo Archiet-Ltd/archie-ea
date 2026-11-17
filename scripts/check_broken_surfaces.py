@@ -236,7 +236,8 @@ def scan() -> dict[str, list[str]]:
         # assistantMsg.content, which no identifier pattern can recognise.
         r"\.error\s*\|\|", re.I)
 
-    forbidden_re = re.compile(r"(?<![\w.])(alert|confirm)\s*\(")
+    # `window.alert(` is the same native dialog behind a prefix, so it counts too.
+    forbidden_re = re.compile(r"(?:(?<![\w.])|(?<=(?<![\w.])window\.))(alert|confirm)\s*\(")
     # A DEFINITION named alert/confirm is the replacement for the native call,
     # not an instance of it. Both remaining findings were the cure, not the
     # disease: components/alert.html is `{% macro alert(variant=...) %}`, the
@@ -245,6 +246,8 @@ def scan() -> dict[str, list[str]]:
     # window.confirm. A definition is followed by `) {`; a call is not.
     definition_re = re.compile(r"(?:\bmacro\s+|\bfunction\s+)?(?:alert|confirm)"
                                r"\s*\([^()]*\)\s*(?:\{|%\})")
+
+    jinja_macro_re = re.compile(r"(?:\{\{-?|\{%-?\s*(?:call|macro))\s+$")
 
     def rel(p): return p.relative_to(ROOT).as_posix()
     def line_of(text, idx): return text[:idx].count("\n") + 1
@@ -360,8 +363,20 @@ def scan() -> dict[str, list[str]]:
                         "%s:%d: silent-empty: a failed request returns an empty value the "
                         "UI renders as data" % (rel(path), ln))
 
+        script_spans = ([(a.end(), b.start()) for a, b in zip(
+            re.finditer(r"<script\b[^>]*>", text, re.I),
+            re.finditer(r"</script\s*>", text, re.I))]
+            if path.suffix == ".html" else [])
         for m in forbidden_re.finditer(text):
             if definition_re.match(text, m.start()):
+                continue
+            # The page library's alert macro is a Jinja call or definition,
+            # rendered on the server; the browser's alert() only exists inside
+            # a script. Outside a script block, `{{ alert(`, `{% call alert(`
+            # and `{% macro alert(` are the macro, not the native dialog.
+            if (m.group(1) == "alert" and path.suffix == ".html"
+                    and not any(a <= m.start() < b for a, b in script_spans)
+                    and jinja_macro_re.search(text[max(0, m.start() - 24):m.start()])):
                 continue
             out["forbidden-ui"].append(
                 "%s:%d: forbidden-ui: %s() — DESIGN.md requires Platform.toast/modal"
