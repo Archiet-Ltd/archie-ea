@@ -336,8 +336,26 @@ def test_physical_layer_api_answers_for_a_layer_it_now_knows(app, client):
     assert count.get_json()["layer"] == "physical"
 
 
+def _member_of(db_session, org, label):
+    """A confirmed user belonging to ``org``, flushed so a login can resolve it."""
+    import uuid
+
+    from app.models.user import User
+
+    user = User(
+        email=f"{label}-{uuid.uuid4().hex[:10]}@example.com",
+        first_name="Layer",
+        last_name="Browser",
+        organization_id=org.id,
+        confirmed=True,
+    )
+    db_session.add(user)
+    db_session.flush()
+    return user
+
+
 def test_physical_equipment_rows_reach_the_browser_payload(
-    app, db_session, client, make_org, tenant_ctx
+    app, db_session, client, make_org, tenant_ctx, login_as
 ):
     """A row in physical_equipment must show up in the layer's element list.
 
@@ -356,9 +374,38 @@ def test_physical_equipment_rows_reach_the_browser_payload(
         )
         db_session.commit()
 
+    # The payload is read for one named organisation, so the request is made by a member of it.
+    login_as(client, _member_of(db_session, org, "physical-nav"))
     resp = client.get(
         "/architecture/api/layer/physical/elements?element_type=Equipment&per_page=100"
     )
     assert resp.status_code == 200
     names = [e["name"] for e in resp.get_json()["elements"]]
     assert "Rack 7 Edge Switch" in names
+
+
+def test_another_organisations_equipment_is_absent_from_the_browser_payload(
+    app, db_session, client, make_org, tenant_ctx, login_as
+):
+    """Each organisation's physical layer lists its own equipment and never the other's."""
+    from app.models.physical_layer import PhysicalEquipment
+
+    org_a = make_org("physical-a")
+    org_b = make_org("physical-b")
+    with tenant_ctx(org_a.id):
+        db_session.add(PhysicalEquipment(name="Rack 7 Edge Switch", equipment_type="Switch"))
+        db_session.commit()
+    with tenant_ctx(org_b.id):
+        db_session.add(PhysicalEquipment(name="Plant 3 Chiller", equipment_type="Chiller"))
+        db_session.commit()
+    user_a = _member_of(db_session, org_a, "physical-a")
+    user_b = _member_of(db_session, org_b, "physical-b")
+
+    url = "/architecture/api/layer/physical/elements?element_type=Equipment&per_page=100"
+    login_as(client, user_a)
+    names_a = [e["name"] for e in client.get(url).get_json()["elements"]]
+    login_as(client, user_b)
+    names_b = [e["name"] for e in client.get(url).get_json()["elements"]]
+
+    assert "Rack 7 Edge Switch" in names_a and "Plant 3 Chiller" not in names_a
+    assert "Plant 3 Chiller" in names_b and "Rack 7 Edge Switch" not in names_b
