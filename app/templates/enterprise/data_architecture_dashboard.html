@@ -10,7 +10,7 @@
 {% from 'components/answer_cascade.html' import answer_cascade %}
 {% from 'basecoat/table.html' import table_cell %}
 
-{% block title %}{{ 'Data models' if models_page else 'Data architecture' }}{% endblock %}{% block content %}
+{% block title %}{{ 'Data models' if models_page else 'Data Architecture Dashboard' }}{% endblock %}{% block content %}
 {# Builds a record's href, or an empty string when the blueprint that owns it failed to register
    (blueprints register non-fatally, so an unguarded url_for would 500 every page). #}
 {% macro row_href(endpoint) %}{% if endpoint in flask.current_app.view_functions %}{{ url_for(endpoint, **kwargs) }}{% endif %}{% endmacro %}
