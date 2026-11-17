@@ -1,8 +1,9 @@
 """Connect GitHub to a cited answer, in a real browser (Job 0 of the product).
 
 The person is the administrator of a brand-new organisation. They open Connect GitHub from the
-connectors page, paste a read-only token, watch the read finish, review what it found, press
-Approve all, find the applications in the inventory with their parts and owner, ask what breaks if
+connectors page, paste a read-only token, watch the read finish, see what became of each finding
+and why (nobody approves anything: the server checks and settles them), find the applications in
+the inventory with their parts and owner, ask what breaks if
 Payments Service fails, and see each answer name the repository and file it rests on. Another
 organisation sees none of it, a Viewer is refused the connect page, and the token is in no page
 and no response.
@@ -239,69 +240,68 @@ def test_2_the_administrator_pastes_a_token_and_submits(admin, world):
 
 def test_3_the_status_moves_to_done_with_counts(admin, world):
     line = admin.locator("#github-progress-line")
-    expect(line).to_have_text(re.compile(r"Read 16 repositories\. 23 proposals are ready for you to review\."), timeout=PAGE_TIMEOUT)
-    # Nothing is in the model until it is approved.
-    expect(admin.locator("#github-count-applications")).to_have_text("0")
+    expect(line).to_have_text(re.compile(r"Read 16 repositories\. 23 findings were checked: 23 added to your model\."), timeout=PAGE_TIMEOUT)
+    # The read settled every finding on the server: the applications are in the model already, nothing waits.
+    expect(admin.locator("#github-count-applications")).to_have_text("8")
+    world["seen"]["checked"] = 23
     remember(world, admin)
     shoot(admin, "3-status")
 
 
-def test_4_the_review_groups_the_proposals_each_with_a_reason_and_the_owners(admin, world):
-    admin.get_by_role("link", name="Review what was found").click()
-    admin.wait_for_url("**/admin/connectors/github/review")
-    expect(admin.get_by_role("heading", name="Review what GitHub showed")).to_be_visible()
-    expect(admin.get_by_test_id("github-review-actions")).to_contain_text(
-        "8 applications, 3 parts, 6 links and 6 repositories that stay out of the model."
-    )
+def test_4_the_record_shows_what_became_of_each_finding_with_a_reason_and_a_source(admin, world, app):
+    admin.get_by_role("link", name="See what was checked").click()
+    admin.wait_for_url("**/ai-chat/approvals/inbox**")
+    # Nothing waits for a person: the page is the record of what was settled, with no Approve or Reject.
+    expect(admin.get_by_role("button", name=re.compile(r"Approve|Reject"))).to_have_count(0)
+    expect(admin.get_by_role("link", name=re.compile(r"Approve|Reject"))).to_have_count(0)
+    expect(admin.get_by_test_id("approval-waiting")).to_have_count(0)
+    checked = world["seen"]["checked"]
+    rows = admin.get_by_test_id("approval-record-row")
+    expect(rows).to_have_count(checked)
+    for index in range(checked):
+        row = rows.nth(index)
+        outcome = row.locator("[data-testid^='approval-outcome-']").inner_text().strip()
+        assert outcome in ("Applied", "Linked"), outcome
+        assert len(row.locator("[data-testid^='approval-reason-']").inner_text().strip()) > 20
+        assert row.locator("[data-testid^='approval-verdict-']").inner_text().strip()
+        href = row.locator("[data-testid^='approval-source-link-']").get_attribute("href")
+        assert re.match(r"https://github\.com/acme/[A-Za-z0-9._-]+(/blob/[0-9a-f]{40}/.+)?$", href), href
+    # What the record and the model hold as the owner of three things the answer names later: the
+    # code-owner facts the read recorded on the elements.
+    from app import db
+    from app.models.archimate_core import ArchiMateElement
 
-    apps = admin.locator("section[aria-labelledby^='group-'] tbody tr")
-    expect(apps).to_have_count(8)
-    parts = admin.locator("section[aria-labelledby='parts-heading'] tbody tr")
-    expect(parts).to_have_count(3)
-    others = admin.locator("section[aria-labelledby='others-heading'] tbody tr")
-    expect(others).to_have_count(6)
-    # the "Why" column: second cell of an application, third of a part or an excluded repository
-    for rows, column in ((apps, 1), (parts, 2), (others, 2)):
-        for i in range(rows.count()):
-            reason = rows.nth(i).locator("td").nth(column).inner_text().strip()
-            assert reason, "a proposal with no reason: %s" % rows.nth(i).inner_text()
-
-    expect(apps.filter(has_text="Payments Service")).to_contain_text("owner.one@example.test")
-    expect(apps.filter(has_text="Customer Portal")).to_contain_text("acme/web-team")
-    expect(admin.get_by_role("button", name="Approve all (23)")).to_be_visible()
-    # What the review shows as the owner of three things the answer will name later.
-    shown = {}
-    for name, rows_, column in (("Billing Api", apps, 2), ("Customer Portal", apps, 2), ("Payments Worker", parts, 3)):
-        shown[name] = rows_.filter(has_text=name).first.locator("td").nth(column).inner_text().strip()
-        assert shown[name], "the review shows nothing in the owner column for %s" % name
-        if name != "Payments Worker":  # its repository has no code-owner file: the review says so
-            assert not shown[name].startswith("No owner"), "the review names no owner for %s: %r" % (name, shown[name])
+    with app.app_context():
+        shown = {}
+        for name in ("Billing Api", "Customer Portal", "Payments Worker"):
+            element = ArchiMateElement.query.filter_by(organization_id=world["one"]["org_id"], name=name).first()
+            props = (element.acm_properties or {}) if element else {}
+            owners = (props.get("github_code_owners") or {}).get("value")
+            shown[name] = ", ".join(owners) if owners else (props.get("github_owning_team") or {}).get("value") or "No owner recorded"
+        db.session.remove()
     world["review_owner"] = shown
     remember(world, admin)
-    shoot(admin, "4-review")
+    shoot(admin, "4-record")
 
-    # On a phone every proposal still shows its name, reason, owner and source, with no sideways scroll.
+    # On a phone the record still reads, with no sideways scroll.
     admin.set_viewport_size({"width": 390, "height": 844})
     try:
         admin.reload(wait_until="domcontentloaded")
         overflow = admin.evaluate("document.documentElement.scrollWidth - document.documentElement.clientWidth")
-        assert overflow <= 0, "the review page scrolls sideways by %spx at 390 wide" % overflow
-        rows = admin.locator("section[aria-labelledby^='group-'] tbody tr")
-        for i in range(rows.count()):
-            cells = rows.nth(i).locator("td")
-            for index, label in ((0, "name"), (1, "reason"), (2, "owner"), (3, "source")):
-                box = cells.nth(index).bounding_box()
-                assert box and cells.nth(index).is_visible() and box["width"] > 200, "the %s of row %s is clipped at 390 wide" % (label, i)
-                assert cells.nth(index).inner_text().strip(), "the %s of row %s is empty at 390 wide" % (label, i)
+        assert overflow <= 0, "the record page scrolls sideways by %spx at 390 wide" % overflow
+        expect(admin.get_by_test_id("approval-record-row").first).to_be_visible()
     finally:
         admin.set_viewport_size({"width": 1440, "height": 900})
 
 
-def test_5_approve_all_adds_everything_to_the_model(admin, world):
-    admin.get_by_role("button", name="Approve all (23)").click()
-    main = admin.locator("#main-content")
-    expect(main.get_by_text("Added 23 items to your model.")).to_be_visible()
-    expect(admin.locator("#main-content").get_by_text("Nothing is waiting for review.", exact=False)).to_be_visible()
+def test_5_nothing_waits_and_the_applications_are_already_in_the_inventory(admin, world):
+    admin.goto(world["base"] + "/admin/connectors/github", wait_until="domcontentloaded")
+    expect(admin.get_by_role("button", name=re.compile(r"Approve all"))).to_have_count(0)
+    expect(admin.locator("#github-progress-line")).to_contain_text("findings were checked")
+    admin.goto(world["base"] + "/applications/", wait_until="domcontentloaded")
+    table = admin.get_by_role("region", name="Applications table")
+    for name in ("Payments Service", "Customer Portal", "Billing Api", "Inventory Service", "Orders Worker", "Mobile App", "Auth", "Gateway"):
+        expect(table.get_by_role("row", name=re.compile(r"^Select %s " % name))).to_have_count(1)
     remember(world, admin)
 
 
@@ -310,7 +310,7 @@ def test_6_the_applications_are_listed_and_payments_service_shows_its_parts_and_
     table = admin.get_by_role("region", name="Applications table")
     for name in ("Payments Service", "Customer Portal", "Billing Api", "Inventory Service", "Orders Worker", "Mobile App", "Auth", "Gateway"):
         expect(table.get_by_role("row", name=re.compile(r"^Select %s " % name))).to_have_count(1)
-    rows = table.locator("tbody tr")
+    rows = table.locator("tbody tr[data-testid^='app-row-']")  # the footer row of each application is not an application
     assert rows.count() == 8
     # Cells are found by the column header a person reads, not by position: the table gained and
     # lost columns and a positional index silently pointed at the wrong one.
@@ -555,7 +555,7 @@ def test_8_another_organisation_sees_none_of_it(browser, world):
         expect(page.get_by_role("button", name="Connect and read my repositories")).to_be_visible()
         expect(page.get_by_test_id("github-progress")).to_have_count(0)
         page.goto(world["base"] + "/admin/connectors/github/review", wait_until="domcontentloaded")
-        expect(page.locator("#main-content").get_by_text("Nothing is waiting for review.", exact=False)).to_be_visible()
+        expect(page.locator("#main-content").get_by_text("Nothing has been checked yet", exact=False)).to_be_visible()
         page.goto(world["base"] + "/applications/", wait_until="domcontentloaded")
         for name in ("Payments Service", "Customer Portal", "Billing Api"):
             expect(page.get_by_text(name)).to_have_count(0)

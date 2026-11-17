@@ -238,9 +238,16 @@ def bring_in(product_ae, *, org_id: int, allowed: bool, choosing: bool, urls: Di
             "state": state,
             "repositories": list((last.payload or {}).get("repositories") or []),
             "already_in_model": list(result.get("already_in_model") or []),
+            "settled": dict(result.get("settled") or {}),
             "error": (result.get("error") or last.error or "The read did not finish; try again.") if state == "failed" else None,
         }
     out["waiting"] = gh.pending_for_product(org_id, product_ae.id)
+    if last is not None and out["last"]["state"] == "done":
+        # The figures are the rows the record lists when opened from here (every GitHub finding of the workspace).
+        settled = gh.findings_counts(org_id)
+        out["last"]["settled"] = settled
+        out["last"]["line"] = gh.read_summary(len(out["last"]["repositories"]), settled, 0)
+        out["last"]["checked"] = sum(settled.values())
     return out
 
 

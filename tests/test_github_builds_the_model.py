@@ -670,91 +670,77 @@ def test_connect_page_takes_a_token_starts_the_first_sync_and_reports_it(
 
     done = signed_in.get("/admin/connectors/github/status").get_json()
     assert done["state"] == "done"
-    assert done["counts"]["pending"] == 23 and done["counts"]["repositories"] == 16
+    # Nobody approves what the read found: all 23 were checked in the read's own job and none is waiting.
+    assert done["counts"]["pending"] == 0 and done["counts"]["repositories"] == 16
+    assert done["counts"]["proposed"] == 23 and sum(outcome["settled"].values()) == 23
+    assert done["counts"]["line"].startswith("Read 16 repositories. 23 findings were checked: ")
     assert TOKEN not in json.dumps(done)
 
 
-def test_the_review_screen_groups_the_proposals_and_approves_them_in_one_action(
-    app, db_session, org_a, people, first_sync, signed_in
+def _settle_the_read(tenant_ctx, db_session, org):
+    """What the read's own job does after the read: every proposal is checked, reviewed and settled."""
+    from app.modules.ai_chat.services import change_review
+
+    db_session.commit()
+    with tenant_ctx(org.id):
+        return change_review.settle_proposals(org.id, sources=("github_connector",))
+
+
+def test_the_record_lists_what_the_read_found_and_nothing_asks_for_an_approval(
+    app, db_session, org_a, people, first_sync, signed_in, tenant_ctx, login_as
 ):
     from app.models import ArchiMateElement
 
-    page = signed_in.get("/admin/connectors/github/review")
-    assert page.status_code == 200
-    html = page.get_data(as_text=True)
-    for heading in ("Shop", "Platform Monorepo", "Parts of applications", "Links between them", "Not added to the model"):
-        assert heading in html, heading
-    assert "Approve all" in html and "Payments Service" in html and "package.json" in html
-    assert TOKEN not in html
-
     assert ArchiMateElement.query.filter_by(organization_id=org_a.id).count() == 0
-    done = signed_in.post("/admin/connectors/github/review/approve-all")
-    assert done.status_code in (302, 303), done.data[:300]
+    counts = _settle_the_read(tenant_ctx, db_session, org_a)
+    assert counts["in_review"] == 0 and counts["declined"] == 0, counts
     assert ArchiMateElement.query.filter_by(organization_id=org_a.id, type="Application").count() == 8
 
+    login_as(signed_in, people.admin)  # the job's session was cleared; the page's reader signs in afresh
     status = signed_in.get("/admin/connectors/github/status").get_json()
     assert status["counts"]["applications"] == 8 and status["counts"]["components"] == 3
     assert status["counts"]["relationships"] == 9 and status["counts"]["pending"] == 0
 
+    page = signed_in.get("/admin/connectors/github/review", follow_redirects=True)
+    assert page.status_code == 200
+    html = page.get_data(as_text=True)
+    assert "Payments Service" in html and "package.json" in html and "Read of GitHub" not in html.split("<h1")[0]
+    assert "Approve all" not in html and ">Approve<" not in html and ">Reject<" not in html
+    assert TOKEN not in html
 
-def test_the_review_screen_names_what_the_read_already_put_in_the_model(
+
+def test_the_record_names_what_the_read_already_put_in_the_model(
     app, db_session, org_a, org_b, people, approved, signed_in, client, login_as
 ):
-    """Once the model holds what GitHub showed, the review page says so with the model's own counts, and
+    """Once the model holds what GitHub showed, the connect page says so with the model's own counts, and
     another organisation's page says nothing of the kind."""
     from tests.test_connector_approval_flow import _make_admin
 
-    html = " ".join(signed_in.get("/admin/connectors/github/review").get_data(as_text=True).split())
+    html = " ".join(signed_in.get("/admin/connectors/github").get_data(as_text=True).split())
     assert "Nothing is in your model until you approve it" not in html
-    assert "Nothing is waiting for review." in html
-    assert "already in your model: 8 applications, 3 parts, 1 technology, 9 links" in html
+    assert ">8</dd>" in html or 'id="github-count-applications">8<' in html
 
     admin_b = _make_admin(db_session, org_b.id, "Other")
     db_session.commit()
     login_as(client, admin_b)
-    other = " ".join(client.get("/admin/connectors/github/review").get_data(as_text=True).split())
-    assert "already in your model" not in other
-    assert "Connect GitHub, or read your repositories again" in other
+    other = " ".join(client.get("/admin/connectors/github").get_data(as_text=True).split())
+    assert 'id="github-count-applications">8<' not in other
 
 
-def test_a_person_can_change_or_skip_one_item_before_approving(
-    app, db_session, org_a, people, first_sync, signed_in
-):
-    from app.models import ArchiMateElement
-    from app.models.ai_chat_crud_approval import ApprovalStatus
-
-    mobile = next(a for p, a in _by_repo(org_a.id) if p["name"] == "Mobile App")
-    gateway = next(a for p, a in _by_repo(org_a.id) if p["name"] == "Gateway")
-    changed = signed_in.post(f"/admin/connectors/github/review/{mobile.id}/classify", data={"classification": "ignore"})
-    skipped = signed_in.post(f"/admin/connectors/github/review/{gateway.id}/skip")
-    assert changed.status_code in (302, 303) and skipped.status_code in (302, 303)
-    refused = signed_in.post(f"/admin/connectors/github/review/{mobile.id}/classify", data={"classification": "toaster"})
-    assert refused.status_code in (302, 303, 400)
-    db_session.refresh(mobile)
-    assert _payload(mobile)["classification"] == "ignore"
-    db_session.refresh(gateway)
-    assert gateway.status == ApprovalStatus.REJECTED
-
-    signed_in.post("/admin/connectors/github/review/approve-all")
-    names = {e.name for e in ArchiMateElement.query.filter_by(organization_id=org_a.id, type="Application")}
-    assert "Mobile App" not in names and "Gateway" not in names and "Auth" in names
-
-
-def test_the_review_screen_of_another_organisation_is_empty(
-    app, db_session, org_a, org_b, people, first_sync, client, login_as
+def test_the_record_of_another_organisation_shows_none_of_these_proposals(
+    app, db_session, org_a, org_b, people, first_sync, client, login_as, tenant_ctx
 ):
     from tests.test_connector_approval_flow import _make_admin
 
     admin_b = _make_admin(db_session, org_b.id, "Other")
     first = next(a for _p, a in _by_repo(org_a.id))
     db_session.commit()
+    _settle_the_read(tenant_ctx, db_session, org_b)  # settling the other organisation touches none of A's
     login_as(client, admin_b)
-    html = client.get("/admin/connectors/github/review").get_data(as_text=True)
-    assert "Payments Service" not in html and "Approve all" not in html
-    assert client.post(f"/admin/connectors/github/review/{first.id}/skip").status_code in (302, 303, 404)
+    html = client.get("/ai-chat/approvals/inbox?source=github_connector").get_data(as_text=True)
+    assert "Payments Service" not in html and "Approve" not in html
     db_session.refresh(first)
-    assert first.status.value == "pending", "another organisation's proposal cannot be skipped"
-    assert client.post("/admin/connectors/github/review/approve-all").status_code in (302, 303)
+    assert first.status.value == "pending", "another organisation's settling leaves this proposal alone"
     assert _count(db_session, "ai_chat_crud_approvals", org_a.id, "AND LOWER(CAST(status AS text)) = 'pending' AND operation_type <> 'owner_proposal'") == 23, (
         "organisation A still holds every proposal"
     )

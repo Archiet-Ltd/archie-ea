@@ -890,7 +890,10 @@ def _github_state(org_id: int) -> dict:
     result = (job.result or {}) if job else {}
     if state == "done" and result.get("success") is False:
         state = "failed"
-    counts = {"repositories": result.get("repositories", 0), "pending": gh.pending_total(org_id), **gh.model_counts(org_id)}
+    settled = result.get("settled") or {}
+    counts = {"repositories": result.get("repositories", 0), "pending": gh.pending_total(org_id),
+              "proposed": result.get("proposals", 0), **gh.model_counts(org_id)}
+    counts["line"] = gh.read_summary(counts["repositories"], settled, counts["pending"])
     return {
         "state": state,
         "organization": (cfg.config or {}).get("organization"),
@@ -911,6 +914,7 @@ def _github_state(org_id: int) -> dict:
 def github_connect():
     """The one page that connects GitHub: one click through the Entelim GitHub App, or
     paste a read-only token, and the first read starts at once either way."""
+    from app.connectors import github as gh
     from app.connectors import github_app
 
     org_id = _require_active_org()
@@ -919,7 +923,7 @@ def github_connect():
         "admin/connectors/github.html",
         status=_github_state(org_id),
         for_product=_product_asked_for(org_id, request.args.get("product")),
-        review_url=url_for("m365_connector.github_review"),
+        review_url=url_for("unified_ai_chat.approval_inbox", source=gh.PROPOSAL_SOURCE),
         status_url=url_for("m365_connector.github_status"),
         github_app_configured=configured,
         github_app_install_url=github_app.install_url(org_id) if configured else None,
@@ -1081,68 +1085,9 @@ def github_resync():
 @login_required
 @connections_access
 def github_review():
-    """The review screen: every proposal the read made, grouped, with one Approve all."""
+    """What the reads of GitHub found and what became of each: the Approvals record, filtered to GitHub.
+    Nothing waits for a person, so there is nothing to approve here any more."""
     from app.connectors import github as gh
 
-    org_id = _require_active_org()
-    return render_template(
-        "admin/connectors/github_review.html",
-        review=gh.pending_review(org_id),
-        model_counts=gh.model_counts(org_id),
-        status=_github_state(org_id),
-        classifications=gh.CLASSIFICATIONS,
-    )
-
-
-@m365_connector_bp.route("/github/review/approve-all", methods=["POST"])
-@login_required
-@connections_access
-def github_review_approve_all():
-    from app.connectors import github as gh
-
-    org_id = _require_active_org()
-    outcome = gh.approve_all_proposals(org_id, current_user_id())
-    if outcome["failed"]:
-        flash(
-            f"Added {outcome['approved']} of {outcome['total']} to your model. "
-            f"{len(outcome['failed'])} could not be added yet; they are still in the list.",
-            "warning",
-        )
-    elif outcome["total"]:
-        flash(f"Added {outcome['approved']} items to your model.", "success")
-    else:
-        flash("Nothing is waiting for review.", "info")
-    return redirect(url_for("m365_connector.github_review"))
-
-
-@m365_connector_bp.route("/github/review/<int:approval_id>/classify", methods=["POST"])
-@login_required
-@connections_access
-def github_review_classify(approval_id):
-    from app.connectors import github as gh
-    from app.extensions import db
-
-    org_id = _require_active_org()
-    try:
-        gh.change_classification(org_id, approval_id, (request.form.get("classification") or "").strip(), current_user_id())
-        db.session.commit()
-        flash("Changed.", "success")
-    except (ValueError, LookupError) as exc:
-        db.session.rollback()
-        flash(str(exc), "error")
-    return redirect(url_for("m365_connector.github_review"))
-
-
-@m365_connector_bp.route("/github/review/<int:approval_id>/skip", methods=["POST"])
-@login_required
-@connections_access
-def github_review_skip(approval_id):
-    from app.connectors import github as gh
-
-    org_id = _require_active_org()
-    try:
-        outcome = gh.skip_proposal(org_id, approval_id, current_user_id())
-        flash("Skipped." if outcome.get("success") else (outcome.get("error") or "Could not skip that."), "info")
-    except LookupError as exc:
-        flash(str(exc), "error")
-    return redirect(url_for("m365_connector.github_review"))
+    _require_active_org()
+    return redirect(url_for("unified_ai_chat.approval_inbox", source=gh.PROPOSAL_SOURCE))

@@ -1065,15 +1065,13 @@ def _execute_relationship(approval, payload) -> Dict[str, Any]:
     return {"success": True, "relationship_id": link.id}
 
 
-def _technology_element(org_id, name, element_type, origin=None):
-    """The element of this organisation that is the technology called *name*: an existing one of
-    that name in the technology layer, else a new one."""
+def _find_technology_element(org_id, name):
+    """The element of this organisation that is the technology called *name* in the technology layer, or None."""
     from sqlalchemy import func
 
     from app.models.archimate_core import ArchiMateElement
-    from app.services.archimate_backbone import create_backbone_element
 
-    existing = (
+    return (
         ArchiMateElement.query.filter(
             ArchiMateElement.organization_id == org_id,
             func.lower(ArchiMateElement.name) == name.lower(),
@@ -1082,6 +1080,14 @@ def _technology_element(org_id, name, element_type, origin=None):
         .order_by(ArchiMateElement.id)
         .first()
     )
+
+
+def _technology_element(org_id, name, element_type, origin=None):
+    """The element of this organisation that is the technology called *name*: an existing one of
+    that name in the technology layer, else a new one."""
+    from app.services.archimate_backbone import create_backbone_element
+
+    existing = _find_technology_element(org_id, name)
     if existing is not None and not getattr(existing, "deleted_at", None):
         return existing, False
     element = create_backbone_element(
@@ -1651,6 +1657,12 @@ class _RepositoryEvidence:
             facts["github_repository_missing"] = False
 
         changed = _write_facts(element, facts)
+        if self.product_id:
+            # A read for a Product joins the repository's element, already in the model, to that
+            # Product: the page shows what the read found there, whatever settled it before.
+            _join_to_product(self.org_id, {"product_id": self.product_id}, element,
+                             repository=full_name, commit=self._commit(full_name),
+                             file=self._evidence_file(root))
         owned = self._apply_owner(element, full_name, owners)
         if self._person_for(owners) is None:
             owned = self._owner_from_commits(element, full_name) or owned
@@ -1871,12 +1883,26 @@ class _RepositoryEvidence:
 
     def _claim_for_product(self, approval, payload) -> None:
         """A proposal still waiting that no Product claimed is claimed by the Product this read is for.
-        A decided proposal, or one another Product already holds, is left as it is."""
+        A decided proposal is left as it is, except that the element it landed (when it landed one) is
+        joined to that Product now: a read for a Product shows what it found on that Product's page,
+        whether the proposal was settled before this read reached it or while it waited."""
         from app.models.ai_chat_crud_approval import ApprovalStatus
 
-        if not self.product_id or payload.get("product_id") or approval.status != ApprovalStatus.PENDING:
+        if not self.product_id or payload.get("product_id"):
             return
-        approval.operation_payload = json.dumps(dict(payload, product_id=self.product_id))
+        if approval.status == ApprovalStatus.PENDING:
+            approval.operation_payload = json.dumps(dict(payload, product_id=self.product_id))
+            return
+        repository = payload.get("repository") or payload.get("from")
+        element = _element_for_repository(self.org_id, repository, payload.get("path")) if repository else None
+        if element is None and approval.operation_type == OP_TECHNOLOGY and payload.get("technology"):
+            element = _find_technology_element(self.org_id, payload["technology"])
+        if element is not None:
+            _join_to_product(
+                self.org_id, {"product_id": self.product_id}, element,
+                repository=repository, commit=payload.get("commit"),
+                file=payload.get("file") or payload.get("evidence_file"),
+            )
 
     # ----- links between repositories ------------------------------------
 
@@ -2067,6 +2093,15 @@ def _item(approval) -> Dict[str, Any]:
     return dict(payload, id=approval.id, short_commit=commit[:7], operation_type=approval.operation_type)
 
 
+def proposal_rank(approval) -> int:
+    """The order proposals are settled in: applications, then their parts, then the decisions that add
+    nothing, then the links (a part and a link need the application in the model first)."""
+    if approval.operation_type in (OP_RELATE, OP_TECHNOLOGY):
+        return 3
+    kind = json.loads(approval.operation_payload or "{}").get("classification")
+    return _APPROVE_ORDER.get(kind, 2)
+
+
 def pending_review(org_id) -> Dict[str, Any]:
     """The pending proposals of one organisation, grouped for the review screen:
     applications by system, parts, links, and the decisions that add nothing to the
@@ -2102,13 +2137,7 @@ def approve_all_proposals(org_id, approver_id) -> Dict[str, Any]:
 
     items = _pending(org_id, OP_CLASSIFY) + _pending(org_id, OP_RELATE) + _pending(org_id, OP_TECHNOLOGY)
 
-    def rank(approval):
-        if approval.operation_type in (OP_RELATE, OP_TECHNOLOGY):
-            return 3
-        kind = json.loads(approval.operation_payload or "{}").get("classification")
-        return _APPROVE_ORDER.get(kind, 2)
-
-    items.sort(key=lambda a: (rank(a), a.id))
+    items.sort(key=lambda a: (proposal_rank(a), a.id))
     service = AIChatApprovalService(user_id=approver_id)
     ids = [a.id for a in items]
     approved, failed = 0, []
@@ -2186,18 +2215,97 @@ def run_first_sync(org_id, connector_id, scope=None) -> Dict[str, Any]:
                 waited += BUSY_WAIT_STEP
                 result = run_connector_sync(org_id=org_id, connector_id=connector_id, delegated=True, scope=scope)
             db.session.commit()
+            # What the read proposed is checked, reviewed and applied, linked or declined here, in the read's
+            # own job: nobody approves it.
+            settled = settle_read_proposals(org_id)
+            if scope and scope.get("product_id"):
+                join_settled_to_product(org_id, scope["product_id"], scope.get("repositories") or [])
     except CredentialUnreadable as exc:  # the sentence says what failed and who can fix it
         db.session.rollback()
         return {"success": False, "repositories": 0, "proposals": pending_total(org_id), "error": str(exc)}
     return {
         "success": bool(result.get("success")),
         "repositories": result.get("records_processed", 0),
-        "proposals": pending_total(org_id),
+        "proposals": sum(settled.values()),
+        "settled": settled,
         "relationships_proposed": result.get("relationships_proposed", 0),
         "already_in_model": result.get("already_in_model", []),
         "failed": result.get("records_failed", 0),
         "error": (result.get("error") or result.get("error_message") or None) if not result.get("success") else None,
     }
+
+
+def join_settled_to_product(org_id, product_id, repositories) -> int:
+    """Join to the Product every element a proposal about one of its chosen repositories landed. A pass that
+    settles an earlier read's proposals can apply one a moment before this read claims it, and the claim then
+    comes too late to carry the Product with it; this pass, run once everything is settled, closes that gap.
+    A join already made is left as it is. Returns how many joins it checked."""
+    from app.models.ai_chat_crud_approval import AIChatCRUDApproval, ApprovalStatus
+
+    chosen = set(repositories)
+    checked = 0
+    rows = AIChatCRUDApproval.query.filter_by(
+        organization_id=org_id, source_table=PROPOSAL_SOURCE, status=ApprovalStatus.APPROVED).order_by(
+        AIChatCRUDApproval.id).all()
+    for approval in rows:
+        try:
+            payload = json.loads(approval.operation_payload or "{}")
+        except (TypeError, ValueError):
+            continue
+        repository = payload.get("repository") or payload.get("from")
+        if repository not in chosen:
+            continue
+        if approval.operation_type == OP_TECHNOLOGY and payload.get("technology"):
+            element = _find_technology_element(org_id, payload["technology"])
+        else:
+            element = _element_for_repository(org_id, repository, payload.get("path"))
+        if element is not None:
+            _join_to_product(org_id, {"product_id": product_id}, element, repository=repository,
+                             commit=payload.get("commit"), file=payload.get("file") or payload.get("evidence_file"))
+            checked += 1
+    db.session.commit()
+    return checked
+
+
+def read_summary(repositories: int, settled: Dict[str, int], waiting: int) -> str:
+    """The sentence the connect page says about a finished read: what was read and what became of it."""
+    noun = "repository" if repositories == 1 else "repositories"
+    checked = sum(settled.values()) + waiting
+    if not checked:
+        return f"Read {repositories} {noun}. Nothing new was found."
+    parts = []
+    if settled.get("applied"):
+        parts.append(f"{settled['applied']} added to your model")
+    if settled.get("linked"):
+        parts.append(f"{settled['linked']} already there and linked")
+    if settled.get("declined"):
+        parts.append(f"{settled['declined']} declined, with the reason kept")
+    if settled.get("retired"):
+        parts.append(f"{settled['retired']} out of date and retired")
+    waiting_words = settled.get("in_review", 0) + waiting
+    if waiting_words:
+        parts.append(f"{waiting_words} still being checked")
+    findings = "finding was" if checked == 1 else "findings were"
+    return f"Read {repositories} {noun}. {checked} {findings} checked: " + ", ".join(parts) + "."
+
+
+def settle_read_proposals(org_id) -> Dict[str, int]:
+    """Settle every proposal a read of this organisation's repositories left waiting (never inside a web
+    request). A failure here is logged and leaves the proposals for the five-minute sweep, which settles
+    them the same way."""
+    from flask import has_request_context
+
+    from app.modules.ai_chat.services import change_review
+
+    empty = {"applied": 0, "linked": 0, "declined": 0, "retired": 0, "in_review": 0}
+    if has_request_context():
+        return empty
+    try:
+        return change_review.settle_proposals(org_id, sources=(PROPOSAL_SOURCE,))
+    except Exception:  # noqa: BLE001 - the read itself succeeded; the sweep settles what is left
+        logger.exception("Settling the proposals of a GitHub read failed for organisation %s", org_id)
+        db.session.rollback()
+        return empty
 
 
 class ConnectRefused(ValueError):
@@ -2290,6 +2398,19 @@ def pending_for_product(org_id, product_id) -> int:
         1 for a in _pending(org_id, OP_CLASSIFY)
         if json.loads(a.operation_payload or "{}").get("product_id") == product_id
     )
+
+
+def findings_counts(org_id) -> Dict[str, int]:
+    """What became of the findings GitHub reads have made for this organisation: how many were applied, linked,
+    declined or retired, and how many are still being checked. The Approvals record filtered to GitHub lists the
+    same rows."""
+    from app.models.ai_chat_crud_approval import AIChatCRUDApproval, ApprovalStatus
+
+    counts = {"applied": 0, "linked": 0, "declined": 0, "retired": 0, "in_review": 0}
+    for row in AIChatCRUDApproval.query.filter_by(organization_id=org_id, source_table=PROPOSAL_SOURCE).all():
+        outcome = (row.review_reasons or {}).get("outcome") if row.status != ApprovalStatus.PENDING else None
+        counts[outcome if outcome in counts else "in_review"] += 1
+    return counts
 
 
 PRODUCT_SCAN_MAX = 25  # repositories read in one scan from a Product's page

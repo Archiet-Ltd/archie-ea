@@ -109,11 +109,11 @@ CHAT_CRUD_ENTITIES = (
     "application_capability_mapping",
 )
 
-# The writers whose proposals this review settles whatever made them, with no person asking: a change to or
-# read of a connection. The organisation's system actor
+# The writers whose proposals this review settles whatever made them, with no person asking: a solution
+# blueprint, a read of GitHub, and a change to or read of a connection. The organisation's system actor
 # decides them (see ``system_actor``).
 PROPOSAL_SOURCES = (
-    "connector_config",
+    "github_connector", "connector_config",
 )
 EXPIRED_CHECK_NAME = "Still current"
 SETTLED_ON_CHECKS_KEY = "settled_on_checks"
@@ -617,9 +617,13 @@ def _target_proposal(approval: AIChatCRUDApproval, payload: Any, org_id: int) ->
     """What a proposal written by a connector or a blueprint is about."""
     args = payload if isinstance(payload, dict) else {}
     label = _short(approval.summary, 120)
+    if approval.source_table == "connector_config":
+        return Target(True, label=label, creates=True,
+                      before={"kind": "unrecorded", "note": "A connection change keeps no copy of the old settings."},
+                      facts={"connector": args.get("connector_type")})
     return Target(True, label=label, creates=True,
-                  before={"kind": "unrecorded", "note": "A connection change keeps no copy of the old settings."},
-                  facts={"connector": args.get("connector_type")})
+                  before={"kind": "create", "note": "Nothing existed before; undoing it removes what was added."},
+                  facts={"repository": args.get("repository") or args.get("source")})
 
 
 # The tools whose target the review reads from the organisation's own records. The eight an owner-founder's
@@ -802,6 +806,14 @@ def run_checks(service, approval: AIChatCRUDApproval, requester) -> Tuple[List[C
                    "The value is allowed for that field." if not target.value_reason else target.value_reason):
             return checks, target
 
+    if approval.source_table == "github_connector":
+        # What the proposal needs in the model first (the application a part belongs to, both ends of a link).
+        from app.connectors.github import proposal_blocker
+
+        blocker = proposal_blocker(approval)
+        if not add("What it depends on is in the model", blocker is None,
+                   "Everything it refers to is already in the model." if blocker is None else blocker):
+            return checks, target
     duplicate = _duplicate_of(service, approval, payload)
     if not add("Not a repeat", duplicate is None,
                "No identical change is waiting or was just applied." if duplicate is None
@@ -1977,6 +1989,8 @@ def _settle_proposals_locked(
 ) -> Dict[str, int]:
     counts = {"applied": 0, "linked": 0, "declined": 0, "retired": 0, "in_review": 0}
     budget = budget or ReviewBudget(CALLS_PER_BATCH)
+    from app.connectors.github import proposal_rank
+
     attempted: set = set()
     # A read that is itself settled (an approved sync of a connection) writes proposals of its own, so the
     # waiting ones are fetched again until a pass finds none that this run has not already tried.
@@ -1989,7 +2003,7 @@ def _settle_proposals_locked(
         if only_ids is not None:
             query = query.filter(AIChatCRUDApproval.id.in_(only_ids))
         rows = sorted((r for r in query.order_by(AIChatCRUDApproval.id).all() if r.id not in attempted),
-                      key=lambda a: a.id)
+                      key=lambda a: (proposal_rank(a) if a.source_table == "github_connector" else 0, a.id))
         if not rows:
             break
         for row in [r.id for r in rows]:
