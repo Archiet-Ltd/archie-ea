@@ -65,10 +65,23 @@ class MissingApproverError(AIChatApprovalError):
     """No resolvable approver identity, or the approver lacks write permission."""
 
 
+def change_review_settled_on_checks() -> str:
+    """The key under which a record says it was settled on its deterministic checks alone."""
+    from app.modules.ai_chat.services.change_review import SETTLED_ON_CHECKS_KEY
+
+    return SETTLED_ON_CHECKS_KEY
+
+
 def _review_rubric_version() -> str:
     from app.modules.ai_chat.services.change_review import RUBRIC_VERSION
 
     return RUBRIC_VERSION
+
+
+def _is_proposal_source(source_table: Optional[str]) -> bool:
+    from app.modules.ai_chat.services.change_review import PROPOSAL_SOURCES
+
+    return source_table in PROPOSAL_SOURCES
 
 
 def create_approval_record(
@@ -147,6 +160,12 @@ def create_approval_record(
             actor_type="user" if user_id is not None else "system",
         )
     )
+    if not settle and (enter_review or _is_proposal_source(source_table)):
+        # A record a writer enters into the review (or a proposal nobody asked for) is settled by the job worker
+        # as soon as the writer saves: nobody approves it. Added to the writer's own transaction.
+        from app.modules.ai_chat.services.change_review import queue_settling
+
+        queue_settling(organization_id)
     if settle and user_id is not None:
         db.session.commit()
         approval.review_verdict = AIChatApprovalService(user_id).settle_after_review(
@@ -712,9 +731,11 @@ class AIChatApprovalService:
             approval = self._load_scoped_approval(approval_id, actor)
             if not approval:
                 return {"success": False, "code": "NOT_FOUND", "error": f"Approval {approval_id} not found"}
-            if approval.user_id is None or not change_review.in_scope(approval):
+            if not change_review.in_scope(approval):
                 return {**change_review.verdict(approval, "in_review", approval.summary, []), "settles": False}
-            runner = self if approval.user_id == self.user_id else AIChatApprovalService(approval.user_id)
+            # A proposal nobody asked for is decided as the organisation's system actor, the account this
+            # service was built for.
+            runner = self if approval.user_id in (None, self.user_id) else AIChatApprovalService(approval.user_id)
             requester, requester_error = runner._acting_user()
             if requester is not None and requester.organization_id != approval.organization_id:
                 requester, requester_error = None, {"code": "MOVED"}
@@ -860,7 +881,7 @@ class AIChatApprovalService:
                     "code": "NOT_FOUND",
                     "error": f"Approval {approval_id} not found",
                 }
-            if settled_by_review and approval.user_id != actor.id and approved_by != actor.id:
+            if settled_by_review and approval.user_id not in (None, actor.id) and approved_by != actor.id:
                 return {
                     "success": False,
                     "code": "FORBIDDEN",
@@ -870,8 +891,9 @@ class AIChatApprovalService:
             if settled_by_review:
                 # The flag is a claim that the review passed; the record must show it. The latest round on
                 # the record has to be a pass, so nothing can apply a change by passing the flag alone.
-                rounds = (approval.review_reasons or {}).get("rounds") if isinstance(approval.review_reasons, dict) else None
-                if not rounds or not rounds[-1].get("passed"):
+                saved_review = approval.review_reasons if isinstance(approval.review_reasons, dict) else {}
+                rounds = saved_review.get("rounds")
+                if not (rounds and rounds[-1].get("passed")) and not saved_review.get(change_review_settled_on_checks()):
                     return {
                         "success": False,
                         "code": "FORBIDDEN",
