@@ -18,6 +18,7 @@ from urllib.parse import urlparse
 from sqlalchemy.orm.attributes import flag_modified
 
 from app import db
+from app.utils.page_path import page_path
 
 _log = logging.getLogger(__name__)
 
@@ -156,16 +157,6 @@ def choices(org) -> Dict[str, Any]:
         "industry": context.get("industry"),
         "frameworks": list(context.get("frameworks") or []),
     }
-
-
-def page_path(endpoint: str, **values: Any) -> str:
-    """The path of a page by endpoint name, built the same way inside and outside a request (a chat turn
-    streams after its request has ended), so no path is written out by hand."""
-    from flask import current_app, has_request_context, url_for
-
-    if has_request_context():
-        return url_for(endpoint, **values)
-    return current_app.url_map.bind("localhost").build(endpoint, values)
 
 
 def signup_answers(org) -> Optional[Dict[str, Any]]:

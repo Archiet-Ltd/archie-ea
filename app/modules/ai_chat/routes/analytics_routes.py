@@ -181,6 +181,7 @@ def own_record_questions(org_id):
     from app import db
     from app.models.organization import Organization
     from app.modules.account.services import onboarding_service as onboarding
+    from app.utils.page_path import page_path
 
     held = onboarding.loaded_at_sign_up(org_id)
     org = db.session.get(Organization, org_id)
@@ -202,7 +203,7 @@ def own_record_questions(org_id):
             0,
             {
                 "question": "Connect GitHub to see who owns what and what breaks",
-                "href": onboarding.page_path("m365_connector.github_connect"),
+                "href": page_path("m365_connector.github_connect"),
             },
         )
     return cards[:4]

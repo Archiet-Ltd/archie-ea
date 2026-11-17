@@ -28,6 +28,8 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Callable, Dict, List, Optional
 
+from app.utils.page_path import page_path
+
 ENVELOPE_VERSION = "1.0.0"
 
 
@@ -52,38 +54,27 @@ class SliceSpec:
 # --------------------------------------------------------------------------- #
 
 
-def _path(endpoint: str, **values) -> Optional[str]:
-    """The site-relative address of an endpoint, built without a request (the chat
-    runs tools on a worker thread that has only an application context)."""
-    from flask import current_app
-
-    try:
-        return current_app.url_map.bind("").build(endpoint, values)
-    except Exception:
-        return None
-
-
 def element_page(element_id) -> Optional[str]:
     """The page that shows one model element, titled with its name."""
     if not isinstance(element_id, int):
         return None
-    return _path("archimate.element_impact_graph_page", element_id=element_id)
+    return page_path("archimate.element_impact_graph_page", element_id=element_id, default=None)
 
 
 def _link(provenance: dict, fallback_endpoint: str) -> Optional[str]:
     element_id = (provenance or {}).get("archimate_element_id")
-    return element_page(element_id) or _path(fallback_endpoint)
+    return element_page(element_id) or page_path(fallback_endpoint, default=None)
 
 
 def capability_page(capability_id) -> Optional[str]:
     """Where a capability's support and planned work are shown: its row on the Capability Coverage page."""
-    base = _path("genome_coverage.generate")
+    base = page_path("genome_coverage.generate", default=None)
     return "%s#capability-%s" % (base, capability_id) if base else None
 
 
 def work_package_page(work_package_id) -> Optional[str]:
     """The work package's own page, which names the capability it changes."""
-    return _path("implementation_planning.work_package_detail", work_package_id=work_package_id)
+    return page_path("implementation_planning.work_package_detail", work_package_id=work_package_id, default=None)
 
 
 def node_id(domain: str, kind: str, store_id) -> str:
@@ -158,7 +149,7 @@ def _implementation_nodes(raw: dict) -> tuple:
             "sequence_order": plateau.get("sequence_order"),
             "target_date": plateau.get("target_date"),
             "provenance": prov,
-            "link": _path("genome_roadmap.index") or _link(prov, "genome_roadmap.index"),
+            "link": page_path("genome_roadmap.index", default=None) or _link(prov, "genome_roadmap.index"),
         })
     for wp in raw.get("work_packages", []):
         prov = wp["provenance"]
