@@ -24,6 +24,8 @@ module.exports = {
       },
     },
     extend: {
+      // A bare `border` draws in the border token, as shadcn's own base rule does, not preflight's light grey.
+      borderColor: { DEFAULT: 'hsl(var(--border))' },
       // `data-disabled:` as Tailwind 4 reads it: the attribute present, whatever its value.
       data: { disabled: 'disabled' },
       // `underline-offset-3` as Tailwind 4 reads it: any whole number of pixels.
