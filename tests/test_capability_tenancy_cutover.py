@@ -223,10 +223,10 @@ def _application_link(connection, mapping_id: int, capability_id: int, app_id: i
     connection.execute(
         text(
             "INSERT INTO unified_application_capability_mapping "
-            "(id, unified_capability_id, application_component_id, is_active) "
-            "VALUES (:id, :capability_id, :app_id, true)"
+            "(id, unified_capability_id, application_component_id, organization_id, is_active) "
+            "VALUES (:id, :capability_id, :app_id, :org_id, true)"
         ),
-        {"id": mapping_id, "capability_id": capability_id, "app_id": app_id},
+        {"id": mapping_id, "capability_id": capability_id, "app_id": app_id, "org_id": org_id},
     )
 
 
@@ -1030,8 +1030,8 @@ def test_apply_holds_relationship_table_locks_until_transaction_end(
     )
     seed.execute(
         "INSERT INTO unified_application_capability_mapping "
-        "(id, unified_capability_id, application_component_id, is_active) "
-        "VALUES (501, 501, 501, true)"
+        "(id, unified_capability_id, application_component_id, organization_id, is_active) "
+        "VALUES (501, 501, 501, 501, true)"
     )
     manifest = tmp_path / "backup.json"
     manifest.write_text(json.dumps({"backup_path": "C:/backups/capabilities.dump"}))
