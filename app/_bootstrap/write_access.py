@@ -142,11 +142,40 @@ READ_ONLY_REASONS = (
 GENERAL_REASON = "Your role is read-only, so it cannot make this change."
 
 
+def _role_label(name):
+    if name in ("admin", "platform_admin"):
+        return "administrator"
+    if name.endswith("architect"):
+        return "architect"
+    return "CTO" if name == "cto" else name.replace("_", " ")
+
+
+def _roles_that_may(roles):
+    """One plain sentence naming the roles a route is open to, each role once."""
+    labels = sorted({_role_label(name) for name in roles})
+    named = [("an " if label[0] in "aeiou" else "a ") + label for label in labels]
+    who = named[0] if len(named) == 1 else ", ".join(named[:-1]) + " or " + named[-1]
+    return f"Only {who} may make this change. Ask your organisation administrator for the role."
+
+
+def _missing_role_reason(endpoint):
+    """The roles the route is open to, when the person holds none of them; otherwise None."""
+    from flask import current_app
+    from flask_login import current_user
+
+    roles = getattr(current_app.view_functions.get(endpoint), "role_guard", None)
+    if not roles or not current_user.is_authenticated:
+        return None
+    from app._decorators_base import _effective_roles
+
+    return None if _effective_roles(current_user) & roles else _roles_that_may(roles)
+
+
 def _reason_for(endpoint):
     for prefix, reason in READ_ONLY_REASONS:
         if (endpoint or "").startswith(prefix):
             return reason
-    return GENERAL_REASON
+    return _missing_role_reason(endpoint) or GENERAL_REASON
 
 
 def _refusal(reason):
