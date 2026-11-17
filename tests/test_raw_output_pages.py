@@ -25,13 +25,13 @@ def _org(db_session, slug):
     return org
 
 
-def _user(db_session, org):
+def _user(db_session, org, role="enterprise_architect"):
     user = User(
         email=f"raw-output-{org.id}@example.com",
         first_name="Chief",
         last_name="Architect",
         organization_id=org.id,
-        enterprise_role="enterprise_architect",
+        enterprise_role=role,
         confirmed=True,
     )
     user.password = "TestPass123!"
@@ -53,9 +53,14 @@ def _visible(html):
 
 
 def _forecast_area(html):
-    """Heading to the opportunities table: where the savings estimate is shown."""
+    """Heading to the consolidation plans table: where the savings estimate is shown.
+
+    The ranked opportunities table now sits above the estimate, so the area ends at
+    the plans table, not at the first table on the page.
+    """
     body = _visible(html)
-    end = body.find("<table")
+    plans = body.find('data-testid="opportunities-table"')
+    end = body.rfind("<", 0, plans) if plans > 0 else -1
     return body[:end] if end > 0 else body
 
 
@@ -103,7 +108,7 @@ def test_opportunities_page_shows_forecast_years_as_figures(
     )
     org = _org(db_session, "opp-years")
     with tenant_ctx(org.id):
-        user = _user(db_session, org)
+        user = _user(db_session, org, role="portfolio_manager")
     login_as(client, user)
 
     html = _forecast_area(client.get(OPPORTUNITIES).get_data(as_text=True))

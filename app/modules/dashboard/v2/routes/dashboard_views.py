@@ -375,6 +375,8 @@ def _assemble_health_scorecard_metrics():
                 arb_pipeline["deferred"] += 1
     except Exception as exc:
         logger.warning("health_scorecard: ARBReviewItem unavailable: %s", exc)
+        # Query failed: report unknown (em dash), not a fabricated empty pipeline.
+        arb_pipeline = {key: None for key in arb_pipeline}
 
     # 3. ArchiMate element count grouped by layer
     # LAYER_TYPES / LAYER_TYPE_TO_LAYER are the single system of record for

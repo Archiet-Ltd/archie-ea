@@ -29,46 +29,48 @@ def test_normalize_phase_code_maps_unknown_values_to_a_known_phase():
     assert _normalize_phase_code("G") == "G"
 
 
-def test_kanban_phase_and_column_counts_always_sum_to_the_same_total(db_session, make_org):
+def test_kanban_phase_and_column_counts_always_sum_to_the_same_total(db_session, make_org, tenant_ctx):
     """Regression for H-03: phase_counts and column_counts must both sum to
-    len(cards) for the same (unfiltered) card set. Uses a KanbanCard with a
-    deliberately garbage adm_phase-adjacent value path exercised through
-    _project_one_deliverable, which is where the divergence QA found lived."""
+    len(cards) for the same (unfiltered) card set. The board projects each
+    solution's own deliverables, so the card's phase is its solution's phase; a
+    solution whose phase value matches no ADM_PHASES code (lowercase) is the shape
+    of row that used to vanish from phase_counts while still appearing in
+    column_counts."""
     from app.services.kanban_projection_service import (
         KanbanProjectionService,
         ADM_PHASES,
         COLUMN_IDS,
     )
-    from app.models.adm_deliverable import ADMDeliverable
+    from app.models.implementation_migration import Deliverable
+    from app.models.solution_models import Solution, solution_deliverables
 
-    make_org("kanban")
+    org = make_org("kanban")
 
-    # A deliverable with a phase value that does NOT exactly match any
-    # ADM_PHASES code (lowercase) — this is the shape of row that used to
-    # vanish from phase_counts while still appearing in column_counts.
-    deliv = ADMDeliverable(
-        name="Garbage-phase deliverable",
-        phase="a",  # lowercase — not a literal ADM_PHASES code
-        is_template=False,
-    )
-    db_session.add(deliv)
-    db_session.flush()
+    with tenant_ctx(org.id):
+        sol = Solution(name="Garbage-phase solution", adm_phase="a")  # lowercase: not a literal ADM_PHASES code
+        deliv = Deliverable(name="Garbage-phase deliverable")
+        db_session.add_all([sol, deliv])
+        db_session.flush()
+        db_session.execute(
+            solution_deliverables.insert().values(solution_id=sol.id, deliverable_id=deliv.id)
+        )
+        db_session.flush()
 
-    svc = KanbanProjectionService()
-    result = svc.get_cards(card_type="deliverable")
+        svc = KanbanProjectionService()
+        result = svc.get_cards(card_type="deliverable")
 
-    total_cards = len(result["cards"])
-    assert total_cards >= 1
+        total_cards = len(result["cards"])
+        assert total_cards >= 1
 
-    phase_sum = sum(result["phase_counts"][p["code"]] for p in ADM_PHASES)
-    column_sum = sum(result["column_counts"][c] for c in COLUMN_IDS)
+        phase_sum = sum(result["phase_counts"][p["code"]] for p in ADM_PHASES)
+        column_sum = sum(result["column_counts"][c] for c in COLUMN_IDS)
 
-    assert phase_sum == total_cards, (
-        f"phase_counts summed to {phase_sum}, but there are {total_cards} cards "
-        "— a card's phase value fell outside the known ADM phase codes"
-    )
-    assert column_sum == total_cards
-    assert phase_sum == column_sum
+        assert phase_sum == total_cards, (
+            f"phase_counts summed to {phase_sum}, but there are {total_cards} cards "
+            "— a card's phase value fell outside the known ADM phase codes"
+        )
+        assert column_sum == total_cards
+        assert phase_sum == column_sum
 
 
 # ---------------------------------------------------------------------------
