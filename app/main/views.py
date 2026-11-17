@@ -1529,23 +1529,13 @@ def _organisation_administrator_names(org_id):
     return names
 
 
-@main.route("/settings")
-@login_required
-def settings():
-    """Settings: the platform page for a platform administrator, the organisation page for its administrator.
-
-    The page reads and writes the global system_settings table, so only a
-    platform administrator sees it. An organisation's own administrator is sent
-    to their organisation's settings; anyone else is refused in plain words
-    naming the people in their organisation who can help.
-    """
+def _settings_for_non_platform_admin():
+    """Answer a person who is not a platform administrator: their organisation's administrator is sent to
+    the organisation settings, anyone else is refused in plain words naming who can help."""
     from flask import g
 
-    from app.middleware.tenant_decorators import is_platform_admin
     from app.services.rbac_service import rbac_service
 
-    if is_platform_admin(current_user):
-        return render_template("settings/index.html")
     org_id = getattr(g, "current_org_id", None) or current_user.organization_id
     if rbac_service.is_org_admin(current_user, org_id):
         return redirect(url_for("admin.index"))
@@ -1558,6 +1548,20 @@ def settings():
         403,
         message="Settings are managed by your organisation's administrators. " + who,
     )
+
+
+@main.route("/settings")
+@login_required
+@platform_admin_required(otherwise=_settings_for_non_platform_admin)
+def settings():
+    """Settings: the platform page for a platform administrator, the organisation page for its administrator.
+
+    The page reads and writes the global system_settings table, so only a
+    platform administrator sees it. An organisation's own administrator is sent
+    to their organisation's settings; anyone else is refused in plain words
+    naming the people in their organisation who can help.
+    """
+    return render_template("settings/index.html")
 
 
 @main.route("/api/system-settings", methods=["GET"])
