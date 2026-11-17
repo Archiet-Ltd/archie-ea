@@ -21,6 +21,7 @@ def _make_user(db_session, org, password="Correct-Horse-9!"):
     user = User(
         email=f"qa100-{uuid.uuid4().hex[:10]}@example.com",
         organization_id=org.id,
+        confirmed=True,
     )
     if hasattr(type(user), "password"):
         user.password = password
