@@ -107,25 +107,35 @@ def is_active_org_admin(user=None) -> bool:
     return is_platform_admin(user) or rbac_service.is_org_admin(user, active_org_id)
 
 
-def platform_admin_required(f=None, *, hide=False):
+def platform_admin_required(f=None, *, hide=False, otherwise=None):
     """Require authenticated user who is a platform admin (cross-org access).
 
     See ``is_platform_admin`` above for the predicate and why it checks both
     flags. Used bare, anyone else gets 403. Used as
     ``@platform_admin_required(hide=True)``, anyone else gets 404 so the route
-    is not advertised.
+    is not advertised. ``otherwise`` is a callable that answers a person who is
+    not a platform admin in the route's own words (a redirect, a plain refusal)
+    instead of the bare 403/404; the view itself still runs only for a platform
+    admin, behind the ADMINISTER permission check that every platform admin holds.
     """
+    from app._decorators_base import permission_required
+    from app.models import Permission
+
     def decorate(view):
+        guarded_view = permission_required(Permission.ADMINISTER)(view) if otherwise else view
+
         @wraps(view)
         @login_required
         def decorated(*args, **kwargs):
             if not is_platform_admin(current_user):
+                if otherwise is not None:
+                    return otherwise()
                 if hide:
                     abort(404)
                 if _wants_json():
                     return jsonify({"error": "Platform admin access required"}), 403
                 abort(403)
-            return view(*args, **kwargs)
+            return guarded_view(*args, **kwargs)
 
         # The write guard leaves a route that answers a non-administrator for itself.
         decorated.answers_non_platform_admins = True
