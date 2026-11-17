@@ -356,8 +356,13 @@ def _construct(model, kwargs):
 # the routes under test do not act on. Stated here, not inferred from a CHECK:
 # "submitted" with no review cycle is the legacy shape the typed-review constraint
 # allows, and is the state the review-board workflow routes operate on.
+# An application's status is refused unless it is on the one list the model
+# keeps, so the seeder reads that list rather than writing a random marker.
+from app.services.application_status import APPLICATION_STATUS_VALUES  # noqa: E402
+
 SEED_VALUES = {
     ("arb_review_items", "status"): "submitted",
+    ("application_components", "deployment_status"): APPLICATION_STATUS_VALUES[0],
 }
 
 _NOT_CONSTRAINED = object()
@@ -421,6 +426,8 @@ class Seeder:
         return "%s%d" % (self.token, self.n)
 
     def _fk_value(self, col, context, depth):
+        import sqlalchemy as sa
+
         fk = next(iter(col.foreign_keys))
         ttable = fk.column.table.name
         if ttable == "organizations":
@@ -430,6 +437,15 @@ class Seeder:
         # A column under a unique index (one work package per element) gets a parent of its own:
         # reusing the shared one would put two rows of the same table on it.
         unique = any(ix.unique and list(ix.columns) == [col] for ix in col.table.indexes)
+        # A reference inside a composite unique key that also names the organisation
+        # (one record per organisation and element) is the same case: a second row
+        # must not land on the same parent.
+        unique = unique or any(
+            isinstance(c, sa.UniqueConstraint)
+            and col in list(c.columns)
+            and "organization_id" in c.columns
+            for c in col.table.constraints
+        )
         if ttable in self.pks and not unique:
             return self.pks[ttable]
         target = table_models().get(ttable)
