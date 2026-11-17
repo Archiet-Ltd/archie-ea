@@ -14,7 +14,7 @@ import pytest
 from playwright.sync_api import expect, sync_playwright
 from werkzeug.serving import make_server
 
-from app.services.site_registry import raw_registry
+from app.services.site_registry import _released_entries, raw_registry
 
 # The retired Ask page's address; these tests assert it is absent and never open it.
 RETIRED_ASK = "/intelligence/ask"
@@ -115,11 +115,24 @@ def test_nothing_on_the_home_page_sends_a_visitor_to_the_retired_ask_page(browse
         context.close()
 
 
-def test_no_coming_soon_capability_is_offered_as_available_on_the_home_page(browser, site_url):
+def held_capability_labels(app):
+    """Labels of the capabilities still coming: listed as coming soon and not released.
+
+    A capability is held only while its release switch is off. The registry's own release check
+    decides, the one every menu, the footer and the home page read, so a released capability
+    is not held and a held one is.
+    """
     raw = raw_registry()
-    held = {i["label"] for i in raw["product"]["coming_soon"]["items"]}
-    held |= {i["label"] for i in raw["solutions"]["coming_soon"]["items"]}
-    held |= {"Simulation and Scenario Planning", "Scenario Planning"}
+    with app.test_request_context("/"):
+        released = {entry["label"] for entry in _released_entries()}
+    listed = {i["label"] for i in raw["product"]["coming_soon"]["items"]}
+    listed |= {i["label"] for i in raw["solutions"]["coming_soon"]["items"]}
+    return listed - released
+
+
+def test_no_coming_soon_capability_is_offered_as_available_on_the_home_page(app, browser, site_url):
+    held = held_capability_labels(app)
+    assert "Software and tool discovery" in held, "a capability that is not released must be held"
     context = browser.new_context(viewport=DESKTOP)
     page = context.new_page()
     try:
