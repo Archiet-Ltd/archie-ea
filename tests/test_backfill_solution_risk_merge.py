@@ -72,6 +72,10 @@ def test_backfill_merges_a_solution_risk_into_the_canonical_risk_with_a_link(
     result = _run(app, organization_id=org_id)
     assert result.exit_code == 0, result.output
 
+    # The command ran in its own app context, so it wrote through a session of
+    # its own: expire what this session still holds so the read below comes
+    # from the database, not from the copy loaded before the command ran.
+    db_session.expire_all()
     merged_source = db_session.get(SolutionRisk, source_id)
     assert merged_source.retired_into_risk_id is not None
     risk = db_session.get(Risk, merged_source.retired_into_risk_id)
