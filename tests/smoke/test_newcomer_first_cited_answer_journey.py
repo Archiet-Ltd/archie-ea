@@ -205,6 +205,9 @@ def test_first_card_gives_a_cited_answer_and_connect_github_lands_on_the_connect
 
         # the canvas card's question is answered from what is on the canvas, and links to the canvas
         page.goto(live_server + "/ai-chat", wait_until="networkidle", timeout=PAGE_TIMEOUT)
+        if name == "390":  # the history panel is a slide-over on a phone
+            page.get_by_role("button", name="Show chat history").click()
+        page.get_by_role("button", name="Start a new chat").click()
         expect(canvas_card.first).to_be_visible(timeout=PAGE_TIMEOUT)
         canvas_card.first.click()
         try:
