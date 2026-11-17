@@ -23,7 +23,7 @@
 
     {% call card() %}
         {% call card_content() %}
-        <form x-data="{
+        <form @submit.prevent="submit()" x-data="{
             submitting: false,
             title: '', description: '', trigger_type: '', capability_id: '', solution_id: '',
             errors: {}, formError: '', createdUrl: '',
@@ -89,7 +89,7 @@
                         self.formError = (error && error.message) || 'The change request could not be raised. Try again.';
                     });
             }
-        }" @submit.prevent="submit()" class="space-y-5" novalidate>
+        }" class="space-y-5" novalidate>
 
             <div>
                 {{ form_field(id='cr-title', label='Title', name='title', required=true, placeholder='Brief title for this change request', attrs_dict={'x-model': 'title', ':aria-invalid': '!!errors.title', 'aria-describedby': 'cr-title-error'}) }}
