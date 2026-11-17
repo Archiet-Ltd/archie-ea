@@ -70,6 +70,15 @@
   {%- else -%}
     {%- set breadcrumb = [('Home', url_for('main.index'))] + close_trail(_where.trail, (_own[-1][0] if _own else title)) -%}
   {%- endif -%}
+  {#- one name per crumb: a label already in the trail is dropped (the first stays), and the page's own last crumb always stays -#}
+  {%- set _seen = namespace(names=[], crumbs=[]) -%}
+  {%- for _c in breadcrumb[:-1] -%}
+    {%- if (_c[0]|lower) not in _seen.names and (_c[0]|lower) != (breadcrumb[-1][0]|lower) -%}
+      {%- set _seen.names = _seen.names + [_c[0]|lower] -%}
+      {%- set _seen.crumbs = _seen.crumbs + [_c] -%}
+    {%- endif -%}
+  {%- endfor -%}
+  {%- set breadcrumb = _seen.crumbs + [breadcrumb[-1]] -%}
 {%- endif -%}
 <div class="mb-6">
     {% if breadcrumb %}
