@@ -1134,7 +1134,9 @@ class AgentRunner:
         # Records the read tools actually returned this turn, for citation.
         sources = []
         # A question that names business facts is searched before the reply may say anything is missing.
-        found_text = self._look_up_business_facts(user_message, sources)
+        found_text = self._look_up_business_facts(user_message, sources) + self._look_up_chosen_records(
+            user_message, sources
+        )
         if found_text:
             messages[-1] = {"role": "user", "content": user_message + found_text}
 
@@ -1922,6 +1924,53 @@ class AgentRunner:
             "success": True,
             "result": [{"id": r.id, "name": r.name, "type": r.type, "layer": r.layer} for r in rows],
         }
+
+    def _look_up_chosen_records(self, user_message: str, sources: list) -> str:
+        """The canvas or framework this organisation picked at sign-up that the question names (the
+        first questions offer them), read as a lookup of this turn and cited by its own page. Empty
+        when the question names none of them."""
+        from app.extensions import db
+        from app.middleware.tenant_context import current_org_id
+        from app.modules.ai_chat.services.architect_persona_charters import fence_untrusted
+
+        org_id = current_org_id()
+        if org_id is None:
+            return ""
+        blocks = []
+        try:
+            from app.models.organization import Organization
+            from app.modules.account.services import onboarding_service
+
+            held = onboarding_service.loaded_at_sign_up(org_id)
+            profile = onboarding_service.signup_answers(db.session.get(Organization, org_id))
+            if profile:
+                held["profile"] = [{"key": org_id, "name": "Your sign-up answers", "match": "when we signed up", "href": profile["href"], "values": profile["values"]}]
+            for kind, rows in (("company_profile", held.get("profile", [])), ("canvas", held["canvases"]), ("framework", held["frameworks"])):
+                for row in rows:
+                    if row.get("match", row["name"]).lower() not in user_message.lower() or len(sources) >= self.MAX_SOURCES:
+                        continue
+                    tool = "get_canvas" if kind == "canvas" else "get_chosen_record"
+                    args = {"canvas_type": "business_model", "canvas_id": row["id"]} if kind == "canvas" else {"query": row["name"]}
+                    self._emit({"type": "tool_start", "tool": tool, "args": args})
+                    if kind == "canvas":
+                        # What is on the canvas comes from the chat's own canvas reader, not a count of it.
+                        from app.modules.ai_chat.tools.route_read_tools import ROUTE_READ_HANDLERS
+
+                        result = ROUTE_READ_HANDLERS["get_canvas"]({"canvas_type": "business_model", "canvas_id": row["id"]})
+                        if not result.get("success"):
+                            continue
+                    else:
+                        result = {"success": True, "result": [{"id": row["key"], "name": row["name"], "kind": kind, "entries": row.get("entries", row.get("count")), "values": row.get("values")}]}
+                    self._note_lookup(tool, result, args, for_question=True)
+                    sources.append({"type": kind, "id": row["key"], "name": row["name"], "url": row["href"]})
+                    self._emit({"type": "tool_result", "tool": tool, "result": result})
+                    blocks.append(fence_untrusted("LOOKUP " + kind + " " + row["name"], json.dumps(result, default=str)))
+        except Exception:
+            logger.warning("AgentRunner: chosen-record lookup failed", exc_info=True)
+            db.session.rollback()
+        if not blocks:
+            return ""
+        return "\n\nThe platform has read the records this question names from this organisation's own model:\n" + "\n".join(blocks)
 
     def _look_up_business_facts(self, user_message: str, sources: list) -> str:
         """Search the model for each business fact the question names, as lookups of this

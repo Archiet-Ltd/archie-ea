@@ -914,8 +914,7 @@ def _job_progress(job_id: Optional[int]) -> Optional[Callable[[Dict[str, Any]], 
 def _tell_the_bell(org_id: int) -> None:
     """Post to the notifications bell of the person who gave the website that its facts are ready to
     confirm, with a link to the screen where they do. Failing to post never fails the reading."""
-    from flask import current_app
-
+    from app.utils.page_path import page_path
     from app.jobs.tenant_safe_job import tenant_scope
     from app.models.organization import Organization
     from app.services.notification_service import NotificationService
@@ -930,7 +929,7 @@ def _tell_the_bell(org_id: int) -> None:
             facts, _completeness = proposals(org_id)
             if not user_id or not facts:
                 return
-            url = current_app.url_map.bind("localhost").build("account.welcome", {"step": 3})
+            url = page_path("account.welcome", step=3)
             NotificationService.create(
                 user_id,
                 "We read your website and %d %s ready for you to confirm." % (len(facts), "fact is" if len(facts) == 1 else "facts are"),

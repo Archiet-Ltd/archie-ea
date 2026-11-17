@@ -19,6 +19,7 @@ import pytest
 from playwright.sync_api import expect
 
 from .conftest import PAGE_TIMEOUT, boot_live_server
+from .test_newcomer_first_cited_answer_journey import cards_a_newcomer_is_shown
 from .test_sign_up_first_screen_journey import SIZES, _skip_to_the_dashboard
 from .test_signup_brings_the_company_in_journey import (  # noqa: F401  (people is a fixture)
     assert_is_a_startup_cto_not_an_administrator,
@@ -41,6 +42,7 @@ def _open_chat(browser, live_server, people, app, viewport, load_sample=True, lo
         )
     page = context.new_page()
     email, _ = sign_up(page, live_server, people)
+    page.signed_up_email = email
     assert_is_a_startup_cto_not_an_administrator(app, email)  # lens "cto", enterprise_role not platform_admin, not a platform admin
     _skip_to_the_dashboard(page)
     if load_sample:
@@ -182,9 +184,16 @@ def test_a_new_startup_owner_with_nothing_recorded_sees_the_startup_next_step(br
         expect(steps).to_be_visible(timeout=PAGE_TIMEOUT)
         expect(steps.get_by_role("link", name="Connect GitHub")).to_be_visible()
         expect(steps.get_by_role("button", name="See a sample company")).to_be_visible()
-        # four starter questions follow, and none of them is the enterprise portfolio prompt
+        # a newcomer is offered only questions about what they picked at sign-up, each of which the chat
+        # answers from a record and cites; no general question and no enterprise portfolio prompt
         cards = briefing.get_by_test_id("first-question-suggestion")
-        expect(cards).to_have_count(4)
+        expect(cards.first).to_be_visible()
+        shown = cards_a_newcomer_is_shown(app, page.signed_up_email)
+        assert len(shown) == 1, shown  # a fresh startup holds only its sign-up answers; the canvases start empty
+        expect(cards).to_have_count(len(shown))
+        for i in range(cards.count()):
+            assert cards.nth(i).inner_text().strip().startswith(("What did we record", "What is on our", "Which ")), cards.nth(i).inner_text()
+        assert "monolith" not in briefing.inner_text() and "general questions" not in briefing.inner_text()
         assert "Import a portfolio" not in page.locator("body").inner_text()
         assert "Nothing flagged in your portfolio" not in page.locator("body").inner_text()
         _shot(page, "startup-empty", "1440")
@@ -327,10 +336,10 @@ def test_when_the_first_provider_refuses_the_footer_names_the_one_that_answered(
 def _footer_journey(browser, two_provider_server, people, app):
     context, page = _open_chat(browser, two_provider_server, people, app, SIZES[0][1], load_sample=False)
     try:
-        page.locator('[data-testid="first-question-suggestion"]', has_text="monolith").click()
+        page.locator('[data-testid="first-question-suggestion"]').first.click()
         expect(page.locator("#messages-container")).to_contain_text("teams block each other", timeout=PAGE_TIMEOUT)
         footer = page.locator("#chat-model-name")
-        expect(footer).to_contain_text("Nvidia")
+        expect(footer).to_contain_text("NVIDIA")
         assert "Openrouter" not in footer.inner_text() and "OpenRouter" not in footer.inner_text()
         asked = [h.split("/")[1] for h in _TwoProviders.hits]
         assert asked[0] == "openrouter" and asked[-1] == "nvidia", asked  # the first refused, the second answered
