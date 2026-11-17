@@ -85,6 +85,7 @@ BUDGET_USED_UP_REASON = (
     "The month's AI budget is used up, so this change is waiting. The review carries on by itself when "
     "the budget allows."
 )
+NO_SYSTEM_ACTOR_REASON = "The workspace has no active administrator account to make this change, so nothing was changed."
 ACCOUNT_OFF_REASON = "The account that asked for this change has been switched off, so the change was not made."
 MOVED_REASON = "The person who asked for this change is no longer in the workspace."
 WRITES_PAUSED_REASON = (
@@ -103,6 +104,26 @@ CHAT_CRUD_ENTITIES = (
     "capability", "application", "vendor", "capability_mapping", "work_package",
     "application_capability_mapping",
 )
+
+# The writers whose proposals this review settles whatever made them, with no person asking: a change to or
+# read of a connection. The organisation's system actor
+# decides them (see ``system_actor``).
+PROPOSAL_SOURCES = (
+    "connector_config",
+)
+EXPIRED_CHECK_NAME = "Still current"
+SETTLED_ON_CHECKS_KEY = "settled_on_checks"
+SPENT_MONTH_SENTENCE = (
+    "Applied on the deterministic checks; the reviewer was not called because this month's review budget is spent."
+)
+NO_REVIEWER_SENTENCE = (
+    "Applied on the deterministic checks; the reviewer was not called because no reviewer model is set up."
+)
+SPENT_RUN_SENTENCE = (
+    "Applied on the deterministic checks; the reviewer was not called because this run's review limit was reached."
+)
+# A read or a blueprint can write many proposals at once; one batch may make this many reviewer calls.
+CALLS_PER_BATCH = 120
 
 _MAX_REASON = 400
 
@@ -588,6 +609,15 @@ def _target_score_rationalization(args: Dict[str, Any], org_id: int) -> Target:
                   facts={"application": app_obj.name, "has_a_score_already": score is not None})
 
 
+def _target_proposal(approval: AIChatCRUDApproval, payload: Any, org_id: int) -> Target:
+    """What a proposal written by a connector or a blueprint is about."""
+    args = payload if isinstance(payload, dict) else {}
+    label = _short(approval.summary, 120)
+    return Target(True, label=label, creates=True,
+                  before={"kind": "unrecorded", "note": "A connection change keeps no copy of the old settings."},
+                  facts={"connector": args.get("connector_type")})
+
+
 # The tools whose target the review reads from the organisation's own records. The eight an owner-founder's
 # assistant may use are all here; any other tool's change is checked for its shape only and says so.
 _TOOL_TARGETS = {
@@ -607,6 +637,8 @@ def resolve_target(approval: AIChatCRUDApproval, payload: Any, org_id: int) -> T
 
     A tool with no lookup of its own comes back with ``checked=False`` and an unrecorded before-snapshot, so
     the record says its target checks were not run and the reviewer is told no snapshot is kept."""
+    if is_proposal(approval):
+        return _target_proposal(approval, payload, org_id)
     if approval.operation_type == "tool_use":
         if approval.entity_type == "update_application_status" and isinstance(payload, dict):
             return _target_update_application_status(payload, org_id)
@@ -621,8 +653,39 @@ def resolve_target(approval: AIChatCRUDApproval, payload: Any, org_id: int) -> T
                   before={"kind": "create", "note": "Nothing existed before; undoing it removes the new record."})
 
 
+def _plain_date(value) -> str:
+    """A date the way a person reads it: 15 Nov 2026."""
+    if isinstance(value, str):
+        try:
+            value = datetime.fromisoformat(value)
+        except ValueError:
+            return value
+    return value.strftime("%d %b %Y").lstrip("0") if value else ""
+
+
+def is_proposal(approval: AIChatCRUDApproval) -> bool:
+    """True for a proposal written by a connector or a blueprint (see PROPOSAL_SOURCES), asked for by no one."""
+    return approval.source_table in PROPOSAL_SOURCES
+
+
+def system_actor(organization_id: int):
+    """The user a proposal with no requesting person is decided as: the organisation's own earliest active,
+    confirmed administrator, by the one admin rule (``User.is_org_admin``). None when it has none."""
+    from app.models.user import User
+
+    candidates = (
+        User.query.filter(User.organization_id == organization_id, User.confirmed.is_(True),
+                          User.disabled_at.is_(None), db.func.coalesce(User.is_service_user, False).is_(False))
+        .order_by(User.id).all()
+    )
+    return next((u for u in candidates if u.is_org_admin), None)
+
+
 def in_scope(approval: AIChatCRUDApproval) -> bool:
-    """True for a change this review settles (see CHAT_CRUD_OPERATIONS)."""
+    """True for a change this review settles: a proposal from any writer in PROPOSAL_SOURCES, the
+    assistant's tool calls, and the chat's own changes (see CHAT_CRUD_OPERATIONS)."""
+    if is_proposal(approval):
+        return True
     if approval.user_id is None or approval.source_table:
         return False
     if approval.operation_type == "tool_use":
@@ -660,6 +723,15 @@ def run_checks(service, approval: AIChatCRUDApproval, requester) -> Tuple[List[C
         else "The change does not belong to the workspace of the person who asked for it.",
     ):
         return checks, Target(False)
+
+    if is_proposal(approval):
+        # A proposal that waited past its due time was not looked at, not judged: it is checked again, now,
+        # against the model as it stands today, and settles on its merits like any other.
+        expires = approval.expires_at
+        late = expires is not None and expires < datetime.utcnow()
+        add(EXPIRED_CHECK_NAME, True,
+            "It was proposed for %s and had not been looked at by then, so it is checked again now against the model as it is today."
+            % _plain_date(expires) if late else "It is still within the time it was proposed for.")
 
     payload = _payload_of(approval)
     if approval.operation_type == "tool_use":
@@ -732,6 +804,9 @@ def run_checks(service, approval: AIChatCRUDApproval, requester) -> Tuple[List[C
         # same rule as the vendor API).
         allowed, role_reason = False, (
             "The vendor list is shared by every workspace, and only a platform administrator can change it.")
+    elif approval.user_id is None:
+        role_reason = ("The workspace's own administrator account makes it, as nobody asked for it."
+                       if allowed else "The workspace's administrator account cannot make changes.")
     else:
         role_reason = ("The person who asked still has the role this change needs." if allowed
                        else "The person who asked no longer has a role that can make changes.")
@@ -928,6 +1003,7 @@ def _state(approval: AIChatCRUDApproval) -> Dict[str, Any]:
         "outcome": state.get("outcome"),
         "outcome_reasons": list(state.get("outcome_reasons") or []),
         "waiting_reason": state.get("waiting_reason"),
+        SETTLED_ON_CHECKS_KEY: state.get(SETTLED_ON_CHECKS_KEY),
         "timings": dict(state.get("timings") or {}),
     }
 
@@ -1055,7 +1131,8 @@ def verdict(approval: AIChatCRUDApproval, state: str, summary: str, reasons: Lis
 
 
 def _decline(
-    service, approval: AIChatCRUDApproval, state: Dict[str, Any], reasons: List[str], charter_refused: bool = False
+    service, approval: AIChatCRUDApproval, state: Dict[str, Any], reasons: List[str], charter_refused: bool = False,
+    outcome: str = "declined",
 ) -> Dict[str, Any]:
     """Decline the change with its reasons: the data is left as it was.
 
@@ -1068,7 +1145,7 @@ def _decline(
     if not claimed:
         return verdict(approval, "applied" if approval.status == ApprovalStatus.APPROVED else "declined",
                        approval.summary, [approval.rejected_reason] if approval.rejected_reason else [])
-    state["outcome"] = "declined"
+    state["outcome"] = outcome
     state["outcome_reasons"] = reasons
     _save(approval, state)
     _event(service, approval, "declined", reason_text, to_status=ApprovalStatus.REJECTED.value)
@@ -1159,6 +1236,11 @@ def settle(
     else:
         choice = router.select_reviewer(drafter_provider, drafter_model)
         if choice is None:
+            if is_proposal(approval):
+                # No reviewer model is set up for this workspace at all: a proposal that passed every
+                # deterministic check is applied and says so, rather than waiting for a reviewer that
+                # does not exist.
+                return _apply_on_checks(service, approval, state, target, NO_REVIEWER_SENTENCE)
             return _wait(service, approval, state, NO_REVIEWER_REASON, counts=True)
         approval.reviewer_model = choice.ref
         state["same_provider"] = choice.same_provider
@@ -1205,8 +1287,12 @@ def settle(
             if not approval.drafter_model or number >= MAX_REVIEWS:
                 return _decline(service, approval, state, _failed_reasons(state["rounds"][-1]))
     except MonthBudgetUsedUp:
+        if is_proposal(approval):
+            return _apply_on_checks(service, approval, state, target, SPENT_MONTH_SENTENCE)
         return _wait(service, approval, state, BUDGET_USED_UP_REASON, counts=False)
     except BudgetSpent:
+        if is_proposal(approval):
+            return _apply_on_checks(service, approval, state, target, SPENT_RUN_SENTENCE)
         return _wait(service, approval, state, "This run's review limit was reached; the review resumes next run.",
                      counts=False)
     except ReviewerUnavailable as exc:
@@ -1244,6 +1330,8 @@ def _revise(service, router, approval, state, payload, budget) -> Optional[Dict[
         _save(approval, state)
         _event(service, approval, "revised", "The revision was the same as the draft, so the review ended.")
         return _decline(service, approval, state, _failed_reasons(last))
+    if is_proposal(approval) and isinstance(payload, dict):
+        revised = {**payload, **revised}  # the revision keeps the proposal's own identity keys
     approval.operation_payload = json.dumps(revised)
     summary = _short(data.get("summary"), 300)
     if summary:
@@ -1253,8 +1341,23 @@ def _revise(service, router, approval, state, payload, budget) -> Optional[Dict[
     return None
 
 
+def _apply_on_checks(
+    service, approval: AIChatCRUDApproval, state: Dict[str, Any], target: Target, note: str
+) -> Dict[str, Any]:
+    """Apply a change that passed its deterministic checks without a reviewer call: a proposal settled while the
+    review budget is spent. ``note`` is recorded."""
+    held = _hold_if_paused(service, approval, state)
+    if held is not None:
+        return held
+    state[SETTLED_ON_CHECKS_KEY] = note
+    approval.before_snapshot = target.before or {"kind": "unrecorded"}
+    _save(approval, state)
+    return _apply(service, approval, state, None, note=note)
+
+
 def _apply(
-    service, approval: AIChatCRUDApproval, state: Dict[str, Any], approved_by: Optional[int] = None
+    service, approval: AIChatCRUDApproval, state: Dict[str, Any], approved_by: Optional[int] = None,
+    note: Optional[str] = None,
 ) -> Dict[str, Any]:
     approval_id, org_id = approval.id, approval.organization_id
     started = time.monotonic()
@@ -1265,12 +1368,15 @@ def _apply(
     if result.get("success"):
         inner = result.get("result") if isinstance(result.get("result"), dict) else {}
         summary = _short(inner.get("message") or approval.summary, 300)
-        state["outcome"] = "applied"
-        state["outcome_reasons"] = []
+        linked = bool(inner.get("linked") or inner.get("already_in_model"))
+        state["outcome"] = "linked" if linked else "applied"
+        state["outcome_reasons"] = [note] if note else []
         _save(approval, state)
-        _event(service, approval, "applied", summary)
+        _event(service, approval, "applied", note or summary)
         db.session.commit()
-        return verdict(approval, "applied", summary, [])
+        answer = verdict(approval, "applied", note if (note and linked) else summary, [])
+        answer["outcome"] = state["outcome"]
+        return answer
     if result.get("code") == "CONFLICT" and approval.status != ApprovalStatus.PENDING:
         # Someone else settled it first; report what happened to it.
         return verdict(approval, "applied" if approval.status == ApprovalStatus.APPROVED else "declined",
@@ -1298,9 +1404,9 @@ def describe(approval: AIChatCRUDApproval) -> Dict[str, Any]:
     """The record of one reviewed change as the page shows it (read only)."""
     saved = _state(approval)
     if approval.status == ApprovalStatus.APPROVED:
-        label, tone = "Applied", "positive"
+        label, tone = ("Linked", "neutral") if saved["outcome"] == "linked" else ("Applied", "positive")
     elif approval.status == ApprovalStatus.REJECTED:
-        label, tone = "Declined", "negative"
+        label, tone = ("Retired", "neutral") if saved["outcome"] == "retired" else ("Declined", "negative")
     else:
         label, tone = "In review", "caution"
     waiting_reason = saved["waiting_reason"] if approval.status == ApprovalStatus.PENDING else None
@@ -1436,12 +1542,16 @@ def waiting_ids(organization_id: int) -> List[int]:
         .filter(
             AIChatCRUDApproval.organization_id == organization_id,
             AIChatCRUDApproval.status == ApprovalStatus.PENDING,
-            AIChatCRUDApproval.user_id.isnot(None),
-            AIChatCRUDApproval.source_table.is_(None),
+            db.or_(
+                db.and_(AIChatCRUDApproval.user_id.isnot(None), AIChatCRUDApproval.source_table.is_(None)),
+                AIChatCRUDApproval.source_table.in_(PROPOSAL_SOURCES),
+            ),
             db.func.coalesce(last_event.c.last_at, AIChatCRUDApproval.created_at) < cutoff,
             # Only a change that is in the loop: it carries a rubric version or has review events. A row
-            # from before the loop has neither and is left alone until its own brief moves it in.
-            db.or_(AIChatCRUDApproval.rubric_version.isnot(None), has_loop_event),
+            # from before the loop has neither and is left alone until its own brief moves it in. A proposal
+            # from a connector or a blueprint is always in the loop.
+            db.or_(AIChatCRUDApproval.rubric_version.isnot(None), has_loop_event,
+                   AIChatCRUDApproval.source_table.in_(PROPOSAL_SOURCES)),
         )
         .order_by(AIChatCRUDApproval.id)
         .all()
@@ -1449,29 +1559,120 @@ def waiting_ids(organization_id: int) -> List[int]:
     return [row.id for row in rows if in_scope(row)]
 
 
-def sweep_organisation(organization_id: int, budget: Optional[ReviewBudget] = None) -> Dict[str, int]:
-    """Settle this organisation's quiet changes in review. Runs with the organisation already active."""
+def _settle_row(row: AIChatCRUDApproval, organization_id: int, budget: Optional[ReviewBudget]) -> Dict[str, Any]:
+    """Settle one waiting change as the person who asked, or as the organisation's system actor when nobody did."""
+    from app.models.user import User
     from app.modules.ai_chat.services.ai_chat_approval_service import AIChatApprovalService
 
+    approval_id = row.id
+    if row.user_id is None:
+        actor = system_actor(organization_id)
+        if actor is None:
+            return decline(AIChatApprovalService(None), row, NO_SYSTEM_ACTOR_REASON)
+        return AIChatApprovalService(actor.id).settle_after_review(approval_id, budget=budget)
+    requester = User.query.filter_by(id=row.user_id, organization_id=organization_id).first()
+    if requester is None:
+        # The person who asked now belongs to another workspace (or none): the change is declined, not
+        # retried by every sweep. Only this organisation's record is touched.
+        return decline(AIChatApprovalService(row.user_id), row, MOVED_REASON)
+    return AIChatApprovalService(row.user_id).settle_after_review(approval_id, budget=budget)
+
+
+def sweep_organisation(organization_id: int, budget: Optional[ReviewBudget] = None) -> Dict[str, int]:
+    """Settle this organisation's quiet changes in review. Runs with the organisation already active."""
     counts = {"applied": 0, "declined": 0, "in_review": 0}
     budget = budget or ReviewBudget()
     if budget.out_of_money:
         return counts  # the month's AI budget stopped this run; the changes wait for the next one
     for approval_id in waiting_ids(organization_id):
         row = AIChatCRUDApproval.query.filter_by(id=approval_id, organization_id=organization_id).first()
-        if row is None or row.user_id is None:
+        if row is None:
             continue
         db.session.expire_all()
-        from app.models.user import User
-
-        requester = User.query.filter_by(id=row.user_id, organization_id=organization_id).first()
-        if requester is None:
-            # The person who asked now belongs to another workspace (or none): the change is declined, not
-            # retried by every sweep. Only this organisation's record is touched.
-            outcome = decline(AIChatApprovalService(row.user_id), row, MOVED_REASON)
-        else:
-            outcome = AIChatApprovalService(row.user_id).settle_after_review(approval_id, budget=budget)
+        outcome = _settle_row(row, organization_id, budget)
         counts[outcome.get("state") if outcome.get("state") in counts else "in_review"] += 1
         if budget.used >= budget.limit or budget.out_of_money:
+            break
+    return counts
+
+
+SETTLE_TASK = "settle_proposals"
+SETTLE_LOCK_WAIT_SECONDS = 180
+
+
+def queue_settling(organization_id: int) -> None:
+    """Ask the job worker to settle this organisation's waiting proposals. Adds the job to the caller's own
+    transaction (no commit of its own), so the proposal and the job are saved together, and adds nothing when
+    one is already queued. Nothing settles inside the web request that wrote the proposal."""
+    from app.models.job import Job, JobStatus
+
+    queued = Job.query.filter(
+        Job.task == SETTLE_TASK, Job.status == JobStatus.PENDING.value,
+        Job.payload["organization_id"].as_string() == str(organization_id),
+    ).first()
+    if queued is None:
+        db.session.add(Job(name="Settle proposals", task=SETTLE_TASK, status=JobStatus.PENDING.value,
+                           payload={"organization_id": organization_id}))
+
+
+def settle_proposals(
+    organization_id: int, sources: Optional[Tuple[str, ...]] = None, budget: Optional[ReviewBudget] = None,
+    only_ids: Optional[List[int]] = None,
+) -> Dict[str, int]:
+    """Settle every proposal of this organisation that is still waiting, now: the job a read or a blueprint
+    starts, and the one-off job for what was waiting before. Never runs inside a web request. Runs with the
+    organisation already active (``tenant_scope``). Returns how many were applied, linked, declined, retired
+    and left in review."""
+    import time
+
+    from app.jobs.tenant_safe_job import job_lock
+
+    # One pass for an organisation at a time: two reads (or a read and a connection change) that finish together
+    # would otherwise settle the same proposals side by side. The second waits for the first, then settles what
+    # the first did not reach.
+    give_up_at = time.monotonic() + SETTLE_LOCK_WAIT_SECONDS
+    while True:
+        with job_lock("settle_proposals:%d" % organization_id, required=False) as acquired:
+            if acquired:
+                return _settle_proposals_locked(organization_id, sources, budget, only_ids)
+        if time.monotonic() >= give_up_at:
+            logger.warning("Settling the proposals of organisation %s waited too long for another pass", organization_id)
+            return {"applied": 0, "linked": 0, "declined": 0, "retired": 0, "in_review": 0}
+        time.sleep(1)
+
+
+def _settle_proposals_locked(
+    organization_id: int, sources: Optional[Tuple[str, ...]], budget: Optional[ReviewBudget],
+    only_ids: Optional[List[int]],
+) -> Dict[str, int]:
+    counts = {"applied": 0, "linked": 0, "declined": 0, "retired": 0, "in_review": 0}
+    budget = budget or ReviewBudget(CALLS_PER_BATCH)
+    attempted: set = set()
+    # A read that is itself settled (an approved sync of a connection) writes proposals of its own, so the
+    # waiting ones are fetched again until a pass finds none that this run has not already tried.
+    for _pass in range(4):
+        query = AIChatCRUDApproval.query.filter(
+            AIChatCRUDApproval.organization_id == organization_id,
+            AIChatCRUDApproval.status == ApprovalStatus.PENDING,
+            AIChatCRUDApproval.source_table.in_(sources or PROPOSAL_SOURCES),
+        )
+        if only_ids is not None:
+            query = query.filter(AIChatCRUDApproval.id.in_(only_ids))
+        rows = sorted((r for r in query.order_by(AIChatCRUDApproval.id).all() if r.id not in attempted),
+                      key=lambda a: a.id)
+        if not rows:
+            break
+        for row in [r.id for r in rows]:
+            attempted.add(row)
+            db.session.expire_all()
+            approval = AIChatCRUDApproval.query.filter_by(id=row, organization_id=organization_id).first()
+            if approval is None or approval.status != ApprovalStatus.PENDING:
+                continue
+            _settle_row(approval, organization_id, budget)
+            db.session.expire_all()
+            done = AIChatCRUDApproval.query.filter_by(id=row, organization_id=organization_id).first()
+            outcome = _state(done)["outcome"] if done.status != ApprovalStatus.PENDING else None
+            counts[outcome if outcome in counts else "in_review"] += 1
+        if only_ids is not None:
             break
     return counts
