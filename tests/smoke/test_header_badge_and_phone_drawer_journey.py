@@ -93,7 +93,19 @@ def test_home_page_labels_its_sections_and_offers_start_free(browser, live_serve
         assert "Roadmap" in labels and "Stages" not in labels, labels
         assert "waiting list" not in page.inner_text("body").lower()
         coming = page.get_by_role("link", name="Coming soon").first
-        assert "early access" in coming.locator("xpath=..").inner_text().lower()
+        sentence = coming.locator("xpath=..").inner_text().lower()
+        assert "early access" in sentence
+        features = ctx.new_page()
+        features.goto(live_server + "/features", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        entries = features.locator("[data-testid=coming-soon-list] li")
+        total = entries.count()
+        linked = features.locator("[data-testid=coming-soon-list] li a[href]").count()
+        features.close()
+        assert total > 0
+        if linked < total:
+            # Not every entry offers a request, so the home page must not say every one does.
+            assert "each open" not in sentence and "on request" not in sentence, (total, linked, sentence)
+            assert "where it is offered" in sentence, sentence
         assert page.get_by_role("link", name="Start free").count() >= 1
         coming.click()
         page.wait_for_load_state("domcontentloaded")
