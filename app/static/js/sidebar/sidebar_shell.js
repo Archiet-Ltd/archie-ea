@@ -40,20 +40,21 @@
         }
 
         function buildDrawer() {
-            drawer = document.createElement('div');
-            drawer.setAttribute('data-fb-sidebar-mobile', '');
+            // The drawer is rendered by components/admin_sidebar.html. It carries no data-state on its parts: the library's
+            // sheet script opens (and moves to <body>) any sheet marked open, which unpins the drawer from its fixed wrapper.
+            // This script owns the drawer's state.
+            drawer = document.querySelector('[data-fb-sidebar-mobile]');
+            if (!drawer) { return; }
             drawer.hidden = true;
-            // The drawer carries no data-state on its parts: the library's sheet script opens (and moves to <body>) any sheet
-            // marked open, which unpins the drawer from its fixed wrapper. This script owns the drawer's state.
-            drawer.innerHTML = '<div data-slot="sheet-overlay"></div>' +
-                '<div data-slot="sheet-content" data-side="left" role="dialog" aria-modal="true" aria-label="Navigation" data-sidebar="sidebar" data-mobile="true"><div class="flex h-full w-full flex-col" data-fb-mobile-slot></div></div>';
             document.body.appendChild(drawer);
-            drawer.firstElementChild.addEventListener('click', function () { setDrawer(false); });
+            drawer.querySelector('[data-slot="sheet-overlay"]').addEventListener('click', function () { setDrawer(false); });
+            drawer.querySelector('[data-fb-drawer-close]').addEventListener('click', function () { setDrawer(false); });
         }
 
         function setDrawer(next) {
             if (next === drawerOpen) { return; }
             if (!drawer) { buildDrawer(); }
+            if (!drawer) { return; }
             var slot = drawer.querySelector('[data-fb-mobile-slot]');
             var inner = sidebar.querySelector('[data-slot="sidebar-inner"]') || slot.firstElementChild;
             drawerOpen = next;

@@ -28,6 +28,13 @@
            GPT-3.5)", "DeepSeek", ...) reflected the same /api/v1/llm/available registry AI
            Chat already reads, so removing it here loses no capability. #}
 
+        {% if current_user.is_authenticated %}
+        {# The persona the signed-in person works as, in the vocabulary the sidebar and the team page use. #}
+        <span id="user-role-badge" class="hidden sm:inline-flex" data-testid="user-role-badge">
+            {% call badge(variant='outline') %}{{ get_role_display_name(get_user_role(current_user)) }}{% endcall %}
+        </span>
+        {% endif %}
+
         {% if resolved_page_guide_context.enabled %}
         <button id="page-guide-trigger"
                 x-data
