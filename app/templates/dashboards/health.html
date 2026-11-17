@@ -113,7 +113,7 @@
         ) }}
         {{ metrics_card(
             title='Open Risks',
-            value=((risk_counts.critical or 0) + (risk_counts.high or 0) + (risk_counts.medium or 0) + (risk_counts.low or 0)) | string,
+            value=(((risk_counts or {}).critical + (risk_counts or {}).high + (risk_counts or {}).medium + (risk_counts or {}).low) | string) if (risk_counts and risk_counts.critical is not none and risk_counts.high is not none and risk_counts.medium is not none and risk_counts.low is not none) else '—',
             icon='alert-triangle',
             description='Active risk register entries'
         ) }}
@@ -129,13 +129,13 @@
                 {% endcall %}
             {% endcall %}
             {% call card.card_content() %}
-                <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <div class="grid grid-cols-2 sm:grid-cols-4 gap-3" data-testid="risk-by-impact">
                     {% set risk_colors = {'critical': 'text-destructive', 'high': 'text-warning-emphasis', 'medium': 'text-layer-strategy-emphasis', 'low': 'text-success'} %}{# design-tokens-ok: 4-tier severity scale (critical/high/medium/low) beyond the 3-tier RAG semantic set — kept raw so each tier stays visually distinct #}
                     {% for level in ['critical', 'high', 'medium', 'low'] %}
                     <div class="rounded-lg border border-border bg-background p-4 text-center">
                         <p class="text-xs text-muted-foreground capitalize mb-1">{{ level }}</p>
                         <p class="text-3xl font-bold {{ risk_colors.get(level, 'text-foreground') }}">
-                            {{ risk_counts.get(level, 0) }}
+                            {{ (risk_counts or {}).get(level) | dash }}
                         </p>
                     </div>
                     {% endfor %}
@@ -156,28 +156,28 @@
                 {% endcall %}
             {% endcall %}
             {% call card.card_content() %}
-                <div class="grid grid-cols-3 gap-3 mb-3">
+                <div class="grid grid-cols-3 gap-3 mb-3" data-testid="arb-pipeline-counts">
                     <div class="rounded-lg border border-border bg-background p-4 text-center">
                         <p class="text-xs text-muted-foreground mb-1">Pending</p>
-                        <p class="text-3xl font-bold text-warning">{{ arb_pipeline.pending }}</p>
+                        <p class="text-3xl font-bold text-warning">{{ (arb_pipeline or {}).pending | dash }}</p>
                     </div>
                     <div class="rounded-lg border border-border bg-background p-4 text-center">
                         <p class="text-xs text-muted-foreground mb-1">Under Review</p>
-                        <p class="text-3xl font-bold text-primary">{{ arb_pipeline.under_review }}</p>
+                        <p class="text-3xl font-bold text-primary">{{ (arb_pipeline or {}).under_review | dash }}</p>
                     </div>
                     <div class="rounded-lg border border-border bg-background p-4 text-center">
                         <p class="text-xs text-muted-foreground mb-1">Approved</p>
-                        <p class="text-3xl font-bold text-success">{{ arb_pipeline.approved }}</p>
+                        <p class="text-3xl font-bold text-success">{{ (arb_pipeline or {}).approved | dash }}</p>
                     </div>
                 </div>
                 <div class="grid grid-cols-2 gap-3">
                     <div class="rounded-lg border border-border bg-background p-3 text-center">
                         <p class="text-xs text-muted-foreground mb-1">Rejected</p>
-                        <p class="text-2xl font-bold text-destructive">{{ arb_pipeline.rejected }}</p>
+                        <p class="text-2xl font-bold text-destructive">{{ (arb_pipeline or {}).rejected | dash }}</p>
                     </div>
                     <div class="rounded-lg border border-border bg-background p-3 text-center">
                         <p class="text-xs text-muted-foreground mb-1">Deferred</p>
-                        <p class="text-2xl font-bold text-muted-foreground">{{ arb_pipeline.deferred }}</p>
+                        <p class="text-2xl font-bold text-muted-foreground">{{ (arb_pipeline or {}).deferred | dash }}</p>
                     </div>
                 </div>
                 <p class="mt-3 text-xs text-muted-foreground">
