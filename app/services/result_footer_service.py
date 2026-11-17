@@ -271,11 +271,15 @@ def origin_of(data_source: Optional[str] = None, sample: bool = False) -> Dict[s
 
 
 def render_footer(footer: Dict[str, Any]) -> str:
-    """The one footer as markup, for a page that draws its results in the browser from data the server sent."""
-    from flask import render_template_string
+    """The one footer as markup, for a page that draws its results in the browser from data the server sent.
 
-    return render_template_string(
-        "{% from 'components/provenance.html' import result_footer %}{{ result_footer(footer) }}", footer=footer)
+    The text is the output of an autoescaped template, so it is returned as ``Markup``: a page that places it
+    renders it as markup without a ``|safe`` that would also pass an unescaped string."""
+    from flask import render_template_string
+    from markupsafe import Markup
+
+    return Markup(render_template_string(
+        "{% from 'components/provenance.html' import result_footer %}{{ result_footer(footer) }}", footer=footer))
 
 
 def application_rows(organization_id: int, application_ids: Iterable[int]) -> Dict[int, Any]:

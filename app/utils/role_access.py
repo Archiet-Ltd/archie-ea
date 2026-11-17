@@ -1394,5 +1394,6 @@ def role_access_context_processor():
         "is_procurement": is_procurement,
         "is_application_manager": is_application_manager,
         "get_role_display_name": get_role_display_name,
+        "get_user_role": get_user_role,
         "link_requires_satisfied": link_requires_satisfied,
     }

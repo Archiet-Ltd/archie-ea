@@ -289,5 +289,17 @@ Budget: scripts/check_sidebar_links.py renders this per role and counts its link
 {% endcall %}{# sidebar_container #}
 {% endcall %}{# sidebar #}
 
+{# The phone drawer: a scrim at z-40 under the panel at z-50 (js/sidebar/sidebar_shell.js moves the
+   navigation into the slot while it is open and puts it back on close). #}
+<div data-fb-sidebar-mobile hidden>
+    <div data-slot="sheet-overlay" class="z-40"></div>
+    <div data-slot="sheet-content" data-side="left" role="dialog" aria-modal="true" aria-label="Navigation" data-sidebar="sidebar" data-mobile="true" class="z-50">
+        <div class="flex justify-end px-2 pt-2">
+            {{ button(variant='ghost', size='icon-sm', aria_label='Close navigation', icon='x', attrs_dict={'data-fb-drawer-close': ''}) }}
+        </div>
+        <div class="flex min-h-0 w-full flex-1 flex-col" data-fb-mobile-slot></div>
+    </div>
+</div>
+
 <script src="{{ url_for('static', filename='js/sidebar/sidebar_shell.js') }}"></script>
 <script src="{{ url_for('static', filename='js/sidebar/nav_items.js') }}" data-cookie="{{ nav.cookie_name or '' }}"></script>
