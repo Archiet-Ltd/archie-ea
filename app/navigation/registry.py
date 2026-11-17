@@ -128,11 +128,12 @@ WORK: tuple = (
     _l("impact", "Impact", "enterprise.impact_analysis", "zap", job="2", toggle=True, group="work",
        children=(
            _l("impact_analysis", "Impact analysis", "enterprise.impact_analysis", job="2",
-              aliases=("Impact", "What breaks", "Dependencies", "Blast radius")),
+              aliases=("Impact", "What breaks", "Dependencies", "Blast radius"),
+              owns=("strategic.impact_analysis",)),
            _l("traceability", "Traceability", "architect_ui.traceability_matrix", job="2",
               aliases=("Traceability matrix", "Trace", "Requirements traceability", "Value streams at risk")),
        ),
-       owns=("strategic.impact_analysis", "intelligence_ui.traceability", "intelligence_ui.value_streams_at_risk",
+       owns=("intelligence_ui.traceability", "intelligence_ui.value_streams_at_risk",
              "intelligence_ui.twin_map")),
     _l("changes", "Changes", "enterprise.gap_analysis", "route", job="4", toggle=True, group="work",
        children=(
