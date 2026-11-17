@@ -85,10 +85,17 @@ SHELL = """() => Object.fromEntries(['org-switcher-trigger', 'user-menu-btn'].ma
 
 def _axe_source():
     candidates = [os.environ.get("AXE_CORE_JS", ""), str(ROOT / "node_modules/axe-core/axe.min.js")]
+    # requirements.txt pins axe-playwright-python, which ships an axe-core bundle; every job that
+    # installs the Python requirements therefore has the checker, with no node install needed.
+    try:
+        import axe_playwright_python
+        candidates.append(str(Path(axe_playwright_python.__file__).parent / "axe.min.js"))
+    except ImportError:
+        pass
     for path in candidates:
         if path and Path(path).is_file():
             return Path(path).read_text(encoding="utf-8")
-    pytest.fail("axe-core is not installed: run `npm install` (axe-core is a devDependency) or set AXE_CORE_JS")
+    pytest.fail("axe-core is not installed: run `pip install -r requirements.txt` (axe-playwright-python bundles it) or set AXE_CORE_JS")
 
 
 def _seed_applications(db_session, org):
