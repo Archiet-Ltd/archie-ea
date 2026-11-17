@@ -101,8 +101,8 @@ def test_first_view_holds_every_element_named_and_legend_is_whole(browser, live_
         assert measured["count"] == total
         assert measured["unnamed"] == 0, "nodes without a name and a type"
         assert not measured["outside"], "%d element(s) lie outside the canvas: %r" % (len(measured["outside"]), measured["outside"][:3])
-        assert any(l["text"] == "Implementation and migration" for l in measured["legend"])
-        assert not [l for l in measured["legend"] if l["cut"]], measured["legend"]
+        assert any(item["text"] == "Implementation and migration" for item in measured["legend"])
+        assert not [item for item in measured["legend"] if item["cut"]], measured["legend"]
         _shot(page, "model-map", scheme)
     finally:
         context.close()
