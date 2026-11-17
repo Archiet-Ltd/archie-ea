@@ -21,7 +21,7 @@ from .test_first_screen_one_message_journey import FOLD, PHONE, _page
 pytestmark = [pytest.mark.smoke, pytest.mark.journey]
 
 WALK = os.environ.get("SCORECARD_WALK_DIR") or tempfile.gettempdir()
-CARDS = ("card-supported", "card-exceptions", "card-exposure", "card-disagree")
+CARDS = ("supported-version-share", "card-exceptions", "card-exposure", "card-disagree")
 INTERNAL = ("orm:", "[store-", "—", "ApplicationComponent", "CostFact", "ApplicationCost", "None")
 
 
@@ -123,7 +123,7 @@ def test_cto_reads_four_cards_in_plain_words_and_every_card_leads_somewhere(brow
 
         for testid in CARDS:
             assert page.locator('[data-testid="%s"]' % testid).count() == 1, testid
-        assert page.locator('[data-testid="card-supported-value"]').inner_text().strip() == "50.0%"
+        assert page.locator('[data-testid="supported-version-share-value"]').inner_text().strip() == "50.0%"
         assert page.locator('[data-testid="card-exceptions-value"]').inner_text().strip() == "1"
         assert page.locator('[data-testid="card-exposure-value"]').inner_text().strip() == "1"
         assert "Quill DB 9" in page.locator('[data-testid="card-exposure-sentence"]').inner_text()
@@ -144,7 +144,7 @@ def test_cto_reads_four_cards_in_plain_words_and_every_card_leads_somewhere(brow
         # the records behind the cards
         assert "ACR-CTO-1" in page.locator('[data-testid="exceptions-table"]').inner_text()
         assert "Ledger Core" in page.locator('[data-testid="exposure-table"]').inner_text()
-        href = page.locator('[data-testid="card-supported"]').get_attribute("href")
+        href = page.locator('[data-testid="supported-version-share"]').get_attribute("href")
         page.goto(live_server + href, wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
         assert "Ledger Core" in page.locator("main").first.inner_text()
         _open_from_sidebar(page, live_server)
@@ -170,7 +170,7 @@ def test_company_without_applications_is_told_what_each_card_needs(browser, live
         for testid in CARDS:
             text = page.locator('[data-testid="%s"]' % testid).inner_text()
             assert len(text.split()) >= 8, (testid, text)
-        assert "record its vendor product" in page.locator('[data-testid="card-supported"]').inner_text()
+        assert "record its vendor product" in page.locator('[data-testid="supported-version-share"]').inner_text()
         assert "Record end-of-support dates" in page.locator('[data-testid="card-exposure"]').inner_text()
         assert "Appears here once a contract states its annual cost" in page.locator(
             '[data-testid="annual-cost-text"]').inner_text()

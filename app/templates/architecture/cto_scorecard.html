@@ -4,8 +4,6 @@
 {% import 'basecoat/index.html' as ui %}
 {% from 'macros/page_shell.html' import page_shell %}
 {% from 'components/list_table.html' import list_table %}
-{% from 'components/explained_value.html' import explained_value %}
-{% from 'components/empty_state.html' import empty_state %}
 {% set apps_href = url_for('unified_applications.application_list') %}
 
 {% block title %}CTO Scorecard — {{ config.APP_NAME }}{% endblock %}
@@ -22,7 +20,8 @@
       <span class="text-sm text-muted-foreground break-words" data-testid="{{ testid }}-sentence">{{ sentence }}</span>
       {% else %}
       <span class="text-lg font-semibold">{{ label }}</span>
-      {{ explained_value(basis=sentence, action=action, testid=testid ~ '-sentence') }}
+      <span class="text-sm text-muted-foreground break-words" data-testid="{{ testid }}-sentence">{{ sentence }}</span>
+      {% if action %}<span class="text-sm">{{ action }}</span>{% endif %}
       {% endif %}
     {% endcall %}
   {% endcall %}
@@ -40,16 +39,14 @@
   {% set open_count = exceptions | length %}
   {% set screens = disagreements | length %}
   <div class="grid grid-cols-1 gap-4 md:gap-6 sm:grid-cols-2 xl:grid-cols-4" data-testid="scorecard-cards">
-    <div data-testid="supported-version-share" class="contents">
     {% if versions.total %}
-      {{ stat('card-supported', 'shield-check', 'Supported estate', versions.share_pct ~ '%',
+      {{ stat('supported-version-share', 'shield-check', 'Supported estate', versions.share_pct ~ '%',
               versions.supported ~ ' of ' ~ versions.total ~ ' applications are on a supported technology version.', apps_href) }}
     {% else %}
-      {{ stat('card-supported', 'shield-check', 'Supported estate', none,
+      {{ stat('supported-version-share', 'shield-check', 'Supported estate', none,
               'No application has a vendor product recorded yet, so no share can be worked out.', apps_href,
               'Open an application and record its vendor product.') }}
     {% endif %}
-    </div>
     {% if open_count %}
       {{ stat('card-exceptions', 'triangle-alert', 'Open exceptions', open_count,
               exceptions[0].acr_reference ~ ' is the oldest, ' ~ ('raised today.' if exceptions[0].age_days == 0 else ('raised 1 day ago.' if exceptions[0].age_days == 1 else ('raised ' ~ exceptions[0].age_days ~ ' days ago.' if exceptions[0].age_days is not none else 'with no raised date recorded.'))), '#open-exceptions') }}
@@ -86,12 +83,12 @@
 
   <section id="open-exceptions" class="space-y-2" data-testid="open-exceptions">
     <h2 class="text-lg font-semibold">Open exceptions</h2>
-    {% call(exc) list_table(rows=exceptions, columns=[('Reference', ''), ('Exception', ''), ('Days open', 'text-right'), ('Status', '')],
+    {% call(exc) list_table(rows=exceptions, columns=[('Reference', ''), ('Exception', ''), ('Raised', 'text-right'), ('Status', '')],
                             caption='Open architecture exceptions, oldest first', testid='exceptions-table', row_testid='exception-row',
                             empty_message='No architecture change is running as an exception. Every change request is on its standard path.') %}
       {% call ui.table_cell(class='tabular-nums', attrs={'data-testid': 'exception-' ~ exc.id}) %}{{ exc.acr_reference }}{% endcall %}
       {% call ui.table_cell(class='') %}{{ exc.title }}{% endcall %}
-      {% call ui.table_cell(class='text-right tabular-nums') %}{{ exc.age_days if exc.age_days is not none else 'Not recorded' }}{% endcall %}
+      {% call ui.table_cell(class='text-right tabular-nums') %}{{ 'Today' if exc.age_days == 0 else ('1 day ago' if exc.age_days == 1 else (exc.age_days ~ ' days ago' if exc.age_days is not none else 'No date recorded')) }}{% endcall %}
       {% call ui.table_cell(class='') %}
         {% if exc.escalated_at %}
         {{ ui.badge(text='Escalated', variant='outline', attrs={'data-testid': 'escalated-badge'}) }}
@@ -109,6 +106,7 @@
     <h2 class="text-lg font-semibold">End of support in the next {{ exposure_window_months }} months</h2>
     {% call(row) list_table(rows=exposure, columns=[('Product', ''), ('Ends support', ''), ('Application', ''), ('Owner', '')],
                             caption='Applications depending on a product that reaches end of support', testid='exposure-table', row_testid='exposure-row',
+                            empty_title='Nothing reaches end of support in the next ' ~ exposure_window_months ~ ' months',
                             empty_message='No technology product this organisation depends on ends support inside the window.') %}
       {% call ui.table_cell(class='font-medium') %}{{ row.product_name }}{% endcall %}
       {% call ui.table_cell(class='tabular-nums') %}{{ row.end_of_life_date | format_date }}{% endcall %}
