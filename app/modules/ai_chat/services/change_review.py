@@ -113,9 +113,12 @@ CHAT_CRUD_ENTITIES = (
 # blueprint, a read of GitHub, and a change to or read of a connection. The organisation's system actor
 # decides them (see ``system_actor``).
 PROPOSAL_SOURCES = (
-    "github_connector", "connector_config",
+    "solution_blueprint_proposals", "github_connector", "connector_config",
 )
 EXPIRED_CHECK_NAME = "Still current"
+# How alike two names must score (SimpleDuplicateService) for the reviewer to be shown the existing element. Low on
+# purpose: the reviewer, not the score, decides whether two close names are one thing.
+NEAR_MATCH_THRESHOLD = 0.4
 SETTLED_ON_CHECKS_KEY = "settled_on_checks"
 SPENT_MONTH_SENTENCE = (
     "Applied on the deterministic checks; the reviewer was not called because this month's review budget is spent."
@@ -182,6 +185,8 @@ class Target:
     value_reason: str = ""  # set when the value written is not legal for the field
     checked: bool = True  # False: this kind of change has no target lookup, so its checks were not run
     creates: bool = False  # the change adds a record; there is nothing that must exist first
+    link: Optional[Dict[str, Any]] = None  # the element already in the model that the change repeats (id, name)
+    near: List[Dict[str, Any]] = field(default_factory=list)  # elements that look like it but are not the same
 
 
 # --------------------------------------------------------------------------- #
@@ -613,9 +618,51 @@ def _target_score_rationalization(args: Dict[str, Any], org_id: int) -> Target:
                   facts={"application": app_obj.name, "has_a_score_already": score is not None})
 
 
+def _target_blueprint(payload: Dict[str, Any], org_id: int) -> Target:
+    """A blueprint proposal against the elements the organisation already has: the same folded name and the
+    same type is an element it already has (linked, never added again); the same name of another type, or a
+    name that nearly matches, is shown to the reviewer to judge."""
+    from app.models.archimate_core import ArchiMateElement
+    from app.utils.duplicate_guard import find_similar_entities, folded_column, normalize_name
+
+    name = _clean_name(payload, "name")
+    kind = str(payload.get("archimate_type") or "")
+    target = Target(True, label=name, creates=True,
+                    before={"kind": "create", "note": "Nothing existed before; undoing it removes the new element."},
+                    facts={"element": name, "type": kind})
+    if not name:
+        return target
+    live = [] if not hasattr(ArchiMateElement, "deleted_at") else [ArchiMateElement.deleted_at.is_(None)]
+    same_name = (
+        ArchiMateElement.query.filter(ArchiMateElement.organization_id == org_id,
+                                      folded_column(ArchiMateElement.name) == normalize_name(name), *live)
+        .order_by(ArchiMateElement.id).all()
+    )
+    exact = next((row for row in same_name if row.type == kind), None)
+    if exact is not None:
+        target.link = {"id": exact.id, "name": exact.name, "type": exact.type}
+        target.before = {"kind": "link", "note": "Nothing was added; the proposal points at the element already there."}
+        return target
+    near = [{"id": row.id, "name": row.name, "type": row.type, "why": "same name, a different type"}
+            for row in same_name]
+    seen = {row["id"] for row in near}
+    for row in find_similar_entities(ArchiMateElement, name, organization_id=org_id, extra_filters=live,
+                                    threshold=NEAR_MATCH_THRESHOLD):
+        if row["id"] not in seen:
+            other = ArchiMateElement.query.filter_by(id=row["id"], organization_id=org_id).first()
+            near.append({"id": row["id"], "name": row["name"], "type": other.type if other else None,
+                         "why": "a close variant of the name"})
+    target.near = near[:5]
+    if target.near:
+        target.facts["near_matches"] = target.near
+    return target
+
+
 def _target_proposal(approval: AIChatCRUDApproval, payload: Any, org_id: int) -> Target:
     """What a proposal written by a connector or a blueprint is about."""
     args = payload if isinstance(payload, dict) else {}
+    if approval.source_table == "solution_blueprint_proposals":
+        return _target_blueprint(args, org_id)
     label = _short(approval.summary, 120)
     if approval.source_table == "connector_config":
         return Target(True, label=label, creates=True,
@@ -659,6 +706,14 @@ def resolve_target(approval: AIChatCRUDApproval, payload: Any, org_id: int) -> T
         return _target_entity(approval, payload, org_id)
     return Target(True, label=approval.entity_type.replace("_", " "), creates=True,
                   before={"kind": "create", "note": "Nothing existed before; undoing it removes the new record."})
+
+
+def _element_words(element: Dict[str, Any]) -> str:
+    """An element as a person names it: 'Payments Service (application component)', never its id."""
+    from app.navigation.registry import element_type_label
+
+    kind = element_type_label(element["type"]).lower() if element.get("type") else ""
+    return "%s (%s)" % (element["name"], kind) if kind else str(element["name"])
 
 
 def _plain_summary(approval: AIChatCRUDApproval, payload: Dict[str, Any]) -> str:
@@ -814,6 +869,23 @@ def run_checks(service, approval: AIChatCRUDApproval, requester) -> Tuple[List[C
         if not add("What it depends on is in the model", blocker is None,
                    "Everything it refers to is already in the model." if blocker is None else blocker):
             return checks, target
+    if approval.source_table == "solution_blueprint_proposals":
+        from app.models.solution_blueprint_proposal import SolutionBlueprintProposal
+
+        proposal = SolutionBlueprintProposal.query.filter_by(id=approval.source_id, organization_id=org_id).first()
+        if not add("Still in the design", proposal is not None and proposal.status != "rejected",
+                   "It is still part of the design." if proposal is not None and proposal.status != "rejected"
+                   else "It was removed from the design before it was checked, so it is not applied."):
+            return checks, target
+        if target.link:
+            add("Not already in the model", True,
+                "It is already in the model as %s, so it is linked to that one and not added again."
+                % _element_words(target.link))
+        else:
+            add("Not already in the model", True,
+                ("Nothing of that name and type is in the model; %d look similar and are judged by the reviewer."
+                 % len(target.near)) if target.near else "Nothing of that name or a close name is in the model.")
+
     duplicate = _duplicate_of(service, approval, payload)
     if not add("Not a repeat", duplicate is None,
                "No identical change is waiting or was just applied." if duplicate is None
@@ -897,7 +969,8 @@ def build_review_prompt(
     approval: AIChatCRUDApproval, payload: Any, target: Target, checks: List[Check], earlier: List[Dict[str, Any]]
 ) -> str:
     """The prompt a reviewer sees. It carries this record's workspace data and nothing from any other."""
-    rubric = "\n".join("%d. %s: %s" % (n, name, question) for n, name, question in RUBRIC)
+    criteria = rubric_for(target)
+    rubric = "\n".join("%d. %s: %s" % (n, name, question) for n, name, question in criteria)
     lines = [
         "You review one change that a person asked an assistant to make in their enterprise architecture "
         "workspace. You did not draft it. Judge it against this rubric (version %s). Score every criterion "
@@ -918,6 +991,8 @@ def build_review_prompt(
         }, default=str, indent=1)),
         _fence("CHECKS_ALREADY_PASSED", "\n".join("- " + c.name + ": " + c.reason for c in checks if c.ran)),
     ]
+    if target.near:
+        lines.append(_fence("NEAR_MATCHES", json.dumps(target.near, default=str, indent=1)))
     not_run = [c for c in checks if not c.ran]
     if not_run:
         lines.append(_fence("CHECKS_NOT_RUN", "\n".join("- " + c.name + ": " + c.reason for c in not_run)))
@@ -928,12 +1003,36 @@ def build_review_prompt(
     lines += [
         "",
         'Reply with one JSON object only: {"criteria": [{"id": 1, "passed": true, "reason": "..."}, ... one '
-        'entry for each of the %d criteria]}. Use plain words in each reason.' % len(RUBRIC),
+        'entry for each of the %d criteria]}. Use plain words in each reason.' % len(criteria),
     ]
     return "\n".join(lines)
 
 
-def parse_review(text: str) -> List[Dict[str, Any]]:
+NEAR_MATCH_CRITERION = (
+    7, "Not a duplicate",
+    "The elements listed under NEAR_MATCHES already exist in the workspace. Pass only if this proposal is a "
+    "genuinely different thing. If it is the same thing as one of them, fail it, say which one in the reason and "
+    "put that element's id in \"link_to\" so it is linked to it; if it should only be named differently, fail it "
+    "and say the better name.",
+)
+
+
+def rubric_for(target: Optional[Target] = None) -> Tuple[Tuple[int, str, str], ...]:
+    """The rubric a reviewer answers: the six criteria, and the seventh when the proposal has near matches."""
+    return RUBRIC + (NEAR_MATCH_CRITERION,) if target is not None and target.near else RUBRIC
+
+
+def _link_chosen(results: List[Dict[str, Any]], target: Target) -> Optional[Dict[str, Any]]:
+    """The near match the reviewer says the proposal is the same as, when that is the only thing it failed."""
+    failed = [r for r in results if not r["passed"]]
+    if len(failed) != 1 or failed[0]["id"] != NEAR_MATCH_CRITERION[0]:
+        return None
+    wanted = failed[0].get("link_to")
+    return next((n for n in target.near if wanted is not None and str(n["id"]) == str(wanted)), None)
+
+
+def parse_review(text: str, rubric: Tuple[Tuple[int, str, str], ...] = RUBRIC,
+                 target: Optional[Target] = None) -> List[Dict[str, Any]]:
     """The reviewer's per-criterion results, or raises ReviewerUnavailable when the reply cannot be read."""
     data = _json_object(text)
     items = data.get("criteria") if isinstance(data, dict) else None
@@ -947,12 +1046,15 @@ def parse_review(text: str) -> List[Dict[str, Any]]:
             except (TypeError, ValueError):
                 continue
     results = []
-    for number, name, _question in RUBRIC:
+    for number, name, _question in rubric:
         item = by_id.get(number)
         if item is None:
             raise ReviewerUnavailable("The reviewer's reply left out the criterion '%s'." % name)
-        results.append({"id": number, "name": name, "passed": item["passed"],
-                        "reason": _short(item.get("reason")) or ("Passed." if item["passed"] else "Failed.")})
+        result = {"id": number, "name": name, "passed": item["passed"],
+                  "reason": _short(item.get("reason")) or ("Passed." if item["passed"] else "Failed.")}
+        if number == NEAR_MATCH_CRITERION[0] and item.get("link_to") is not None:
+            result["link_to"] = item["link_to"]
+        results.append(result)
     return results
 
 
@@ -1030,6 +1132,7 @@ def _state(approval: AIChatCRUDApproval) -> Dict[str, Any]:
         "outcome": state.get("outcome"),
         "outcome_reasons": list(state.get("outcome_reasons") or []),
         "waiting_reason": state.get("waiting_reason"),
+        "linked_to": state.get("linked_to"),
         SETTLED_ON_CHECKS_KEY: state.get(SETTLED_ON_CHECKS_KEY),
         "undone": state.get("undone"),
         "written": state.get("written"),
@@ -1258,6 +1361,13 @@ def settle(
         return _decline(service, approval, state, [failed.reason],
                         charter_refused=failed.name == CHARTER_CHECK_NAME)
 
+    # 2b. An exact repeat of an element already in the model is linked to it: nothing is added and no reviewer
+    # is called.
+    if target.link:
+        state["linked_to"] = target.link
+        return _apply_on_checks(service, approval, state, target,
+                                "Linked to the existing %s; nothing was added." % _element_words(target.link))
+
     # 3. The reviewer: never the model that drafted. It stays the same across the rounds of one change.
     drafter_provider, drafter_model = split_ref(approval.drafter_model)
     if approval.reviewer_model:
@@ -1306,8 +1416,20 @@ def settle(
             started = time.monotonic()
             reply = _ask(router, choice, build_review_prompt(approval, payload, target, checks, state["rounds"]), budget)
             _time_step(state, "review %d" % number, started)
-            results = parse_review(reply)
+            results = parse_review(reply, rubric_for(target), target)
             passed = all(r["passed"] for r in results)
+            moved = _link_chosen(results, target)
+            if moved is not None:
+                state["rounds"].append({"round": number, "passed": True, "criteria": results,
+                                        "summary": approval.summary})
+                _save(approval, state)
+                _event(service, approval, "reviewed", "Review %d. %s" % (number, _round_words(state["rounds"][-1])))
+                state["linked_to"] = moved
+                target.link = moved
+                return _apply_on_checks(service, approval, state, target,
+                                        "The reviewer judged it the same as %s, so it is linked to "
+                                        "that one and nothing was added." % _element_words(moved),
+                                        reviewed=True)
             state["rounds"].append({"round": number, "passed": passed, "criteria": results,
                                     "summary": approval.summary})
             _save(approval, state)
@@ -1372,14 +1494,19 @@ def _revise(service, router, approval, state, payload, budget) -> Optional[Dict[
 
 
 def _apply_on_checks(
-    service, approval: AIChatCRUDApproval, state: Dict[str, Any], target: Target, note: str
+    service, approval: AIChatCRUDApproval, state: Dict[str, Any], target: Target, note: str, reviewed: bool = False
 ) -> Dict[str, Any]:
-    """Apply a change that passed its deterministic checks without a reviewer call: a proposal settled while the
-    review budget is spent. ``note`` is recorded."""
+    """Apply a change that passed its deterministic checks without a (further) reviewer call: an exact repeat
+    linked to what is there, or a proposal settled while the review budget is spent. ``note`` is recorded."""
     held = _hold_if_paused(service, approval, state)
     if held is not None:
         return held
-    state[SETTLED_ON_CHECKS_KEY] = note
+    if not reviewed:
+        state[SETTLED_ON_CHECKS_KEY] = note
+    payload = _payload_of(approval)
+    if target.link and isinstance(payload, dict):
+        payload["link_to_element_id"] = target.link["id"]
+        approval.operation_payload = json.dumps(payload)
     approval.before_snapshot = target.before or {"kind": "unrecorded"}
     _save(approval, state)
     return _apply(service, approval, state, None, note=note)
@@ -1431,7 +1558,7 @@ def _apply(
         _remember_what_was_written(approval, state, org_id, newest_relationship)
         inner = result.get("result") if isinstance(result.get("result"), dict) else {}
         summary = _short(inner.get("message") or approval.summary, 300)
-        linked = bool(inner.get("linked") or inner.get("already_in_model"))
+        linked = bool(inner.get("linked") or inner.get("already_in_model") or state.get("linked_to"))
         state["outcome"] = "linked" if linked else "applied"
         state["outcome_reasons"] = [note] if note else []
         _save(approval, state)

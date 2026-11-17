@@ -258,29 +258,69 @@ class DocumentIngestionService:
             logger.error("File extraction failed for %s: %s", filename, e)
             return {"proposals_created": 0, "errors": [f"Failed to read {filename}: {str(e)}"]}
 
-    def list_proposals(self, solution_id, status=None):
-        """List proposals for a solution, optionally filtered by status."""
+    def list_proposals(self, solution_id, status=None, recent=False):
+        """List proposals for a solution, optionally filtered by status. ``recent`` keeps the ones an upload
+        made in the last three days that the review has a record for (what the import panel shows)."""
         from app.models.solution_blueprint_proposal import SolutionBlueprintProposal
 
         query = SolutionBlueprintProposal.query.filter_by(solution_id=solution_id)
         if status:
             query = query.filter_by(status=status)
+        if recent:
+            from datetime import datetime, timedelta
+
+            query = query.filter(SolutionBlueprintProposal.retired_into_id.isnot(None),
+                                 SolutionBlueprintProposal.created_at >= datetime.utcnow() - timedelta(days=3))
         query = query.order_by(SolutionBlueprintProposal.confidence.desc())
 
+        proposals = query.all()
+        verdicts = self._verdicts(proposals)
         return [
-            {
-                "id": p.id,
-                "archimate_type": p.archimate_type,
-                "name": p.name,
-                "description": p.description,
-                "confidence": p.confidence,
-                "source": p.source,
-                "source_doc_name": p.source_doc_name,
-                "status": p.status,
-                "capability_id": p.capability_id,
-            }
-            for p in query.all()
+            dict(
+                {
+                    "id": p.id,
+                    "archimate_type": p.archimate_type,
+                    "kind_label": self._kind_label(p.archimate_type),
+                    "name": p.name,
+                    "description": p.description,
+                    "confidence": p.confidence,
+                    "source": p.source,
+                    "source_doc_name": p.source_doc_name,
+                    "status": p.status,
+                    "capability_id": p.capability_id,
+                },
+                **verdicts.get(p.id, {"outcome": "In review", "verdict": "Not decided yet", "reason": "",
+                                     "record_url": None, "settled": False}),
+            )
+            for p in proposals
         ]
+
+    @staticmethod
+    def _kind_label(archimate_type):
+        """An ArchiMate type as a person says it ('Application component')."""
+        from app.navigation.registry import element_type_label
+
+        return element_type_label(archimate_type) if archimate_type else None
+
+    @staticmethod
+    def _verdicts(proposals):
+        """What the review decided for each proposal, from its own record: the verdict, the reasons and the
+        record's address. Only this organisation's records are read."""
+        from app.models.ai_chat_crud_approval import AIChatCRUDApproval, ApprovalStatus
+        from app.modules.ai_chat.services import change_review
+
+        out = {}
+        for p in proposals:
+            if not p.retired_into_id or p.organization_id is None:
+                continue
+            approval = AIChatCRUDApproval.query.filter_by(
+                id=p.retired_into_id, organization_id=p.organization_id).first()
+            if approval is None:
+                continue
+            row = change_review.record_row(approval)
+            out[p.id] = {"outcome": row["label"], "verdict": row["verdict"], "reason": row["reason"], "record_url": row["record_url"],
+                         "settled": approval.status != ApprovalStatus.PENDING}
+        return out
 
     @records_changes_as("ai_proposal")
     def accept_proposal(self, proposal_id, solution_id):

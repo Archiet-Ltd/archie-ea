@@ -1074,6 +1074,13 @@ class AIChatApprovalService:
 
                 result = execute_github_proposal(approval, data_service)
 
+            elif approval.operation_type == "propose" and approval.entity_type == "solution_blueprint_element":
+                # A blueprint's proposed element: it becomes a new element, or is linked to the one the
+                # workspace already has. Written by app/services/solution_blueprint_service.py.
+                from app.services.solution_blueprint_service import execute_blueprint_proposal
+
+                result = execute_blueprint_proposal(approval)
+
             elif approval.operation_type in ("vendor_detection", "vendor_architecture"):
                 # A vendor product found on the organisation's website, in its domain records or in what
                 # a person told the assistant, and the catalogue's architecture for it once it is
