@@ -100,6 +100,8 @@ def test_home_page_labels_its_sections_and_offers_start_free(browser, live_serve
         entries = features.locator("[data-testid=coming-soon-list] li")
         total = entries.count()
         linked = features.locator("[data-testid=coming-soon-list] li a[href]").count()
+        features.locator("#coming-soon").scroll_into_view_if_needed()
+        features.screenshot(path=os.path.join(_shot_dir(tmp_path), "features-coming-soon-%d-%s.png" % (width, scheme)))
         features.close()
         assert total > 0
         if linked < total:
@@ -113,6 +115,7 @@ def test_home_page_labels_its_sections_and_offers_start_free(browser, live_serve
         assert len(page.inner_text("main").strip()) > 200, "the Coming soon link landed on an empty page"
         page.goto(live_server + "/", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
         page.locator("p.home-eyebrow", has_text="Roadmap").scroll_into_view_if_needed()
+        page.get_by_role("link", name="Coming soon").first.scroll_into_view_if_needed()
         page.screenshot(path=os.path.join(_shot_dir(tmp_path), "home-roadmap-%d-%s.png" % (width, scheme)))
     finally:
         ctx.close()
