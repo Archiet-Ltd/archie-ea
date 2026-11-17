@@ -12,8 +12,12 @@ from datetime import datetime, timedelta
 
 import pytest
 
-ARCHITECTS = ("enterprise_architect", "solution_architect", "business_architect")
-OTHERS = ("security_architect", "data_architect", "cto", "arb_member", "portfolio_manager")
+from app.utils.role_access import CONNECTION_ARCHITECT_ROLES
+
+# The personas shown Connections come from the one list the page's own guard reads.
+ARCHITECTS = tuple(sorted(CONNECTION_ARCHITECT_ROLES))
+OTHERS = tuple(r for r in ("security_architect", "data_architect", "cto", "arb_member", "portfolio_manager")
+               if r not in CONNECTION_ARCHITECT_ROLES)
 
 
 def _org(db_session, label):

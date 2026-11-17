@@ -21,6 +21,7 @@ import click
 from flask.cli import with_appcontext
 
 from app import db
+from app.models.archimate_element_types import is_application_kind
 
 # ── organisation ───────────────────────────────────────────────────────────
 
@@ -4236,7 +4237,7 @@ def _seed_demo_company() -> dict:
         ):
             if demo_app.archimate_element_id is None:
                 match = elements.get(demo_app.name)
-                if match is not None and match.type == "ApplicationComponent":
+                if match is not None and is_application_kind(match.type):
                     demo_app.archimate_element_id = match.id
         db.session.flush()
         stats["capability_elements_created"] = elements_made
