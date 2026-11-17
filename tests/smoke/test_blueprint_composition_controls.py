@@ -8,6 +8,16 @@ from playwright.sync_api import expect
 from .conftest import PAGE_TIMEOUT
 from .test_archetype_journeys import _login
 
+
+def open_section_editors(page, live_server, solution_id):
+    """Reach the section editors the way a person does: the record, then More, then Edit design sections."""
+    response = page.goto(live_server + "/solutions/" + str(solution_id), timeout=PAGE_TIMEOUT)
+    assert response.status == 200
+    page.get_by_role("button", name="More", exact=True).click()
+    page.get_by_role("menuitem", name="Edit design sections", exact=True).click()
+    page.wait_for_url(re.compile(r"\?edit=blueprint$"), timeout=PAGE_TIMEOUT)
+    expect(page.locator("#application_cooperation")).to_be_attached()
+
 pytestmark = [pytest.mark.smoke, pytest.mark.journey]
 
 
@@ -15,8 +25,7 @@ def test_composition_editor_open_cancel_and_escape(browser, live_server, seeded)
     page = browser.new_page()
     try:
         _login(page, live_server, seeded["emails"]["platform_admin"])
-        response = page.goto(live_server + "/solutions/" + str(seeded["ids"]["solution"]) + "?edit=blueprint", timeout=PAGE_TIMEOUT)
-        assert response.status == 200
+        open_section_editors(page, live_server, seeded["ids"]["solution"])
         page.locator('#application_cooperation').get_by_role(
             'button', name=re.compile(r'^5\. Application Cooperation')
         ).click()
@@ -50,7 +59,7 @@ def test_composition_add_edit_and_delete_survive_reload(browser, live_server, se
     created_id = None
     try:
         _login(page, live_server, seeded["emails"]["platform_admin"])
-        assert page.goto(url + "?edit=blueprint", timeout=PAGE_TIMEOUT).status == 200
+        open_section_editors(page, live_server, seeded["ids"]["solution"])
         page.locator('#application_cooperation').get_by_role(
             'button', name=re.compile(r'^5\. Application Cooperation')
         ).click()

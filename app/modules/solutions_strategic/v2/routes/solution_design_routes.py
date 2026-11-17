@@ -3165,8 +3165,13 @@ def view_solution(solution_id: int):
 
     # The solution record: one record page with seven tabs (the solutions
     # rethink, slice 5). ?edit=1 still opens the legacy editor.
-    # ?edit=blueprint opens the section editors (composition, governance and the rest).
+    # ?edit=blueprint opens the section editors (composition, governance and the rest) for the author or an
+    # administrator, from "Edit design sections" in the record's More menu.
     if request.args.get("edit") == "blueprint":
+        from app.modules.solutions_strategic.v2.services.solution_record_service import _may_edit_record
+
+        if not _may_edit_record(solution, current_user):
+            abort(403)
         ctx = _build_blueprint_context(solution)
         ctx["show_created_banner"] = False
         return render_template("solutions/blueprint.html", **_for_cost_rule(ctx))

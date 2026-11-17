@@ -31,6 +31,15 @@ def _get_solution_or_404(solution_id):
     return solution, None
 
 
+def _write_refusal(solution):
+    """A 403 answer unless the person may edit this solution (its author or an administrator)."""
+    from app.modules.solutions_strategic.v2.services.solution_record_service import _may_edit_record
+
+    if _may_edit_record(solution, current_user):
+        return None
+    return jsonify({"success": False, "error": "Only the author or an administrator can change this solution"}), 403
+
+
 # ── Generic CRUD helpers (reusable for all 14 models) ────────────────
 
 def _list_generic(model_class, solution_id):
@@ -43,6 +52,9 @@ def _list_generic(model_class, solution_id):
 
 def _create_generic(model_class, solution_id, required_fields):
     solution, err = _get_solution_or_404(solution_id)
+    if err:
+        return err
+    err = _write_refusal(solution)
     if err:
         return err
     data = request.get_json(silent=True) or {}
@@ -65,6 +77,9 @@ def _update_generic(model_class, solution_id, item_id):
     solution, err = _get_solution_or_404(solution_id)
     if err:
         return err
+    err = _write_refusal(solution)
+    if err:
+        return err
     item = db.session.get(model_class, item_id)
     if not item or item.solution_id != solution_id:
         return jsonify({"success": False, "error": "Item not found"}), 404
@@ -79,6 +94,9 @@ def _update_generic(model_class, solution_id, item_id):
 
 def _delete_generic(model_class, solution_id, item_id):
     solution, err = _get_solution_or_404(solution_id)
+    if err:
+        return err
+    err = _write_refusal(solution)
     if err:
         return err
     item = db.session.get(model_class, item_id)

@@ -5,6 +5,7 @@ from playwright.sync_api import expect
 
 from .conftest import PAGE_TIMEOUT
 from .test_archetype_journeys import _login
+from .test_blueprint_composition_controls import open_section_editors
 
 pytestmark = [pytest.mark.smoke, pytest.mark.journey]
 
@@ -14,8 +15,7 @@ def test_governance_editor_open_cancel_and_escape(browser, live_server, seeded, 
     page = browser.new_page()
     try:
         _login(page, live_server, seeded["emails"]["platform_admin"])
-        response = page.goto(live_server + "/solutions/" + str(seeded["ids"]["solution"]) + "?edit=blueprint", timeout=PAGE_TIMEOUT)
-        assert response.status == 200
+        open_section_editors(page, live_server, seeded["ids"]["solution"])
         trigger = page.get_by_role("button", name=label, exact=True)
         trigger.click()
         dialog = page.get_by_role("dialog")
@@ -57,8 +57,7 @@ def test_governance_editor_saves_to_real_api_and_survives_reload(
     created_id = None
     try:
         _login(page, live_server, seeded["emails"]["platform_admin"])
-        response = page.goto(live_server + "/solutions/" + str(seeded["ids"]["solution"]) + "?edit=blueprint", timeout=PAGE_TIMEOUT)
-        assert response.status == 200
+        open_section_editors(page, live_server, seeded["ids"]["solution"])
         page.get_by_role("button", name=label, exact=True).click()
         dialog = page.get_by_role("dialog")
         expect(dialog).to_be_visible()

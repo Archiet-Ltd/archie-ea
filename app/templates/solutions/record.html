@@ -81,6 +81,7 @@
     {% call ui.dropdown_menu_trigger(variant='outline', size='sm', attrs={'data-testid': 'record-more'}) %}{{ lucide('ellipsis') }}More{% endcall %}
     {% call ui.dropdown_menu_content(align='end', class='w-56') %}
       {{ ui.dropdown_menu_item(text='Compare options', href=base ~ '/options-advisor', attrs={'data-testid': 'record-compare'}) }}
+      {% if actions.can_edit %}{{ ui.dropdown_menu_item(text='Edit design sections', href=base ~ '?edit=blueprint', attrs={'data-testid': 'record-edit-sections'}) }}{% endif %}
       {% if actions.can_edit %}{{ ui.dropdown_menu_item(text='Download document', href=base ~ '/export/sad', attrs={'data-testid': 'record-download'}) }}{% endif %}
       {{ ui.dropdown_menu_item(text='Ask about this solution', href='/ai-chat?q=' ~ ('What does the solution "' ~ solution.name ~ '" change, what does it cost and what should happen next?')|urlencode, attrs={'data-testid': 'record-ask'}) }}
     {% endcall %}
