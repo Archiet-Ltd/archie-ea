@@ -76,6 +76,7 @@ class JourneyOrchestrator:
                 } for n in nodes]
                 for layer, nodes in by_layer.items()
             }
+            self._attach_verdicts(architecture)
         except Exception as e:
             logger.debug("No architecture to load: %s", e)
 
@@ -1922,6 +1923,26 @@ class JourneyOrchestrator:
 
     # ── ACM Domain-Driven Architecture ────────────────────────────────
 
+    def _attach_verdicts(self, layers):
+        """Say, on each element a person sees, what the review decided about the proposal that made it, from the
+        review's own record. An element no proposal made says so rather than showing a verdict it never had."""
+        from app.models.solution_blueprint_proposal import SolutionBlueprintProposal
+        from app.modules.architecture_assistant.document_ingestion import DocumentIngestionService
+
+        elements = [el for els in layers.values() for el in els]
+        proposals = SolutionBlueprintProposal.query.filter_by(solution_id=self.solution_id).filter(
+            SolutionBlueprintProposal.status.in_(["promoted", "accepted"])).order_by(SolutionBlueprintProposal.id).all()
+        # A proposal is matched by the element it promoted, else by the name and type it carries.
+        by_element = {p.promoted_element_id: p for p in proposals if p.promoted_element_id}
+        by_name = {(p.name, p.archimate_type): p for p in proposals}
+        verdicts = DocumentIngestionService._verdicts(proposals)
+        no_proposal = {"outcome": "Not reviewed", "verdict": "Not made from a proposal", "reason": "",
+                       "record_url": None, "settled": True}
+        for el in elements:
+            proposal = by_element.get(el.get("id")) or by_name.get((el.get("name"), el.get("type")))
+            el["proposal_id"] = proposal.id if proposal else None
+            el.update(verdicts.get(proposal.id, no_proposal) if proposal else no_proposal)
+
     def get_promoted_elements(self):
         """Return all promoted/accepted proposals for confirmed domains, grouped by ArchiMate layer."""
         from app.models.solution_blueprint_proposal import SolutionBlueprintProposal
@@ -1974,6 +1995,12 @@ class JourneyOrchestrator:
             "application": [], "technology": [],
             "implementation": [], "physical": [],
         }
+        from app.modules.architecture_assistant.document_ingestion import DocumentIngestionService
+
+        # What the review decided for each, from its own record; an element it never reviewed says so.
+        verdicts = DocumentIngestionService._verdicts(proposals)
+        not_reviewed = {"outcome": "Not reviewed", "verdict": "Added before reviews were recorded", "reason": "",
+                        "record_url": None, "settled": True}
         for p in proposals:
             layer = LAYER_MAP.get(p.archimate_type, "application")
             if layer not in by_layer:
@@ -1988,6 +2015,7 @@ class JourneyOrchestrator:
                 "acm_domain": p.acm_domain,
                 "is_baseline": p.is_baseline,
                 "acm_properties": p.acm_properties or {},
+                **verdicts.get(p.id, not_reviewed),
             })
 
         total = sum(len(v) for v in by_layer.values())

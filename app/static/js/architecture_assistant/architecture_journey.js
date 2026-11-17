@@ -564,9 +564,9 @@
                     // Mark all elements as accepted in local state
                     Object.keys(self.domainsData).forEach(function (code) {
                         let elements = self.getDomainElements(code);
-                        elements.forEach(function (el) { el.status = 'accepted'; });
+                        elements.forEach(function (el) { el.settling = true; });
                     });
-                    self.copilotMessage = 'All baselines accepted. Confirming 7 domains...';
+                    self.copilotMessage = 'Baselines handed to the review. Confirming 7 domains...';
 
                     // Confirm all domains sequentially to avoid overwhelming the server
                     let codes = ['UX', 'APP', 'DATA', 'SEC', 'DEV', 'AI', 'COM'];
@@ -709,7 +709,7 @@
                         break;
                     case 3:
                         if (this.architectureResult) {
-                            this.copilotMessage = 'Architecture generated. Review elements by layer -- accept or reject each.';
+                            this.copilotMessage = 'Architecture generated. Review elements by layer; the review decides each one.';
                         } else {
                             this.copilotMessage = 'Click "Generate Architecture" to create ArchiMate elements from your accepted capabilities.';
                         }
@@ -1820,24 +1820,9 @@
                 });
             },
 
-            toggleElement: function (elId) {
-                // undefined means implicitly accepted; first click must reject
-                this.acceptedElements[elId] = this.isElementAccepted(elId) ? false : true;
-            },
-
-            isElementAccepted: function (elId) {
-                return this.acceptedElements[elId] !== false;
-            },
-
             getElementsByLayer: function (layer) {
                 if (!this.architectureResult || !this.architectureResult.elements_by_layer) return [];
                 return this.architectureResult.elements_by_layer[layer] || [];
-            },
-
-            acceptAllInLayer: function (layer) {
-                let self = this;
-                let els = self.getElementsByLayer(layer);
-                els.forEach(function (el) { self.acceptedElements[el.id || el.name] = true; });
             },
 
             rejectAllInLayer: function (layer) {
@@ -1854,27 +1839,6 @@
                         body: JSON.stringify({ proposal_ids: proposalIds })
                     }).catch(function (e) {
                         Platform.toast.error('Rejecting these elements did not save — please retry.');
-                    });
-                }
-            },
-
-            acceptAllElements: function () {
-                if (!this.architectureResult) return;
-                let self = this;
-                let allIds = [];
-                Object.keys(self.architectureResult.elements_by_layer).forEach(function (layer) {
-                    self.getElementsByLayer(layer).forEach(function (el) {
-                        self.acceptedElements[el.id || el.name] = true;
-                        if (el.id) allIds.push(el.id);
-                    });
-                });
-                if (allIds.length > 0) {
-                    _fetch(API_BASE + '/' + self.solutionId + '/proposals/batch-accept', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ proposal_ids: allIds })
-                    }).catch(function (e) {
-                        Platform.toast.error('Accepting these elements did not save — please retry.');
                     });
                 }
             },
@@ -1997,19 +1961,6 @@
                     self.error = 'Domain analysis failed: ' + (e.message || 'Unknown');
                     self.copilotMessage = 'Domain analysis failed. You can retry.';
                 }).then(function () { self.domainsLoading = false; });
-            },
-
-            acceptDomainElement: function (code, elementId) {
-                let self = this;
-                _fetch(API_BASE + '/' + self.solutionId + '/proposals/' + elementId + '/accept', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' }
-                }).then(function () {
-                    let elements = self.getDomainElements(code);
-                    for (let i = 0; i < elements.length; i++) {
-                        if (elements[i].id === elementId) { elements[i].status = 'accepted'; break; }
-                    }
-                }).catch(function (e) { self.error = 'Accept failed: ' + (e.message || 'Unknown'); });
             },
 
             rejectDomainElement: function (code, elementId) {
@@ -2142,9 +2093,9 @@
                     body: JSON.stringify({ proposal_ids: proposedIds })
                 }).then(function () {
                     elements.forEach(function (el) {
-                        if (proposedIds.indexOf(el.id) !== -1) { el.status = 'accepted'; }
+                        if (proposedIds.indexOf(el.id) !== -1) { el.settling = true; }
                     });
-                    self.copilotMessage = proposedIds.length + ' elements accepted in ' + self.getDomainName(code) + '. Confirming…';
+                    self.copilotMessage = proposedIds.length + ' elements handed to the review in ' + self.getDomainName(code) + '. Confirming…';
                     self.confirmDomain(code);
                 }).catch(function (e) { self.error = 'Batch accept failed: ' + (e.message || 'Unknown'); });
             },
@@ -2663,10 +2614,10 @@
                     codes.forEach(function (code) {
                         let elements = self.getDomainElements(code);
                         elements.forEach(function (el) {
-                            if (allIds.indexOf(el.id) !== -1) { el.status = 'accepted'; }
+                            if (allIds.indexOf(el.id) !== -1) { el.settling = true; }
                         });
                     });
-                    self.copilotMessage = allIds.length + ' baselines accepted. Now review LLM-suggested elements per domain.';
+                    self.copilotMessage = allIds.length + ' baselines handed to the review. Now review LLM-suggested elements per domain.';
                 }).catch(function (e) { self.error = 'Bulk accept failed: ' + (e.message || 'Unknown'); });
             },
 
@@ -2700,7 +2651,7 @@
                         codes.forEach(function (code) {
                             let elements = self.getDomainElements(code);
                             elements.forEach(function (el) {
-                                if (proposedIds.indexOf(el.id) !== -1) { el.status = 'accepted'; }
+                                if (proposedIds.indexOf(el.id) !== -1) { el.settling = true; }
                             });
                         });
                     })
@@ -2739,7 +2690,7 @@
 
                     acceptPromise.then(function () {
                         elements.forEach(function (el) {
-                            if (proposedIds.indexOf(el.id) !== -1) { el.status = 'accepted'; }
+                            if (proposedIds.indexOf(el.id) !== -1) { el.settling = true; }
                         });
                         return _fetch(API_BASE + '/' + self.solutionId + '/domain/' + code + '/confirm', {
                             method: 'POST',

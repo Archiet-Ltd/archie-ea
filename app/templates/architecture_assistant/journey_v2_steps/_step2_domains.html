@@ -192,9 +192,7 @@
                                               x-text="getElementPropertyScore(code, el.id, el.archimate_type).pct + '%'"></span>
                                         <template x-if="el.status === 'proposed' && !el.waived">
                                             <div class="flex items-center gap-0.5" @click.stop>
-                                                <button type="button" @click="acceptDomainElement(code, el.id)" class="p-0.5 rounded hover:bg-success/10" title="Accept">
-                                                    <svg class="w-3.5 h-3.5 text-success" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
-                                                </button>
+                                                <span class="text-2xs text-muted-foreground" x-show="el.settling" x-text="'Being checked'"></span>
                                                 <template x-if="el.is_baseline || el.source === 'industry_overlay'">
                                                     <button type="button" @click="waiveDomainElement(code, el.id)" class="p-0.5 rounded hover:bg-warning/10" title="Waive">
                                                         <svg class="w-3.5 h-3.5 text-warning" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"/></svg>
