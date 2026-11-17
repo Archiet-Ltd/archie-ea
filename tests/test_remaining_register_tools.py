@@ -150,6 +150,8 @@ def test_bulk_update_dispatches_through_execute_with_permission(db_session, make
     """The dispatch choke point runs the handler for a write-permitted user."""
     org = make_org("g4disp")
     user = _make_user(db_session, org)
+    user.enterprise_role = "solution_architect"
+    db_session.flush()
     with tenant_ctx(org.id):
         a = _make_app(db_session, "Dispatch App")
         ex = ToolExecutor(user.id)
@@ -160,6 +162,22 @@ def test_bulk_update_dispatches_through_execute_with_permission(db_session, make
         ))
         assert out["success"] is True
         assert a.lifecycle_status == "3. sunset"
+
+
+def test_bulk_update_is_refused_for_a_person_without_write_permission(db_session, make_org, tenant_ctx):
+    """A person with no architect role is refused by the choke point and nothing is written."""
+    org = make_org("g4refuse")
+    user = _make_user(db_session, org)
+    with tenant_ctx(org.id):
+        a = _make_app(db_session, "Refused App")
+        ex = ToolExecutor(user.id)
+        out = ex.execute(ToolCall(
+            id="t2",
+            name="bulk_update_application_status",
+            arguments={"app_ids": [a.id], "new_status": "3. sunset"},
+        ))
+        assert out["success"] is False
+        assert a.lifecycle_status == "2.1 strategic"
 
 
 # --------------------------------------------------------------------------- #

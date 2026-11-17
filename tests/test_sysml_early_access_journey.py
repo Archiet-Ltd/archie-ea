@@ -183,7 +183,7 @@ def test_the_page_is_readable_in_both_themes_and_widths(browser, site_url, schem
 
 
 def test_the_hub_row_opens_the_waiting_list_page_which_is_in_the_sitemap_and_its_closing_link_leads_to_the_enquiry(
-    browser, site_url
+    browser, site_url, app
 ):
     context = browser.new_context(viewport={"width": 1440, "height": 900})
     page = context.new_page()
@@ -198,7 +198,12 @@ def test_the_hub_row_opens_the_waiting_list_page_which_is_in_the_sitemap_and_its
     expect(module).to_have_count(1)
     assert blurb in " ".join(module.inner_text().split())
     assert page.get_by_test_id("early-access-page").count() == 0
-    assert PATH in re.findall(r"<loc>https://entelim\.org([^<]*)</loc>", page.request.get(site_url + "/sitemap-en.xml").text())
+    from app.services.origin import canonical_origin
+
+    with app.app_context():
+        origin = canonical_origin()
+    sitemap = page.request.get(site_url + "/sitemap-en.xml").text()
+    assert PATH in re.findall(rf"<loc>{re.escape(origin)}([^<]*)</loc>", sitemap)
 
     closing = page.get_by_test_id("landing-closing").get_by_role("link", name="Talk to us")
     expect(closing).to_have_attribute("href", "/contact?from=sysml-to-archimate")
