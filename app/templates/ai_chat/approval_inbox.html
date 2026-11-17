@@ -3,7 +3,7 @@
 {% import 'basecoat/index.html' as ui %}
 {% from 'macros/page_shell.html' import page_shell %}
 {% from 'components/list_table.html' import list_table %}
-{% from 'components/figures.html' import state_badge, section %}
+{% from 'components/figures.html' import state_badge %}
 {% from 'components/fact_list.html' import fact_list %}
 {% from 'basecoat/table.html' import table_cell %}
 
@@ -28,7 +28,7 @@
 
 {% block content %}
 <div class="p-6 space-y-6">
-{{ page_shell(title='Approvals', subtitle='Changes the AI chat makes are checked and reviewed automatically; other records wait here for a person',
+{{ page_shell(title='Approvals', subtitle='Every proposal is checked and reviewed automatically. This is the record of what was applied, linked or declined, and why',
               breadcrumb=[('Home', url_for('dashboard.overview')), ('AI chat', url_for('unified_ai_chat.index')), ('Approvals', none)]) }}
 
 {#- The record of one reviewed change, read only: what was asked, what was decided, who drafted and who reviewed,
@@ -90,6 +90,12 @@
     </div>
     {% endfor %}
 
+    {% if record.undone %}
+    <p class="text-sm text-muted-foreground" data-testid="review-record-undone">Undone on {{ record.undone.at|format_date }}. {{ record.undone.what }}</p>
+    {% elif record.undo_problem %}
+    <p class="text-sm text-muted-foreground" data-testid="review-record-undo">Undo: {{ record.undo_problem }}</p>
+    {% endif %}
+
     {% if not record.checks and not record.review_rounds %}
     <p class="text-sm text-muted-foreground" data-testid="review-record-unreviewed">No review has been recorded for this change.</p>
     {% endif %}
@@ -110,6 +116,9 @@
   {{ ui.alert_description(text='Refresh the page to try again. Nothing has been approved or rejected.') }}
 {% endcall %}
 {% elif approvals %}
+<section class="space-y-3" aria-labelledby="waiting-heading" data-testid="approval-waiting">
+<h2 id="waiting-heading" class="text-lg font-semibold">Waiting for a person</h2>
+<p class="text-sm text-muted-foreground">These come from sources that are not checked and reviewed automatically yet. Everything else is settled by the server and listed below.</p>
 <div class="space-y-4" data-testid="approval-queue">
   {% for item in approvals %}
   {%- set op = OPERATION.get(item.operation_type, ((item.operation_type or 'Change')|replace('_', ' ')|capitalize, 'neutral')) -%}
@@ -204,43 +213,50 @@
   {% endcall %}
   {% endfor %}
 </div>
-{% elif not decisions and not decided_error %}
-{#- Nothing waiting and nothing decided: one empty state for the whole page. -#}
-{% call ui.card() %}
-  {{ _empty('inbox', 'No approvals yet',
-            'When someone asks the AI chat to change your architecture, the change is checked and reviewed automatically, and how each one was checked is kept under Recently decided. Records outside that review wait here for a person to approve or reject them.',
-            'approval-inbox-empty', _open_chat) }}
-{% endcall %}
-{% else %}
-{% call ui.card() %}
-  {{ _empty('inbox', 'No pending approvals waiting for your review',
-            'Changes the AI chat makes are checked and reviewed automatically, so they do not wait here. Records outside that review wait here for a person to approve or reject them.',
-            'approval-inbox-empty', _open_chat) }}
-{% endcall %}
+</section>
 {% endif %}
 
-{% if approvals or queue_error or decisions or decided_error %}
-
-{% call section('Recently decided', 'The latest approved and rejected proposals, with the reason given for each rejection', testid='approval-decided') %}
-  {% if decided_error %}
-    <p class="text-sm text-muted-foreground" role="alert">{{ decided_error }} Refresh the page to try again.</p>
-  {% elif decisions %}
-    {% call(d) list_table(rows=decisions, columns=[('Proposal', ''), ('Decision', ''), {'label': 'Proposed', 'sortable': true}],
-                          caption='Recently decided proposals', testid='approval-decided-table', row_testid='approval-decided-row',
-                          search_placeholder='Filter decisions...') %}
-      {% call table_cell(class='max-w-lg truncate font-medium') %}{{ d.summary or ((d.operation_type or 'change')|replace('_', ' ')|capitalize ~ ' ' ~ (d.entity_type or 'record')|replace('_', ' ')) }}{% endcall %}
-      {% call table_cell(class='whitespace-normal') %}
-        <div data-testid="approval-decided-{{ d.id }}" class="space-y-1">
-          {{ state_badge('Rejected' if d.status == 'rejected' else 'Approved', tone=('negative' if d.status == 'rejected' else 'positive')) }}
-          {% if d.status == 'rejected' %}<p class="text-sm text-muted-foreground">Reason: <span class="text-foreground">{{ d.rejected_reason or 'No reason was given' }}</span></p>{% endif %}
-          <a href="{{ url_for('unified_ai_chat.approval_inbox', approval=d.id) }}#record-{{ d.id }}" class="text-sm underline hover:no-underline" data-testid="approval-record-link-{{ d.id }}">See how it was checked</a>
-        </div>
-      {% endcall %}
-      {% call table_cell(class='whitespace-nowrap tabular-nums text-muted-foreground', attrs={'data-sort': d.proposed.isoformat() if d.proposed else ''}) %}{{ d.proposed|format_date if d.proposed else 'Date not recorded' }}{% endcall %}
-    {% endcall %}
-  {% else %}
-    <p class="text-sm text-muted-foreground" data-testid="approval-decided-empty">Nothing decided yet.</p>
-  {% endif %}
+{% if records_error %}
+{% call ui.alert(variant='destructive', attrs={'data-testid': 'approval-inbox-unavailable', 'role': 'alert'}) %}
+  {{ lucide('circle-alert') }}
+  {{ ui.alert_title(text='The record could not be loaded') }}
+  {{ ui.alert_description(text='Refresh the page to try again. Nothing has been changed.') }}
+{% endcall %}
+{% elif records %}
+{% if source_label %}
+<p class="text-sm text-muted-foreground" data-testid="approval-source-filter">Showing only: <span class="text-foreground">{{ source_label }}</span>. <a href="{{ url_for('unified_ai_chat.approval_inbox') }}" class="underline hover:no-underline">Show everything</a></p>
+{% endif %}
+<div data-testid="approval-record">
+{% call(r) list_table(rows=records, columns=[('Item', ''), ('Outcome', ''), ('Why', ''), ('Source', ''), ('Verdict', ''), {'label': 'When', 'sortable': true}, ('Undo', '')],
+                      caption='What was applied, linked and declined', testid='approval-record-table', row_testid='approval-record-row',
+                      search_placeholder='Filter the record...') %}
+  {% call table_cell(class='max-w-sm whitespace-normal font-medium') %}
+    <a href="{{ r.record_url }}#record-{{ r.id }}" class="underline hover:no-underline" data-testid="approval-record-link-{{ r.id }}">{{ r.summary }}</a>
+  {% endcall %}
+  {% call table_cell(class='whitespace-nowrap') %}{{ state_badge(r.label, tone=r.tone, testid='approval-outcome-' ~ r.id) }}{% endcall %}
+  {% call table_cell(class='max-w-md whitespace-normal text-sm text-muted-foreground') %}<span data-testid="approval-reason-{{ r.id }}">{{ r.reason }}</span>{% endcall %}
+  {% call table_cell(class='max-w-xs whitespace-normal text-sm') %}
+    {% if r.source.url %}<a href="{{ r.source.url }}" class="underline hover:no-underline" data-testid="approval-source-link-{{ r.id }}"{% if r.source.url.startswith('http') %} rel="noopener noreferrer" target="_blank"{% endif %}>{{ r.source.label }}</a>{% else %}<span class="text-muted-foreground" data-testid="approval-source-{{ r.id }}">{{ r.source.label }}</span>{% endif %}
+  {% endcall %}
+  {% call table_cell(class='whitespace-nowrap text-sm text-muted-foreground') %}<span data-testid="approval-verdict-{{ r.id }}">{{ r.verdict }}</span>{% endcall %}
+  {% call table_cell(class='whitespace-nowrap tabular-nums text-muted-foreground', attrs={'data-sort': r.when.isoformat() if r.when else ''}) %}{{ r.when|format_date if r.when else 'Date not recorded' }}{% endcall %}
+  {% call table_cell(class='whitespace-normal') %}
+    {% if r.can_undo %}
+    <form method="post" action="{{ url_for('unified_ai_chat.undo_applied_approval', approval_id=r.id) }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      {% call ui.button(type='submit', variant='outline', size='sm', attrs={'data-testid': 'approval-undo-' ~ r.id}) %}{{ lucide('rotate-ccw') }}Undo{% endcall %}
+    </form>
+    {% elif r.undo_note %}
+    <span class="text-sm text-muted-foreground" data-testid="approval-undo-note-{{ r.id }}">{{ r.undo_note }}</span>
+    {% endif %}
+  {% endcall %}
+{% endcall %}
+</div>
+{% else %}
+{% call ui.card() %}
+  {{ _empty('inbox', 'Nothing has been checked yet',
+            'When the AI chat, a read of GitHub or a blueprint proposes a change, it is checked and reviewed automatically, and what became of it is kept here with the reason.',
+            'approval-inbox-empty', _open_chat) }}
 {% endcall %}
 {% endif %}
 </div>

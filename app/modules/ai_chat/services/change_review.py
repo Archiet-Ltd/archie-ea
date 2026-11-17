@@ -88,6 +88,10 @@ BUDGET_USED_UP_REASON = (
 NO_SYSTEM_ACTOR_REASON = "The workspace has no active administrator account to make this change, so nothing was changed."
 ACCOUNT_OFF_REASON = "The account that asked for this change has been switched off, so the change was not made."
 MOVED_REASON = "The person who asked for this change is no longer in the workspace."
+PRE_LOOP_REASON = (
+    "This was recorded before changes by the assistant were checked and reviewed automatically, so nothing has "
+    "checked it."
+)
 WRITES_PAUSED_REASON = (
     "Changes by the assistant are paused for this workspace. This one is made, after it is checked and "
     "reviewed, when they resume."
@@ -653,6 +657,17 @@ def resolve_target(approval: AIChatCRUDApproval, payload: Any, org_id: int) -> T
                   before={"kind": "create", "note": "Nothing existed before; undoing it removes the new record."})
 
 
+def _plain_summary(approval: AIChatCRUDApproval, payload: Dict[str, Any]) -> str:
+    """The item's one-line summary with an internal ArchiMate type written as a plain kind."""
+    summary = approval.summary or ""
+    kind = payload.get("archimate_type") if isinstance(payload, dict) else None
+    if kind and "(%s)" % kind in summary:
+        from app.navigation.registry import element_type_label
+
+        summary = summary.replace("(%s)" % kind, "(%s)" % element_type_label(kind).lower())
+    return summary
+
+
 def _plain_date(value) -> str:
     """A date the way a person reads it: 15 Nov 2026."""
     if isinstance(value, str):
@@ -1004,6 +1019,9 @@ def _state(approval: AIChatCRUDApproval) -> Dict[str, Any]:
         "outcome_reasons": list(state.get("outcome_reasons") or []),
         "waiting_reason": state.get("waiting_reason"),
         SETTLED_ON_CHECKS_KEY: state.get(SETTLED_ON_CHECKS_KEY),
+        "undone": state.get("undone"),
+        "written": state.get("written"),
+        "added_relationships": state.get("added_relationships"),
         "timings": dict(state.get("timings") or {}),
     }
 
@@ -1355,17 +1373,50 @@ def _apply_on_checks(
     return _apply(service, approval, state, None, note=note)
 
 
+def _newest_relationship_id(org_id: int) -> int:
+    from app.models.archimate_core import ArchiMateRelationship
+
+    return db.session.query(db.func.max(ArchiMateRelationship.id)).filter(
+        ArchiMateRelationship.organization_id == org_id).scalar() or 0
+
+
+def _remember_what_was_written(approval: AIChatCRUDApproval, state: Dict[str, Any], org_id: int,
+                               newest_relationship: int) -> None:
+    """Record what this change itself set, so Undo can tell it from what someone changed afterwards: the value of
+    each field it overwrote, and the relationships that appeared on the elements it added."""
+    snapshot = approval.before_snapshot if isinstance(approval.before_snapshot, dict) else {}
+    written: Dict[str, Any] = {}
+    for item in _restorable(snapshot):
+        model = _model_named(item["record"])
+        row = _scoped_row(model, item["id"], org_id) if model is not None else None
+        if row is not None:
+            written["%s:%s" % (item["record"], item["id"])] = {
+                key: _plain_value(getattr(row, key)) for key in item["fields"] if hasattr(row, key)}
+    state["written"] = written or None
+    elements = _created_ids(approval).get("elements", [])
+    if elements:
+        from app.models.archimate_core import ArchiMateRelationship
+
+        state["added_relationships"] = sorted({
+            r.id for r in ArchiMateRelationship.query.filter(
+                ArchiMateRelationship.organization_id == org_id, ArchiMateRelationship.id > newest_relationship,
+                db.or_(ArchiMateRelationship.source_id.in_(elements), ArchiMateRelationship.target_id.in_(elements)),
+            ).all()} | set(_created_ids(approval).get("relationships", [])))
+
+
 def _apply(
     service, approval: AIChatCRUDApproval, state: Dict[str, Any], approved_by: Optional[int] = None,
     note: Optional[str] = None,
 ) -> Dict[str, Any]:
     approval_id, org_id = approval.id, approval.organization_id
+    newest_relationship = _newest_relationship_id(org_id)
     started = time.monotonic()
     result = service.approve_and_execute(approval_id, settled_by_review=True, approved_by=approved_by)
     _time_step(state, "apply", started)
     db.session.expire_all()
     approval = AIChatCRUDApproval.query.filter_by(id=approval_id, organization_id=org_id).first()
     if result.get("success"):
+        _remember_what_was_written(approval, state, org_id, newest_relationship)
         inner = result.get("result") if isinstance(result.get("result"), dict) else {}
         summary = _short(inner.get("message") or approval.summary, 300)
         linked = bool(inner.get("linked") or inner.get("already_in_model"))
@@ -1405,6 +1456,8 @@ def describe(approval: AIChatCRUDApproval) -> Dict[str, Any]:
     saved = _state(approval)
     if approval.status == ApprovalStatus.APPROVED:
         label, tone = ("Linked", "neutral") if saved["outcome"] == "linked" else ("Applied", "positive")
+        if saved["undone"]:
+            label, tone = "Undone", "neutral"
     elif approval.status == ApprovalStatus.REJECTED:
         label, tone = ("Retired", "neutral") if saved["outcome"] == "retired" else ("Declined", "negative")
     else:
@@ -1440,7 +1493,284 @@ def describe(approval: AIChatCRUDApproval) -> Dict[str, Any]:
         "checks": saved["checks"],
         "review_rounds": saved["rounds"],
         "rubric_version": approval.rubric_version,
+        "undo_problem": undo_problem(approval) if approval.status == ApprovalStatus.APPROVED else None,
+        "undone": saved["undone"],
     }
+
+
+# --------------------------------------------------------------------------- #
+# The inbox record: one row for each settled item, and Undo                    #
+# --------------------------------------------------------------------------- #
+
+SOURCE_WORDS = {
+    "solution_blueprint_proposals": "Solution blueprint",
+    "github_connector": "Read of GitHub",
+    "connector_config": "Connection",
+}
+LOOP_OUTCOME_WORDS = {
+    "applied": ("Applied", "positive"),
+    "linked": ("Linked", "neutral"),
+    "declined": ("Declined", "negative"),
+    "retired": ("Retired", "neutral"),
+}
+
+
+def _source_of(approval: AIChatCRUDApproval, payload: Any) -> Dict[str, Any]:
+    """Where the item came from, in words, and the address of the thing it cites (None when it cites none)."""
+    args = payload if isinstance(payload, dict) else {}
+    table = approval.source_table
+    label, url = SOURCE_WORDS.get(table) or ("Asked for in the AI chat" if approval.user_id else "The system"), None
+    try:
+        from flask import url_for
+
+        if table == "github_connector":
+            from app.connectors.github import file_url
+
+            repository = args.get("repository") or args.get("from") or args.get("source")
+            if repository:
+                commit = str(args.get("commit") or "")
+                file = args.get("evidence_file") or args.get("file")
+                label = "%s%s%s" % (repository, (" at " + commit[:7]) if commit else "", (", " + file) if file else "")
+                url = file_url(repository, commit, file) or "https://github.com/%s" % repository
+        elif table == "solution_blueprint_proposals" and args.get("solution_id"):
+            from app.models.solution_models import Solution
+
+            solution = Solution.query.filter_by(id=args["solution_id"], organization_id=approval.organization_id).first()
+            if solution is not None:
+                label = "Blueprint: %s" % solution.name
+                url = url_for("solution_design.view_solution", solution_id=solution.id)
+        elif table == "connector_config":
+            label = "Connection: %s" % (args.get("connector_type") or "connector")
+            url = url_for("m365_connector.connectors_index")
+    except Exception:  # noqa: BLE001 - a source address is a convenience; the row reads without it
+        url = None
+    return {"label": label, "url": url}
+
+
+def undo_problem(approval: AIChatCRUDApproval) -> Optional[str]:
+    """Why an applied item cannot be undone (a sentence), or None when it can."""
+    saved = _state(approval)
+    if approval.status != ApprovalStatus.APPROVED:
+        return "Only an applied item can be undone."
+    if saved["undone"]:
+        return "It has already been undone."
+    snapshot = approval.before_snapshot if isinstance(approval.before_snapshot, dict) else {}
+    kind = snapshot.get("kind")
+    if saved["outcome"] == "linked" or kind == "link":
+        return "Nothing was added, so there is nothing to undo."
+    if _restorable(snapshot):
+        return None
+    if kind == "create" and _created_ids(approval):
+        return None
+    return "This kind of change keeps no copy of what it replaced, so it cannot be undone here."
+
+
+# The records whose fields a snapshot may put back (the ones a change of this review overwrites).
+RESTORABLE_RECORDS = ("ApplicationComponent", "BusinessCapability", "VendorOrganization")
+
+
+def _restorable(snapshot: Dict[str, Any]) -> List[Dict[str, Any]]:
+    """The records (id and the fields they held) a before-snapshot can put back, else an empty list."""
+    if snapshot.get("record") not in RESTORABLE_RECORDS:
+        return []
+    items = snapshot.get("records") if isinstance(snapshot.get("records"), list) else [snapshot]
+    return [dict(i, record=snapshot["record"]) for i in items
+            if isinstance(i, dict) and i.get("id") and isinstance(i.get("fields"), dict) and i["fields"]]
+
+
+def _model_named(name: str):
+    for mapper in db.Model.registry.mappers:
+        if mapper.class_.__name__ == name:
+            return mapper.class_
+    return None
+
+
+def _result_of(approval: AIChatCRUDApproval) -> Dict[str, Any]:
+    try:
+        value = json.loads(approval.execution_result or "{}")
+    except (TypeError, ValueError):
+        return {}
+    return value if isinstance(value, dict) else {}
+
+
+def _created_ids(approval: AIChatCRUDApproval) -> Dict[str, List[int]]:
+    """The records an applied item added, as its writer reported them."""
+    result = _result_of(approval)
+    inner = result.get("result") if isinstance(result.get("result"), dict) else result
+    found: Dict[str, List[int]] = {}
+    elements = [i for i in (inner.get("created_element_ids") or []) if isinstance(i, int)]
+    if not elements and isinstance(inner.get("element_id"), int) and not inner.get("linked"):
+        elements = [inner["element_id"]]
+    if elements:
+        found["elements"] = elements
+    relationships = [inner[k] for k in ("composition_id", "relationship_id") if isinstance(inner.get(k), int)
+                     and not inner.get("already_in_model")]
+    if relationships:
+        found["relationships"] = relationships
+    return found
+
+
+def record_row(approval: AIChatCRUDApproval, people: Optional[Dict[int, str]] = None) -> Dict[str, Any]:
+    """One row of the Approvals record: what, outcome, reason, source, verdict, and whether Undo is offered."""
+    saved = _state(approval)
+    payload = _payload_of(approval)
+    if approval.status == ApprovalStatus.PENDING:
+        label, tone = "In review", "caution"
+        if in_scope(approval) and is_before_the_loop(approval):
+            reason = PRE_LOOP_REASON
+        elif in_scope(approval) and _writes_paused(approval.organization_id):
+            reason = WRITES_PAUSED_REASON
+        else:
+            reason = (saved["waiting_reason"] if saved["waiting_reason"] != WRITES_PAUSED_REASON else None) or (
+                "It is being checked and reviewed by the server." if in_scope(approval)
+                else "This kind of proposal is not checked automatically yet.")
+    elif approval.status == ApprovalStatus.APPROVED:
+        label, tone = LOOP_OUTCOME_WORDS["linked" if saved["outcome"] == "linked" else "applied"]
+        reason = " ".join(saved["outcome_reasons"]) if saved["outcome_reasons"] else (
+            "Checked, then reviewed by %s, and it passed." % model_words(approval.reviewer_model)
+            if saved["rounds"] and approval.reviewer_model else "Checked and applied.")
+        if saved["undone"]:
+            label, tone = "Undone", "neutral"
+            reason = "Undone on %s. %s" % (_plain_date(saved["undone"].get("at")), reason)
+    else:
+        label, tone = LOOP_OUTCOME_WORDS["retired" if saved["outcome"] == "retired" else "declined"]
+        reason = " ".join(saved["outcome_reasons"]) or approval.rejected_reason or "No reason was recorded."
+    rounds = saved["rounds"]
+    if approval.status == ApprovalStatus.PENDING:
+        verdict_words = "Not decided yet"
+    elif saved["outcome"] == "retired":
+        verdict_words = "Past its time"
+    elif rounds:
+        verdict_words = "Reviewer passed it" if rounds[-1]["passed"] else "Reviewer did not pass it"
+    elif saved[SETTLED_ON_CHECKS_KEY]:
+        verdict_words = "Checks only"
+    elif saved["outcome"] == "linked":
+        verdict_words = "Checks only"
+    elif approval.status == ApprovalStatus.REJECTED:
+        verdict_words = "Failed a check"
+    else:
+        verdict_words = "Checked"
+    problem = undo_problem(approval)
+    return {
+        "id": approval.id,
+        "summary": _plain_summary(approval, payload),
+        "label": label,
+        "tone": tone,
+        "reason": reason,
+        "verdict": verdict_words,
+        "source": _source_of(approval, payload),
+        "source_key": approval.source_table or "chat",
+        "when": approval.executed_at or approval.approved_at or approval.created_at,
+        "can_undo": problem is None,
+        "undo_note": None if problem is None else _undo_note(approval, saved, problem),
+        "record_url": record_path(approval.id),
+        "requested_by": (people or {}).get(approval.user_id) or "The system",
+    }
+
+
+def _undo_note(approval: AIChatCRUDApproval, saved: Dict[str, Any], problem: str) -> Optional[str]:
+    """The short note beside a row with no Undo: only an applied item that truly cannot be undone says so.
+    A declined, waiting, linked or already undone row has nothing to undo, so it says nothing."""
+    if approval.status != ApprovalStatus.APPROVED or saved["undone"] or saved["outcome"] == "linked":
+        return None
+    return "Cannot be undone"
+
+
+def undo(service, approval: AIChatCRUDApproval, actor) -> Dict[str, Any]:
+    """Put back what an applied item changed: the fields it overwrote, or remove what it added. Recorded on
+    the item and in its audit trail. Only the item's own organisation's records are touched."""
+    problem = undo_problem(approval)
+    if problem is not None:
+        return {"success": False, "code": "CONFLICT", "error": problem}
+    org_id = approval.organization_id
+    snapshot = approval.before_snapshot if isinstance(approval.before_snapshot, dict) else {}
+    restorable = _restorable(snapshot)
+    saved = _state(approval)
+    if restorable:
+        model = _model_named(restorable[0]["record"])
+        rows = []
+        for item in restorable:
+            row = _scoped_row(model, item["id"], org_id) if model is not None else None
+            if row is None:
+                continue
+            # Only what this change set is put back: a field someone has edited since is not touched.
+            written = (saved["written"] or {}).get("%s:%s" % (item["record"], item["id"]))
+            later = [key for key in item["fields"]
+                     if written is not None and key in written and hasattr(row, key)
+                     and _plain_value(getattr(row, key)) != written[key]]
+            if later:
+                return {"success": False, "code": "CONFLICT", "error": (
+                    "Not undone: %s was changed after this item (%s), and putting the old value back would "
+                    "overwrite that change." % (getattr(row, "name", None) or "the record",
+                                                 ", ".join(k.replace("_", " ") for k in later)))}
+            rows.append((row, item))
+        restored, names = 0, set()
+        for row, item in rows:
+            for key, value in item["fields"].items():  # request-field-writes-ok: the values come from this server's own before_snapshot, not from a request body
+                if hasattr(row, key):
+                    setattr(row, key, value)
+                    names.add(key)
+            restored += 1
+        if not restored:
+            return {"success": False, "code": "CONFLICT", "error": "The record it changed is no longer in this workspace."}
+        what = "Put back %s on %d record%s." % (", ".join(sorted(names)), restored,
+                                              "" if restored == 1 else "s")
+    else:
+        from app.models.archimate_core import ArchiMateElement, ArchiMateRelationship
+        from app.models.solution_models import SolutionArchiMateElement
+
+        created = _created_ids(approval)
+        now = datetime.utcnow()
+        ours = set(created.get("relationships", [])) | set(saved["added_relationships"] or [])
+        # A relationship that joins what this item added to something, but that this item did not add, was made
+        # later by a person; it is never removed, and the element it joins is not removed from under it.
+        for element_id in created.get("elements", []):
+            element = ArchiMateElement.query.filter_by(id=element_id, organization_id=org_id).first()
+            if element is None:
+                continue
+            others = ArchiMateRelationship.query.filter(
+                ArchiMateRelationship.organization_id == org_id,
+                db.or_(ArchiMateRelationship.source_id == element_id, ArchiMateRelationship.target_id == element_id),
+                ~ArchiMateRelationship.id.in_(ours or {0}),
+            ).count()
+            if others:
+                return {"success": False, "code": "CONFLICT", "error": (
+                    "Not undone: %s now has %d relationship%s that %s added after this item. Remove %s first, "
+                    "then undo this." % (element.name, others, "" if others == 1 else "s",
+                                         "was" if others == 1 else "were", "it" if others == 1 else "them"))}
+        removed = 0
+        for rel_id in ours:
+            rel = ArchiMateRelationship.query.filter_by(id=rel_id, organization_id=org_id).first()
+            if rel is not None:
+                db.session.delete(rel)
+                removed += 1
+        for element_id in created.get("elements", []):
+            element = ArchiMateElement.query.filter_by(id=element_id, organization_id=org_id).first()
+            if element is None:
+                continue
+            for junction in SolutionArchiMateElement.query.filter_by(element_id=element_id).all():
+                db.session.delete(junction)
+            if hasattr(element, "deleted_at"):
+                element.deleted_at = now
+            else:
+                db.session.delete(element)
+            removed += 1
+        if approval.source_table == "solution_blueprint_proposals":
+            from app.models.solution_blueprint_proposal import SolutionBlueprintProposal
+
+            proposal = SolutionBlueprintProposal.query.filter_by(
+                id=approval.source_id, organization_id=org_id).first()
+            if proposal is not None:
+                proposal.status = "proposed"
+                proposal.promoted_element_id = None
+        what = "Removed %d record%s it added." % (removed, "" if removed == 1 else "s")
+    state = _state(approval)
+    state["undone"] = {"at": datetime.utcnow().isoformat(timespec="seconds"), "by": actor.id, "what": what}
+    _save(approval, state)
+    service._audit(approval, event="undone", to_status=approval.status.value, actor_user_id=actor.id,
+                   from_status=approval.status.value, reason=what)
+    db.session.commit()
+    return {"success": True, "message": what, "approval_id": approval.id}
 
 
 # --------------------------------------------------------------------------- #

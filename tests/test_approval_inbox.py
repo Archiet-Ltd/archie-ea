@@ -95,12 +95,8 @@ def approval_inbox_setup(db_session, make_org, tenant_ctx):
 
 
 def test_approval_inbox_page_renders(app, approval_inbox_setup, login_as):
-    """The inbox lists the pending proposal with its Approve and Reject forms.
-
-    The page used to load its rows with script behind loading, empty and
-    unavailable placeholders; it now renders the queue on the server, so the
-    approver's proposal, its summary and both actions are in the HTML.
-    """
+    """The page is the record of what was settled: the proposal is listed with its outcome and reason, and there
+    is no Approve or Reject, because nothing waits for a person."""
     setup = approval_inbox_setup
     client = app.test_client()
     login_as(client, setup["approver_a"])
@@ -110,11 +106,13 @@ def test_approval_inbox_page_renders(app, approval_inbox_setup, login_as):
     html = resp.get_data(as_text=True)
     assert "Approvals" in html
     approval_id = setup["approval_id"]
-    assert 'data-testid="approval-card-%s"' % approval_id in html
+    assert 'data-testid="approval-record-link-%s"' % approval_id in html
     assert "Create capability &#39;Test Cap&#39;" in html
-    assert "/ai-chat/approvals/%s/approve" % approval_id in html
-    assert "/ai-chat/approvals/%s/reject" % approval_id in html
-    # The queue loaded, so neither the empty state nor the error alert shows.
+    assert 'data-testid="approval-outcome-%s"' % approval_id in html
+    assert 'data-testid="approval-reason-%s"' % approval_id in html
+    assert "/ai-chat/approvals/%s/approve" % approval_id not in html
+    assert "/ai-chat/approvals/%s/reject" % approval_id not in html
+    # The record loaded, so neither the empty state nor the error alert shows.
     assert 'data-testid="approval-inbox-empty"' not in html
     assert 'data-testid="approval-inbox-unavailable"' not in html
 
@@ -374,7 +372,7 @@ def test_approval_inbox_escalation_notifies_only_own_org(app, db_session, make_o
 
 
 def test_approval_inbox_template_has_required_elements(app, approval_inbox_setup, login_as):
-    """The inbox template includes approve/reject buttons and technical detail disclosure."""
+    """The record has a row for each item with its outcome, reason, source and verdict, and no decision buttons."""
     setup = approval_inbox_setup
     client = app.test_client()
     login_as(client, setup["approver_a"])
@@ -382,12 +380,10 @@ def test_approval_inbox_template_has_required_elements(app, approval_inbox_setup
     resp = client.get("/ai-chat/approvals/inbox")
     html = resp.get_data(as_text=True)
 
-    # Check for key UI elements in the Alpine.js template
-    assert "Approve" in html
-    assert "Reject" in html
-    assert "View technical detail" in html
-    assert "Requested by" in html
-    assert "Expires:" in html
+    assert 'data-testid="approval-record-table"' in html
+    for heading in ("Item", "Outcome", "Why", "Source", "Verdict", "Undo"):
+        assert heading in html
+    assert ">Approve<" not in html and ">Reject<" not in html and "Confirm Reject" not in html
 
 
 def test_approval_inbox_empty_state(app, db_session, make_org, login_as):
@@ -401,10 +397,9 @@ def test_approval_inbox_empty_state(app, db_session, make_org, login_as):
     resp = client.get("/ai-chat/approvals/inbox")
     assert resp.status_code == 200
     html = resp.get_data(as_text=True)
-    # A person with nothing waiting and nothing decided sees one empty state
-    # that says why and points at the next step (the AI chat).
+    # A person with nothing recorded sees one empty state that says why and points at the next step (the AI chat).
     assert 'data-testid="approval-inbox-empty"' in html
-    assert "No approvals yet" in html
+    assert "Nothing has been checked yet" in html
     assert "checked and reviewed automatically" in html
     assert "second person" not in html
 

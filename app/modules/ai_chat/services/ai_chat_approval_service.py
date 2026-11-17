@@ -1636,12 +1636,57 @@ class AIChatApprovalService:
             status=ApprovalStatus.PENDING,
         )
 
-    def count_approver_queue(self) -> int:
-        """How many items the approvals inbox lists for this person (0 when they may not open it)."""
+    RECORD_LIMIT = 300
+
+    def count_waiting_for_a_person(self) -> int:
+        """How many proposals wait for a person: only those of a source the server does not settle yet. Zero
+        when nothing waits, and for a person who may not open the page."""
+        from app.modules.ai_chat.services import change_review
+
         actor, actor_error = self._acting_user(require_general=True)
         if actor_error:
             return 0
-        return self._approver_queue_query(actor).count()
+        return sum(1 for row in self._approver_queue_query(actor).all() if not change_review.in_scope(row))
+
+    def get_settled_records(self, source: Optional[str] = None) -> Dict[str, Any]:
+        """The Approvals record: this organisation's items, newest first, one row for each, with what became of
+        it and why. Read only, and limited to the active organisation."""
+        from app.modules.ai_chat.services import change_review
+
+        _, org_id, error = self._active_org_actor()
+        if error:
+            return error
+        query = AIChatCRUDApproval.query.filter(AIChatCRUDApproval.organization_id == org_id)
+        if source == "chat":
+            query = query.filter(AIChatCRUDApproval.source_table.is_(None))
+        elif source:
+            query = query.filter(AIChatCRUDApproval.source_table == source)
+        rows = [r for r in query.order_by(AIChatCRUDApproval.id.desc()).limit(self.RECORD_LIMIT).all()
+                if r.status != ApprovalStatus.PENDING or change_review.in_scope(r)]
+        people = {
+            user.id: " ".join(part for part in (user.first_name, user.last_name) if part) or user.email
+            for user in User.query.filter(
+                User.organization_id == org_id, User.id.in_({r.user_id for r in rows if r.user_id})
+            ).all()
+        } if any(r.user_id for r in rows) else {}
+        return {"success": True, "records": [change_review.record_row(row, people) for row in rows]}
+
+    def undo_applied(self, approval_id: int) -> Dict[str, Any]:
+        """Put back what an applied item changed, from the copy kept before it was applied."""
+        from app.modules.ai_chat.services import change_review
+
+        actor, org_id, error = self._active_org_actor()
+        if error:
+            return error
+        approval = AIChatCRUDApproval.query.filter_by(id=approval_id, organization_id=org_id).first()
+        if approval is None:
+            return {"success": False, "code": "NOT_FOUND", "error": f"Approval {approval_id} not found"}
+        try:
+            return change_review.undo(self, approval, actor)
+        except Exception:
+            db.session.rollback()
+            self.logger.exception("Undo of approval %s failed", approval_id)
+            return {"success": False, "error": "It could not be undone just now. Nothing was changed."}
 
     def get_approver_queue(self) -> Dict[str, Any]:
         """Same-org changes still in review, including the ones the viewer asked for.
@@ -1748,6 +1793,8 @@ class AIChatApprovalService:
         # Two facts are carried only by the rows they are true of, so every other row keeps its shape: a row
         # recorded before automatic review (nothing has checked it), and a held row with a check on its record.
         for row in rows:
+            if looped[row["id"]]:
+                row["in_loop"] = True  # the server settles it; it is listed in the record, not waited on
             if pre_loop[row["id"]]:
                 row["pre_loop"] = True
             elif row["held_by_pause"] and recorded[row["id"]]:

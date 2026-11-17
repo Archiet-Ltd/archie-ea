@@ -123,25 +123,46 @@ def _when(value):
         return None
 
 
+@unified_ai_chat_bp.route("/approvals/<int:approval_id>/undo", methods=["POST"])
+@login_required
+def undo_applied_approval(approval_id):
+    """Undo an applied item from the record: put back what it changed."""
+    _, missing = require_entity_json(AIChatCRUDApproval, approval_id, label="Approval")
+    if missing:
+        return missing
+    result = _approval_service().undo_applied(approval_id)
+    if request.form.get("csrf_token") is not None:
+        if result.get("success"):
+            flash(result.get("message") or "Undone.", "success")
+        else:
+            flash(result.get("error") or "It could not be undone. Nothing was changed.", "error")
+        return redirect(url_for("unified_ai_chat.approval_inbox"))
+    return jsonify(result), _decision_status(result)
+
+
 @unified_ai_chat_bp.route("/approvals/inbox", methods=["GET"])
 @login_required
 def approval_inbox():
-    """Approval inbox page — one queue for every pending change proposal.
+    """The Approvals record: what was applied, linked and declined, and why.
 
-    Requires GENERAL permission (write/approval access) — Viewer roles
-    cannot reach this page, matching the sidebar link guard.
-    """
+    Every proposal is settled by the server, so nothing here waits for a person and there is no Approve or
+    Reject. Requires GENERAL permission (write access), matching the sidebar link guard."""
     from app.models.user import Permission
 
     if not current_user.can(Permission.GENERAL):
         from flask import abort
 
         abort(403)
+    from app.modules.ai_chat.services.change_review import SOURCE_WORDS
+
     from datetime import datetime
 
     service = _approval_service()
+    source = (request.args.get("source") or "").strip() or None
+    # Only a proposal from a source that is not settled by the server yet waits for a person; everything else
+    # is in the record below, with what became of it.
     queue = service.get_approver_queue()
-    approvals = queue.get("approvals", []) if queue.get("success") else []
+    approvals = [a for a in (queue.get("approvals", []) if queue.get("success") else []) if not a.get("in_loop")]
     now = datetime.utcnow()
     for item in approvals:
         item["created"] = _when(item.get("created_at"))
@@ -150,13 +171,10 @@ def approval_inbox():
         if expires is not None and expires.tzinfo is not None:
             expires = expires.replace(tzinfo=None)
         item["overdue"] = bool(expires and expires < now)
-    decided = service.get_recent_decisions()
-    decisions = decided.get("decisions", []) if decided.get("success") else []
-    for row in decisions:
-        row["proposed"] = _when(row.get("created_at"))
-    # What one proposal would affect is worked out on demand, for the proposal the
-    # person opened (a notification link or "What does this affect?"), so the page
-    # stays quick however long the queue is.
+    found = service.get_settled_records(source)
+    records = found.get("records", []) if found.get("success") else []
+    # The record of one reviewed item (checks, rounds, both models, every reason), read only, for the item the
+    # person opened from the assistant's answer or from the list.
     focus_id = request.args.get("approval", type=int)
     impact = None
     if focus_id and any(item["id"] == focus_id for item in approvals):
@@ -165,14 +183,12 @@ def approval_inbox():
             impact = result.get("impact") if result.get("success") else {"error": True}
         except Exception:
             impact = {"error": True}
-    # The record of one reviewed change (checks, rounds, both models, every reason), read only, for the
-    # change the person opened from the assistant's answer or from the decided list.
     record = None
     record_missing = False
     if focus_id:
-        found = service.get_review_record(focus_id)
-        if found.get("success"):
-            record = found["record"]
+        opened = service.get_review_record(focus_id)
+        if opened.get("success"):
+            record = opened["record"]
         else:
             record_missing = True
     return render_template(
@@ -180,11 +196,13 @@ def approval_inbox():
         record=record,
         record_missing=record_missing,
         approvals=approvals,
-        queue_error=None if queue.get("success") else "The approval inbox could not be loaded. Refresh the page to try again.",
-        decisions=decisions,
-        decided_error=None if decided.get("success") else "Recent decisions could not be loaded.",
-        focus_id=focus_id,
+        queue_error=None if queue.get("success") else "The approval inbox could not be loaded.",
         impact=impact,
+        records=records,
+        records_error=None if found.get("success") else "The record could not be loaded.",
+        source_label=(SOURCE_WORDS.get(source) or ("Asked for in the AI chat" if source == "chat" else source))
+        if source else None,
+        focus_id=focus_id,
     )
 
 
@@ -195,5 +213,6 @@ __all__ = [
     "approval_impact",
     "approve_pending_approval",
     "reject_pending_approval",
+    "undo_applied_approval",
     "approval_inbox",
 ]

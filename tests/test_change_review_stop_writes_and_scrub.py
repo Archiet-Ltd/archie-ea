@@ -376,7 +376,8 @@ def test_the_queue_offers_approve_only_where_it_will_act(db_session, make_org, t
     assert "approval-own-request-%d" % own.id in html
     assert "/ai-chat/approvals/%d/approve" % own.id not in html
     assert "/ai-chat/approvals/%d/approve" % theirs.id in html
-    assert "approval-in-review-%d" % aid in html
+    # The change the server settles is in the record with its reason, not offered to a person to approve.
+    assert 'data-testid="approval-reason-%d"' % aid in html and "/ai-chat/approvals/%d/approve" % aid not in html
     assert "waits here for a second person" not in html
     with tenant_ctx(other.id):
         assert AIChatApprovalService(other_user.id).get_approver_queue()["approvals"] == []
