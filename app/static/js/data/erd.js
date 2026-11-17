@@ -202,7 +202,7 @@ function erdApp() {
         storageKey: function() { return 'archie.erd.positions.' + this.domainId; },
 
         savedPositions: function() {
-            try { return JSON.parse(window.localStorage.getItem(this.storageKey()) || '{}'); } catch (e) { return {}; }
+            try { return JSON.parse(window.localStorage.getItem(this.storageKey()) || '{}'); } catch (e) { /* swallow-ok: an unreadable saved layout means no saved layout; the diagram is laid out afresh */ return {}; }
         },
 
         rememberPosition: function(cell) {
