@@ -531,7 +531,6 @@
             host._items = shown;
             if (offered.basis === 'records' && startupSteps) {
                 host.querySelector('[data-startup-next-step]').appendChild(startupSteps.content.cloneNode(true));
-                lockWhileLoading(host.querySelector('[data-sample-form]'));
             }
         } catch (err) {
             /* An outage must not read as a clean portfolio. The endpoint's own
