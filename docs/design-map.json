@@ -29194,6 +29194,8 @@
    "charts": [],
    "components": [
     "alert",
+    "explained-value",
+    "list-table",
     "badge",
     "breadcrumb",
     "button",
@@ -29222,6 +29224,9 @@
    ],
    "extends": [
     "layouts/admin_base.html"
+   ],
+   "extra_macros": [
+    "components/explained_value.html"
    ],
    "frame": "dashboard-01",
    "grid": "G1",
