@@ -129,7 +129,8 @@
       return Alpine.effect(function () {
         var v = getter();
         if (first) { old = v; first = false; return; }
-        if (v !== old) { var prev = old; old = v; cb(v, prev); }
+        // A watcher whose callback the evaluator could not resolve must not abort the other effects.
+        if (v !== old) { var prev = old; old = v; if (typeof cb === 'function') cb(v, prev); }
       });
     }
 

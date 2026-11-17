@@ -156,10 +156,10 @@ class JourneyOrchestrator:
         svc = DocumentIngestionService()
         return svc.extract_from_text(self.solution_id, text, source_doc_name=source_name)
 
-    def list_proposals(self, status=None) -> list:
+    def list_proposals(self, status=None, recent=False) -> list:
         """List blueprint proposals for this solution."""
         from app.modules.architecture_assistant.document_ingestion import DocumentIngestionService
-        return DocumentIngestionService().list_proposals(self.solution_id, status)
+        return DocumentIngestionService().list_proposals(self.solution_id, status, recent=recent)
 
     def accept_proposal(self, proposal_id) -> dict:
         """Accept a single proposal — create element + run inference chain."""
