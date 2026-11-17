@@ -136,12 +136,18 @@ def analyze_impact():
                 ImpactAnalysisService,
             )
 
+            from flask_login import current_user as _analyst
+
+            from app.core.auth.permissions import may_write
+
             change_type = _scenario_to_change_type(scenario)
-            raw = ImpactAnalysisService.analyze_change_impact(
+            raw =ImpactAnalysisService.analyze_change_impact(
                 element_id=element_id,
                 change_type=change_type,
                 scenario=scenario,
-                record=False,
+                # A person who may change the model keeps a history entry; a
+                # read-only person gets the same answer and nothing is stored.
+                record=bool(may_write(_analyst)),
             )
             result = _normalise_element_result(raw)
 
