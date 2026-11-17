@@ -114,6 +114,11 @@ CHAT_CRUD_ENTITIES = (
 # decides them (see ``system_actor``).
 PROPOSAL_SOURCES = (
     "solution_blueprint_proposals", "github_connector", "connector_config",
+    # The other writers of proposals nobody asked for: a confidence review, a suggested relationship, a match a
+    # connector could not make alone, a vendor detection, a vendor product deadline, a read of the website, an
+    # application's owner and an architecture review item.
+    "review_queue_items", "relationship_suggestions", "matcher_service", "vendor_detection", "vendor_products",
+    "website_crawler", "application_ownership", "arb_review_items",
 )
 EXPIRED_CHECK_NAME = "Still current"
 # How alike two names must score (SimpleDuplicateService) for the reviewer to be shown the existing element. Low on
@@ -898,7 +903,7 @@ def run_checks(service, approval: AIChatCRUDApproval, requester) -> Tuple[List[C
         allowed, role_reason = False, ACCOUNT_OFF_REASON
     elif allowed and approval.entity_type == "connectors" and not requester.is_admin():
         allowed, role_reason = False, "Connector changes need an administrator, and the person who asked is not one."
-    elif allowed and approval.entity_type == "vendor" and not is_platform_admin(requester):
+    elif allowed and approval.entity_type == "vendor" and not is_proposal(approval) and not is_platform_admin(requester):
         # The vendor list is shared by every workspace, so only a platform administrator changes it (the
         # same rule as the vendor API).
         allowed, role_reason = False, (

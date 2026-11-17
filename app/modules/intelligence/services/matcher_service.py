@@ -7,16 +7,15 @@ updates in place; an uncertain match becomes an approval row with evidence.
 from __future__ import annotations
 
 import json
+import re
 import logging
 from dataclasses import dataclass
-from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional
 
 from app import db
 from app.middleware.tenant_context import current_org_id
 from app.models.archimate_core import ArchiMateElement
 from app.models.archimate_element_types import base_type
-from app.models.ai_chat_crud_approval import AIChatCRUDApproval
 from app.modules.intelligence.services.crosswalk_service import CrosswalkService
 
 logger = logging.getLogger(__name__)
@@ -399,19 +398,19 @@ class MatcherService:
                 f"has no match in the organisation"
             )
 
-        approval = AIChatCRUDApproval(
+        from app.modules.ai_chat.services.ai_chat_approval_service import create_approval_record
+
+        approval = create_approval_record(
             organization_id=org_id,
             operation_type="merge" if result.matched_element_id is not None else "create",
             entity_type=entity_type,
             original_command=f"system: matcher proposed {entity_type}",
-            operation_payload=json.dumps(evidence),
+            operation_payload=evidence,
             summary=summary,
             source_table="matcher_service",
             source_id=result.matched_element_id,
-            expires_at=datetime.utcnow() + timedelta(minutes=PROPOSAL_EXPIRY_MINUTES),
+            expiry_minutes=PROPOSAL_EXPIRY_MINUTES,
         )
-        db.session.add(approval)
-        db.session.flush()
 
         result.approval_id = approval.id
         result.evidence = evidence
@@ -420,3 +419,36 @@ class MatcherService:
             approval.id, entity_type, summary,
         )
         return result
+
+
+def execute_matcher_proposal(approval) -> dict:
+    """Apply one settled proposal of the matcher: an incoming element that nearly matches one the workspace has
+    is linked to that one (nothing is added twice), and one with no match is added as a new element.
+
+    Called only by ``AIChatApprovalService.approve_and_execute``, for this organisation's own record."""
+    from app.models.archimate_core import _ELEMENT_TYPE_LAYER
+    from app.services.archimate_backbone import create_backbone_element
+
+    org_id = approval.organization_id
+    try:
+        payload = json.loads(approval.operation_payload or "{}")
+    except (TypeError, ValueError):
+        return {"success": False, "error": "The matcher's proposal could not be read."}
+    if payload.get("matched_element_id") is not None:
+        existing = ArchiMateElement.query.filter_by(id=payload["matched_element_id"], organization_id=org_id).first()
+        if existing is None:
+            return {"success": False, "error": "The element it matched is no longer in this workspace."}
+        return {"success": True, "linked": True, "element_id": existing.id, "element_name": existing.name,
+                "message": "Linked to the existing %s." % existing.name}
+    name = (payload.get("incoming_name") or "").strip()
+    kind = (payload.get("incoming_type") or "").strip()
+    layer = _ELEMENT_TYPE_LAYER.get(re.sub(r"(?<!^)(?=[A-Z])", "_", kind).lower())
+    if not name or not layer or layer == "unknown":
+        return {"success": False, "error": "The incoming element needs a name and a known ArchiMate type before "
+                                           "it can be added."}
+    element = create_backbone_element(
+        element_type=kind, layer=layer, name=name, organization_id=org_id,
+        provenance={"source_system": payload.get("incoming_source_system"),
+                    "external_id": payload.get("incoming_external_id")})
+    return {"success": True, "linked": False, "element_id": element.id, "created_element_ids": [element.id],
+            "element_name": element.name, "message": "Added %s to the model." % element.name}

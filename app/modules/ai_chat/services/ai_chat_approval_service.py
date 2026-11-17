@@ -1081,6 +1081,13 @@ class AIChatApprovalService:
 
                 result = execute_blueprint_proposal(approval)
 
+            elif approval.source_table == "matcher_service":
+                # An element an import or a connector brought that may be one the workspace already has: it is
+                # linked to that one, or added when nothing matches. Written by the matcher.
+                from app.modules.intelligence.services.matcher_service import execute_matcher_proposal
+
+                result = execute_matcher_proposal(approval)
+
             elif approval.operation_type in ("vendor_detection", "vendor_architecture"):
                 # A vendor product found on the organisation's website, in its domain records or in what
                 # a person told the assistant, and the catalogue's architecture for it once it is
