@@ -92,7 +92,7 @@ def live_server(request, app, tmp_path_factory, provider):
 def _shot(page, name, size):
     if SHOTS:
         os.makedirs(SHOTS, exist_ok=True)
-        page.screenshot(path=os.path.join(SHOTS, "%s-%s.png" % (name, size)), full_page=True)
+        page.screenshot(path=os.path.join(SHOTS, "%s-%s-%s.png" % (name, size, os.environ.get("NEWCOMER_THEME", "light"))), full_page=True)
 
 
 def cards_a_newcomer_is_shown(app, email):
@@ -142,6 +142,8 @@ def test_first_card_gives_a_cited_answer_and_connect_github_lands_on_the_connect
     browser, live_server, people, app, name, viewport
 ):
     context, page = _open(browser, viewport)
+    if os.environ.get("NEWCOMER_THEME") == "dark":
+        context.add_init_script("try { localStorage.setItem('theme', 'dark'); } catch (e) {} document.documentElement.classList.add('dark');")
     try:
         email, _ = sign_up(page, live_server, people)
         _skip_to_the_dashboard(page)
