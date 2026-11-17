@@ -110,6 +110,16 @@
         });
     }
 
+    // Moves focus into a dialog a moment after it opens, unless the person has already put it somewhere
+    // inside: a late move would take the next keystrokes (a space presses the close control).
+    function _focusInto(el, target) {
+        setTimeout(function () {
+            const active = global.document.activeElement;
+            if (active && active !== global.document.body && el.contains(active)) return;
+            target.focus();
+        }, 50);
+    }
+
     function _trapFocus(el, id, returnFocus) {
         // Store prevFocus per-entry so parallel modals each restore their own trigger.
         // Saved before the focusable check: a modal with nothing focusable yet still returns focus.
@@ -118,11 +128,11 @@
         }
         const autofocusEl = el.querySelector('[autofocus]');
         if (autofocusEl) {
-            setTimeout(function () { autofocusEl.focus(); }, 50);
+            _focusInto(el, autofocusEl);
         } else {
             const focusable = _focusableIn(el);
             if (!focusable.length) return;
-            setTimeout(function () { focusable[0].focus(); }, 50);
+            _focusInto(el, focusable[0]);
         }
 
         function onKeyDown(e) {
@@ -783,7 +793,7 @@
         // Focus the first focusable element
         let focusable = _focusableIn(el);
         if (focusable.length) {
-            setTimeout(function () { focusable[0].focus(); }, 50);
+            _focusInto(el, focusable[0]);
         }
 
         // Attach focus-trap keydown handler
