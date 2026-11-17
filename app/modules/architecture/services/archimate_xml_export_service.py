@@ -257,6 +257,21 @@ def export_to_xml(model_id: Optional[int] = None) -> str:
                 if key not in prop_defs:
                     prop_defs[key] = f"propid-{len(prop_defs) + 1}"
 
+    # A relationship carries its stored properties too (a specialisation such as "verifies"
+    # is one of them), so a re-import reads the same relationship back.
+    rel_props: Dict[int, Dict[str, str]] = {}
+    for rel in relationships:
+        merged = {
+            k: v
+            for k, v in _coerce_properties(getattr(rel, "custom_properties", None)).items()
+            if not k.startswith("archie:")
+        }
+        if merged:
+            rel_props[rel.id] = merged
+            for key in merged:
+                if key not in prop_defs:
+                    prop_defs[key] = f"propid-{len(prop_defs) + 1}"
+
     # <elements>
     elements_el = ET.SubElement(root, f"{{{_OEF_NS}}}elements")
     for elem in elements:
@@ -290,7 +305,7 @@ def export_to_xml(model_id: Optional[int] = None) -> str:
         if src is None or tgt is None:
             continue
         oef_rel_type = _rel_oef_type(getattr(rel, "type", None))
-        ET.SubElement(
+        rel_node = ET.SubElement(
             relationships_el,
             f"{{{_OEF_NS}}}relationship",
             attrib={
@@ -300,6 +315,7 @@ def export_to_xml(model_id: Optional[int] = None) -> str:
                 "target": f"id-{tgt}",
             },
         )
+        _emit_properties(rel_node, rel_props.get(rel.id), prop_defs)
         exported_rel_ids.add(rel.id)
 
     # <organizations> — the folder tree an importing tool shows in its model
