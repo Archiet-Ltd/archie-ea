@@ -1045,9 +1045,10 @@ def init_context_processors(app):
 
         try:
             from app.models.archimate_core import ArchiMateElement
+            from app.models.archimate_element_types import application_kind_types
             sample_marker = ArchiMateElement.query.filter(
                 ArchiMateElement.name == "Payments service",
-                ArchiMateElement.type == "ApplicationComponent"
+                ArchiMateElement.type.in_(application_kind_types())
             ).first()
 
             if not sample_marker:

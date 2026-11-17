@@ -989,8 +989,12 @@ def seeded_interface_gap(seeded, seeded_interface_initiative, seeded_interface_e
     app = create_app("testing")
     with app.app_context():
         org_id = seeded["ids"]["org"]
+        # An element has one gap per organisation (uq_gaps_org_element) and
+        # writing a Gap element already records it, so reuse that gap and
+        # create one only when the element has none.
         gap = Gap.query.filter_by(
-            name="Auth-matrix probe gap", organization_id=org_id,
+            archimate_element_id=seeded_interface_element,
+            organization_id=org_id,
         ).first()
         if gap is None:
             gap = Gap(

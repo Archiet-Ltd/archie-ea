@@ -954,6 +954,20 @@
         };
     }());
 
+    /* The sample company takes a few seconds to load. The first press locks the button and says so;
+       a second tap on a slow phone sends nothing. One handler for every page that offers the sample:
+       it listens on the document, so a form added later (the chat draws its offer) is covered too. */
+    document.addEventListener('submit', function (event) {
+        const form = event.target;
+        if (!form || !form.matches || !form.matches('[data-sample-form]')) return;
+        if (form.dataset.sampleBusy === 'true') { event.preventDefault(); return; }
+        form.dataset.sampleBusy = 'true';
+        const button = form.querySelector('button[type="submit"]');
+        if (button) { button.disabled = true; button.setAttribute('aria-busy', 'true'); }
+        const line = form.querySelector('[data-sample-busy]');
+        if (line) line.hidden = false;
+    });
+
     global.Platform.register('fetch', platformFetch);
 
 }(window));

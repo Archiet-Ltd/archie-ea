@@ -458,7 +458,7 @@
   }
 
   function createFromTemplate(templateId) {
-    Platform.fetch.post('/architecture-journey/start-from-template', { template_id: templateId }, { headers: { 'Accept': 'application/json' } })
+    Platform.fetch.post('/architecture-journey/start-from-template', { template_id: templateId }, { headers: { 'Accept': 'application/json' }, errorMsg: 'The solution could not be created. Try again in a moment.' })
       .then(function(data) {
         if (data.success && data.redirect) {
           if (window.Platform && Platform.modal) Platform.modal.close('template-picker');
@@ -467,7 +467,9 @@
           Platform.toast.error(data.error || 'Failed to create solution');
         }
       })
-      .catch(function() {});
+      .catch(function() {
+        // swallow-ok: Platform.fetch has already shown the one error message for this failure
+      });
   }
 
   function openSolutionCompare() {
