@@ -13,7 +13,7 @@ from __future__ import annotations
 
 from typing import Any, Callable, Dict, List, Optional
 
-from app.models.archimate_element_types import ArchiMateElementTypes, base_type
+from app.models.archimate_element_types import ArchiMateElementTypes, is_application_kind
 from app.modules.architecture.routes.archimate_crud import element_page
 from app.services.impact_graph import build_impact_graph, canonical_relationship_type
 
@@ -293,7 +293,7 @@ def linked_material(product_ae, rows, org_id: int) -> Dict[str, List[Dict[str, A
             repositories[found["label"]] = {**found, "via": None if element.id == product_ae.id else element.name}
     from app.models.application_portfolio import ApplicationComponent
 
-    element_ids = [r["element"].id for r in rows if base_type(r["element"].type) == "ApplicationComponent"]
+    element_ids = [r["element"].id for r in rows if is_application_kind(r["element"].type)]
     apps = ApplicationComponent.query.filter(
         ApplicationComponent.archimate_element_id.in_(element_ids or [0]),
         ApplicationComponent.organization_id == org_id).all()
@@ -327,7 +327,7 @@ def cost_of(product_id: int, rows, org_id: int) -> Dict[str, Any]:
     from app.services.application_cost_accessor import get_annual_cost, get_reporting_currency
     from app.modules.architecture.services.application_technology_links import is_technology_element
 
-    element_ids = [r["element"].id for r in rows if base_type(r["element"].type) == "ApplicationComponent"]
+    element_ids = [r["element"].id for r in rows if is_application_kind(r["element"].type)]
     apps = {a.archimate_element_id: a for a in ApplicationComponent.query.filter(
         ApplicationComponent.archimate_element_id.in_(element_ids or [0]),
         ApplicationComponent.organization_id == org_id).all()}
@@ -341,7 +341,7 @@ def cost_of(product_id: int, rows, org_id: int) -> Dict[str, Any]:
         elif is_technology_element(element):
             amount = technology_cost.allocation(org_id, element.id)["total"]
             what = "Yearly technology cost"
-        elif base_type(element.type) == "ApplicationComponent":
+        elif is_application_kind(element.type):
             amount = None  # an application element with no portfolio record has no cost to read
             what = "Yearly cost"
         else:

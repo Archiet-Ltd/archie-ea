@@ -25,7 +25,7 @@ def _org_with_solution(db_session, make_org, phase="B"):
     user = User(
         email="adm.%s@example.com" % uuid.uuid4().hex[:8], first_name="A", last_name="B",
         organization_id=org.id, enterprise_role="enterprise_architect", confirmed=True,
-        role=Role.query.filter_by(name="Viewer").first(),
+        role=Role.query.filter_by(name="Architect").first(),
     )
     user.password = "Passw0rd!x"
     db_session.add(user)

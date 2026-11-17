@@ -441,7 +441,7 @@
                 appendAnswerCards(estate.html);
                 return;
             }
-        } catch (_estateErr) {
+        } catch (_estateErr) { // swallow-ok: optional lookup; the question goes on to the AI without it
             /* The records lookup is an extra step before the AI, not the answer. When it fails the question
                goes on to the AI exactly as if the lookup had found nothing; the turn does not end here. */
         }
