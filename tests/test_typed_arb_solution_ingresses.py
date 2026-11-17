@@ -299,7 +299,7 @@ def test_approved_tool_uses_tool_call_as_server_command_key_and_returns_typed_id
     )
     with tenant_ctx(org.id):
         executor = ToolExecutor(actor.id)
-        monkeypatch.setattr(executor, "_user_can_write", lambda: True)
+        monkeypatch.setattr(executor, "_user_can_write", lambda _tool_name=None: True)
         executor._resolver.resolve_solution = lambda _name: {
             "resolved": True,
             "id": solution.id,
