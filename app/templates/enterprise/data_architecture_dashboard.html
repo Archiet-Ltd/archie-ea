@@ -36,10 +36,12 @@
 {% endcall %}
 {% endmacro %}
 
+{% macro _actions() %}{% if models_page %}{{ button(text='Data architecture overview', variant='outline', href=url_for('data_architecture.data_architecture_dashboard')) }}{% else %}{{ button(text='See every entity', icon='database', href=url_for('data_architecture.data_entity_catalog')) }}{% endif %}{% endmacro %}
 <div class="space-y-6">
+    {{ page_shell(title='Data models' if models_page else 'Data architecture',
+                  subtitle='Conceptual, logical and physical models of the data your organisation holds' if models_page else 'The data your organisation holds, where it flows and what is not yet traced',
+                  actions_caller=_actions) }}
 {% if models_page %}
-    {% macro _back() %}{{ button(text='Data architecture overview', variant='outline', href=url_for('data_architecture.data_architecture_dashboard')) }}{% endmacro %}
-    {{ page_shell(title='Data models', subtitle='Conceptual, logical and physical models of the data your organisation holds', actions_caller=_back) }}
     <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {{ stat_card('conceptual-models-card', 'Conceptual models', conceptual_count, 'brain', none, none,
             'None recorded yet. A conceptual model names the main things your organisation cares about and how they relate.') }}
@@ -49,8 +51,6 @@
             'None recorded yet. A physical model maps the logical design onto the tables of a specific database.') }}
     </div>
 {% else %}
-    {% macro _actions() %}{{ button(text='See every entity', icon='database', href=url_for('data_architecture.data_entity_catalog')) }}{% endmacro %}
-    {{ page_shell(title='Data architecture', subtitle='The data your organisation holds, where it flows and what is not yet traced', actions_caller=_actions) }}
     {% if load_error %}<p class="text-sm text-destructive" role="alert" data-testid="data-architecture-error">{{ load_error }}</p>{% endif %}
 
     <div class="grid grid-cols-1 gap-4 @xl/main:grid-cols-2 @5xl/main:grid-cols-4 sm:grid-cols-2 lg:grid-cols-4" data-testid="data-stat-row">
