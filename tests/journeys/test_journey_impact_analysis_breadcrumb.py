@@ -46,6 +46,19 @@ def test_impact_analysis_breadcrumb_leaf_matches_the_page_title(app, client):
     html = response.get_data(as_text=True)
 
     crumbs = _crumbs(html)
-    assert crumbs[-1] == _h1(html) == "Impact Analysis", (crumbs, _h1(html))
-    # The parent crumbs are unchanged.
-    assert crumbs[:2] == ["Home", "Strategy Layer"], crumbs
+    assert crumbs[-1] == _h1(html) == "Impact analysis", (crumbs, _h1(html))
+
+    # The page sits where the sidebar puts it: the registry is the one source of every trail, so the
+    # trail equals the one on the sidebar's own impact analysis page.
+    sidebar = client.get("/enterprise/analysis/impact-analysis")
+    assert sidebar.status_code == 200
+    sidebar_crumbs = _crumbs(sidebar.get_data(as_text=True))
+    # The sidebar page's own heading is title case; its parents are the registry's and must match exactly.
+    assert crumbs[:-1] == sidebar_crumbs[:-1], (crumbs, sidebar_crumbs)
+    assert crumbs[-1].lower() == sidebar_crumbs[-1].lower(), (crumbs, sidebar_crumbs)
+
+    from app.navigation.registry import page_trail
+
+    with app.test_request_context("/strategic/impact-analysis"):
+        expected = ["Home"] + [label for label, _ in page_trail(architect, "strategic.impact_analysis")]
+    assert crumbs[:-1] == expected, (crumbs, expected)

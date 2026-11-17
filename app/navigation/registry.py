@@ -128,11 +128,12 @@ WORK: tuple = (
     _l("impact", "Impact", "enterprise.impact_analysis", "zap", job="2", toggle=True, group="work",
        children=(
            _l("impact_analysis", "Impact analysis", "enterprise.impact_analysis", job="2",
-              aliases=("Impact", "What breaks", "Dependencies", "Blast radius")),
+              aliases=("Impact", "What breaks", "Dependencies", "Blast radius"),
+              owns=("strategic.impact_analysis",)),
            _l("traceability", "Traceability", "architect_ui.traceability_matrix", job="2",
               aliases=("Traceability matrix", "Trace", "Requirements traceability", "Value streams at risk")),
        ),
-       owns=("strategic.impact_analysis", "intelligence_ui.traceability", "intelligence_ui.value_streams_at_risk",
+       owns=("intelligence_ui.traceability", "intelligence_ui.value_streams_at_risk",
              "intelligence_ui.twin_map")),
     _l("changes", "Changes", "enterprise.gap_analysis", "route", job="4", toggle=True, group="work",
        children=(
@@ -888,13 +889,6 @@ def page_trail(user, endpoint: str | None, args=None) -> list:
     so every breadcrumb reads the way the sidebar is laid out. A section such as Spend has no
     page of its own, so it carries no link. Empty for Home and for pages the sidebar does not hold.
     """
-    # Impact Analysis page: conceptually sits under the Strategy layer of the model,
-    # so its breadcrumb reads Home > Strategy Layer > Impact Analysis.
-    if endpoint == "strategic.impact_analysis":
-        from flask import url_for
-        strategy_layer_url = url_for("archimate_crud.dashboard", layer="strategy")
-        return [("Strategy Layer", strategy_layer_url), ("Impact analysis", None)]
-
     # A filtered view of a shared page (a layer of the model) sits where the sidebar item with that
     # filter sits, not under the entry that owns the unfiltered page.
     if args:
