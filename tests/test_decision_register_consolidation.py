@@ -41,6 +41,17 @@ def _make_adr_record(org_id, **overrides):
     return record
 
 
+def _record_against_solution(canonical, org_id):
+    """Attach a paired decision to a real solution, as the options advisor records it."""
+    from app.models.solution_models import Solution
+
+    solution = Solution(name=f"sol-{uuid.uuid4().hex[:8]}", organization_id=org_id)
+    db.session.add(solution)
+    db.session.flush()
+    canonical.solution_id = solution.id
+    db.session.flush()
+
+
 def _make_capability(org_id, name="Customer Acquisition"):
     cap = UnifiedCapability(name=name, level=1, organization_id=org_id)
     db.session.add(cap)
@@ -636,6 +647,7 @@ def test_set_status_updates_the_canonical_row_and_leaves_the_legacy_row_frozen(d
     with tenant_ctx(org.id):
         record = _make_adr_record(org.id, status="proposed")
         canonical = record.pair_with_canonical_register()
+        _record_against_solution(canonical, org.id)
         db.session.commit()
 
         result = SolutionOptionsAdvisor.set_status(canonical.id, "accepted", user_id=1)
@@ -664,12 +676,14 @@ def test_set_status_on_one_organisations_decision_never_touches_another(db_sessi
     with tenant_ctx(org_b.id):
         record_b = _make_adr_record(org_b.id, status="proposed")
         canonical_b = record_b.pair_with_canonical_register()
+        _record_against_solution(canonical_b, org_b.id)
         db.session.commit()
         canonical_b_id = canonical_b.id
 
     with tenant_ctx(org_a.id):
         record_a = _make_adr_record(org_a.id, status="proposed")
         canonical_a = record_a.pair_with_canonical_register()
+        _record_against_solution(canonical_a, org_a.id)
         db.session.commit()
         canonical_a_id = canonical_a.id
 

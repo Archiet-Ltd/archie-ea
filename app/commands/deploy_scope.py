@@ -53,6 +53,7 @@ DEPLOY_DATA_COMMANDS = frozenset(
         "project-capabilities",
         "backfill-capability-types",
         "backfill-capability-catalogs",
+        "rescore-consolidation-candidates",
     }
 )
 
