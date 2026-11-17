@@ -1,376 +1,688 @@
-{# smoke-coverage-ok: plain-language filter wiring — element_type and layer display now use |plain_name and |plain_layer filters #}
+{# smoke-coverage-ok: plain-language filter wiring — element_type and layer display use |plain_name and |plain_layer filters #}
+{#
+  One page for every ArchiMate element type. It answers "what is this, and what depends on it?" on the first
+  screen: header, four figures, the answer, then the connections and the record. Composed only from the pattern
+  library's parts (page-header, action-bar, kpi-band, answer-cascade rows, dense-table, centered-modal).
+  The depends-on / used-by figures and the "affected" total come from the same impact walk the Impact analysis
+  page reads, built in the view (element_page.py); this template does no counting of its own.
+#}
 {% extends 'layouts/admin_base.html' %}
-{% from 'macros/page_shell.html' import page_shell %}
+{% from 'components/disabled_action.html' import disabled_action %}
+{% from 'macros/page_shell.html' import page_shell, stat_card %}
+{% from 'macros/shadcn_compat.html' import shadcn_select %}
+{% from 'components/modal.html' import modal %}
+{% from 'components/badge.html' import badge %}
+{% from 'components/element_table.html' import element_table %}
+{% from 'components/select.html' import native_select %}
+{% from 'components/dialog.html' import dialog %}
+{% from 'components/form_field.html' import form_field, form_footer %}
+{% from 'components/provenance.html' import result_footer %}
+{% from 'components/button.html' import button %}
+{% from 'components/checkbox.html' import checkbox %}
+{% from 'intelligence/_entity_picker.html' import entity_picker with context %}
+{% from 'components/input.html' import input %}
+{% from 'components/table.html' import table, table_header, table_body, table_row, table_head, table_cell %}
 
 {% block title %}{{ element_type | plain_name(current_user) }}: {{ element.name if element.name else (element.title if element.title else 'Unnamed') }}{% endblock %}
 
-{# breadcrumb-ok: this page renders its own breadcrumb inline in {% block
-   content %} (the <nav> right above the page_shell() call below) rather than
-   via {% block breadcrumb %} or page_shell's breadcrumb= arg, because it's
-   the one wired to the Alpine tab-switch (@click="activeTab='details'") the
-   layer crumb needs -- breadcrumb_nav()'s plain (label, href) slot has no
-   way to carry that handler. A second, separate breadcrumb_nav() call used
-   to live in a {% block breadcrumb %} above; removed as a duplicate. #}
+{% block extra_head_js %}
+<script src="{{ url_for('static', filename='js/intelligence/core.js') }}"></script>
+<script src="{{ url_for('static', filename='js/intelligence/picker.js') }}"></script>
+<script src="{{ url_for('static', filename='js/archimate_crud/product_add.js') }}"></script>
+{% endblock %}
 
 {% block content %}
 {% set elem_name = element.name if element.name else (element.title if element.title else 'Unnamed') %}
-{% set layer_label = layer_config[layer].name if layer in layer_config else layer|title %}
+{% set type_label = element_type | plain_name(current_user) %}
+{% set layer_label = layer | plain_layer(current_user) %}
+{% set conn = page.connections %}
+{% set connection_count = (conn.depends_on | length + conn.used_by | length + conn.other | length) if conn.available else none %}
+{# An element held with no record of its own is addressed by the element's id, and says so: the two number spaces overlap. #}
+{% set id_scope = {'ae': 1} if element.__class__.__name__ == 'ArchiMateElement' else {} %}
+{% set edit_url = url_for('archimate_crud.update_element', layer=layer, element_type=element_type, element_id=element.id, **id_scope) %}
+{% set flag_help = {
+    'Critical path member': 'Part of a chain that has to keep running for the business to run.',
+    'Is customized': 'Changed from the standard definition this element started from.',
+    'Is baseline': 'Part of the agreed starting point that later changes are measured against.'
+} %}
 
 <div class="p-6 space-y-6 mx-auto" x-data="archimateDetail()">
 
-    <!-- Breadcrumb + Header -->
-    {# The layer crumb is an Alpine tab-switch, not a link, so this nav is kept
-       verbatim rather than folded into page_shell's (label, href) breadcrumb
-       slot, which would silently drop the @click. #}
-    <nav class="flex items-center gap-2 text-sm text-muted-foreground mb-2">
-                <a href="{{ url_for('archimate_crud.dashboard') }}" class="hover:text-foreground">Architecture</a>
-                <i data-lucide="chevron-right" class="h-3 w-3 shrink-0" aria-hidden="true"></i>
-                <span class="hover:text-foreground cursor-pointer" @click="activeTab='details'">{{ layer_label }}</span>
-                <i data-lucide="chevron-right" class="h-3 w-3 shrink-0" aria-hidden="true"></i>
-                <a href="{{ url_for('archimate_crud.list_elements', layer=layer, element_type=element_type) }}" class="hover:text-foreground">{{ element_type | plain_name(current_user) }}</a>
-                <i data-lucide="chevron-right" class="h-3 w-3 shrink-0" aria-hidden="true"></i>
-                <span class="text-foreground truncate max-w-xs">{{ elem_name }}</span>
-    </nav>
-
-    {% macro _ps_actions() %}
-            <a href="{{ url_for('architect_ui.impact_analysis', element_id=element.id) }}"
-               class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
-                <i data-lucide="zap" class="h-4 w-4 mr-1.5" aria-hidden="true"></i>Impact
-            </a>
-            <a href="{{ url_for('archimate.element_impact_graph_page', element_id=element.id) }}"
-               class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
-                <i data-lucide="git-fork" class="h-4 w-4 mr-1.5" aria-hidden="true"></i>Impact graph
-            </a>
-            <a href="{{ url_for('archimate_crud.update_element', layer=layer, element_type=element_type, element_id=element.id) }}"
-               class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
-                <i data-lucide="pencil" class="h-4 w-4 mr-1.5" aria-hidden="true"></i>Edit
-            </a>
-            <button type="button" @click="deleteElement()"
-                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-destructive text-destructive-foreground text-sm font-semibold transition-colors hover:bg-destructive/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center"
-                    aria-label="Delete element">
-                <i data-lucide="trash-2" class="h-4 w-4 mr-1.5" aria-hidden="true"></i>Delete
-            </button>
-            <button type="button" @click="downloadDiagram()"
-                    class="inline-flex items-center justify-center rounded-md text-xs font-medium bg-primary/10 text-info-emphasis border border-primary/30 hover:bg-primary/20 h-9 px-3 py-2"
-                    aria-label="Export ArchiMate diagram as SVG">
-                <svg class="w-3 h-3 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
-                Export Diagram
-            </button>
+    {# ── 1. Header: breadcrumb, title, one plain sentence, identity badges, actions ── #}
+    {% macro _meta() %}
+        <span title="ArchiMate type: {{ element_type }}" data-testid="element-type">
+            {% call badge(variant='outline') %}{{ type_label }}{% endcall %}
+        </span>
+        <span data-testid="element-layer" title="Layer: {{ layer_label }}">
+            {% call badge(variant='outline') %}<i data-lucide="layers" class="mr-1 h-3 w-3" aria-hidden="true"></i>{{ layer_label }}{% endcall %}
+        </span>
+        {% if page.state %}
+        <span data-testid="element-state">{% call badge(variant='info') %}{{ page.state }}{% endcall %}</span>
+        {% endif %}
+        {% if element.status %}
+        {% call badge(variant=('success' if element.status == 'Active' else ('warning' if element.status in ('Deprecated', 'Retired') else 'neutral'))) %}{{ element.status | replace('_', ' ') | capitalize }}{% endcall %}
+        {% endif %}
+        {% if element.scope %}
+        {% call badge(variant='neutral') %}{{ element.scope | title }} scope{% endcall %}
+        {% endif %}
+        {% if element.building_block_type %}
+        {% call badge(variant='neutral') %}{{ element.building_block_type }} building block{% endcall %}
+        {% endif %}
     {% endmacro %}
-    {{ page_shell(title=elem_name, actions_caller=_ps_actions) }}
 
-            <!-- Identity badges -->
-            <div class="flex flex-wrap items-center gap-2 -mt-3">
-                <span class="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold bg-primary/5 text-primary border-primary/20">
-                    <i data-lucide="layers" class="h-3 w-3 mr-1" aria-hidden="true"></i>{{ element_type | plain_name(current_user) }}
-                </span>
-                <span class="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold bg-info/10 text-info-emphasis border-info/20">
-                    <i data-lucide="stack" class="h-3 w-3 mr-1" aria-hidden="true"></i>{{ layer | plain_layer(current_user) }}
-                </span>
-                {% if element.scope %}
-                <span class="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold bg-muted text-foreground border-border">
-                    {{ element.scope|title }}
-                </span>
-                {% endif %}
-                {% if element.building_block_type %}
-                <span class="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold bg-warning/10 text-warning-emphasis border-warning/20">
-                    <i data-lucide="box" class="h-3 w-3 mr-1" aria-hidden="true"></i>{{ element.building_block_type }}
-                </span>
-                {% endif %}
-                {% if element.plateau %}
-                <span class="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold bg-success/10 text-success-emphasis border-success/20">
-                    <i data-lucide="flag" class="h-3 w-3 mr-1" aria-hidden="true"></i>{{ element.plateau }}
-                </span>
-                {% endif %}
-                {% if element.status %}
-                <span class="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold {% if element.status == 'Active' %}bg-success/10 text-success-emphasis border-success/20{% elif element.status in ('Deprecated','Retired') %}bg-destructive/5 text-destructive-emphasis border-destructive/20{% else %}bg-muted text-foreground border-border{% endif %}">
-                    {{ element.status }}
-                </span>
-                {% endif %}
-                {% if relationships and relationships|length > 0 %}
-                <span class="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold bg-muted text-foreground border-border">
-                    <i data-lucide="git-merge" class="h-3 w-3 mr-1" aria-hidden="true"></i>{{ relationships|length }} relationship{{ 's' if relationships|length != 1 else '' }}
-                </span>
+    {% macro _actions() %}
+        <div class="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto sm:flex-wrap sm:items-center">
+            {% if conn.available %}
+            {% call button(variant='primary', href=url_for('architect_ui.impact_analysis', element_id=source_ae_id), testid='impact-analysis-link', class='gap-2 col-span-2 sm:col-span-1') %}
+                <i data-lucide="zap" class="h-4 w-4" aria-hidden="true"></i>Impact analysis
+            {% endcall %}
+            {% call button(variant='outline', href=url_for('archimate.element_impact_graph_page', element_id=source_ae_id), class='gap-2') %}
+                <i data-lucide="git-fork" class="h-4 w-4" aria-hidden="true"></i>Impact graph
+            {% endcall %}
+            {% endif %}
+            {% if decision_table_id %}
+            {% call button(variant='default', href=url_for('decision_tables.detail', decision_id=decision_table_id), testid='open-decision-table', class='gap-2') %}
+                <i data-lucide="table" class="h-4 w-4" aria-hidden="true"></i>Open the decision table
+            {% endcall %}
+            {% endif %}
+            {% if can_change_model() %}
+            {% call button(variant='outline', href=edit_url, class='gap-2') %}
+                <i data-lucide="pencil" class="h-4 w-4" aria-hidden="true"></i>Edit
+            {% endcall %}
+            {% else %}
+            {{ disabled_action('Edit', 'Only an architect can edit elements. Ask an administrator in Team settings.', 'edit-element-reason', icon='pencil') }}
+            {% endif %}
+            <div class="col-span-2 inline-flex flex-col items-start gap-1 sm:col-span-1">
+                {% call button(variant='outline', on_click='downloadDiagram()', aria_label='Export diagram as SVG', class='gap-2 w-full', testid='export-diagram') %}
+                    <i data-lucide="download" class="h-4 w-4" aria-hidden="true"></i>Export diagram
+                {% endcall %}
+                {% if connection_count == 0 %}
+                <p class="text-xs text-muted-foreground" data-testid="export-diagram-no-relationships">
+                    This element has no relationships yet.
+                    {% if source_ae_id %}<a href="#connections" class="text-primary underline hover:underline">Add one</a>.{% endif %}
+                </p>
                 {% endif %}
             </div>
+            {% if can_change_model() %}
+            <span class="mx-1 hidden h-6 w-px bg-border sm:block" aria-hidden="true"></span>
+            {% call button(variant='outline', on_click='deleteElement()', testid='delete-element', aria_label='Delete ' ~ elem_name, class='gap-2 text-destructive-emphasis col-span-2 sm:col-span-1') %}
+                <i data-lucide="trash-2" class="h-4 w-4" aria-hidden="true"></i>Delete
+            {% endcall %}
+            {% endif %}
+        </div>
+    {% endmacro %}
 
-    <!-- Description banner (if present) -->
-    {% if element.description %}
-    <div class="rounded-lg border bg-muted/30 px-5 py-4">
-        <p class="text-sm leading-relaxed text-muted-foreground">{{ element.description }}</p>
+    {{ page_shell(
+        title=elem_name,
+        subtitle=page.subtitle,
+        breadcrumb=[
+            ('Architecture', url_for('archimate_crud.dashboard')),
+            (layer_label, url_for('archimate_crud.dashboard', layer=layer)),
+            (type_label, url_for('archimate_crud.list_elements', layer=layer, element_type=element_type)),
+            (elem_name, None)
+        ],
+        stack_actions=True,
+        meta_caller=_meta,
+        actions_caller=_actions
+    ) }}
+
+    {# ── 2. The four figures ── #}
+    {% if element_type == 'Plateau' and page.stage %}
+        {% set k3_label = 'Position' %}
+        {% set k3_value = ('Stage ' ~ page.stage.order) if page.stage.order else 'Not set' %}
+        {% set k3_hint = 'Its place on the roadmap' if page.stage.order else 'Edit to add its order' %}
+    {% elif element_type == 'Gap' and element.resolution_status %}
+        {% set k3_label = 'Status' %}
+        {% set k3_value = element.resolution_status | replace('_', ' ') | capitalize %}
+        {% set k3_hint = None %}
+    {% elif (element.custom_properties or {}).get('status_label') %}
+        {% set k3_label = 'Status' %}
+        {% set k3_value = element.custom_properties.get('status_label') %}
+        {% set k3_hint = 'Whether this can be used today' %}
+    {% elif element.status %}
+        {% set k3_label = 'Status' %}
+        {% set k3_value = element.status | replace('_', ' ') | capitalize %}
+        {% set k3_hint = None %}
+    {% elif page.state %}
+        {% set k3_label = 'Status' %}
+        {% set k3_value = page.state %}
+        {% set k3_hint = 'Where it sits between today and the target' %}
+    {% else %}
+        {% set k3_label = 'Status' %}
+        {% set k3_value = 'Not set' %}
+        {% set k3_hint = 'Edit to add one' %}
+    {% endif %}
+    {% set changed = element.updated_at or element.created_at or element.recorded_at %}
+    {% set changed_is_recorded = not (element.updated_at or element.created_at) and element.recorded_at %}
+
+    <div class="grid grid-cols-2 gap-4 lg:grid-cols-4" data-testid="kpi-band">
+        <div data-testid="kpi-depends-on" class="flex [&>*]:w-full">
+            {% if not conn.available %}
+                {{ stat_card('Depends on', 'Unknown', hint='Not in the model graph yet') }}
+            {% elif conn.depends_on %}
+                {% set hint %}<a href="#connections" class="text-primary underline hover:underline">See what it depends on</a>{% endset %}
+                {{ stat_card('Depends on', conn.depends_on | length, hint=hint) }}
+            {% else %}
+                {{ stat_card('Depends on', 0, hint='Nothing it relies on is recorded') }}
+            {% endif %}
+        </div>
+        <div data-testid="kpi-used-by" class="flex [&>*]:w-full">
+            {% if not conn.available %}
+                {{ stat_card('Used by', 'Unknown', hint='Not in the model graph yet') }}
+            {% elif conn.used_by %}
+                {% set hint %}<a href="#connections" class="text-primary underline hover:underline">See what uses it</a>{% endset %}
+                {{ stat_card('Used by', conn.used_by | length, hint=hint) }}
+            {% else %}
+                {{ stat_card('Used by', 0, hint='Nothing that uses it is recorded') }}
+            {% endif %}
+        </div>
+        <div data-testid="kpi-status" class="flex [&>*]:w-full">
+            {% if k3_hint and k3_hint.startswith('Edit') and can_change_model() %}
+                {% set hint %}<a href="{{ edit_url }}" class="text-primary underline hover:underline">{{ k3_hint }}</a>{% endset %}
+                {{ stat_card(k3_label, k3_value, hint=hint) }}
+            {% else %}
+                {{ stat_card(k3_label, k3_value, hint=k3_hint) }}
+            {% endif %}
+        </div>
+        <div data-testid="kpi-updated" class="flex [&>*]:w-full">
+            {% if changed %}
+                {{ stat_card('Recorded' if changed_is_recorded else 'Last updated', changed.strftime('%d %b %Y'), hint=('Reviewed ' ~ element.last_reviewed_date.strftime('%d %b %Y')) if element.last_reviewed_date else ('Date it was added to the model' if changed_is_recorded else 'Not reviewed yet')) }}
+            {% else %}
+                {{ stat_card('Last updated', 'Not recorded', hint='Shown after the next edit') }}
+            {% endif %}
+        </div>
     </div>
+
+    {# ── 3. What this answers ── #}
+    {% set row_total = conn.depends_on | length + conn.used_by | length + conn.other | length %}
+    <section class="rounded-lg border border-border bg-card p-6" data-testid="answer-card" aria-labelledby="answer-heading">
+        <h2 id="answer-heading" class="text-xs font-semibold uppercase tracking-[0.06em] text-muted-foreground">What this answers</h2>
+        <p class="question-line mt-3 max-w-[640px]">What depends on {{ elem_name }}, and what does it need?</p>
+
+        {% if not conn.available %}
+        <p class="mt-4 text-sm text-muted-foreground" data-testid="answer-impact">
+            This element is not in the model graph yet, so its impact is unknown. Linking it to another element puts it in.
+        </p>
+        {% elif row_total == 0 %}
+        <div class="mt-4 rounded-md border border-border bg-muted/30 p-4" role="status" data-testid="answer-empty">
+            <p class="text-sm text-foreground">Nothing is connected to this yet, so its impact is unknown. Use Add relationship below to link it to the elements it relies on or serves.</p>
+        </div>
+        {% else %}
+        <ul class="mt-4 space-y-2" role="list">
+            {% for line in page.lines %}
+            <li class="rounded-md border border-border bg-card px-4 py-2.5 text-sm text-foreground" data-testid="answer-line">
+                <span class="font-semibold">{{ line.lead }} {{ line.count }} {{ line.noun }}</span><span class="text-muted-foreground">:</span>
+                 {% for row in line['items'] %}{% if row.href %}<a href="{{ row.href }}" class="text-primary underline hover:underline">{{ row.name }}</a>{% else %}{{ row.name }}{% endif %}{% if line.show_kind %} <span class="text-muted-foreground">({{ row.relationship }})</span>{% endif %}{{ ', ' if not loop.last }}{% endfor %}{% if line.more %}<a href="#connections" class="ml-1 text-muted-foreground underline hover:text-foreground">and {{ line.more }} more</a>{% endif %}
+            </li>
+            {% endfor %}
+        </ul>
+        <p class="mt-4 text-sm text-foreground" data-testid="answer-impact">
+            If this changes or fails, {{ conn.total }} element{{ '' if conn.total == 1 else 's' }} {{ 'is' if conn.total == 1 else 'are' }} affected{% if conn.by_layer %}:
+            {% for label, count in conn.by_layer %}{{ count }} in {{ label }}{{ ', ' if not loop.last }}{% endfor %}{% endif %}.
+            {% if conn.beyond %}<span class="text-muted-foreground">{{ conn.beyond }} of them {{ 'is' if conn.beyond == 1 else 'are' }} reached through another element.</span>{% endif %}
+             <a href="{{ url_for('architect_ui.impact_analysis', element_id=source_ae_id) }}" class="ml-1 font-medium text-primary underline hover:underline">See the full impact</a>
+        </p>
+        {% endif %}
+    </section>
+
+    {# ── Product: everything that makes it up, by ArchiMate layer (product_page.py) ── #}
+    {% if product %}
+    <section class="rounded-lg border border-border bg-card p-6" data-testid="product-summary" aria-labelledby="product-summary-heading">
+        <div class="flex flex-wrap items-start justify-between gap-3">
+            <h2 id="product-summary-heading" class="text-xl font-semibold tracking-[-0.01em] text-foreground">What this product is made of</h2>
+            {% call button(variant='outline', href=product.export_url, testid='product-export', class='gap-2') %}
+                <i data-lucide="download" class="h-4 w-4" aria-hidden="true"></i>Export every section
+            {% endcall %}
+        </div>
+        <p class="mt-3 max-w-[720px] text-sm text-foreground" data-testid="product-summary-text">{{ product.summary }}</p>
+        {% if product.truncated %}
+        <p class="mt-2 text-sm text-muted-foreground" data-testid="product-truncated">This product reaches more elements than the page can show at once. The first {{ product.member_total }} are listed.</p>
+        {% endif %}
+        {{ result_footer(product.footer) }}
+        {% if 'intelligence_ui.answer_for_element' in flask.current_app.view_functions %}
+        <p class="mt-3 text-sm"><a href="{{ url_for('intelligence_ui.answer_for_element', element_id=source_ae_id) }}" class="font-medium text-primary underline hover:underline" data-testid="product-cited-answer">Open what breaks if this product fails, with its citations</a></p>
+        {% endif %}
+    </section>
+
+    {% if product.bring_in %}
+    {% set bi = product.bring_in %}
+    <section id="bring-in" class="rounded-lg border border-border bg-card p-6" data-testid="product-bring-in" aria-labelledby="bring-in-heading">
+        <h2 id="bring-in-heading" class="text-xl font-semibold tracking-[-0.01em] text-foreground">Bring in repositories</h2>
+        {% if bi.state == 'not_connected' %}
+        <p class="mt-2 max-w-[720px] text-sm text-muted-foreground">Connect GitHub once and Entelim can read this product's repositories, propose the applications, services, interfaces, data and technology they show, and cite the file each came from.</p>
+        <div class="mt-4">
+            {% call button(variant='default', href=bi.connect_url, testid='product-connect-github', class='gap-2') %}
+                <i data-lucide="github" class="h-4 w-4" aria-hidden="true"></i>Connect GitHub
+            {% endcall %}
+        </div>
+        {% else %}
+        <p class="mt-2 max-w-[720px] text-sm text-muted-foreground">Choose repositories of <span class="font-medium text-foreground">{{ bi.organization }}</span>. Entelim reads them and proposes what they show, linked to {{ elem_name }}. Nothing is added until you approve it.</p>
+        {% if bi.last %}
+        <div class="mt-4 text-sm" data-testid="product-scan-state" data-state="{{ bi.last.state }}">
+            {% if bi.last.state in ('waiting', 'reading') %}
+            <p>Reading {{ bi.last.repositories | join(', ') }}. This page shows the result when the read has finished; reload it in a moment.</p>
+            {% elif bi.last.state == 'failed' %}
+            <p class="text-destructive-emphasis">The last read did not finish: {{ bi.last.error }}</p>
+            {% else %}
+            <p>Read {{ bi.last.repositories | length }} repositor{{ 'y' if bi.last.repositories | length == 1 else 'ies' }}: {{ bi.last.repositories | join(', ') }}.</p>
+            {% if bi.last.already_in_model %}
+            <p class="mt-1 text-muted-foreground" data-testid="product-scan-already">Already in your model, so nothing new is proposed for {{ bi.last.already_in_model | join(', ') }}. Join the application to this product with Add in its layer.</p>
+            {% endif %}
+            {% endif %}
+        </div>
+        {% endif %}
+        {% if bi.waiting %}
+        <p class="mt-3 text-sm" data-testid="product-scan-waiting">{{ bi.waiting }} proposal{{ '' if bi.waiting == 1 else 's' }} read for this product {{ 'is' if bi.waiting == 1 else 'are' }} waiting for your decision. <a href="{{ bi.review_url }}" class="font-medium text-primary underline hover:underline" data-testid="product-review-link">Review and approve them</a></p>
+        {% endif %}
+        {% if bi.choosing %}
+        {% if bi.error %}
+        <p class="mt-4 text-sm text-destructive-emphasis" role="alert" data-testid="product-repositories-error">{{ bi.error }}</p>
+        {% elif not bi.repositories %}
+        <p class="mt-4 text-sm text-muted-foreground" data-testid="product-repositories-empty">GitHub lists no repository for {{ bi.organization }} that this connection can read.</p>
+        {% else %}
+        <form method="post" action="{{ bi.scan_url }}" class="mt-4 space-y-4" data-testid="product-repositories-form">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <fieldset>
+                <legend class="text-sm font-medium text-foreground">Repositories ({{ bi.repositories | length }}), up to {{ bi.limit }} at a time</legend>
+                <ul class="mt-3 grid gap-3 sm:grid-cols-2">
+                    {% for r in bi.repositories %}
+                    <li data-testid="product-repository-option">
+                        {{ checkbox(id='repo-' ~ loop.index, name='repository', value=r.full_name, label=r.full_name,
+                                    description=(r.description or 'No description') ~ (' · ' ~ r.language if r.language else '') ~ (' · archived' if r.archived else '')) }}
+                        {% if r.href %}<p class="ml-6 mt-1 text-xs text-muted-foreground">Already in your model: <a href="{{ r.href }}" class="text-primary underline hover:underline">{{ r.element.name }}</a></p>{% endif %}
+                    </li>
+                    {% endfor %}
+                </ul>
+            </fieldset>
+            <div class="flex flex-wrap gap-3">
+                {% call button(variant='default', type='submit', testid='product-repositories-submit') %}Read the chosen repositories{% endcall %}
+                {% call button(variant='outline', href=url_for('archimate_crud.detail_element', layer='business', element_type='Product', element_id=source_ae_id, ae=1) ~ '#bring-in') %}Cancel{% endcall %}
+            </div>
+        </form>
+        {% endif %}
+        {% else %}
+        <div class="mt-4">
+            {% call button(variant='default', href=bi.choose_url, testid='product-choose-repositories', class='gap-2') %}
+                <i data-lucide="github" class="h-4 w-4" aria-hidden="true"></i>Choose repositories
+            {% endcall %}
+        </div>
+        {% endif %}
+        {% endif %}
+    </section>
     {% endif %}
 
-    <!-- Tabs -->
-    <div class="border-b">
-        <nav class="flex space-x-6" role="tablist">
-            <button type="button" @click="activeTab='details'" role="tab"
-                    :class="activeTab==='details' ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:border-border hover:text-foreground'"
-                    class="border-b-2 pb-3 text-sm font-medium transition-colors">
-                <i data-lucide="info" class="h-4 w-4 inline mr-1.5" aria-hidden="true"></i>Details
-            </button>
-            <button type="button" @click="activeTab='relationships'" role="tab"
-                    :class="activeTab==='relationships' ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:border-border hover:text-foreground'"
-                    class="border-b-2 pb-3 text-sm font-medium transition-colors">
-                <i data-lucide="git-merge" class="h-4 w-4 inline mr-1.5" aria-hidden="true"></i>
-                Relationships
-                {% if relationships %}<span class="ml-1.5 rounded-full bg-muted px-2 py-0.5 text-xs">{{ relationships|length }}</span>{% endif %}
-            </button>
-        </nav>
+    <div id="layers" class="space-y-6" data-testid="product-layers">
+        {% for sec in product.sections %}
+        <section class="rounded-lg border border-border bg-card" data-testid="product-layer" data-layer="{{ sec.key }}" aria-labelledby="layer-{{ sec.key }}-heading" x-data="{ addOpen: false }">
+            <div class="flex flex-wrap items-center justify-between gap-3 p-6 pb-0">
+                <div class="flex items-center gap-2">
+                    <h2 id="layer-{{ sec.key }}-heading" class="text-xl font-semibold tracking-[-0.01em] text-foreground">{{ sec.label }}</h2>
+                    {% call badge(variant='outline') %}<span data-testid="layer-count">{{ sec.count }}</span>{% endcall %}
+                </div>
+                {% if sec.add %}
+                {% call button(variant='outline', testid='product-add-' ~ sec.key, class='gap-2', attrs_dict={'@click': 'addOpen = true'}) %}
+                    <i data-lucide="plus" class="h-4 w-4" aria-hidden="true"></i>Add
+                {% endcall %}
+                {% endif %}
+            </div>
+            <div class="p-6">
+                {% if sec.rows %}
+                {% call(row) element_table(rows=sec.rows, columns=[('Type', ''), ('Relationship', ''), ('Owner', ''), ('Source', '')], caption=sec.label ~ ' elements of this product', testid='product-layer-table-' ~ sec.key, row_testid='product-element-row', link_testid='product-element-link', page_size=25, toolbar=false) %}
+                    {% call table_cell() %}{{ row.type_label }}{% endcall %}
+                    {% call table_cell() %}{{ row.relationship }}{% endcall %}
+                    {% call table_cell() %}{{ row.owner }}{% endcall %}
+                    {% call table_cell() %}<span data-testid="product-element-source">{% if row.source.href %}<a href="{{ row.source.href }}" class="text-primary underline hover:underline" rel="noopener noreferrer" data-testid="product-element-source-link">{{ row.source.text }}</a>{% else %}{{ row.source.text }}{% endif %}</span>{% endcall %}
+                {% endcall %}
+                {% else %}
+                <p class="text-sm text-muted-foreground" data-testid="layer-empty">{{ sec.empty_reason }}{% if sec.add %} Use Add to join one with the relationship already chosen.{% endif %}</p>
+                {% endif %}
+            </div>
+            {% if sec.add %}
+            {% call dialog(title='Add to ' ~ sec.label, description='Whatever you pick or create is joined to ' ~ elem_name ~ ' by ' ~ sec.add.relationship | lower ~ '.', open_expr='addOpen', close_expr='addOpen = false', start_hidden=false) %}
+            <form method="post" action="{{ sec.add.url }}" class="space-y-4" data-testid="product-add-form-{{ sec.key }}"
+                  x-data="productAdd({{ sec.add.types | map(attribute=0) | list | tojson | forceescape }}, {{ dict(sec.add.types) | tojson | forceescape }})" x-ref="addForm"
+                  @keydown.enter="if ($event.target.tagName === 'INPUT') $event.preventDefault()">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <input type="hidden" name="section" value="{{ sec.key }}">
+                {{ input(type='hidden', name='existing_id', attrs_dict={'x-ref': 'existing'}) }}
+                {{ input(type='hidden', name='name', attrs_dict={'x-ref': 'newName'}) }}
+                <p class="text-sm font-medium text-muted-foreground">Find one your organisation already has</p>
+                {{ entity_picker('add-' ~ sec.key, 'Type a few letters of its name') }}
+                <div x-show="canCreate()" x-cloak class="space-y-3" data-testid="product-add-create-{{ sec.key }}">
+                    <div x-show="similar.length" x-cloak class="space-y-2" data-testid="product-add-near-{{ sec.key }}">
+                        <template x-for="near in similar" :key="near.id">
+                            {% call button(variant='outline', testid='product-add-near-option', attrs_dict={'@click': 'join(near.id)'}) %}<span x-text="'Did you mean ' + near.name + '?'"></span>{% endcall %}
+                        </template>
+                    </div>
+                    <label for="add-{{ sec.key }}-type" class="block text-sm font-medium text-muted-foreground">Nothing matches exactly. Type of the new element</label>
+                    {{ native_select(id='add-' ~ sec.key ~ '-type', name='element_type', options=sec.add.types, aria_label='Type', attrs_dict={'x-model': 'chosenType'}) }}
+                    {% call button(variant='default', testid='product-add-create-' ~ sec.key ~ '-submit', attrs_dict={'@click': 'create()', 'x-text': 'createLabel()'}) %}{% endcall %}
+                </div>
+                <div class="flex justify-end pt-2">
+                    {% call button(variant='ghost', attrs_dict={'@click': 'addOpen = false'}) %}Cancel{% endcall %}
+                </div>
+            </form>
+            {% endcall %}
+            {% endif %}
+        </section>
+        {% endfor %}
     </div>
 
-    <!-- ── DETAILS TAB ── -->
-    <div x-show="activeTab==='details'" x-cloak class="space-y-6">
-
-        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-
-            <!-- ArchiMate Identity -->
-            <div class="border rounded-lg p-5 space-y-3">
-                <h2 class="text-sm font-semibold uppercase tracking-wide text-muted-foreground">ArchiMate Identity</h2>
-                <dl class="space-y-2">
-                    <div class="flex justify-between text-sm">
-                        <dt class="text-muted-foreground">Type</dt>
-                        <dd class="font-medium">{{ element_type | plain_name(current_user) }}</dd>
-                    </div>
-                    <div class="flex justify-between text-sm">
-                        <dt class="text-muted-foreground">Layer</dt>
-                        <dd class="font-medium">{{ layer | plain_layer(current_user) }}</dd>
-                    </div>
-                    {% if element.scope %}
-                    <div class="flex justify-between text-sm">
-                        <dt class="text-muted-foreground">Scope</dt>
-                        <dd class="font-medium">{{ element.scope|title }}</dd>
-                    </div>
-                    {% endif %}
-                    {% if element.building_block_type %}
-                    <div class="flex justify-between text-sm">
-                        <dt class="text-muted-foreground">Building Block</dt>
-                        <dd class="font-medium">{{ element.building_block_type }}</dd>
-                    </div>
-                    {% endif %}
-                    {% if element.plateau %}
-                    <div class="flex justify-between text-sm">
-                        <dt class="text-muted-foreground">Plateau</dt>
-                        <dd class="font-medium">{{ element.plateau }}</dd>
-                    </div>
-                    {% endif %}
-                    {% if element.status %}
-                    <div class="flex justify-between text-sm">
-                        <dt class="text-muted-foreground">Status</dt>
-                        <dd class="font-medium">{{ element.status }}</dd>
-                    </div>
-                    {% endif %}
-                    <div class="flex justify-between text-sm">
-                        <dt class="text-muted-foreground">Element ID</dt>
-                        <dd class="font-mono text-xs text-muted-foreground">#{{ element.id }}</dd>
-                    </div>
-                </dl>
+    <section class="rounded-lg border border-border bg-card p-6" data-testid="product-linked" aria-labelledby="product-linked-heading">
+        <h2 id="product-linked-heading" class="text-xl font-semibold tracking-[-0.01em] text-foreground">Linked material</h2>
+        <div class="mt-4 grid gap-6 md:grid-cols-2">
+            <div data-testid="linked-diagrams">
+                <h3 class="text-xs font-semibold uppercase tracking-[0.06em] text-muted-foreground">Diagrams</h3>
+                <ul class="mt-2 space-y-1 text-sm" role="list">
+                    {% for d in product.linked.diagrams %}<li><a href="{{ d.href }}" class="text-primary underline hover:underline" data-testid="linked-diagram-link">{{ d.name }}</a></li>
+                    {% else %}<li class="text-muted-foreground">No diagram shows this product or its elements yet.</li>{% endfor %}
+                </ul>
             </div>
+            <div data-testid="linked-decisions">
+                <h3 class="text-xs font-semibold uppercase tracking-[0.06em] text-muted-foreground">Decision records</h3>
+                <ul class="mt-2 space-y-1 text-sm" role="list">
+                    {% for d in product.linked.decisions %}<li><a href="{{ d.href }}" class="text-primary underline hover:underline" data-testid="linked-decision-link">{{ d.name }}</a> <span class="text-muted-foreground">{{ d.status }}</span></li>
+                    {% else %}<li class="text-muted-foreground">No decision has been recorded about this product or its elements.</li>{% endfor %}
+                </ul>
+            </div>
+            <div data-testid="linked-repositories">
+                <h3 class="text-xs font-semibold uppercase tracking-[0.06em] text-muted-foreground">Repositories</h3>
+                <ul class="mt-2 space-y-1 text-sm" role="list">
+                    {% for r in product.linked.repositories %}<li>{% if r.href %}<a href="{{ r.href }}" class="text-primary underline hover:underline" rel="noopener noreferrer" data-testid="linked-repository-link">{{ r.label }}</a>{% else %}{{ r.label }}{% endif %}{% if r.via %} <span class="text-muted-foreground">for {{ r.via }}</span>{% endif %}</li>
+                    {% else %}<li class="text-muted-foreground">No repository is connected to this product or its elements.</li>{% endfor %}
+                </ul>
+            </div>
+            <div data-testid="linked-documents">
+                <h3 class="text-xs font-semibold uppercase tracking-[0.06em] text-muted-foreground">Documents</h3>
+                <ul class="mt-2 space-y-1 text-sm" role="list">
+                    {% for d in product.linked.documents %}<li><a href="{{ d.href }}" class="text-primary underline hover:underline" data-testid="linked-document-link">{{ d.name }}</a>{% if d.via %} <span class="text-muted-foreground">for {{ d.via }}</span>{% endif %}</li>
+                    {% else %}<li class="text-muted-foreground">No document is attached to the applications in this product.</li>{% endfor %}
+                </ul>
+            </div>
+        </div>
+    </section>
 
-            <!-- Auto-discovered attributes (display_fields) -->
-            {% if display_fields %}
-            <div class="border rounded-lg p-5 space-y-3 lg:col-span-2">
-                <h2 class="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Attributes</h2>
-                <dl class="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2">
-                    {% for field in display_fields %}
-                    <div class="text-sm">
-                        <dt class="text-muted-foreground">{{ field.label }}</dt>
-                        <dd class="font-medium mt-0.5 break-words">{{ field.value }}</dd>
-                    </div>
+    <section class="rounded-lg border border-border bg-card p-6" data-testid="product-cost" aria-labelledby="product-cost-heading">
+        <h2 id="product-cost-heading" class="text-xl font-semibold tracking-[-0.01em] text-foreground">Cost, gaps and risks</h2>
+        <div class="mt-4 grid gap-6 md:grid-cols-2">
+            <div>
+                <h3 class="text-xs font-semibold uppercase tracking-[0.06em] text-muted-foreground">Yearly cost</h3>
+                {% if product.cost.withheld %}
+                <p class="mt-2 text-sm text-muted-foreground" data-testid="product-cost-total">{{ costs_withheld_sentence }}</p>
+                {% elif product.cost.total is not none %}
+                <p class="mt-2 text-sm font-medium" data-testid="product-cost-total">{{ product.cost.total | currency(product.cost.currency) }} a year across {{ product.cost.counted }} cost line{{ '' if product.cost.counted == 1 else 's' }}</p>
+                {% elif product.cost.counted == 0 %}
+                <p class="mt-2 text-sm text-muted-foreground" data-testid="product-cost-total">No application or technology in this product has a yearly cost recorded, so no total is shown.</p>
+                {% else %}
+                <p class="mt-2 text-sm text-muted-foreground" data-testid="product-cost-total">No total is shown because {{ product.cost.missing | join(', ') }} {{ 'has' if product.cost.missing | length == 1 else 'have' }} no yearly cost recorded.</p>
+                {% endif %}
+                <ul class="mt-2 space-y-1 text-sm" role="list">
+                    {% for c in (product.cost.lines if not product.cost.withheld else []) %}<li data-testid="product-cost-line">{{ c.name }}: {{ c.amount | currency(product.cost.currency) }}</li>{% endfor %}
+                </ul>
+            </div>
+            <div data-testid="product-problems">
+                <h3 class="text-xs font-semibold uppercase tracking-[0.06em] text-muted-foreground">Open gaps and risks</h3>
+                <ul class="mt-2 space-y-1 text-sm" role="list">
+                    {% for p in product.problems %}<li data-testid="product-problem">{% if p.href %}<a href="{{ p.href }}" class="text-primary underline hover:underline">{{ p.name }}</a>{% else %}{{ p.name }}{% endif %} <span class="text-muted-foreground">{{ p.kind }}, {{ p.status | lower }}</span></li>
+                    {% else %}<li class="text-muted-foreground">No open gap or risk is recorded against this product's elements.</li>{% endfor %}
+                </ul>
+            </div>
+        </div>
+    </section>
+    {% endif %}
+
+    {# ── 4. Connections ── #}
+    <section id="connections" class="rounded-lg border border-border bg-card" data-testid="connections" aria-labelledby="connections-heading">
+        <div class="flex flex-wrap items-center justify-between gap-3 p-6 pb-0">
+            <h2 id="connections-heading" class="text-xl font-semibold tracking-[-0.01em] text-foreground">Connections</h2>
+            {% if source_ae_id %}
+            {% call button(variant='outline', testid='add-relationship', class='gap-2', attrs_dict={'data-modal-open': 'add-relationship-dialog'}) %}
+                <i data-lucide="plus" class="h-4 w-4" aria-hidden="true"></i>Add relationship
+            {% endcall %}
+            {% endif %}
+        </div>
+        {% if row_total == 0 %}
+            <p class="p-6 text-sm text-muted-foreground">No connections to list yet.</p>
+        {% else %}
+        <div class="p-6">
+            <div class="overflow-hidden rounded-lg border border-border">
+                {% call table() %}
+                    {% call table_header(class='bg-muted/50') %}
+                        {% call table_row() %}
+                            {% call table_head(class='h-auto p-3', attrs_dict={'scope': 'col'}) %}Relationship{% endcall %}
+                            {% call table_head(class='h-auto p-3', attrs_dict={'scope': 'col'}) %}Element{% endcall %}
+                            {% call table_head(class='h-auto p-3 hidden md:table-cell', attrs_dict={'scope': 'col'}) %}Type{% endcall %}
+                            {% call table_head(class='h-auto p-3 hidden md:table-cell', attrs_dict={'scope': 'col'}) %}Layer{% endcall %}
+                        {% endcall %}
+                    {% endcall %}
+                    {% for group_id, group_title, group_rows in [('depends-on', 'Depends on', conn.depends_on), ('used-by', 'Used by', conn.used_by), ('other', 'Other links', conn.other)] %}
+                    {% if group_rows %}
+                    {% call table_body(class='divide-y divide-border', attrs_dict={'data-group': group_id}) %}
+                        {% call table_row(class='bg-muted/30') %}
+                            {% call table_head(class='h-auto p-3 text-xs font-semibold uppercase tracking-[0.06em]', attrs_dict={'scope': 'rowgroup', 'colspan': 4}) %}{{ group_title }} ({{ group_rows | length }}){% endcall %}
+                        {% endcall %}
+                        {% for row in group_rows %}
+                        {% call table_row(class='border-0', attrs_dict={'data-testid': 'connection-row', 'data-group': group_id}) %}
+                            {% call table_cell(class='p-3 text-muted-foreground') %}<span title="ArchiMate relationship: {{ row.relationship_raw }}">{{ row.relationship }}</span>{% endcall %}
+                            {% call table_cell(class='p-3 font-medium') %}
+                                 {% if row.href %}<a href="{{ row.href }}" class="text-primary underline hover:underline">{{ row.name }}</a>{% else %}{{ row.name }}{% endif %}
+                                <span class="block text-xs font-normal text-muted-foreground md:hidden">{{ row.type_label }} · {{ row.layer_label }}</span>
+                                {% if row.origin and row.origin.repository and (row.origin.detail or row.origin.file) %}<span class="block text-xs font-normal text-muted-foreground" data-testid="connection-origin">Read from {{ row.origin.repository }}, {{ row.origin.detail or row.origin.file }}{% if row.origin.url %} <a href="{{ row.origin.url }}" target="_blank" rel="noopener noreferrer" class="underline underline-offset-4">View file on GitHub</a>{% endif %}</span>{% endif %}
+                            {% endcall %}
+                            {% call table_cell(class='hidden p-3 text-muted-foreground md:table-cell') %}{{ row.type_label }}{% endcall %}
+                            {% call table_cell(class='hidden p-3 text-muted-foreground md:table-cell') %}{{ row.layer_label }}{% endcall %}
+                        {% endcall %}
+                        {% endfor %}
+                    {% endcall %}
+                    {% endif %}
+                    {% endfor %}
+                {% endcall %}
+            </div>
+        </div>
+        {% endif %}
+    </section>
+
+    {% if technology_cost %}{% include 'archimate_crud/partials/_technology_cost.html' %}{% endif %}
+
+    {# ── 4b. Decisions applied (business processes only) ── #}
+    {% if decisions_applied is not none %}
+    <section id="decisions" class="rounded-lg border border-border bg-card p-6 space-y-4" data-testid="decisions-applied" aria-labelledby="decisions-heading">
+        <div class="flex flex-wrap items-center justify-between gap-3">
+            <h2 id="decisions-heading" class="text-xl font-semibold tracking-[-0.01em] text-foreground">Decisions applied</h2>
+            {% if 'decision_tables.index' in flask.current_app.view_functions %}
+            {% call button(variant='outline', href=url_for('decision_tables.index'), class='gap-2') %}Decision tables{% endcall %}
+            {% endif %}
+        </div>
+        {% if decisions_applied %}
+        <ul class="divide-y divide-border" role="list">
+            {% for d in decisions_applied %}
+            <li class="flex flex-wrap items-center justify-between gap-2 py-2" data-testid="decision-applied-row">
+                <a href="{{ url_for('decision_tables.detail', decision_id=d.id) }}" class="font-medium text-primary underline hover:underline" data-testid="decision-applied-link">{{ d.name }}</a>
+                <span class="text-sm text-muted-foreground">{{ d.policy_name }} hit policy, {{ d.rules }} rule{{ '' if d.rules == 1 else 's' }}</span>
+            </li>
+            {% endfor %}
+        </ul>
+        {% else %}
+        <p class="text-sm text-muted-foreground" data-testid="decisions-applied-empty">No decision table is linked to this process yet. Open a decision table and link this process to it.</p>
+        {% endif %}
+    </section>
+    {% endif %}
+
+    {# ── 5. About this element ── #}
+    <div class="grid grid-cols-1 gap-6 lg:grid-cols-3">
+
+        <section class="space-y-5 rounded-lg border border-border bg-card p-6 lg:col-span-2" aria-labelledby="about-heading" data-testid="about-card">
+            <h2 id="about-heading" class="text-xl font-semibold tracking-[-0.01em] text-foreground">About</h2>
+
+            {% if page.description %}
+            <p class="max-w-[72ch] text-sm leading-relaxed text-foreground" data-testid="element-description">{{ page.description }}</p>
+            {% else %}
+            <p class="text-sm text-muted-foreground" data-testid="element-description">
+                No description yet.{% if can_change_model() %} <a href="{{ edit_url }}" class="text-primary underline hover:underline">Edit to add one</a> so the next person knows what this is.{% else %} An architect can add one.{% endif %}
+            </p>
+            {% endif %}
+            {% if page.description_origin %}<p class="text-xs text-muted-foreground" data-testid="element-description-origin">{{ page.description_origin }}</p>{% endif %}
+
+            <dl class="grid grid-cols-1 gap-x-6 gap-y-3 sm:grid-cols-2 text-sm">
+                {% if has_owner_field %}
+                {% set rows = owner_rows %}{% set assign_url = owner_assign_url %}{% set legacy_text = legacy_owner_text %}{% set assign_link = owner_assign_link %}
+                {% set can_edit = can('assign', 'owner') or can('edit', 'application') %}
+                <div data-testid="element-owner"><dt class="text-muted-foreground" data-testid="element-owner-label">Owner</dt>
+                <dd class="font-medium">
+                    {% include 'partials/owner_step.html' with context %}
+                </dd></div>
+                {% endif %}
+                {% for field in display_fields if field.label not in flag_help %}
+                <div><dt class="text-muted-foreground">{{ field.label }}</dt>
+                <dd class="break-words font-medium">{% if field.href %}<a href="{{ field.href }}" class="text-primary hover:underline">{{ field.value }}</a>{% else %}{{ field.value }}{% endif %}</dd></div>
+                {% endfor %}
+            </dl>
+
+            {% set flags = display_fields | selectattr('label', 'in', flag_help) | list %}
+            {% if flags %}
+            <div class="border-t border-border pt-4" data-testid="element-flags">
+                <h3 class="text-xs font-semibold uppercase tracking-[0.06em] text-muted-foreground">Flags</h3>
+                <dl class="grid grid-cols-[auto_1fr] gap-x-4 gap-y-3 mt-3 text-sm">
+                    {% for field in flags %}
+                    <div><dt class="font-medium text-foreground">{{ field.label }}</dt>
+                    <dd class="flex items-start justify-between gap-4">
+                        <span class="text-xs text-muted-foreground min-w-0">{{ flag_help[field.label] }}</span>
+                        <span class="shrink-0 font-medium">{{ field.value }}</span>
+                    </dd></div>
                     {% endfor %}
                 </dl>
             </div>
-            {% else %}
-            <div class="border rounded-lg p-5 lg:col-span-2 flex items-center justify-center text-sm text-muted-foreground">
-                No additional attributes recorded for this element.
-            </div>
             {% endif %}
-        </div>
+        </section>
 
-        <!-- Metadata -->
-        {% if element.created_at or element.updated_at or element.last_reviewed_date or element.architecture_review_status %}
-        <div class="border rounded-lg p-5">
-            <h2 class="text-sm font-semibold uppercase tracking-wide text-muted-foreground mb-3">Audit</h2>
-            <dl class="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                {% if element.created_at %}
-                <div>
-                    <dt class="text-muted-foreground">Created</dt>
-                    <dd class="font-medium mt-0.5">{{ element.created_at.strftime('%d %b %Y') }}</dd>
-                </div>
+        <section class="space-y-4 rounded-lg border border-border bg-card p-6" aria-labelledby="record-heading" data-testid="record-card">
+            <h2 id="record-heading" class="text-xl font-semibold tracking-[-0.01em] text-foreground">Record</h2>
+            <dl class="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2.5 text-sm">
+                <div><dt class="text-muted-foreground">Type</dt>
+                <dd class="text-right font-medium" title="ArchiMate type: {{ element_type }}">{{ type_label }}</dd></div>
+                <div><dt class="text-muted-foreground">Layer</dt>
+                <dd class="text-right font-medium">{{ layer_label }}</dd></div>
+                {% if element.scope %}<div><dt class="text-muted-foreground">Scope</dt><dd class="text-right font-medium">{{ element.scope | title }}</dd></div>{% endif %}
+                {% if element.building_block_type %}<div><dt class="text-muted-foreground">Building block</dt><dd class="text-right font-medium">{{ element.building_block_type }}</dd></div>{% endif %}
+                {% if element.status %}<div><dt class="text-muted-foreground">Status</dt><dd class="text-right font-medium">{{ element.status | replace('_', ' ') | capitalize }}</dd></div>{% endif %}
+                {% if page.state %}<div><dt class="text-muted-foreground">Architecture state</dt><dd class="text-right font-medium">{{ page.state }}</dd></div>{% endif %}
+                {% if page.plateau_link %}
+                <div><dt class="text-muted-foreground">Stage</dt>
+                <dd class="text-right font-medium">{% if page.plateau_link[1] %}<a href="{{ page.plateau_link[1] }}" class="text-primary underline">{{ page.plateau_link[0] }}</a>{% else %}{{ page.plateau_link[0] }}{% endif %}</dd></div>
                 {% endif %}
-                {% if element.updated_at %}
-                <div>
-                    <dt class="text-muted-foreground">Last Updated</dt>
-                    <dd class="font-medium mt-0.5">{{ element.updated_at.strftime('%d %b %Y') }}</dd>
-                </div>
+                {% if page.stage %}
+                <div><dt class="text-muted-foreground">Order on the roadmap</dt>
+                <dd class="text-right font-medium">{{ 'Stage ' ~ page.stage.order if page.stage.order else 'Not set' }}</dd></div>
+                {% if page.stage.target_date %}<div><dt class="text-muted-foreground">Target date</dt><dd class="text-right font-medium">{{ page.stage.target_date.strftime('%d %b %Y') }}</dd></div>{% endif %}
+                {% if page.stage.follows %}
+                <div><dt class="text-muted-foreground">Follows</dt>
+                <dd class="text-right font-medium">{% if page.stage.follows[1] %}<a href="{{ page.stage.follows[1] }}" class="text-primary underline">{{ page.stage.follows[0] }}</a>{% else %}{{ page.stage.follows[0] }}{% endif %}</dd></div>
                 {% endif %}
-                {% if element.last_reviewed_date %}
-                <div>
-                    <dt class="text-muted-foreground">Last Reviewed</dt>
-                    <dd class="font-medium mt-0.5">{{ element.last_reviewed_date.strftime('%d %b %Y') }}</dd>
-                </div>
                 {% endif %}
-                {% if element.architecture_review_status %}
-                <div>
-                    <dt class="text-muted-foreground">Review Status</dt>
-                    <dd class="font-medium mt-0.5">{{ element.architecture_review_status }}</dd>
-                </div>
+                {% if element.created_at %}<div><dt class="text-muted-foreground">Created</dt><dd class="text-right font-medium">{{ element.created_at.strftime('%d %b %Y') }}</dd></div>{% endif %}
+                {% if element.updated_at %}<div data-testid="element-provenance-asof"><dt class="text-muted-foreground">Last updated</dt><dd class="text-right font-medium">{{ element.updated_at.strftime('%d %b %Y') }}</dd></div>{% endif %}
+                {% if element.last_reviewed_date %}<div><dt class="text-muted-foreground">Last reviewed</dt><dd class="text-right font-medium">{{ element.last_reviewed_date.strftime('%d %b %Y') }}</dd></div>{% endif %}
+                {% if element.architecture_review_status %}<div><dt class="text-muted-foreground">Review status</dt><dd class="text-right font-medium">{{ element.architecture_review_status }}</dd></div>{% endif %}
+                {% if external_links %}
+                <div><dt class="text-muted-foreground">Source system</dt>
+                <dd class="text-right font-medium">{{ external_links | map(attribute='source_system') | unique | join(', ') }}</dd></div>
                 {% endif %}
             </dl>
-        </div>
-        {% endif %}
 
-        {% with external_links = external_links|default([]) %}
-        {% include 'intelligence/_external_ids.html' %}
-        {% endwith %}
+            {% with external_links = external_links|default([]), source_facts = source_facts|default([]), live_connectors = live_connectors|default([]), connectors_url = connectors_url %}
+            {% include 'intelligence/_external_ids.html' %}
+            {% endwith %}
+
+            {% if current_user.is_platform_admin %}
+            <details class="border-t border-border pt-3 text-sm" data-testid="technical-details">
+                <summary class="cursor-pointer text-muted-foreground">Technical details</summary>
+                <dl class="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 mt-2">
+                    <div><dt class="text-muted-foreground">Element ID</dt>
+                    <dd class="font-mono text-xs text-muted-foreground">#{{ element.id }}</dd></div>
+                    {% for field in technical_fields %}
+                    <div><dt class="text-muted-foreground">{{ field.label }}</dt>
+                    <dd class="font-mono text-xs text-muted-foreground">{{ field.value }}</dd></div>
+                    {% endfor %}
+                </dl>
+            </details>
+            {% endif %}
+        </section>
     </div>
 
-    <!-- ── RELATIONSHIPS TAB ── -->
-    <div x-show="activeTab==='relationships'" x-cloak class="space-y-4">
-        {% set outgoing = relationships | selectattr('direction', 'equalto', 'outgoing') | list %}
-        {% set incoming = relationships | selectattr('direction', 'equalto', 'incoming') | list %}
-
-        {# F-05(a), Capgemini dry-run: this tab was read-only with no way to add
-           a relationship — the create API and valid-types API already work
-           (F-05(c)'s investigation confirmed both, for real element ids),
-           nothing on this page called them. #}
-        {% if source_ae_id %}
-        <div class="border rounded-lg p-4" x-data="addRelationshipForm({{ source_ae_id }})">
-            <button type="button" @click="open = !open"
-                    class="text-sm font-medium text-primary hover:underline inline-flex items-center gap-1">
-                <i data-lucide="plus" class="h-4 w-4" aria-hidden="true"></i>
-                <span x-text="open ? 'Cancel' : 'Add relationship'"></span>
-            </button>
-            <div x-show="open" x-cloak class="mt-3 space-y-3">
-                <div>
-                    <label class="block text-xs font-medium mb-1" for="rel-target-search">Target element</label>
-                    <input id="rel-target-search" type="text" x-model="targetQuery" @input.debounce.400ms="searchTargets()"
-                           placeholder="Search by name…"
-                           class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm">
-                    <div x-show="targetResults.length > 0" x-cloak class="mt-1 border rounded-md divide-y max-h-48 overflow-y-auto">
-                        <template x-for="r in targetResults" :key="r.id">
-                            <button type="button" @click="selectTarget(r)"
-                                    class="w-full text-left px-3 py-1.5 text-sm hover:bg-accent">
-                                <span x-text="r.name"></span>
-                                <span class="text-xs text-muted-foreground" x-text="' · ' + r.type"></span>
-                            </button>
-                        </template>
-                    </div>
-                    <p x-show="selectedTarget" x-cloak class="mt-1 text-sm">
-                        Selected: <span class="font-medium" x-text="selectedTarget && selectedTarget.name"></span>
-                    </p>
-                </div>
-                <div x-show="selectedTarget" x-cloak>
-                    <label class="block text-xs font-medium mb-1" for="rel-type-select">Relationship type</label>
-                    <select id="rel-type-select" x-model="relType"
-                            class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm">
-                        <option value="">Select a type…</option>
-                        <template x-for="t in validTypes" :key="t.type">
-                            <option :value="t.type" x-text="t.type"></option>
-                        </template>
-                    </select>
-                </div>
-                <p x-show="errorMsg" x-cloak class="text-sm text-destructive-emphasis" x-text="errorMsg"></p>
-                <button type="button" @click="createRelationship()" :disabled="!selectedTarget || !relType || saving"
-                        class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
-                    <span x-text="saving ? 'Saving…' : 'Create relationship'"></span>
-                </button>
+    {# ── Add relationship: centered dialog, label above input, inline validation, right-aligned actions ── #}
+    {% if source_ae_id %}
+    {% call modal(id='add-relationship-dialog', title='Add a relationship', description='Connect ' ~ elem_name ~ ' to another element.') %}
+    <div x-data="addRelationshipForm({{ source_ae_id }})" class="space-y-4">
+        <div>
+            <label class="mb-1.5 block text-sm font-medium" for="rel-target-search">Target element</label>
+            {{ input(id='rel-target-search', placeholder='Search by name…', attrs_dict={'x-model': 'targetQuery', '@input.debounce.400ms': 'searchTargets()', 'autocomplete': 'off'}) }}
+            <div x-show="targetResults.length > 0" x-cloak class="mt-1 max-h-48 divide-y divide-border overflow-y-auto rounded-md border border-border">
+                <template x-for="r in targetResults" :key="r.id">
+                    {% call button(variant='ghost', on_click='selectTarget(r)', class='h-auto w-full justify-start rounded-none px-3 py-2 text-left font-normal') %}
+                        <span x-text="r.name"></span>
+                        <span class="ml-1 text-xs text-muted-foreground" x-text="' · ' + r.type"></span>
+                    {% endcall %}
+                </template>
             </div>
+            <p x-show="selectedTarget" x-cloak class="mt-2 text-sm">
+                Selected: <span class="font-medium" x-text="selectedTarget && selectedTarget.name"></span>
+            </p>
         </div>
-        {% endif %}
-
-        {% if not relationships %}
-        <div class="border rounded-lg p-8 text-center text-sm text-muted-foreground">
-            <i data-lucide="git-merge" class="h-8 w-8 mx-auto mb-3 opacity-40" aria-hidden="true"></i>
-            No ArchiMate relationships recorded for this element.
+        <div x-show="selectedTarget" x-cloak>
+            {% call shadcn_select('relationship_type', label='Relationship type', id='rel-type-select', placeholder='Select a type…', attrs={'x-model': 'relType'}) %}
+            <template x-for="t in validTypes" :key="t.type">
+                <option :value="t.type" x-text="t.type"></option>
+            </template>
+            {% endcall %}
         </div>
-        {% endif %}
-
-        {% if outgoing %}
-        <div class="border rounded-lg p-5">
-            <h2 class="text-sm font-semibold uppercase tracking-wide text-muted-foreground mb-3">
-                <i data-lucide="arrow-right" class="h-4 w-4 inline mr-1" aria-hidden="true"></i>
-                Outgoing ({{ outgoing|length }})
-            </h2>
-            <div class="divide-y">
-                {% for rel in outgoing %}
-                <div class="flex items-center justify-between py-2.5 gap-4">
-                    <div class="flex items-center gap-3 min-w-0">
-                        <span class="inline-flex shrink-0 items-center rounded border px-2 py-0.5 text-xs font-medium bg-muted text-muted-foreground border-border">
-                            {{ rel.type }}
-                        </span>
-                        <div class="min-w-0">
-                            <a href="{{ url_for('archimate_crud.detail_element', layer=rel.target.layer|lower, element_type=rel.target.type, element_id=rel.target.id) }}"
-                               class="text-sm font-medium hover:underline truncate block">{{ rel.target.name }}</a>
-                            <p class="text-xs text-muted-foreground">{{ rel.target.type | plain_name(current_user) }} · {{ rel.target.layer | plain_layer(current_user) }}</p>
-                        </div>
-                    </div>
-                    <a href="{{ url_for('archimate_crud.detail_element', layer=rel.target.layer|lower, element_type=rel.target.type, element_id=rel.target.id) }}"
-                       class="shrink-0 text-muted-foreground hover:text-foreground" aria-label="View">
-                        <i data-lucide="arrow-right" class="h-4 w-4" aria-hidden="true"></i>
-                    </a>
-                </div>
-                {% endfor %}
-            </div>
+        <p x-show="errorMsg" x-cloak class="text-sm text-destructive-emphasis" role="alert" x-text="errorMsg"></p>
+        <div class="flex flex-col-reverse gap-2 pt-2 sm:flex-row sm:justify-end">
+            {{ button(text='Cancel', variant='outline', attrs_dict={'data-modal-close': 'add-relationship-dialog'}) }}
+            {% call button(variant='primary', on_click='createRelationship()', attrs_dict={':disabled': '!selectedTarget || !relType || saving'}) %}
+                <span x-text="saving ? 'Saving…' : 'Create relationship'"></span>
+            {% endcall %}
         </div>
-        {% endif %}
-
-        {% if incoming %}
-        <div class="border rounded-lg p-5">
-            <h2 class="text-sm font-semibold uppercase tracking-wide text-muted-foreground mb-3">
-                <i data-lucide="arrow-left" class="h-4 w-4 inline mr-1" aria-hidden="true"></i>
-                Incoming ({{ incoming|length }})
-            </h2>
-            <div class="divide-y">
-                {% for rel in incoming %}
-                <div class="flex items-center justify-between py-2.5 gap-4">
-                    <div class="flex items-center gap-3 min-w-0">
-                        <span class="inline-flex shrink-0 items-center rounded border px-2 py-0.5 text-xs font-medium bg-muted text-muted-foreground border-border">
-                            {{ rel.type }}
-                        </span>
-                        <div class="min-w-0">
-                            <a href="{{ url_for('archimate_crud.detail_element', layer=rel.source.layer|lower, element_type=rel.source.type, element_id=rel.source.id) }}"
-                               class="text-sm font-medium hover:underline truncate block">{{ rel.source.name }}</a>
-                            <p class="text-xs text-muted-foreground">{{ rel.source.type | plain_name(current_user) }} · {{ rel.source.layer | plain_layer(current_user) }}</p>
-                        </div>
-                    </div>
-                    <a href="{{ url_for('archimate_crud.detail_element', layer=rel.source.layer|lower, element_type=rel.source.type, element_id=rel.source.id) }}"
-                       class="shrink-0 text-muted-foreground hover:text-foreground" aria-label="View">
-                        <i data-lucide="arrow-right" class="h-4 w-4" aria-hidden="true"></i>
-                    </a>
-                </div>
-                {% endfor %}
-            </div>
-        </div>
-        {% endif %}
     </div>
+    {% endcall %}
+    {% endif %}
 
 </div>
+
+{% if owner_assign_url %}
+<script src="{{ url_for('static', filename='js/applications/owner_picker.js') }}"></script>
+{% endif %}
 
 <script>
 /* Top-level (window) factory used as x-data="archimateDetail()". The CSP-safe
    Alpine evaluator (app/static/js/csp/csp-evaluator.js) resolves a bare x-data
    identifier against the component scope and then window; it never consults
-   Alpine.data() registrations, so the bare-name form mounted an empty component
-   and the tab switcher and Delete button did nothing.
-   See scripts/check_alpine_data_binding.py. */
+   Alpine.data() registrations. See scripts/check_alpine_data_binding.py. */
 function archimateDetail() {
     return {
-        activeTab: 'details',
-
         async deleteElement() {
-            if (!(await Platform.modal.confirm('Delete "' + {{ elem_name | tojson }} + '"? This cannot be undone.'))) return;
             try {
+                const check = await Platform.fetch(
+                    '{{ url_for("archimate_crud.delete_check", layer=layer, element_type=element_type, element_id=element.id, **id_scope) }}',
+                    { silent: true }
+                );
+                if (!check.allowed) {
+                    Platform.toast.error(check.reason || 'This element cannot be deleted.');
+                    return;
+                }
+                const links = check.relationships
+                    ? ' Its ' + check.relationships + (check.relationships === 1 ? ' relationship is' : ' relationships are') + ' removed with it.'
+                    : '';
+                if (!(await Platform.modal.confirm('Delete "' + {{ elem_name | tojson }} + '"?' + links + ' This cannot be undone.'))) return;
                 const data = await Platform.fetch(
-                    '{{ url_for("archimate_crud.delete_element", layer=layer, element_type=element_type, element_id=element.id) }}',
-                    { 
-                        method: 'POST', 
+                    '{{ url_for("archimate_crud.delete_element", layer=layer, element_type=element_type, element_id=element.id, **id_scope) }}',
+                    {
+                        method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        silent: true 
+                        silent: true
                     }
                 );
                 if (data.success) {
-                    window.location.href = '{{ url_for("archimate_crud.list_elements", layer=layer, element_type=element_type) }}';
+                    window.location.href = {{ after_delete_url | tojson }};
                 } else {
                     Platform.toast.error('Error: ' + (data.error || 'Unknown error'));
                 }
@@ -380,8 +692,8 @@ function archimateDetail() {
         },
 
         downloadDiagram() {
-            const elId = {{ element.id }};
-            const url = '/api/enterprise/archimate/diagram?elements=' + elId + '&viewpoint=application';
+            const elId = {{ (source_ae_id or element.id) | tojson }};
+            const url = '/api/enterprise/archimate/diagram?elements=' + elId + '&viewpoint={{ element.layer | default('application') | lower }}';
             const a = document.createElement('a');
             a.href = url;
             a.download = 'archimate-diagram-' + elId + '.svg';
@@ -395,7 +707,6 @@ window.archimateDetail = archimateDetail;
 
 function addRelationshipForm(sourceId) {
     return {
-        open: false,
         targetQuery: '',
         targetResults: [],
         selectedTarget: null,
@@ -459,3 +770,4 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 </script>
 {% endblock %}
+{# design-block: record-detail #}

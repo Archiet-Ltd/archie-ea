@@ -404,9 +404,12 @@ def test_single_view_switcher_row(app, db_session, make_org, tenant_ctx):
     exactly one segmented-control row (data-testid="capability-view-switcher")
     and the old tab-strip's per-tab role="tab" buttons must be gone."""
     html = _get(app, db_session, make_org, tenant_ctx, "switcher", "/capability-map/")
-    assert html.count('data-testid="capability-view-switcher"') == 1
+    # Updated for the current map: the old ids (capability-view-switcher, capability-lens) went with
+    # the old page. The same promise is asserted on the page a person uses: exactly one Lens row,
+    # exactly one Map/List view row, and no tab strip.
+    assert html.count('aria-label="Lens"') == 1, "exactly one Lens row"
+    assert html.count('aria-label="View mode"') == 1, "exactly one Map/List view row"
     assert 'role="tab" id="tab-' not in html, "the old 11-button tab strip must be gone"
-    assert 'id="capability-lens"' in html, "the Lens dropdown must replace it"
 
 
 # ARCH-064: the three "map applications" modals (acm-mapping-modal,
@@ -455,7 +458,9 @@ def test_capability_map_modal_ids_unchanged_and_present(app, db_session, make_or
     used to. Asserting they are inline would pin the payload back.
     """
     html = _get(app, db_session, make_org, tenant_ctx, "modal-ids", "/capability-map/")
-    assert 'id="lazy-modal-host"' in html, "the lazy modal host is missing from the page"
+    # Updated for the current map: the old page's lazy-modal-host is gone (the map opens a
+    # capability drawer instead). The page must still serve the drawer its tiles open.
+    assert 'id="drawer-capability-detail"' in html, "the capability drawer is missing from the page"
 
     variants = {
         "acm-mapping-modal": "acm-mapping-modal",

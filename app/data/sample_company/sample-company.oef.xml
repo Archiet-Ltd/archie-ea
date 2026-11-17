@@ -1,0 +1,132 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<model xmlns="http://www.opengroup.org/xsd/archimate/3.0/"
+       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+       identifier="sample-company-v1">
+  <name xml:lang="en">Sample company</name>
+  <documentation>A small sample estate showing dependencies — what breaks if a service fails.</documentation>
+  <elements>
+    <!-- Strategy layer: two capabilities -->
+    <element identifier="cap-1" xsi:type="Capability">
+      <name xml:lang="en">Process online payments</name>
+      <documentation>Accept and process customer payments through multiple channels.</documentation>
+    </element>
+    <element identifier="cap-2" xsi:type="Capability">
+      <name xml:lang="en">Track customer orders</name>
+      <documentation>Maintain visibility of orders from placement through fulfilment.</documentation>
+    </element>
+
+    <!-- Business layer: two business processes -->
+    <element identifier="proc-1" xsi:type="BusinessProcess">
+      <name xml:lang="en">Handle customer checkout</name>
+      <documentation>Complete a customer purchase including payment authorisation.</documentation>
+    </element>
+    <element identifier="proc-2" xsi:type="BusinessProcess">
+      <name xml:lang="en">Fulfil customer order</name>
+      <documentation>Pick, pack and ship items once payment is confirmed.</documentation>
+    </element>
+
+    <!-- Application layer: core services -->
+    <element identifier="app-payments" xsi:type="ApplicationComponent">
+      <name xml:lang="en">Payments service</name>
+      <documentation>Processes card transactions and integrates with payment gateways.</documentation>
+    </element>
+    <element identifier="app-web" xsi:type="ApplicationComponent">
+      <name xml:lang="en">Customer web app</name>
+      <documentation>Public-facing storefront where customers browse and purchase.</documentation>
+    </element>
+    <element identifier="app-order" xsi:type="ApplicationComponent">
+      <name xml:lang="en">Order management system</name>
+      <documentation>Tracks orders from placement through delivery.</documentation>
+    </element>
+    <element identifier="app-inventory" xsi:type="ApplicationComponent">
+      <name xml:lang="en">Inventory system</name>
+      <documentation>Maintains stock levels and warehouse locations.</documentation>
+    </element>
+    <element identifier="app-notifications" xsi:type="ApplicationComponent">
+      <name xml:lang="en">Notification service</name>
+      <documentation>Sends order confirmations and shipping updates to customers.</documentation>
+    </element>
+    <element identifier="api-payments" xsi:type="ApplicationInterface">
+      <name xml:lang="en">Payments API</name>
+      <documentation>REST API for payment operations.</documentation>
+    </element>
+    <element identifier="api-orders" xsi:type="ApplicationInterface">
+      <name xml:lang="en">Orders API</name>
+      <documentation>Internal API for order operations.</documentation>
+    </element>
+
+    <!-- Technology layer: infrastructure -->
+    <element identifier="tech-db-payments" xsi:type="SystemSoftware">
+      <name xml:lang="en">Payments database</name>
+      <documentation>PostgreSQL database storing payment records and transaction logs.</documentation>
+    </element>
+    <element identifier="tech-db-orders" xsi:type="SystemSoftware">
+      <name xml:lang="en">Orders database</name>
+      <documentation>PostgreSQL database storing order and customer data.</documentation>
+    </element>
+    <element identifier="tech-queue" xsi:type="SystemSoftware">
+      <name xml:lang="en">Message queue</name>
+      <documentation>RabbitMQ queue for asynchronous order processing events.</documentation>
+    </element>
+    <element identifier="tech-cache" xsi:type="SystemSoftware">
+      <name xml:lang="en">Cache layer</name>
+      <documentation>Redis cache for session data and frequently accessed content.</documentation>
+    </element>
+    <element identifier="tech-platform" xsi:type="Node">
+      <name xml:lang="en">Cloud platform</name>
+      <documentation>AWS infrastructure hosting all application services.</documentation>
+    </element>
+    <element identifier="tech-loadbalancer" xsi:type="Node">
+      <name xml:lang="en">Load balancer</name>
+      <documentation>Distributes incoming requests across application instances.</documentation>
+    </element>
+  </elements>
+  <relationships>
+    <!-- Capabilities realise processes -->
+    <relationship identifier="rel-1" source="cap-1" target="proc-1" xsi:type="Realization" />
+    <relationship identifier="rel-2" source="cap-2" target="proc-2" xsi:type="Realization" />
+
+    <!-- Processes realised by applications -->
+    <relationship identifier="rel-3" source="app-payments" target="proc-1" xsi:type="Realization" />
+    <relationship identifier="rel-4" source="app-web" target="proc-1" xsi:type="Realization" />
+    <relationship identifier="rel-5" source="app-order" target="proc-2" xsi:type="Realization" />
+
+    <!-- Application dependencies (serving relationships) -->
+    <relationship identifier="rel-6" source="app-payments" target="app-web" xsi:type="Serving">
+      <documentation>Web app calls payments service to process transactions.</documentation>
+    </relationship>
+    <relationship identifier="rel-7" source="app-order" target="app-web" xsi:type="Serving">
+      <documentation>Web app calls order system to create and track orders.</documentation>
+    </relationship>
+    <relationship identifier="rel-8" source="app-payments" target="app-order" xsi:type="Serving">
+      <documentation>Payments service notifies order system when payment succeeds.</documentation>
+    </relationship>
+    <relationship identifier="rel-9" source="app-inventory" target="app-order" xsi:type="Serving">
+      <documentation>Order system checks inventory before confirming orders.</documentation>
+    </relationship>
+    <relationship identifier="rel-10" source="app-notifications" target="app-order" xsi:type="Serving">
+      <documentation>Order system triggers notifications for status changes.</documentation>
+    </relationship>
+
+    <!-- Applications serve through interfaces -->
+    <relationship identifier="rel-11" source="api-payments" target="app-payments" xsi:type="Assignment" />
+    <relationship identifier="rel-12" source="api-orders" target="app-order" xsi:type="Assignment" />
+
+    <!-- Applications assigned to technology -->
+    <relationship identifier="rel-13" source="app-payments" target="tech-db-payments" xsi:type="Assignment" />
+    <relationship identifier="rel-14" source="app-order" target="tech-db-orders" xsi:type="Assignment" />
+    <relationship identifier="rel-15" source="app-order" target="tech-queue" xsi:type="Assignment" />
+    <relationship identifier="rel-16" source="app-notifications" target="tech-queue" xsi:type="Assignment" />
+    <relationship identifier="rel-17" source="app-web" target="tech-cache" xsi:type="Assignment" />
+
+    <!-- Technology composition -->
+    <relationship identifier="rel-18" source="tech-platform" target="tech-db-payments" xsi:type="Composition" />
+    <relationship identifier="rel-19" source="tech-platform" target="tech-db-orders" xsi:type="Composition" />
+    <relationship identifier="rel-20" source="tech-platform" target="tech-queue" xsi:type="Composition" />
+    <relationship identifier="rel-21" source="tech-platform" target="tech-cache" xsi:type="Composition" />
+    <relationship identifier="rel-22" source="tech-platform" target="tech-loadbalancer" xsi:type="Composition" />
+
+    <!-- Load balancer serves applications -->
+    <relationship identifier="rel-23" source="tech-loadbalancer" target="app-web" xsi:type="Serving" />
+  </relationships>
+</model>

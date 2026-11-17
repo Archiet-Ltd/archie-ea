@@ -48,9 +48,8 @@ def handle_llm_unavailable_error(error):
         logger.warning(f"LLM service unavailable for {request.path}: {error_message}")
 
         user_friendly_message = (
-            "AI features are currently unavailable. "
-            "An LLM provider must be configured to use this feature. "
-            "Please configure an API key in Admin > API Settings or contact your administrator."
+            "The assistant could not answer just now. "
+            "Your question is saved; try again in a moment."
         )
 
         # Include technical details for debugging (visible to admins)

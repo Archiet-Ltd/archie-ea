@@ -164,24 +164,33 @@
         </div>
 
         <!-- Financial Impact -->
-        <div class="border border-border rounded-md p-3">
+        <div id="financial-impact" class="border border-border rounded-md p-3">
           <h3 class="text-sm font-semibold mb-3 text-foreground">Financial Impact</h3>
+          {% if costs_withheld %}
+          {#- The sentence is said once on the page; a loaded dossier says it itself and hides this one. -#}
+          <p class="text-sm text-muted-foreground" data-page-costs-withheld data-testid="costs-withheld-page">{{ costs_withheld_sentence }}</p>
+          {% else %}
           <div class="space-y-3">
             <div>
               <p class="text-xs text-muted-foreground mb-0.5">Projected Savings</p>
-              <p class="text-xl font-bold tabular-nums text-emerald-600" x-text="fmtCurrency(data.financial && data.financial.total_projected_savings)"><!-- token-migration-ok --></p>
+              <p class="tabular-nums"
+                 :class="(data.financial && data.financial.total_projected_savings != null) ? 'text-xl font-bold text-success' : 'text-sm text-muted-foreground'"
+                 x-text="fmtCurrency(data.financial && data.financial.total_projected_savings)"></p>
             </div>
             <div>
               <p class="text-xs text-muted-foreground mb-0.5">Investment Needed</p>
-              <p class="text-xl font-bold tabular-nums text-amber-600" x-text="fmtCurrency(data.financial && data.financial.total_investment_needed)"><!-- token-migration-ok --></p>
+              <p class="tabular-nums"
+                 :class="(data.financial && data.financial.total_investment_needed != null) ? 'text-xl font-bold text-warning' : 'text-sm text-muted-foreground'"
+                 x-text="fmtCurrency(data.financial && data.financial.total_investment_needed)"></p>
             </div>
             <div class="pt-1 border-t border-border">
               <p class="text-xs text-muted-foreground mb-0.5">Net Benefit</p>
-              <p class="text-base font-semibold tabular-nums"
-                 :class="netBenefit() >= 0 ? 'text-success' : 'text-destructive'"
+              <p class="font-semibold tabular-nums"
+                 :class="netBenefit() === null ? 'text-sm text-muted-foreground' : (netBenefit() >= 0 ? 'text-base text-success' : 'text-base text-destructive')"
                  x-text="fmtCurrency(netBenefit())"><!-- token-migration-ok --></p>
             </div>
           </div>
+          {% endif %}
         </div>
 
         <!-- Pipeline Status -->
@@ -321,6 +330,7 @@
     </div>
 
     <!-- Potential Savings -->
+    {% if not costs_withheld %}
     <div id="savings-stat" class="relative rounded-xl border border-input bg-background hover:border-primary/50 transition-all duration-200">
       <div class="p-5">
         <div class="flex items-start gap-3 mb-4">
@@ -331,12 +341,13 @@
           </div>
           <div class="flex-1 min-w-0">
             <p class="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">Potential Savings</p>
-            <p class="text-3xl font-bold tabular-nums text-success leading-none">{% if stats and stats.estimated_savings is not none %}{{ currency_symbol|default("£") }}{{ "{:,.0f}".format(stats.estimated_savings) }}{% else %}&mdash;{% endif %}</p>
+            <p class="{% if stats and stats.estimated_savings is not none %}text-3xl text-success{% else %}text-sm text-muted-foreground{% endif %} font-bold tabular-nums leading-none">{% if stats and stats.estimated_savings is not none %}{{ currency_symbol|default("£") }}{{ "{:,.0f}".format(stats.estimated_savings) }}{% else %}Not estimated yet{% endif %}</p>
           </div>
         </div>
         <p class="text-xs text-muted-foreground font-medium">Annual estimate</p>
       </div>
     </div>
+    {% endif %}
 
     <!-- Decision Readiness (RAT-101) — populated by JS after load -->
     <div id="readiness-stat" class="relative rounded-xl border border-input bg-background hover:border-primary/50 transition-all duration-200">
@@ -401,10 +412,10 @@
       </li>
       <i data-lucide="chevron-right" class="w-4 h-4 text-muted-foreground hidden sm:block" aria-hidden="true"></i>
       <li>
-        <a href="#savings-stat" class="flex items-center gap-2 px-3 py-1.5 rounded-lg {{ 'bg-primary/10 text-primary' if stats.estimated_savings|default(0) > 0 else 'text-muted-foreground' }} text-sm font-medium hover:bg-accent/50 transition-colors cursor-pointer no-underline">
-          <span class="flex items-center justify-center w-5 h-5 rounded-full {{ 'bg-primary text-primary-foreground' if stats.estimated_savings|default(0) > 0 else 'bg-muted text-muted-foreground' }} text-xs font-bold" aria-hidden="true">5</span>
+        <a href="{{ '#financial-impact' if costs_withheld else '#savings-stat' }}" class="flex items-center gap-2 px-3 py-1.5 rounded-lg {{ 'bg-primary/10 text-primary' if (stats.estimated_savings and stats.estimated_savings > 0) else 'text-muted-foreground' }} text-sm font-medium hover:bg-accent/50 transition-colors cursor-pointer no-underline">
+          <span class="flex items-center justify-center w-5 h-5 rounded-full {{ 'bg-primary text-primary-foreground' if (stats.estimated_savings and stats.estimated_savings > 0) else 'bg-muted text-muted-foreground' }} text-xs font-bold" aria-hidden="true">5</span>
           Track
-          <span class="inline-flex items-center px-1.5 py-0.5 rounded-md text-xs font-semibold {{ 'bg-primary/20 text-primary' if stats.estimated_savings|default(0) > 0 else 'bg-muted text-muted-foreground' }}">{% if stats and stats.estimated_savings is not none %}{{ currency_symbol|default("£") }}{{ "{:,.0f}".format(stats.estimated_savings) }}{% else %}&mdash;{% endif %}</span>
+          {% if not costs_withheld %}<span class="inline-flex items-center px-1.5 py-0.5 rounded-md text-xs font-semibold {{ 'bg-primary/20 text-primary' if (stats.estimated_savings and stats.estimated_savings > 0) else 'bg-muted text-muted-foreground' }}">{% if stats and stats.estimated_savings is not none %}{{ currency_symbol|default("£") }}{{ "{:,.0f}".format(stats.estimated_savings) }}{% else %}&mdash;{% endif %}</span>{% endif %}
         </a>
       </li>
     </ol>
@@ -472,7 +483,7 @@
                   aria-label="Filter by disposition action">
             <option value="">All</option>
             <template x-for="[action, count] in Object.entries(facets.dispositions || {})" :key="action">
-              <option :value="action" x-text="action + ' (' + count + ')'"></option>
+              <option :value="action" x-text="disposition_option(action, count)"></option>
             </template>
           </select>
         </div>
@@ -641,7 +652,7 @@
                     <span x-show="row.disposition_action" x-cloak
                           class="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium"
                           :class="_dispositionClass(row.disposition_action)"
-                          x-text="row.disposition_action"></span>
+                          x-text="disposition_words(row.disposition_action)"></span>
                   </div>
                 </td>
                 <td class="px-4 py-3">
@@ -712,7 +723,7 @@
       <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-3" role="list" aria-label="Disposition taxonomy legend">
         <!-- Retain -->
         <div class="rounded-lg border p-3 flex flex-col gap-1" role="listitem">
-          <span class="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium bg-blue-500/10 text-blue-600 border border-blue-500/30 w-fit"><!-- token-migration-ok -->
+          <span class="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium bg-info/10 text-info-emphasis border border-info/30 w-fit"><!-- token-migration-ok -->
             Retain
           </span>
           <p class="text-xs text-muted-foreground leading-snug">Keep as-is — adequate fit, minimal risk</p>
@@ -917,10 +928,12 @@
                 <span class="text-sm font-medium text-muted-foreground">Fuzzy Matches:</span>
                 <span id="result-fuzzy" class="text-2xl font-bold tabular-nums text-success">0</span>
               </div>
+              {% if not costs_withheld %}
               <div class="flex justify-between items-center py-3 px-4 rounded-md bg-background/60 border border-success/20">
                 <span class="text-sm font-medium text-muted-foreground">Est. Savings:</span>
-                <span id="result-savings" class="text-2xl font-bold text-success tabular-nums">{{ currency_symbol|default("£") }}0</span>
+                <span id="result-savings" class="text-2xl font-bold text-success tabular-nums">{% if costs_withheld %}{{ costs_withheld_sentence }}{% else %}{{ currency_symbol|default("£") }}0{% endif %}</span>
               </div>
+              {% endif %}
             </div>
             <div class="flex gap-3">
               <a id="view-results-link" href="{{ url_for('unified_duplicate.simple_dashboard') }}" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 flex-1 items-center justify-center">
@@ -1684,7 +1697,7 @@
                         'bg-muted/50 text-muted-foreground border-border': dcPlanStatus === 'draft',
                         'bg-warning/10 text-warning-emphasis border-warning/30': dcPlanStatus === 'reviewed',
                         'bg-success/10 text-success-emphasis border-success/30': dcPlanStatus === 'approved',
-                        'bg-blue-500/10 text-blue-600 border-blue-500/30': dcPlanStatus === 'in_progress', /* token-migration-ok */
+                        'bg-info/10 text-info-emphasis border-info/30': dcPlanStatus === 'in_progress', /* token-migration-ok */
                         'bg-green-500/10 text-green-600 border-green-500/30': dcPlanStatus === 'completed', /* token-migration-ok */
                       }"
                       x-text="dcStatusLabel(dcPlanStatus)"><!-- token-migration-ok --></span>
@@ -2094,6 +2107,7 @@
           <div class="relative">
             <input id="dossier-app-search"
                    type="text"
+                   role="combobox"
                    autocomplete="off"
                    placeholder="Search application…"
                    class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm pr-8"
@@ -2172,7 +2186,7 @@
         <div class="flex flex-wrap gap-2">
           <span class="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium border"
                 :class="_dispositionClass(dossierData && dossierData.recommendation && dossierData.recommendation.disposition_action)"
-                x-text="(dossierData && dossierData.recommendation && dossierData.recommendation.disposition_action) || '—'"></span>
+                x-text="(dossierData && dossierData.recommendation && (dossierData.recommendation.disposition_label || dossierData.recommendation.disposition_action)) || '—'"></span>
           <span x-show="dossierData && dossierData.recommendation && dossierData.recommendation.disposition_confidence" x-cloak
                 class="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium border"
                 :class="_confidenceClass(dossierData && dossierData.recommendation && dossierData.recommendation.disposition_confidence)"
@@ -2322,7 +2336,10 @@
               <span class="font-medium tabular-nums"
                     x-text="_formatCurrency(dossierData && dossierData.financial && dossierData.financial.total_cost_of_ownership)"></span>
             </div>
-            <p x-show="dossierData && dossierData.financial &&
+            <p x-show="dossierData && dossierData.financial && dossierData.financial.costs_withheld" x-cloak
+               class="text-xs text-muted-foreground" data-testid="costs-withheld"
+               x-text="dossierData && dossierData.costs_withheld_sentence"></p>
+            <p x-show="dossierData && dossierData.financial && !dossierData.financial.costs_withheld &&
                         dossierData.financial.estimated_annual_savings == null &&
                         dossierData.financial.estimated_investment_needed == null &&
                         dossierData.financial.total_cost_of_ownership == null" x-cloak
@@ -2661,7 +2678,7 @@
 <script>
   window.__APP_CONFIG__ = window.__APP_CONFIG__ || {};
   Object.assign(window.__APP_CONFIG__, {
-    currencySymbol: '{{ currency_symbol|default("£") }}',
+    currencySymbol: {% if costs_withheld %}''{% else %}'{{ currency_symbol|default("£") }}'{% endif %},
     runDetectionUrl: '{{ url_for("unified_duplicate.run_simple_detection_api") }}',
     simpleDashboardUrl: '{{ url_for("unified_duplicate.simple_dashboard") }}',
     autoResolveUrl: '{{ url_for("unified_applications.rationalization_auto_resolve") }}',
@@ -2940,7 +2957,7 @@
       saveError: '',
 
       // Currency symbol from server config
-      currencySymbol: (window.__APP_CONFIG__ || {}).currencySymbol || '£', // frontend-quality-ok
+      currencySymbol: (window.__APP_CONFIG__ || {}).currencySymbol || '', // frontend-quality-ok
 
       // Form values — mirrors ReplacementPlan fields
       form: {
@@ -3453,6 +3470,14 @@
   // the Disposition and Review Status select options.
   function decisionWorkbench() {
     return {
+      // The model's label for a disposition code, as served with the results.
+      disposition_labels: {},
+      disposition_words: function(action) {
+        return this.disposition_labels[action] || action;
+      },
+      disposition_option: function(action, count) {
+        return this.disposition_words(action) + ' (' + count + ')';
+      },
       loading: false,
       error: '',
       results: [],
@@ -3550,6 +3575,7 @@
           this.results = data.results || [];
           this.total = data.total || 0;
           this.filters_applied = data.filters_applied || {};
+          this.disposition_labels = data.disposition_labels || {};
           if (data.facets) {
             this.facets = data.facets;
           }
@@ -3599,7 +3625,7 @@
           replatform: 'bg-violet-500/10 text-violet-600 border border-violet-500/30', /* token-migration-ok */
           rehost: 'bg-sky-500/10 text-sky-600 border border-sky-500/30', /* token-migration-ok */
           refactor: 'bg-amber-500/10 text-amber-600 border border-amber-500/30', /* token-migration-ok */
-          retain: 'bg-blue-500/10 text-blue-600 border border-blue-500/30', /* token-migration-ok */
+          retain: 'bg-info/10 text-info-emphasis border border-info/30', /* token-migration-ok */
         };
         return map[(disposition || '').toLowerCase()] || 'bg-muted/50 text-muted-foreground border border-border'; /* token-migration-ok */
       },
@@ -3616,7 +3642,7 @@
       _reviewStatusClass(status) {
         const map = {
           reviewed: 'bg-success/10 text-success-emphasis border border-success/30',
-          approved: 'bg-blue-500/10 text-blue-600 border border-blue-500/30', /* token-migration-ok */
+          approved: 'bg-info/10 text-info-emphasis border border-info/30', /* token-migration-ok */
           draft: 'bg-muted/50 text-muted-foreground border border-border',
           rejected: 'bg-destructive/10 text-destructive-emphasis border border-destructive/30',
         };
@@ -3640,6 +3666,7 @@
         this.selectedAppId = null;
         this.dossierData = null;
         this.error = null;
+        document.querySelectorAll('[data-page-costs-withheld]').forEach(function (el) { el.hidden = false; });
         clearTimeout(this._searchTimer);
         if (!value || value.length < 2) {
           this.results = [];
@@ -3675,6 +3702,8 @@
             return;
           }
           this.dossierData = data;
+          // the dossier says the sentence itself, so the page says it once
+          document.querySelectorAll('[data-page-costs-withheld]').forEach(function (el) { el.hidden = !!data.costs_withheld_sentence; });
           if (typeof lucide !== 'undefined') { lucide.createIcons(); }
         } catch (e) {
           this.error = 'Network error loading dossier.';
@@ -3691,7 +3720,7 @@
           replatform: 'bg-violet-500/10 text-violet-600 border-violet-500/30', /* token-migration-ok */
           rehost: 'bg-sky-500/10 text-sky-600 border-sky-500/30', /* token-migration-ok */
           refactor: 'bg-amber-500/10 text-amber-600 border-amber-500/30',  /* design-tokens-ok: matches _dispositionClass sibling copy (already exempted) */
-          retain: 'bg-blue-500/10 text-blue-600 border-blue-500/30', /* token-migration-ok */
+          retain: 'bg-info/10 text-info-emphasis border-info/30', /* token-migration-ok */
         };
         return map[(disposition || '').toLowerCase()] || 'bg-muted/50 text-muted-foreground border-border';
       },
@@ -3708,7 +3737,7 @@
       _reviewStatusClass(status) {
         const map = {
           reviewed: 'bg-success/10 text-success-emphasis border-success/30',
-          approved: 'bg-blue-500/10 text-blue-600 border-blue-500/30', /* token-migration-ok */
+          approved: 'bg-info/10 text-info-emphasis border-info/30', /* token-migration-ok */
           draft: 'bg-muted/50 text-muted-foreground border-border',
           rejected: 'bg-destructive/10 text-destructive border-destructive/30',
         };
@@ -3718,7 +3747,7 @@
       _formatCurrency(amount) {
         if (amount == null) return '—';
         if (typeof formatCurrency === 'function') return formatCurrency(amount);
-        let sym = (window.__APP_CONFIG__ || {}).currencySymbol || '£'; // frontend-quality-ok
+        let sym = (window.__APP_CONFIG__ || {}).currencySymbol || ''; // frontend-quality-ok
         return sym + Number(amount).toLocaleString();
       },
     };
@@ -4055,7 +4084,7 @@
         const map = {
           projected: 'bg-muted/50 text-muted-foreground border-border',
           in_progress: 'bg-amber-500/10 text-amber-600 border-amber-500/30', /* token-migration-ok */
-          measured: 'bg-blue-500/10 text-blue-600 border-blue-500/30', /* token-migration-ok */
+          measured: 'bg-info/10 text-info-emphasis border-info/30', /* token-migration-ok */
           validated: 'bg-emerald-500/10 text-emerald-600 border-emerald-500/30', /* token-migration-ok */
         };
         return map[(status || '').toLowerCase()] || 'bg-muted/50 text-muted-foreground border-border';
@@ -4075,3 +4104,4 @@
 </script>
 <script src="{{ url_for('static', filename='js/applications/rationalization.js') }}"></script>
 {% endblock %}
+{# design-block: dashboard #}

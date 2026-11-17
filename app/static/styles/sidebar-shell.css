@@ -1,0 +1,136 @@
+/* Sidebar parts: the rules behind the library's cn-sidebar-* classes.
+   Source: flask-basecoat commit b327186, static/css/flask-basecoat.min.css (.cn-sidebar-*),
+   rewritten onto this app's tokens (hsl(var(--token))) with no shadows. Markup is
+   components/ui_sidebar.html; behaviour is js/sidebar/sidebar_shell.js. */
+
+[data-slot="sidebar-wrapper"] { --sidebar-width: 16rem; --sidebar-width-icon: 3rem; }
+.cn-sidebar-gap { transition: width 0.2s linear; }
+.cn-sidebar-inner { background-color: hsl(var(--sidebar)); }
+.cn-sidebar-inset { background-color: hsl(var(--background)); }
+.cn-sidebar-header { gap: 0.5rem; padding: 0.5rem; }
+.cn-sidebar-content { gap: 0.5rem; -ms-overflow-style: none; scrollbar-width: none; }
+.cn-sidebar-content::-webkit-scrollbar { display: none; }
+.cn-sidebar-footer { gap: 0.5rem; padding: 0.5rem; }
+.cn-sidebar-group { padding: 0.5rem; }
+.cn-sidebar-menu { gap: 0.25rem; margin: 0; padding: 0; list-style: none; }
+.cn-sidebar-group-label {
+    height: 2rem;
+    border-radius: calc(var(--radius) * 0.8);
+    padding-inline: 0.5rem;
+    font-size: 0.75rem;
+    line-height: 1rem;
+    font-weight: 500;
+    color: hsl(var(--sidebar-foreground) / 0.7);
+    transition: margin 0.2s linear, opacity 0.2s linear;
+}
+.group[data-collapsible="icon"] .cn-sidebar-group-label { margin-top: -2rem; opacity: 0; }
+
+.cn-sidebar-menu-button {
+    gap: 0.5rem;
+    border-radius: calc(var(--radius) * 0.8);
+    padding: 0.5rem;
+    text-align: left;
+    font-size: 0.875rem;
+    line-height: 1.25rem;
+    color: hsl(var(--sidebar-foreground));
+    transition: width 0.15s, height 0.15s, padding 0.15s;
+}
+.cn-sidebar-menu-button-size-default { height: 2rem; }
+.cn-sidebar-menu-button-size-sm { height: 1.75rem; font-size: 0.75rem; line-height: 1rem; }
+.cn-sidebar-menu-button-size-lg { height: 3rem; }
+.cn-sidebar-menu-button[data-wrap] { height: auto; min-height: 2rem; padding-block: 0.375rem; }
+.cn-sidebar-menu-button[data-wrap] > span:last-child { white-space: normal; overflow-wrap: anywhere; }
+.cn-sidebar-menu-button:hover,
+.cn-sidebar-menu-button:active,
+.cn-sidebar-menu-button[data-state="open"]:hover {
+    background-color: hsl(var(--sidebar-accent));
+    color: hsl(var(--sidebar-accent-foreground));
+}
+.cn-sidebar-menu-button[data-active="true"] {
+    background-color: hsl(var(--sidebar-accent));
+    color: hsl(var(--sidebar-accent-foreground));
+    font-weight: 500;
+}
+.cn-sidebar-menu-button:focus-visible,
+.cn-sidebar-menu-sub-button:focus-visible,
+.cn-sidebar-trigger:focus-visible { outline: 2px solid hsl(var(--ring)); outline-offset: -2px; }
+.group[data-collapsible="icon"] .cn-sidebar-menu-button { width: 2rem !important; height: 2rem !important; padding: 0.5rem !important; }
+.group[data-collapsible="icon"] .cn-sidebar-menu-button-size-lg { padding: 0 !important; }
+
+.cn-sidebar-menu-badge {
+    position: absolute;
+    right: 0.25rem;
+    height: 1.25rem;
+    min-width: 1.25rem;
+    border-radius: calc(var(--radius) * 0.8);
+    padding-inline: 0.25rem;
+    font-size: 0.75rem;
+    line-height: 1rem;
+    font-weight: 500;
+    pointer-events: none;
+    color: hsl(var(--sidebar-foreground));
+}
+
+.cn-sidebar-menu-sub {
+    margin-inline: 0.875rem;
+    translate: 1px 0;
+    gap: 0.25rem;
+    border-left: 1px solid hsl(var(--sidebar-border));
+    padding-inline: 0.625rem;
+    padding-block: 0.125rem;
+    list-style: none;
+}
+.cn-sidebar-menu-sub-button {
+    height: 1.75rem;
+    gap: 0.5rem;
+    border-radius: calc(var(--radius) * 0.8);
+    padding-inline: 0.5rem;
+    font-size: 0.875rem;
+    line-height: 1.25rem;
+    color: hsl(var(--sidebar-foreground));
+}
+.cn-sidebar-menu-sub-button:hover,
+.cn-sidebar-menu-sub-button:active,
+.cn-sidebar-menu-sub-button[data-active="true"] {
+    background-color: hsl(var(--sidebar-accent));
+    color: hsl(var(--sidebar-accent-foreground));
+}
+
+.cn-sidebar-rail:hover::after { background-color: hsl(var(--sidebar-border)); }
+.cn-sidebar-container { background-color: hsl(var(--sidebar)); border-color: hsl(var(--sidebar-border)); }
+
+/* The drawer below 768px: the library's sheet, over a scrim. */
+[data-fb-sidebar-mobile] { position: fixed; inset: 0; z-index: 50; }
+[data-fb-sidebar-mobile][hidden] { display: none; }
+[data-fb-sidebar-mobile] [data-slot="sheet-overlay"] { position: fixed; inset: 0; background-color: hsl(var(--overlay) / 0.5); }
+[data-fb-sidebar-mobile] [data-slot="sheet-content"] {
+    position: fixed;
+    inset-block: 0;
+    left: 0;
+    display: flex;
+    height: 100%;
+    width: min(18rem, 85vw);
+    flex-direction: column;
+    background-color: hsl(var(--sidebar));
+    color: hsl(var(--sidebar-foreground));
+    border-right: 1px solid hsl(var(--sidebar-border));
+}
+
+/* The icon rail's tooltip: one floating label, shown for the menu button under the pointer or focus. */
+.fb-sidebar-tooltip {
+    position: fixed;
+    z-index: 60;
+    max-width: 20rem;
+    border-radius: calc(var(--radius) * 0.8);
+    background-color: hsl(var(--foreground));
+    color: hsl(var(--background));
+    padding: 0.375rem 0.75rem;
+    font-size: 0.75rem;
+    line-height: 1rem;
+    pointer-events: none;
+}
+.fb-sidebar-tooltip[hidden] { display: none; }
+
+/* app.css has a legacy `nav { margin-bottom: 40px !important }` (no sidebar exclusion); it would eat 40px of the list. */
+#sidebar-nav { margin-bottom: 0 !important; }
+@media print { [data-slot="sidebar"], [data-slot="sidebar-trigger"] { display: none !important; } }

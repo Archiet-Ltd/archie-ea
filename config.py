@@ -89,7 +89,7 @@ for key in [
     "OPENAI_API_KEY",
     "ANTHROPIC_API_KEY",
     "GEMINI_API_KEY",
-    "DEEPSEEK_API_KEY",
+    "NVIDIA_API_KEY",
     "HUGGINGFACE_API_KEY",
     "OPENROUTER_API_KEY",
     "AZURE_API_KEY",
@@ -103,11 +103,30 @@ else:
 
 
 class Config:
+    # Sign-up bot checks (app/services/signup_guard.py): a signed form stamp must be at least this old.
+    SIGNUP_FORM_TOKEN_REQUIRED = True
+    SIGNUP_MIN_SECONDS = int(os.environ.get("SIGNUP_MIN_SECONDS", "3") or 3)
+    # Optional Cloudflare Turnstile check on the sign-up form; off until enabled with both keys.
+    SIGNUP_TURNSTILE_ENABLED = _env_bool("SIGNUP_TURNSTILE_ENABLED", False)
+    TURNSTILE_SITE_KEY = os.environ.get("TURNSTILE_SITE_KEY") or None
+    TURNSTILE_SECRET_KEY = os.environ.get("TURNSTILE_SECRET_KEY") or None
+    # Vendor detection reads the public DNS records of an organisation's own website domain.
+    VENDOR_DNS_LOOKUPS = True
     # Webhook and compliance-check URLs may point at loopback/private hosts only
     # where this is True. It is False everywhere by default; Development and
     # Testing can opt in with the environment variable of the same name. No
     # configuration class turns it on by itself, and Production never reads it.
     ALLOW_INTERNAL_WEBHOOK_TARGETS = False
+    # Continue with Google / Continue with Microsoft. A provider is on exactly when both of its
+    # values are set; OAUTH_REDIRECT_HOSTS names the hosts that may start a sign-in. The two
+    # OAUTH_TEST_METADATA_URL_* values point at a stand-in provider and are read only under TESTING.
+    GOOGLE_OAUTH_CLIENT_ID = os.environ.get("GOOGLE_OAUTH_CLIENT_ID") or None
+    GOOGLE_OAUTH_CLIENT_SECRET = os.environ.get("GOOGLE_OAUTH_CLIENT_SECRET") or None
+    MICROSOFT_OAUTH_CLIENT_ID = os.environ.get("MICROSOFT_OAUTH_CLIENT_ID") or None
+    MICROSOFT_OAUTH_CLIENT_SECRET = os.environ.get("MICROSOFT_OAUTH_CLIENT_SECRET") or None
+    OAUTH_REDIRECT_HOSTS = os.environ.get("OAUTH_REDIRECT_HOSTS") or "entelim.tech,entelim.org"
+    OAUTH_TEST_METADATA_URL_GOOGLE = os.environ.get("OAUTH_TEST_METADATA_URL_GOOGLE") or None
+    OAUTH_TEST_METADATA_URL_MICROSOFT = os.environ.get("OAUTH_TEST_METADATA_URL_MICROSOFT") or None
     # Extra networks the outbound-URL guard refuses (comma-separated CIDRs).
     SSRF_BLOCKED_CIDRS = [
         c.strip() for c in os.environ.get("SSRF_BLOCKED_CIDRS", "").split(",") if c.strip()
@@ -136,6 +155,16 @@ class Config:
             "for this session. Sessions will NOT persist across restarts. "
             "Set SECRET_KEY in your .env file for production use."
         )
+    # The Entelim GitHub App: lets a person connect GitHub with one click
+    # instead of pasting a token. All three must be set for the one-click
+    # button to appear; with any unset, the connect pages fall back to the
+    # token form, which always works. The id and slug are not secret; the
+    # private key is a file path, never the key's contents.
+    GITHUB_APP_ID = os.environ.get("GITHUB_APP_ID", "")
+    GITHUB_APP_SLUG = os.environ.get("GITHUB_APP_SLUG", "")
+    GITHUB_APP_PRIVATE_KEY_PATH = os.environ.get("GITHUB_APP_PRIVATE_KEY_PATH", "")
+    GITHUB_APP_CLIENT_ID = os.environ.get("GITHUB_APP_CLIENT_ID", "")
+    GITHUB_APP_CLIENT_SECRET = os.environ.get("GITHUB_APP_CLIENT_SECRET", "")
     SQLALCHEMY_COMMIT_ON_TEARDOWN = True
     # Separate from SECRET_KEY so database command capabilities can be rotated
     # without invalidating sessions. This value is shared only by the schema
@@ -235,6 +264,12 @@ class Config:
     # MCP_ENABLED is true and this is empty, so a misconfigured deploy fails
     # loudly instead of quietly serving relative or wrong-host metadata.
     PUBLIC_BASE_URL = os.environ.get("PUBLIC_BASE_URL", "").rstrip("/")
+    # Additional origins the OAuth/MCP/connector surfaces also answer on.
+    # Comma-separated list (e.g. "https://entelim.org,https://www.entelim.org").
+    # Each alias must include scheme and host exactly. The request's origin is
+    # used only when it matches the canonical PUBLIC_BASE_URL or one of these
+    # aliases; any other Host value gets the canonical origin.
+    PUBLIC_BASE_URL_ALIASES = os.environ.get("PUBLIC_BASE_URL_ALIASES", "")
     MCP_ENABLED = _env_bool("MCP_ENABLED", False)
 
     # DNS rebinding protection for POST /mcp (app/modules/mcp/blueprint.py):
@@ -266,6 +301,9 @@ class Config:
     # page, including /contact). Unset means enquiries are still stored, just
     # not emailed — see app/main/views.py:product_inquiry_submit.
     SALES_NOTIFY_EMAIL = os.environ.get("SALES_NOTIFY_EMAIL")
+    # Who hears of a new sign-up that has stalled, and gets the daily sign-up report
+    # (app/services/signup_attribution.py). Unset means neither is sent.
+    FOUNDER_ALERT_EMAIL = os.environ.get("FOUNDER_ALERT_EMAIL")
 
     # Analytics
     SEGMENT_API_KEY = os.environ.get("SEGMENT_API_KEY", "")
@@ -376,29 +414,6 @@ class Config:
     CELERY_TIMEZONE = "UTC"
     CELERY_ENABLE_UTC = True
 
-    # SSO / Enterprise Identity (S0-01)
-    # Supports Azure AD and Okta (OIDC).
-    # Feature-flagged: SSO routes only active when FeatureFlag(key='sso_authentication') is enabled.
-    SSO_PROVIDERS = {
-        "azure": {
-            "client_id": os.environ.get("AZURE_AD_CLIENT_ID", ""),
-            "client_secret": os.environ.get("AZURE_AD_CLIENT_SECRET", ""),
-            "server_metadata_url": os.environ.get(
-                "AZURE_AD_METADATA_URL",
-                "https://login.microsoftonline.com/{tenant}/v2.0/.well-known/openid-configuration".format(
-                    tenant=os.environ.get("AZURE_AD_TENANT_ID", "common")
-                ),
-            ),
-            "client_kwargs": {"scope": "openid email profile"},
-        },
-        "okta": {
-            "client_id": os.environ.get("OKTA_CLIENT_ID", ""),
-            "client_secret": os.environ.get("OKTA_CLIENT_SECRET", ""),
-            "server_metadata_url": os.environ.get("OKTA_METADATA_URL", ""),
-            "client_kwargs": {"scope": "openid email profile"},
-        },
-    }
-
     # Internationalization (S2-01) — date/number/currency formatting
     # Full string translation (gettext) is Phase 2.
     BABEL_DEFAULT_LOCALE = os.environ.get("BABEL_DEFAULT_LOCALE", "en")
@@ -503,6 +518,13 @@ class Config:
     }
     UPLOAD_FOLDER = os.path.join(basedir, "uploads", "documents")
 
+    # Asset manifest reload (QA-015): the shared preview runs the production
+    # configuration (TestingConfig sets DEBUG=False), so we need a separate flag
+    # to control whether the manifest is reloaded when its mtime changes without
+    # a restart. True in every non-production config; False in production and
+    # its subclasses.
+    ASSET_MANIFEST_RELOAD = True
+
     @staticmethod
     def init_app(app):
         """Base class hook — subclasses override to customize app initialization."""
@@ -572,6 +594,12 @@ class DevelopmentConfig(Config):
 
 class TestingConfig(Config):
     TESTING = True
+    # Most tests post the sign-up form without drawing it first; the ones for the check switch it on.
+    SIGNUP_FORM_TOKEN_REQUIRED = _env_bool("SIGNUP_FORM_TOKEN_REQUIRED", False)
+    # Tests use recorded DNS answers, never live lookups.
+    VENDOR_DNS_LOOKUPS = False
+    # A test may fix the date the Money page reads as today (an ISO date); production never sets it.
+    FINANCE_FACTS_TODAY = os.environ.get("FINANCE_FACTS_TODAY", "")
     ALLOW_INTERNAL_WEBHOOK_TARGETS = os.environ.get(
         "ALLOW_INTERNAL_WEBHOOK_TARGETS", ""
     ).lower() in ("1", "true", "yes")
@@ -596,8 +624,11 @@ class TestingConfig(Config):
     # design (it must not silently store a credential in plaintext). Generated
     # at import time rather than a literal, so nothing here reads as a real key.
     from cryptography.fernet import Fernet as _Fernet
-    CREDENTIAL_ENCRYPTION_KEY = _Fernet.generate_key().decode()
-    ORG_ENCRYPTION_MASTER_KEY = _Fernet.generate_key().decode()
+    # A key set in the environment wins, so a preview server and the scripts
+    # that connect a source to it (or several worker processes) share one
+    # vault key; without one, each process gets its own generated key.
+    CREDENTIAL_ENCRYPTION_KEY = os.environ.get("CREDENTIAL_ENCRYPTION_KEY") or _Fernet.generate_key().decode()
+    ORG_ENCRYPTION_MASTER_KEY = os.environ.get("ORG_ENCRYPTION_MASTER_KEY") or _Fernet.generate_key().decode()
 
     # Brute-force protection is a production control; under test it throttles the
     # suite instead of an attacker. /account/login is capped at 10 POSTs per
@@ -613,7 +644,8 @@ class TestingConfig(Config):
     # and asserts the login route still carries the decorator — so disabling it
     # here costs no coverage of the control. It only stops the control from
     # deciding the outcome of tests that are not about it.
-    RATE_LIMITING_ENABLED = False
+    # A journey about the limiter itself starts its own server with SMOKE_RATE_LIMITING=1.
+    RATE_LIMITING_ENABLED = os.environ.get("SMOKE_RATE_LIMITING", "") == "1"
 
     # PostgreSQL REQUIRED for tests (matches production behavior)
     # SQLite is NOT supported - tests must use PostgreSQL for consistency
@@ -641,6 +673,15 @@ class TestingConfig(Config):
 
     @classmethod
     def init_app(cls, app):
+        # Read the database again when the app is created. The class attribute
+        # above is fixed when config.py is first imported, which in a pytest run
+        # is at collection, before tests/conftest.py's worker_database points
+        # TEST_DATABASE_URL at each parallel worker's own copy. Kept as the
+        # import-time value, every worker shared one database and the
+        # row-level-security fixture's policy changes deadlocked against
+        # another worker's reads.
+        if os.environ.get("TEST_DATABASE_URL"):
+            app.config["SQLALCHEMY_DATABASE_URI"] = os.environ["TEST_DATABASE_URL"]
         # Validate PostgreSQL is being used (not SQLite)
         db_uri = app.config.get("SQLALCHEMY_DATABASE_URI", "")
         if "sqlite" in db_uri.lower():
@@ -702,6 +743,7 @@ class SmokeTestingConfig(TestingConfig):
 class ProductionConfig(Config):
     DEBUG = False
     USE_RELOADER = False
+    ASSET_MANIFEST_RELOAD = False
 
     # Session cookie security.
     #
@@ -829,7 +871,7 @@ class CurrencyConfig:
         "EUR": {
             "symbol": "€",
             "code": "EUR",
-            "position": "suffix",
+            "position": "prefix",
             "decimal_places": 2,
             "thousands_separator": ".",
             "name": "Euro",
@@ -874,25 +916,39 @@ class CurrencyConfig:
         return config
 
     @classmethod
-    def get_org_currency_code(cls, organization=None):
+    def get_org_currency_code(cls, organization=None, organization_id=None):
         """H-04: single source of truth for "which currency does this org use".
 
-        Reads `organization.settings['currency_code']` (a plain JSON field
-        already on Organization — no schema change) and falls back to
-        DEFAULT_CURRENCY. Every server-rendered money figure AND the client
-        currencyManager default should both come from this, not from a
-        hardcoded '$' or '£' baked into a template.
+        Delegates to ``application_cost_accessor.get_reporting_currency`` which
+        reads the ``Organization.reporting_currency`` column (the one stored
+        currency value) and falls back to DEFAULT_CURRENCY. Every server-rendered
+        money figure AND the client currencyManager default both come from
+        this, not from a hardcoded '$' or '£' baked into a template.
+
+        Accepts either an ``organization`` object (with an ``id`` attribute) or
+        an explicit ``organization_id``. If neither is given, the current
+        organisation from the request context is used.
         """
-        code = None
-        try:
-            if organization is not None:
-                settings = getattr(organization, "settings", None) or {}
-                code = settings.get("currency_code")
-        except Exception:
-            code = None
-        if not code or not cls.is_supported(code):
-            code = cls.DEFAULT_CURRENCY
-        return code
+        from flask import has_app_context
+
+        # Resolve the organisation id from the given arguments.
+        org_id = None
+        if organization is not None:
+            org_id = getattr(organization, "id", None)
+        elif organization_id is not None:
+            org_id = organization_id
+
+        # Call get_reporting_currency inside an application context (request or CLI).
+        # Outside any context, fall back to DEFAULT_CURRENCY.
+        if has_app_context():
+            try:
+                from app.services.application_cost_accessor import get_reporting_currency
+
+                return get_reporting_currency(org_id)
+            except Exception:
+                pass
+
+        return cls.DEFAULT_CURRENCY
 
     @classmethod
     def get_org_currency_config(cls, organization=None):

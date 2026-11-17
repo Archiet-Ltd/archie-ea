@@ -31,8 +31,9 @@ from flask import (  # dead-code-ok
     request,
     url_for,
 )
-from flask_login import login_required
+from flask_login import current_user, login_required
 from app.middleware.tenant_decorators import platform_admin_required
+from app.services.cost_visibility import COSTS_WITHHELD, costs_visible, withhold_costs
 
 from .. import db
 from ..models.application_duplicate_detection import (  # dead-code-ok
@@ -51,6 +52,7 @@ from ..services.unified_duplicate_service import UnifiedDuplicateService
 from app.utils.api_response import error_response
 from app.utils.pagination import safe_int_arg
 from app.modules.duplicate_detection.group_access import group_visible_to_caller
+from app.utils.plain_errors import render_plain_error
 logger = logging.getLogger(__name__)
 
 # Create unified blueprint
@@ -114,6 +116,8 @@ def get_enterprise_analysis(application_id):
         result = unified_service.get_duplicate_analysis_for_application(application_id)
 
         if result["success"]:
+            if not costs_visible(current_user):
+                result = withhold_costs(result)
             return jsonify(result), 200
         else:
             return jsonify(result), 400
@@ -133,7 +137,10 @@ def get_enterprise_groups():
     """Get enterprise duplicate groups"""
     try:
         groups = unified_service.get_duplicate_groups("enterprise")
-        return jsonify({"success": True, "groups": groups}), 200
+        reply = {"success": True, "groups": groups}
+        if not costs_visible(current_user):
+            reply = withhold_costs(reply)
+        return jsonify(reply), 200
 
     except HTTPException:
 
@@ -173,7 +180,8 @@ def simple_dashboard():
 
     currency_symbol = CurrencyConfig.get_currency_config()["symbol"]
     return render_template(
-        "duplicate_detection/dashboard.html", currency_symbol=currency_symbol
+        "duplicate_detection/dashboard.html", currency_symbol=currency_symbol,
+        costs_withheld=not costs_visible(current_user), costs_withheld_sentence=COSTS_WITHHELD
     )
 
 
@@ -254,7 +262,10 @@ def get_simple_groups():
     """Get simple duplicate groups"""
     try:
         groups = unified_service.get_duplicate_groups("simple")
-        return jsonify({"success": True, "groups": groups}), 200
+        reply = {"success": True, "groups": groups}
+        if not costs_visible(current_user):
+            reply = withhold_costs(reply)
+        return jsonify(reply), 200
 
     except HTTPException:
 
@@ -470,10 +481,10 @@ def get_simple_statistics():
             UnifiedDuplicateGroup.id.in_(db.session.query(active_group_ids.c.group_id)),
             UnifiedDuplicateGroup.similarity_score >= 0.85,
         ).count()
+        # The column defaults to 0.0, so a run whose savings were never estimated reads 0:
+        # that is "no figure", not a measured nil, and the page says so in words.
         total_estimated_savings = (
-            latest_run.estimated_savings
-            if latest_run and latest_run.estimated_savings
-            else 0
+            latest_run.estimated_savings or None if latest_run else None
         )
 
         return jsonify(
@@ -824,13 +835,14 @@ def simple_group_detail(group_id):
             value = match_details.get(metric_name, 0)
             return float(value) if isinstance(value, (int, float)) else 0.0
 
+        costs_withheld = not costs_visible(current_user)
         group_payload = {
             "id": group.id,
             "group_name": group.name or f"Group {group.id}",
             "description": group.description,
             "duplicate_type": group.duplicate_type or "fuzzy",
-            "overall_similarity_score": group.similarity_score or 0,
-            "estimated_savings": group.estimated_savings or 0,
+            "overall_similarity_score": group.similarity_score,
+            "estimated_savings": group.estimated_savings if not costs_withheld else None,
             "consolidation_priority": group.risk_level or "medium",
             "functional_similarity": _similarity("functional_similarity"),
             "capability_similarity": _similarity("capability_similarity"),
@@ -955,6 +967,8 @@ def simple_group_detail(group_id):
             pairwise_analyses=pairwise_analyses,
             currency_symbol=currency_symbol,
             dashboard_registry_url=dashboard_registry_url,
+            costs_withheld=costs_withheld,
+            costs_withheld_sentence=COSTS_WITHHELD,
         )
 
     except HTTPException:
@@ -1021,7 +1035,10 @@ def get_unified_groups():
     try:
         mode = request.args.get("mode", "all")
         groups = unified_service.get_duplicate_groups(mode)
-        return jsonify({"success": True, "groups": groups}), 200
+        reply = {"success": True, "groups": groups}
+        if not costs_visible(current_user):
+            reply = withhold_costs(reply)
+        return jsonify(reply), 200
 
     except HTTPException:
 
@@ -1101,7 +1118,11 @@ def duplicate_dashboard():
                 }
             )
 
-        return render_template("duplicate_detection/dashboard.html")
+        return render_template(
+            "duplicate_detection/dashboard.html",
+            costs_withheld=not costs_visible(current_user),
+            costs_withheld_sentence=COSTS_WITHHELD,
+        )
 
     except HTTPException:
 
@@ -1119,6 +1140,8 @@ def duplicate_dashboard():
             return render_template(
                 "duplicate_detection/dashboard.html",
                 load_error="Duplicate detection results could not be read.",
+                costs_withheld=not costs_visible(current_user),
+                costs_withheld_sentence=COSTS_WITHHELD,
             )
 
 
@@ -1243,7 +1266,7 @@ def ai_insights(run_id):
     try:
         run = UnifiedDetectionRun.query.get(run_id)
         if run is None:
-            return render_template("errors/404.html"), 404
+            return render_plain_error(404)
 
         # Get AI-specific insights
         if run.algorithm_version.startswith("ai_"):
@@ -1293,7 +1316,7 @@ def ai_insights(run_id):
 
     except Exception as e:
         current_app.logger.error(f"Error loading AI insights: {e}")
-        return render_template("errors/500.html"), 500
+        return render_plain_error(500)
 
 
 # ===== AI API Endpoints =====
@@ -2115,23 +2138,24 @@ def api_statistics_summary():
             {"priority": k, "count": v} for k, v in priority_counts.items()
         ]
 
-        return jsonify(
-            {
-                "total_groups": total_groups,
-                "total_estimated_savings": total_estimated_savings,
-                "groups_by_priority": groups_by_priority,
-                "latest_run": {
-                    "id": latest_run.id,
-                    "run_name": getattr(latest_run, "run_name", ""),
-                    "status": latest_run.status,
-                    "created_at": latest_run.created_at.isoformat()
-                    if latest_run.created_at
-                    else None,
-                }
-                if latest_run
+        reply = {
+            "total_groups": total_groups,
+            "total_estimated_savings": total_estimated_savings,
+            "groups_by_priority": groups_by_priority,
+            "latest_run": {
+                "id": latest_run.id,
+                "run_name": getattr(latest_run, "run_name", ""),
+                "status": latest_run.status,
+                "created_at": latest_run.created_at.isoformat()
+                if latest_run.created_at
                 else None,
             }
-        )
+            if latest_run
+            else None,
+        }
+        if not costs_visible(current_user):
+            reply = withhold_costs(reply)
+        return jsonify(reply)
 
     except HTTPException:
 
@@ -2177,7 +2201,7 @@ def api_duplicate_groups():
                         g, "consolidation_priority", "low"
                     ),
                     "duplicate_type": getattr(g, "duplicate_type", "unknown"),
-                    "estimated_savings": getattr(g, "estimated_savings", 0) or 0,
+                    "estimated_savings": getattr(g, "estimated_savings", None),
                     "application_count": len(g.applications)
                     if hasattr(g, "applications")
                     else 0,
@@ -2187,19 +2211,20 @@ def api_duplicate_groups():
                 }
             )
 
-        return jsonify(
-            {
-                "groups": groups_data,
-                "pagination": {
-                    "page": pagination.page,
-                    "per_page": pagination.per_page,
-                    "total": pagination.total,
-                    "pages": pagination.pages,
-                    "has_next": pagination.has_next,
-                    "has_prev": pagination.has_prev,
-                },
-            }
-        )
+        reply = {
+            "groups": groups_data,
+            "pagination": {
+                "page": pagination.page,
+                "per_page": pagination.per_page,
+                "total": pagination.total,
+                "pages": pagination.pages,
+                "has_next": pagination.has_next,
+                "has_prev": pagination.has_prev,
+            },
+        }
+        if not costs_visible(current_user):
+            reply = withhold_costs(reply)
+        return jsonify(reply)
 
     except HTTPException:
 

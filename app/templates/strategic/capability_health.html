@@ -1,19 +1,15 @@
+{# design-block: dashboard #}
 {% extends 'layouts/admin_base.html' %}
+{% block extra_head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/basecoat_components.css') }}">
+{% endblock %}
 {% from 'components/page_header.html' import page_header %}
 {% from 'components/metrics_card.html' import metrics_card %}
+{% from 'basecoat/button.html' import button %}
+{% from 'components/list_table.html' import list_table %}
+{% from 'basecoat/table.html' import table_cell %}
 
-{% block title %}Capability Health Dashboard{% endblock %}
-
-{% block breadcrumb %}
-{% from 'components/breadcrumb_nav.html' import breadcrumb_nav %}
-{{ breadcrumb_nav(items=[
-    {'text': 'Home', 'href': url_for('main.index'), 'icon': 'home'},
-    {'text': 'Strategy Layer', 'href': url_for('archimate_crud.dashboard') + '#strategy'},
-    {'text': 'Capability Health', 'current': true}
-]) }}
-{% endblock %}
-
-{% block content %}
+{% block title %}Capability Health Dashboard{% endblock %}{% block content %}
 {# Builds the href for a row's record, or an empty string when the blueprint that
    owns the destination failed to register -- blueprints register non-fatally here,
    so an unguarded url_for would raise BuildError and 500 every page rendering the
@@ -26,7 +22,7 @@
         title='Capability Health Dashboard',
         description='Real-time assessment of business capabilities based on maturity, coverage, and technical risk.',
         actions=[
-            {'text': 'Create Plan', 'icon': 'lightbulb', 'onclick': "document.dispatchEvent(new CustomEvent('open-initiative-health-remediation-modal'))", 'variant': 'default'}
+            {'text': 'Create Plan', 'icon': 'lightbulb', 'onclick': "$dispatch('open-initiative-health-remediation-modal')", 'variant': 'default'}
         ]
     ) }}
 
@@ -49,24 +45,29 @@
                         if metrics.assessed_capabilities else 'No capability has recorded maturity, coverage or delivery data yet'
         ) }}
         {{ metrics_card(
-            title='Critical Capabilities',
+            title='High-importance Capabilities',
             value=metrics.critical_capabilities|string,
             icon='alert-triangle',
-            description='Labeled as high strategic importance'
+            description='Labelled as high strategic importance, whatever their health'
         ) }}
         {{ metrics_card(
             title='At Risk Hotspots',
             value=metrics.at_risk_capabilities|string,
             icon='flame',
-            description='Health score currently below 60%',
+            description='Health score currently below ' ~ metrics.at_risk_below ~ '%',
             value_class='text-warning'
         ) }}
+        <div data-testid="health-recorded-gaps" class="flex flex-col items-start gap-1 [&>*]:w-full">
         {{ metrics_card(
-            title='Capability Gap Signals',
-            value=metrics.gaps_summary.gaps_identified|string,
+            title='Recorded gaps',
+            value=recorded_gaps|string,
             icon='git-branch',
-            description='Coverage/maturity shortfalls across capabilities — ' + metrics.gaps_summary.gaps_with_decisions|string + ' already have linked solutions or requirements'
+            description='Gaps in the gap register.'
         ) }}
+        {% if 'enterprise.gap_analysis' in flask.current_app.view_functions %}
+        {{ button(text='Open the gap register to see each one', variant='link', href=url_for('enterprise.gap_analysis'), attrs={'data-testid': 'health-gap-register-link'}) }}
+        {% endif %}
+        </div>
     </div>
 
     <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
@@ -82,7 +83,7 @@
                     <div class="space-y-2">
                         <div class="flex items-center justify-between text-sm font-medium">
                             <div class="flex items-center">
-                                <span class="mr-2">{{ domain.name }}</span>
+                                <span class="mr-2">{{ domain.name if domain.name is not none else 'Unnamed domain' }}</span>
                                 <span class="text-xs text-muted-foreground font-normal">({{ domain.count }} caps)</span>
                             </div>
                             <span class="{% if domain.score is none %}text-muted-foreground{% elif domain.score < 60 %}text-destructive-emphasis{% elif domain.score < 80 %}text-warning-emphasis{% else %}text-success-emphasis{% endif %}">
@@ -119,11 +120,30 @@
                         <div class="text-sm font-bold text-warning-emphasis" id="warning-count">0</div>
                     </div>
                     <div>
-                        <div class="text-xs text-muted-foreground mb-1">Critical</div>
+                        <div class="text-xs text-muted-foreground mb-1">At risk</div>
                         <div class="text-sm font-bold text-destructive-emphasis" id="critical-count">0</div>
                     </div>
                 </div>
             </div>
+        </div>
+    </div>
+
+    <!-- Compliance by capability -->
+    <div data-slot="card" class="rounded-lg border border-border bg-card text-card-foreground overflow-hidden">
+        <div class="flex flex-col space-y-1.5 p-6 border-b">
+            <h2 class="font-semibold leading-none tracking-tight">Capability Compliance</h2>
+            <p class="text-sm text-muted-foreground">How far the controls mapped to each capability's applications are in place. A capability with no mapped control is not assessed. A control on an application that supports several capabilities is counted under each of them.</p>
+            <p class="text-sm text-muted-foreground" data-testid="not-in-place-count">{{ metrics.controls_not_in_place_text }}.</p>
+        </div>
+        <div class="p-6">
+            {% call(item) list_table(rows=metrics.compliance_by_capability, columns=[('Capability', ''), ('Compliance', ''), ('Status', ''), ('Controls not in place', '')],
+                                     caption='Compliance of each assessed capability', testid='capability-compliance-table', row_testid='capability-compliance-row',
+                                     empty_message='No capability is assessed yet. Map controls to the applications that support a capability on the Regulatory Compliance page.') %}
+                {% call table_cell(class='font-medium') %}{% if item.id %}{% set _h = row_href('archimate_crud.detail_element', layer='strategy', element_type='Capability', element_id=item.id)|trim %}{% if _h %}<a href="{{ _h }}" class="text-primary hover:underline">{{ item.name }}</a>{% else %}{{ item.name }}{% endif %}{% else %}{{ item.name }}{% endif %}{% endcall %}
+                {% call table_cell(class='tabular-nums', attrs={'data-testid': 'compliance-figure'}) %}{{ item.compliance_figure }}{% endcall %}
+                {% call table_cell() %}{{ item.compliance_status }}{% endcall %}
+                {% call table_cell(class='tabular-nums') %}{{ 'Not assessed' if item.compliance_status == 'Not assessed' else item.missing_controls }}{% endcall %}
+            {% endcall %}
         </div>
     </div>
 
@@ -133,7 +153,7 @@
             <h2 class="font-semibold leading-none tracking-tight">Top At-Risk Capabilities</h2>
             <p class="text-sm text-muted-foreground">Prioritized list of capabilities requiring immediate attention based on Health Score.</p>
         </div>
-        <div class="p-0">
+        <div class="p-0 overflow-x-auto">
             <table class="dense-table w-full text-sm border-collapse">
                 <thead>
                     <tr class="bg-muted/50 border-b">
@@ -155,22 +175,17 @@
                                 {% else %}{{ item.name }}{% endif %}
                             </div>
                             <div class="mt-1 text-xs text-muted-foreground">
-                                {{ item.application_count }} apps · {{ item.planned_solution_count }} solutions · {{ item.requirement_count }} reqs
+                                {{ item.application_count }} app{{ 's' if item.application_count != 1 }} · {{ item.planned_solution_count }} solution{{ 's' if item.planned_solution_count != 1 }} · {{ item.requirement_count }} requirement{{ 's' if item.requirement_count != 1 }}
                             </div>
                         </td>
-                        <td class="p-4 text-muted-foreground">{{ item.domain }}</td>
+                        <td class="p-4 text-muted-foreground">{{ item.domain if item.domain is not none else 'Domain not assigned' }}</td>
                         <td class="p-4">
                             <span class="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold {% if item.maturity_gap > 1 %}border-destructive text-destructive{% else %}border-muted text-muted-foreground{% endif %}">
                                 L{{ item.maturity_gap }} Gap
                             </span>
                         </td>
                         <td class="p-4">
-                            <div class="flex items-center space-x-2">
-                                <div class="w-12 h-1.5 bg-secondary rounded-full overflow-hidden">
-                                    <div class="h-full bg-primary" style="width: {{ item.compliance_score }}%"></div>
-                                </div>
-                                <span class="text-xs text-muted-foreground">{{ item.compliance_score|round }}%</span>
-                            </div>
+                            <span class="text-xs text-muted-foreground" data-testid="compliance-figure">{{ item.compliance_figure }}</span>
                         </td>
                         {# "Not assessed" is a fact; 60% would be an invention. #}
                         <td class="p-4 font-bold">{{ (item.score|string + '%') if item.score is not none else '—' }}</td>
@@ -189,6 +204,9 @@
                     {% endfor %}
                 </tbody>
             </table>
+            {% if metrics.at_risk_capabilities > metrics.at_risk_list|length %}
+            <p class="px-4 py-3 text-sm text-muted-foreground" data-testid="at-risk-list-total">Showing the {{ metrics.at_risk_list|length }} most at risk of {{ metrics.at_risk_capabilities }} capabilities below {{ metrics.at_risk_below }}%.</p>
+            {% endif %}
         </div>
     </div>
 </div>
@@ -215,7 +233,7 @@ document.addEventListener('DOMContentLoaded', function() {
     new Chart(ctx, {
         type: 'doughnut',
         data: {
-            labels: ['Healthy', 'Warning', 'Critical'],
+            labels: ['Healthy', 'Warning', 'At risk'],
             datasets: [{
                 data: [healthy, warning, critical],
                 backgroundColor: ['#16a34a', '#f97316', '#dc2626'],
@@ -253,20 +271,24 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 ) }}
 
-{% from 'components/initiative_modal.html' import initiative_modal %}
+{% from 'components/initiative_modal.html' import initiative_modal, plans_created_here %}
+
+<div class="mt-6">
+{{ plans_created_here(id='health-remediation-modal', kind='remediation_plan', button_text='Create Plan') }}
+</div>
 
 {{ initiative_modal(
     id='health-remediation-modal',
     title='Create Remediation Plan',
     endpoint='/strategic/api/initiatives/from-health',
     fields=[
-        {'name': 'title', 'type': 'text', 'label': 'Plan Title', 'required': True, 'placeholder': 'e.g., Remediation: Finance Capability'},
+        {'name': 'name', 'type': 'text', 'label': 'Plan Title', 'required': True, 'placeholder': 'e.g., Remediation: Finance Capability'},
         {'name': 'description', 'type': 'textarea', 'label': 'Description', 'required': True, 'placeholder': 'Describe the remediation approach...'},
         {'name': 'priority', 'type': 'select', 'label': 'Priority', 'required': True, 'options': [('high', 'High'), ('medium', 'Medium'), ('low', 'Low')], 'value': 'high'},
-        {'name': 'owner', 'type': 'text', 'label': 'Owner', 'required': True, 'placeholder': 'Team or individual responsible'},
+        {'name': 'owner_id', 'type': 'select', 'label': 'Owner', 'required': True, 'options': initiative_owner_options(), 'value_key': 'id', 'label_key': 'name'},
         {'name': 'start_date', 'type': 'date', 'label': 'Start Date', 'required': False},
         {'name': 'target_completion_date', 'type': 'date', 'label': 'Target Completion', 'required': False},
-        {'name': 'budget', 'type': 'number', 'label': 'Budget ($)', 'required': False, 'placeholder': '0'}
+        {'name': 'budget_allocated', 'type': 'number', 'label': 'Budget', 'required': False, 'placeholder': '0'}
     ]
 ) }}
 

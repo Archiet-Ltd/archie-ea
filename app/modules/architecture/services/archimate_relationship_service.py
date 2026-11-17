@@ -11,7 +11,12 @@ from datetime import datetime, timezone
 from typing import Dict, List, Optional, Tuple
 
 from app import db
-from app.models.models import ArchiMateElement, ArchiMateRelationship  # dead-code-ok (pre-existing)
+from app.models.models import (  # dead-code-ok (pre-existing)
+    ArchiMateElement,
+    ArchiMateRelationship,
+    CrossOrganisationRelationship,
+    assert_relationship_same_organisation,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -212,6 +217,24 @@ class ArchiMateRelationshipService:
             logger.error(f"Relationship validation failed: {error_message}")
             return None
 
+        # Same-organisation guard: source and target must both belong to the
+        # relationship's owning organisation. The one function in the model
+        # module, so the service and the model guard cannot disagree.
+        if organization_id is not None:
+            try:
+                assert_relationship_same_organisation(
+                    db.session.connection(),
+                    organization_id,
+                    source_element.id,
+                    target_element.id,
+                )
+            except CrossOrganisationRelationship as exc:
+                logger.error(f"Same-organisation check failed: {exc}")
+                if not rollback:
+                    raise
+                db.session.rollback()
+                return None
+
         try:
             # Where this relationship came from: the person drawing it.
             person_id, person_name = _signed_in_person()
@@ -325,22 +348,47 @@ class ArchiMateRelationshipService:
     # -----------------------------------------------------------------
 
     @classmethod
-    def get_pending_suggestions(cls, limit: int = 50, min_confidence: float = 0.3):
+    def get_pending_suggestions(cls, limit: int = 50, min_confidence: float = 0.3,
+                                organization_id: int = None):
         """Return pending relationship suggestions above confidence threshold.
+
+        When *organization_id* is provided, only suggestions whose source AND
+        target elements belong to that organisation are returned.
 
         Args:
             limit: Maximum number of suggestions to return.
             min_confidence: Minimum confidence score (0.0-1.0).
+            organization_id: If set, scope to this organisation.
 
         Returns:
             List of RelationshipSuggestion records ordered by confidence desc.
         """
-        from app.models.archimate_core import RelationshipSuggestion
+        from app import db
+        from app.models.archimate_core import ArchiMateElement, RelationshipSuggestion
 
-        return (
+        query = (
             RelationshipSuggestion.query
             .filter_by(status="pending")
             .filter(RelationshipSuggestion.confidence >= min_confidence)
+        )
+
+        if organization_id is not None:
+            # Only include suggestions where both source and target elements
+            # exist in this organisation.
+            src_org = db.session.query(ArchiMateElement.id).filter(
+                ArchiMateElement.organization_id == organization_id
+            ).subquery()
+            tgt_org = db.session.query(ArchiMateElement.id).filter(
+                ArchiMateElement.organization_id == organization_id
+            ).subquery()
+            query = (
+                query
+                .filter(RelationshipSuggestion.source_element_id.in_(src_org))
+                .filter(RelationshipSuggestion.target_element_id.in_(tgt_org))
+            )
+
+        return (
+            query
             .order_by(RelationshipSuggestion.confidence.desc())
             .limit(limit)
             .all()
@@ -371,11 +419,27 @@ class ArchiMateRelationshipService:
                 f"Suggestion {suggestion_id} already {suggestion.status}"
             )
 
+        # Same-organisation guard: source and target elements must belong to
+        # the same organisation, which becomes the relationship's owner.
+        source_el = db.session.get(ArchiMateElement, suggestion.source_element_id)
+        target_el = db.session.get(ArchiMateElement, suggestion.target_element_id)
+        if source_el is None or target_el is None:
+            raise ValueError(
+                f"Suggestion {suggestion_id} references a missing element"
+            )
+        assert_relationship_same_organisation(
+            db.session.connection(),
+            source_el.organization_id,
+            suggestion.source_element_id,
+            suggestion.target_element_id,
+        )
+
         # Create the actual relationship
         relationship = ArchiMateRelationship(
             source_id=suggestion.source_element_id,
             target_id=suggestion.target_element_id,
             type=suggestion.relationship_type,
+            organization_id=source_el.organization_id,
         )
         db.session.add(relationship)
 
@@ -427,18 +491,21 @@ class ArchiMateRelationshipService:
         )
 
     @classmethod
-    def bulk_accept(cls, min_confidence: float, user_id: int) -> int:
+    def bulk_accept(cls, min_confidence: float, user_id: int,
+                    organization_id: int = None) -> int:
         """Accept all pending suggestions above a confidence threshold.
 
         Args:
             min_confidence: Minimum confidence score (0.0-1.0).
             user_id: The EA user accepting.
+            organization_id: If set, scope bulk-accept to this organisation.
 
         Returns:
             Number of suggestions accepted.
         """
         suggestions = cls.get_pending_suggestions(
-            limit=100, min_confidence=min_confidence
+            limit=100, min_confidence=min_confidence,
+            organization_id=organization_id,
         )
         count = 0
         for s in suggestions:

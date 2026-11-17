@@ -160,20 +160,18 @@ def test_exactly_one_header_row(app, db_session, make_org):
     assert html.count('data-testid="chat-header-row"') == 1
 
 
-def test_overflow_menu_wraps_docs_match_export_approvals(app, db_session, make_org):
+def test_chat_options_sheet_holds_match_export_approvals_and_the_panels(app, db_session, make_org):
     html = _get_chat_html(app, db_session, make_org)
-    assert 'data-testid="chat-overflow-menu"' in html
+    assert 'data-testid="chat-options-trigger"' in html
 
-    start = html.index('data-testid="chat-overflow-menu"')
-    # The overflow menu is a bounded dropdown container — grab a generous
-    # slice after its opening tag rather than trying to balance divs.
-    end = start + 6000
-    menu_slice = html[start:end]
+    start = html.index('id="drawer-chat-options"')
+    sheet = html[start:]
 
-    assert "Docs" in menu_slice
-    assert "Match" in menu_slice
-    assert "Export" in menu_slice
-    assert "Approvals" in menu_slice
+    for text in ("Match entities", "Export conversation", "Export context log", "Approvals for review",
+                 'id="persona-selector"', 'id="domain-selector"', 'id="nl-query-input"', 'id="domain-context"'):
+        assert text in sheet, text
+    # the upload control is an icon in the composer, not a menu entry
+    assert 'data-testid="chat-upload"' in html[:start]
 
 
 def test_rail_has_alpine_collapse_state(app, db_session, make_org):
@@ -197,41 +195,14 @@ def test_model_selector_still_present(app, db_session, make_org):
     assert 'id="model-selector"' in html
 
 
-def test_show_more_suggestions_declared_on_shared_ancestor(app, db_session, make_org):
-    """Evidence review: Task 6's "More suggestions" disclosure declared
-    `showMoreSuggestions` on an inner `x-data` that only wrapped the
-    AI-architects card grid, while the disclosure button, the remaining
-    domain cards, and the toggle's own `x-show="!showMoreSuggestions"` live
-    as siblings outside that div. Alpine's `with()`-based expression
-    evaluation throws `ReferenceError: showMoreSuggestions is not defined`
-    for every one of those siblings — reproduced 8x in the console capture
-    behind the screenshot evidence. Pin the fix structurally: exactly one
-    `x-data` block declares the variable (on #domain-welcome-grid, the
-    common ancestor of every element that reads it), not the narrower inner
-    div."""
+def test_welcome_offers_one_slot_for_four_questions_and_no_disclosure(app, db_session, make_org):
+    """The welcome is a greeting and one grid of questions; the old browse-by-area cards and
+    their "More suggestions" disclosure (an Alpine variable that once threw ReferenceError) are gone."""
     html = _get_chat_html(app, db_session, make_org)
-
-    assert html.count("showMoreSuggestions: false") == 1, (
-        "showMoreSuggestions must be declared exactly once, on the common "
-        "ancestor of every element that reads it — a second declaration "
-        "means it is scoped too narrowly again and siblings outside it will "
-        "throw ReferenceError at render"
-    )
-
-    grid_start = html.index('id="domain-welcome-grid"')
-    grid_tag_end = html.index(">", grid_start)
-    grid_open_tag = html[grid_start:grid_tag_end]
-    assert "showMoreSuggestions" in grid_open_tag, (
-        "showMoreSuggestions must be declared on #domain-welcome-grid itself "
-        "so every x-show reading it (the disclosure button, the remaining "
-        "domain cards) shares its scope"
-    )
-
-    more_button_idx = html.index("More suggestions")
-    disclosure_idx = html.rindex('x-show="!showMoreSuggestions"', 0, more_button_idx)
-    remaining_cards_idx = html.rindex('x-show="showMoreSuggestions"', 0, more_button_idx)
-    assert grid_start < disclosure_idx, "disclosure toggle must be inside #domain-welcome-grid"
-    assert grid_start < remaining_cards_idx, "remaining domain cards must be inside #domain-welcome-grid"
+    assert "showMoreSuggestions" not in html
+    assert "More suggestions" not in html
+    assert html.count('id="portfolio-briefing"') == 1
+    assert 'id="domain-welcome-grid"' in html
 
 
 def _find_ancestor_ids_and_testids(html, target_id):
@@ -305,3 +276,11 @@ def test_approvals_modal_is_not_descendant_of_overflow_menu(app, db_session, mak
         "and toggling menuOpen would hide the modal out from under "
         "Platform.modal"
     )
+
+
+def test_approvals_modal_is_not_inside_the_options_sheet(app, db_session, make_org):
+    """The sheet closes when Approvals is chosen, so the dialog cannot live inside it."""
+    html = _get_chat_html(app, db_session, make_org)
+    ancestors = _find_ancestor_ids_and_testids(html, "ai-chat-approvals-modal")
+    assert ancestors is not None
+    assert "drawer-chat-options" not in {a.get("id") for _, a in ancestors}

@@ -12,6 +12,12 @@ from flask_login import current_user, login_required
 
 from app.decorators import audit_log
 from app.models.ai_service import AIPromptTemplate
+from app.modules.ai_chat.services.agent_runner import (
+    CREDIT_EXHAUSTED,
+    RATE_LIMITED,
+    classify_provider_error,
+)
+from app.modules.ai_chat.services.failure_messages import failure_sentence
 from app.services.feature_flag_service import FeatureFlagService
 from app.services.rate_limiter import rate_limit
 from app.utils.validators import (
@@ -144,8 +150,8 @@ def _get_configured_chat_models():
                 model_info["recommended_for"] = ["Complex reasoning", "Analysis"]
             elif provider_name == "gemini":
                 model_info["recommended_for"] = ["Multi-modal", "General tasks"]
-            elif provider_name == "deepseek":
-                model_info["recommended_for"] = ["Code analysis", "Technical tasks"]
+            elif provider_name == "nvidia":
+                model_info["recommended_for"] = ["General conversation", "Technical tasks"]
 
             models.append(model_info)
 
@@ -298,6 +304,29 @@ def get_available_models():
         )
 
 
+def _waited_seconds(data) -> float:
+    """Seconds the person has already waited for this question, as the browser measured them from the send
+    (the stored-answer lookup comes first). The turn's budget is what is left of one minute."""
+    value = data.get("waited_seconds") if isinstance(data, dict) else None
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return 0.0
+    return min(max(float(value), 0.0), 600.0)
+
+
+def _is_retry(data) -> bool:
+    """Whether the browser says this is a Retry of a failed turn. Only the fact is read: what an earlier try
+    recorded is read from the approval record, filtered by the signed-in person's organisation and
+    conversation, so a list sent by the browser has no say."""
+    return bool(isinstance(data, dict) and data.get("retry") is True)
+
+
+def _failed_turn_id(data):
+    """The id of the turn that failed, which a Retry names. It only narrows the signed-in person's own
+    approval rows to that turn; it names no change and grants nothing."""
+    value = data.get("failed_turn_id") if isinstance(data, dict) else None
+    return value.strip()[:64] if isinstance(value, str) and value.strip() else None
+
+
 def _load_history(thread_id, user_id):
     """Prior turns of *thread_id*, oldest first, or [] when there are none.
 
@@ -407,6 +436,15 @@ def send_message():
     if isinstance(data, dict) and "thread_id" in data:
         data = dict(data)
         data.pop("thread_id", None)
+    waited_seconds = _waited_seconds(data)
+    if isinstance(data, dict) and "waited_seconds" in data:
+        data = dict(data)
+        data.pop("waited_seconds", None)
+    is_retry = _is_retry(data)
+    failed_turn_id = _failed_turn_id(data)
+    if isinstance(data, dict):
+        # "completed_actions" is no longer read: a browser's list of changes is not evidence of any.
+        data = {k: v for k, v in data.items() if k not in ("retry", "completed_actions", "failed_turn_id")}
 
     # T-031: marshmallow schema validation
     _schema = ChatMessageSchema()
@@ -611,6 +649,7 @@ def send_message():
         # Falls back to text-only mode automatically for unsupported providers.
         from app.modules.ai_chat.services.agent_runner import (
             AgentRunner,
+            is_pause,
             sanitize_agent_error,
         )
 
@@ -635,6 +674,9 @@ def send_message():
             persona=persona,
             requested_model=requested_model,
             history=_load_history(incoming_thread_id, current_user.id),
+            waited_seconds=waited_seconds,
+            retry=is_retry,
+            failed_turn_id=failed_turn_id,
         )
 
         # ENH-018: Populate junction tables if agent result includes design_output
@@ -675,6 +717,8 @@ def send_message():
         agent_failure = agent_result.get("error")
         if agent_failure:
             logger.warning("send_message agent failure: %s", agent_failure)
+        # The pause is the whole reply: the person reads it as the answer, with nothing hanging under it.
+        agent_error = None if is_pause(agent_failure) else sanitize_agent_error(agent_failure)
 
         return jsonify(
             {
@@ -683,11 +727,20 @@ def send_message():
                 "domain": domain,
                 "actions_taken": agent_result.get("actions_taken", []),
                 "pending_approvals": agent_result.get("pending_approvals", []),
-                "requires_approval": bool(agent_result.get("pending_approvals")),
+                # The id of this turn; a Retry of it names it, so only its own changes are read back.
+                "turn_id": agent_result.get("turn_id"),
+                # Only a change still in review is waiting on anything; an applied or declined one is settled.
+                "requires_approval": any(
+                    (p or {}).get("state") == "in_review" for p in agent_result.get("pending_approvals", [])
+                ),
                 # The records the read tools actually returned this turn, so the
                 # reader can check the answer against the rows rather than
                 # trusting it.
                 "sources": agent_result.get("sources", []),
+                # The provider and model that answered; absent when none did.
+                "answered_by": agent_result.get("answered_by"),
+                # An answer that read the model, checked and drawn on the server.
+                "genome_answer": agent_result.get("genome_answer"),
                 # AgentRunner._fallback() persists a friendly "couldn't be
                 # completed" response AND keeps the raw failure reason on the
                 # same dict; without this field the UI could not tell an
@@ -698,7 +751,10 @@ def send_message():
                 # for OpenRouter's 402 contains the provider account's user_id.
                 # That was reaching the browser verbatim. The full reason is in
                 # the server log line above.
-                "agent_error": sanitize_agent_error(agent_failure),
+                "agent_error": agent_error,
+                "reason_code": agent_result.get("reason_code"),
+                # The platform's pause: the reply is the pause itself, built from nothing.
+                "paused": bool(agent_failure) and is_pause(agent_failure),
                 # Was hardcoded True on every response regardless of whether any
                 # context was built - _build_system_prompt swallows a context
                 # failure into an empty string, so the API asserted grounding
@@ -722,7 +778,8 @@ def send_message():
         return (
             jsonify(
                 {
-                    "error": "Unable to connect to AI service. Please check your API configuration in Admin > API Settings.",
+                    "error": failure_sentence("provider_unreachable"),
+                    "reason_code": "provider_unreachable",
                     "error_type": "connection",
                 }
             ),
@@ -733,7 +790,8 @@ def send_message():
         return (
             jsonify(
                 {
-                    "error": "AI service request timed out. Please try again or use a shorter message.",
+                    "error": failure_sentence("timeout"),
+                    "reason_code": "timeout",
                     "error_type": "timeout",
                 }
             ),
@@ -750,23 +808,38 @@ def send_message():
             return (
                 jsonify(
                     {
-                        "error": "AI service authentication failed. Please verify your API key in Admin > API Settings.",
+                        "error": failure_sentence("provider_unreachable"),
+                        "reason_code": "provider_unreachable",
                         "error_type": "auth",
                     }
                 ),
                 401,
             )
-        elif "rate limit" in error_msg.lower() or "quota" in error_msg.lower():
+
+        kind = classify_provider_error(e)
+        if kind == CREDIT_EXHAUSTED:
             return (
                 jsonify(
                     {
-                        "error": "AI service rate limit exceeded. Please wait a moment and try again.",
+                        "error": failure_sentence("credit_exhausted"),
+                        "reason_code": "credit_exhausted",
+                        "error_type": "credit_exhausted",
+                    }
+                ),
+                402,
+            )
+        if kind == RATE_LIMITED:
+            return (
+                jsonify(
+                    {
+                        "error": failure_sentence("rate_limited"),
+                        "reason_code": "rate_limited",
                         "error_type": "rate_limit",
                     }
                 ),
                 429,
             )
-        elif "model" in error_msg.lower() and (
+        if "model" in error_msg.lower() and (
             "not found" in error_msg.lower() or "invalid" in error_msg.lower()
         ):
             return (
@@ -855,6 +928,15 @@ def send_message_stream():
     if isinstance(data, dict) and "thread_id" in data:
         data = dict(data)
         data.pop("thread_id", None)
+    waited_seconds = _waited_seconds(data)
+    if isinstance(data, dict) and "waited_seconds" in data:
+        data = dict(data)
+        data.pop("waited_seconds", None)
+    is_retry = _is_retry(data)
+    failed_turn_id = _failed_turn_id(data)
+    if isinstance(data, dict):
+        # "completed_actions" is no longer read: a browser's list of changes is not evidence of any.
+        data = {k: v for k, v in data.items() if k not in ("retry", "completed_actions", "failed_turn_id")}
 
     _schema = ChatMessageSchema()
     _validated, _err = _load_and_validate(_schema, data)
@@ -963,6 +1045,7 @@ def send_message_stream():
 
                 from app.modules.ai_chat.services.agent_runner import (
                     AgentRunner,
+                    is_pause,
                     sanitize_agent_error,
                 )
                 runner = AgentRunner(
@@ -983,6 +1066,9 @@ def send_message_stream():
                     requested_model=requested_model or None,
                     stream_mode=True,
                     history=history_for_thread,
+                    waited_seconds=waited_seconds,
+                    retry=is_retry,
+                    failed_turn_id=failed_turn_id,
                 )
                 # Persist this turn (thread-backed history rail). Always on;
                 # never breaks the stream. thread_id rides back on the done event.
@@ -1003,13 +1089,16 @@ def send_message_stream():
                 # provider account's user_id). Log it, send a category.
                 if result.get("error"):
                     logger.warning("stream agent failure: %s", result["error"])
-                    result["error"] = sanitize_agent_error(result["error"])
+                    # The pause is the whole reply; no error rides beside it, and the footer names the pause.
+                    result["paused"] = is_pause(result["error"])
+                    result["error"] = None if result["paused"] else sanitize_agent_error(result["error"])
                 event_queue.put({"type": "done", **result})
         except Exception as exc:
             logger.exception("send_message_stream: agent error")
             from app.modules.ai_chat.services.agent_runner import (
                 sanitize_agent_error as _sanitize,
             )
+
             event_queue.put({
                 "type": "done",
                 "response": "",
@@ -1610,7 +1699,10 @@ def approve_tool_action(approval_id: int):
         "NOT_FOUND": 404,
         "FORBIDDEN": 403,
         "APPROVAL_DENIED": 403,
+        "ACCOUNT_OFF": 403,
         "CONFLICT": 409,
+        "DECLINED": 409,
+        "IN_REVIEW": 409,
     }.get(result.get("code"), 200 if result.get("success") else 400)
     return jsonify({
         "success": result.get("success", False),
@@ -1631,7 +1723,10 @@ def reject_tool_action(approval_id: int):
         "NOT_FOUND": 404,
         "FORBIDDEN": 403,
         "APPROVAL_DENIED": 403,
+        "ACCOUNT_OFF": 403,
         "CONFLICT": 409,
+        "DECLINED": 409,
+        "IN_REVIEW": 409,
     }.get(result.get("code"), 200 if result.get("success") else 400)
     return jsonify({
         "success": result.get("success", False),

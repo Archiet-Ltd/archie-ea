@@ -248,6 +248,8 @@ def market_analysis(category):
               type: array
               items:
                 type: string
+      404:
+        description: No market data for the category
       500:
         description: Market analysis failed
     """
@@ -266,7 +268,7 @@ def market_analysis(category):
                         "message": "No data sources returned valid results",
                     }
                 ),
-                500,
+                404,
             )
 
     except Exception as e:

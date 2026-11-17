@@ -29,7 +29,8 @@ from app.modules.architecture_assistant.property_service import (
     GOVERNED_TYPE_LABELS,
     GovernedPropertyService,
     PropertyDefinitionError,
-    metamodel_element_types,
+    element_type_name,
+    grouped_element_types,
 )
 
 # Who may change the organisation's metamodel. ``role_required`` also lets an
@@ -87,13 +88,18 @@ def _render_index(form=None, error=None, status=200):
     rows = []
     for definition in definitions:
         missing = service.missing_values(definition, org_id) if definition.is_mandatory else None
-        rows.append({"definition": definition, "missing_count": None if missing is None else len(missing)})
+        rows.append({
+            "definition": definition,
+            "type_name": element_type_name(definition.archimate_type),
+            "usage_count": service.usage_count(definition, org_id),
+            "missing_count": None if missing is None else len(missing),
+        })
     return (
         render_template(
             "metamodel/properties.html",
             rows=rows,
             can_define=_can_define(),
-            element_types=metamodel_element_types(),
+            element_type_groups=grouped_element_types(),
             value_types=[(t, GOVERNED_TYPE_LABELS[t]) for t in GOVERNED_PROPERTY_TYPES],
             type_labels=GOVERNED_TYPE_LABELS,
             form=form or {},
@@ -151,6 +157,8 @@ def detail(definition_id: int):
         definition=definition,
         missing=missing,
         type_labels=GOVERNED_TYPE_LABELS,
+        type_name=element_type_name(definition.archimate_type),
+        usage_count=service.usage_count(definition, org_id),
     )
 
 

@@ -106,7 +106,7 @@ function displayImportHistory() {
                     '</div>' +
                     '<div>' +
                         '<span class="text-muted-foreground">Avg Confidence:</span>' +
-                        '<span class="font-medium ml-1">' + Math.round((stats.avg_confidence || 0) * 100) + '%</span>' +
+                        '<span class="font-medium ml-1">' + Platform.figure.percent(stats.avg_confidence, 100) + '</span>' +
                     '</div>' +
                 '</div>' +
             '</div>';
@@ -218,7 +218,7 @@ function formatDate(dateString) {
 }
 
 function formatDuration(seconds) {
-    if (!seconds) return 'N/A';
+    if (!seconds) return 'Not timed';
     if (seconds < 60) return Math.round(seconds) + 's';
     if (seconds < 3600) return Math.round(seconds / 60) + 'm ' + Math.round(seconds % 60) + 's';
     return Math.round(seconds / 3600) + 'h ' + Math.round((seconds % 3600) / 60) + 'm';

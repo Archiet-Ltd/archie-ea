@@ -63,6 +63,7 @@ def api_set_capability_owner(capability_id):
             organization_id=org_id,
             ownership_type=ownership_type,
             assigned_by=getattr(g, "current_user_id", None),
+            replace_primary=bool(data.get("replace")),
         )
     except ValueError as exc:  # includes CrossOrganisationCapabilityOwner
         return jsonify({"message": str(exc)}), 400

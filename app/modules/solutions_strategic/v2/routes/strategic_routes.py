@@ -19,6 +19,7 @@ from flask import Blueprint, current_app, jsonify, render_template, request
 from flask_login import current_user, login_required
 
 from app.models.business_capability import BusinessCapability
+from app.modules.genome.services.roadmap_links import redirect_to_roadmap
 from app.modules.solutions_strategic.v2.services.architecture_governance_service import (
     ArchitectureGovernanceService,
 )
@@ -31,20 +32,25 @@ from app.modules.solutions_strategic.v2.services.compliance_tracking_service imp
 from app.modules.solutions_strategic.v2.services.dependency_visualization_service import (
     DependencyVisualizationService,
 )
+from app.modules.solutions_strategic.v2.services import simulation_service
 from app.modules.solutions_strategic.v2.services.impact_analysis_service import (
     ImpactAnalysisService,
 )
 from app.modules.solutions_strategic.v2.services.investment_prioritization_service import (
+    currency_symbol,
     InvestmentPrioritizationService,
+)
+from app.services.cost_visibility import (
+    COSTS_WITHHELD,
+    INVESTMENT_MONEY_KEYS,
+    costs_visible,
+    withhold_costs,
 )
 from app.modules.solutions_strategic.v2.services.process_optimization_service import (
     ProcessOptimizationService,
 )
 from app.modules.solutions_strategic.v2.services.risk_assessment_service import (
     RiskAssessmentService,
-)
-from app.modules.solutions_strategic.v2.services.risk_mitigation_service import (
-    RiskMitigationService,
 )
 from app.modules.solutions_strategic.v2.services.strategic_service import StrategicService
 from app.modules.solutions_strategic.v2.services.technology_roadmap_service import (
@@ -61,8 +67,74 @@ from app import db
 from app.decorators import audit_log
 from datetime import datetime
 from app.utils.pagination import safe_int_arg
+from app.utils.rbac import require_role, user_has_role, who_holds_role
 
 strategic_bp = Blueprint("strategic", __name__, url_prefix="/strategic")
+
+# The kind of plan each strategic page's initiative dialog creates (StrategicInitiative.record_kind).
+PLAN_KINDS = {
+    "health": "remediation_plan",
+    "investment": "investment_proposal",
+    "risk": "risk_mitigation",
+    "impact": "change_request",
+}
+
+
+def _plan_request(source):
+    """The dialog's body with the plan's kind set, or None when the owner is not one of the
+    caller's organisation's people (the owner's name is shown with the plan)."""
+    from app.middleware.tenant_context import current_org_id
+    from app.models.user import User
+
+    data = dict(request.get_json(silent=True) or {})
+    data["record_kind"] = PLAN_KINDS[source]
+    owner_id = data.get("owner_id")
+    if owner_id not in (None, ""):
+        try:
+            owner_id = int(owner_id)
+        except (TypeError, ValueError):
+            return None
+        owner = db.session.get(User, owner_id)
+        if owner is None or owner.organization_id != current_org_id():
+            return None
+        data["owner_id"] = owner_id
+    return data
+
+
+@strategic_bp.app_template_global("initiative_plans")
+def initiative_plans(kind):
+    """The organisation's plans of one kind, newest first, for a page's "Plans created here" card."""
+    from app.middleware.tenant_context import current_org_id
+    from app.models.strategic import StrategicInitiative
+
+    org_id = current_org_id()
+    if org_id is None or kind not in PLAN_KINDS.values():
+        return []
+    return (
+        StrategicInitiative.query.filter(
+            StrategicInitiative.organization_id == org_id,
+            StrategicInitiative.record_kind == kind,
+        )
+        .order_by(StrategicInitiative.created_at.desc(), StrategicInitiative.id.desc())
+        .limit(20)
+        .all()
+    )
+
+
+@strategic_bp.app_template_global("initiative_owner_options")
+def initiative_owner_options():
+    """The people of the organisation a plan can be owned by, for the dialog's Owner select."""
+    from app.middleware.tenant_context import current_org_id
+    from app.models.user import User
+
+    org_id = current_org_id()
+    if org_id is None:
+        return []
+    people = User.query.filter(User.organization_id == org_id).order_by(User.email.asc(), User.id.asc()).all()
+    return [
+        {"id": person.id, "name": "%s — %s" % (person.full_name(), person.email) if person.full_name() else person.email}
+        for person in people
+    ]
 
 
 @strategic_bp.route("/capability-health")
@@ -72,7 +144,16 @@ def capability_health():
     try:
         service = CapabilityHealthService()
         metrics = service.get_capability_health_metrics()
-        return render_template("strategic/capability_health.html", metrics=metrics)
+        from app.middleware.tenant_context import current_org_id
+        from app.services.gap_register_service import count_gaps
+
+        # The one gap count: the recorded gaps. The figure inside the metrics is
+        # a signal computed from capability maturity and coverage.
+        return render_template(
+            "strategic/capability_health.html",
+            metrics=metrics,
+            recorded_gaps=count_gaps(current_org_id()),
+        )
     except Exception:
         return jsonify({"error": "An internal error occurred"}), 500
 
@@ -97,6 +178,15 @@ def investment_matrix():
         service = InvestmentPrioritizationService()
         analysis = service.analyze_investment_priorities(include_risk_analysis=True)
 
+        # Rows are drawn in the browser, so each carries its footer as markup.
+        from app.middleware.tenant_context import current_org_id
+        from app.services import result_footer_service
+
+        result_footer_service.attach_capability_footers(current_org_id(), analysis["capability_scores"])
+        # After the footers, which read the figures to say where each came from.
+        if not costs_visible(current_user):
+            analysis = withhold_costs(analysis, keys=INVESTMENT_MONEY_KEYS)
+
         return render_template(
             "strategic/investment_matrix.html",
             capability_scores=analysis["capability_scores"],
@@ -106,9 +196,16 @@ def investment_matrix():
             low_investments=analysis["low_investments"],
             portfolio_metrics=analysis["portfolio_metrics"],
             recommendations=analysis["recommendations"],
+            currency_symbol=currency_symbol(),
+            costs_withheld_sentence=COSTS_WITHHELD,
         )
     except Exception:
-        return jsonify({"error": "An internal error occurred"}), 500
+        current_app.logger.exception("Investment matrix scores could not be loaded")
+        from app.modules.architecture.routes.architecture_routes import (
+            investment_scores_unavailable_response,
+        )
+
+        return investment_scores_unavailable_response(currency_symbol())
 
 
 @strategic_bp.route("/api/investment-analysis")
@@ -118,6 +215,8 @@ def api_investment_analysis():
     try:
         service = InvestmentPrioritizationService()
         analysis = service.analyze_investment_priorities(include_risk_analysis=True)
+        if not costs_visible(current_user):
+            analysis = withhold_costs(analysis, keys=INVESTMENT_MONEY_KEYS)
         return jsonify(analysis)
     except Exception:
         return jsonify({"error": "An internal error occurred"}), 500
@@ -130,38 +229,6 @@ def api_investment_analysis():
 # (hardened version adds: @login_required, role-based auth, rate limiting, audit logging)
 
 
-@strategic_bp.route("/api/risks/<int:capability_id>/assign-owner", methods=["POST"])
-@login_required
-@audit_log("assign_risk_owner")
-def assign_risk_owner(capability_id):
-    """Quick action to assign risk owner."""
-    try:
-        data = request.get_json()
-        owner = data.get("owner")
-        if not owner:
-            return jsonify({"error": "Owner name required"}), 400
-        result = RiskMitigationService.assign_risk_owner(capability_id, owner)
-        return jsonify(result)
-    except Exception:
-        return jsonify({"error": "An internal error occurred"}), 500
-
-
-@strategic_bp.route("/api/risks/<int:capability_id>/status", methods=["PATCH"])
-@login_required
-@audit_log("update_risk_status")
-def update_risk_status(capability_id):
-    """Update mitigation status."""
-    try:
-        data = request.get_json()
-        status = data.get("status")
-        result = RiskMitigationService.update_mitigation_status(capability_id, status)
-        return jsonify(result)
-    except ValueError:
-        return jsonify({"error": "Invalid request parameters"}), 400
-    except Exception:
-        return jsonify({"error": "An internal error occurred"}), 500
-
-
 # REMOVED: /api/risks/statuses — now served by strategic_risks_hardened.py
 # (hardened version adds: @login_required, role-based auth, rate limiting, audit logging)
 
@@ -169,22 +236,21 @@ def update_risk_status(capability_id):
 @strategic_bp.route("/risk-assessment")
 @login_required
 def risk_assessment():
-    """Risk assessment dashboard."""
+    """Risk assessment: the register's risks, with the capabilities each one threatens."""
     try:
-        service = RiskAssessmentService()
-        analysis = service.analyze_portfolio_risks(include_technology_debt=True)
+        from app.services import risk_service
 
+        assessment = risk_service.risk_assessment()
+        # The cards count open risks, so the rows are the open risks too: the page lists what it counts.
+        open_rows = [row for row in assessment["rows"] if row["status"] == "open"]
         return render_template(
             "strategic/risk_assessment.html",
-            capability_risks=analysis["capability_risks"],
-            critical_risks=analysis["critical_risks"],
-            high_risks=analysis["high_risks"],
-            medium_risks=analysis["medium_risks"],
-            low_risks=analysis["low_risks"],
-            portfolio_metrics=analysis["portfolio_metrics"],
-            recommendations=analysis["recommendations"],
+            risk_rows=open_rows,
+            closed_count=len(assessment["rows"]) - len(open_rows),
+            counts=assessment["counts"],
         )
     except Exception:
+        current_app.logger.exception("The risk assessment could not be built")
         return jsonify({"error": "An internal error occurred"}), 500
 
 
@@ -206,10 +272,17 @@ def impact_analysis():
     """Impact analysis dashboard — architecture change ripple-effect visualization."""
     from app.middleware.tenant_context import current_org_id
     from app.services.priority_action_service import limit_for, prioritised_actions
+    from app.services.risk_service import footers_by_risk
 
     return render_template(
         "strategic/impact_analysis.html",
-        priority_actions=prioritised_actions(current_org_id(), limit=limit_for(request.args)),
+        can_save_scenario=user_has_role(current_user, *SCENARIO_SAVE_ROLES),
+        scenario_list_limit=SCENARIO_LIST_LIMIT,
+        save_scenario_roles=who_holds_role(*SCENARIO_SAVE_ROLES),
+        change_labels=simulation_service.CHANGE_LABELS,
+        priority_actions=prioritised_actions(current_org_id(), limit=limit_for(request.args),
+                                             risk_footers=footers_by_risk(current_org_id())),
+        **_model_state(),
     )
 
 
@@ -250,9 +323,232 @@ def api_impact_analysis():
         analysis = service.analyze_change_impact(
             element_id, change_type, cursor=cursor, page_size=page_size
         )
+        if isinstance(analysis, dict):
+            # The result is drawn in the browser, so its one footer travels with it as markup.
+            from app.middleware.tenant_context import current_org_id
+            from app.services import result_footer_service
+
+            analysis["footer_html"] = result_footer_service.render_footer(
+                result_footer_service.impact_footer(current_org_id(), analysis))
+            if not costs_visible(current_user):
+                analysis = withhold_costs(analysis)
         return jsonify(analysis)
     except Exception:
         return jsonify({"error": "An internal error occurred"}), 500
+
+
+def _model_state():
+    """Whether the caller's model has any element at all, and whether they may open the GitHub connection page."""
+    from app.middleware.tenant_context import current_org_id
+    from app.models import ArchiMateElement
+    from app.utils.role_access import may_connect_github
+
+    return {
+        "model_empty": ArchiMateElement.query.count() == 0,
+        "may_connect_github": may_connect_github(current_user, current_org_id()),
+    }
+
+
+def simulations_page():
+    """The simulations page: the impact analysis screen in its "try it on a copy" form."""
+    from app.middleware.tenant_context import current_org_id
+    from app.services.priority_action_service import limit_for, prioritised_actions
+    from app.services.risk_service import footers_by_risk
+
+    return render_template(
+        "strategic/impact_analysis.html",
+        simulation=True,
+        can_save_scenario=user_has_role(current_user, *SCENARIO_SAVE_ROLES),
+        scenario_list_limit=SCENARIO_LIST_LIMIT,
+        save_scenario_roles=who_holds_role(*SCENARIO_SAVE_ROLES),
+        change_labels=simulation_service.CHANGE_LABELS,
+        priority_actions=prioritised_actions(current_org_id(), limit=limit_for(request.args),
+                                             risk_footers=footers_by_risk(current_org_id())),
+        **_model_state(),
+    )
+
+
+@strategic_bp.route("/api/simulations", methods=["POST"])
+@login_required
+@audit_log("simulation")
+def api_simulation():
+    """Work out a change on a copy of the model. Reads only: nothing in the model is written."""
+    data = request.get_json(silent=True) or {}
+    element_id = data.get("element_id")
+    change_type = str(data.get("change_type") or "MODIFY").upper()
+    if not isinstance(element_id, int) or isinstance(element_id, bool):
+        return jsonify({"error": "element_id is required"}), 400
+    if change_type not in simulation_service.CHANGE_LABELS:
+        return jsonify({"error": "change_type must be one of " + ", ".join(sorted(simulation_service.CHANGE_LABELS))}), 400
+    try:
+        result = simulation_service.simulate_change(element_id, change_type)
+        from app.middleware.tenant_context import current_org_id
+        from app.services import result_footer_service
+
+        result["footer_html"] = result_footer_service.render_footer(
+            result_footer_service.impact_footer(current_org_id(), result))
+        if not costs_visible(current_user):
+            result = withhold_costs(result)
+        return jsonify(result)
+    except simulation_service.ElementNotInModel:
+        return jsonify({"error": "That element is not in your model."}), 404
+    except Exception:
+        current_app.logger.exception("Simulation failed")
+        return jsonify({"error": "The simulation could not be worked out. Try again in a moment."}), 500
+
+
+SCENARIO_SAVE_ROLES = ("architect", "org_admin", "super_admin")
+# the saved-scenario list holds this many, newest first; the dialog says so when it is full
+SCENARIO_LIST_LIMIT = 200
+
+
+def _scenario_figures(server):
+    """What a saved scenario keeps: the lists and figures the server worked out, nothing the browser sent."""
+    return {
+        "severity": server["risk_level"],
+        "estimated_risk_cost": server["estimated_financial_risk"],
+        "impacted_capabilities": list(server["impacted_capabilities"]),
+        "impacted_processes": list(server["impacted_processes"]),
+        "dependencies": list(server["direct_dependencies"]),
+        "indirect_dependencies": list(server["indirect_dependencies"]),
+        "financial_risk_reason": server.get("financial_risk_reason") or "",
+        "figures": [dict(f) for f in (server.get("simulation") or {}).get("figures") or []],
+    }
+
+
+def _scenario_for_caller(row):
+    """A saved scenario as the caller may read it: the running costs are left out for a person the cost rule withholds from."""
+    data = row.to_dict()
+    if not costs_visible(current_user):
+        data["analysis_result"] = withhold_costs(data["analysis_result"])
+    return data
+
+
+@strategic_bp.route("/api/scenarios", methods=["GET"])
+@login_required
+def api_list_scenarios():
+    """The scenarios the caller's organisation has saved, newest first."""
+    from app.models.saved_scenario import SavedScenario
+
+    rows = SavedScenario.query.order_by(SavedScenario.created_at.desc(), SavedScenario.id.desc()).limit(SCENARIO_LIST_LIMIT).all()
+    return jsonify([_scenario_for_caller(r) for r in rows])
+
+
+@strategic_bp.route("/api/scenarios", methods=["POST"])
+@login_required
+@require_role(*SCENARIO_SAVE_ROLES)
+@audit_log("scenario_save")
+def api_save_scenario():
+    """Keep a named scenario for the organisation, so a colleague can compare it after signing in."""
+    from app.models.saved_scenario import SavedScenario
+
+    data = request.get_json(silent=True) or {}
+    name = str(data.get("name") or "").strip()
+    change_type = str(data.get("change_type") or "").upper()
+    element = data.get("element") if isinstance(data.get("element"), dict) else {}
+    result = data.get("analysis_result")
+    if not name:
+        return jsonify({"error": "Give the scenario a name so you can find it when you compare."}), 400
+    if len(name) > 200:
+        return jsonify({"error": "Use a name of 200 characters or fewer."}), 400
+    if change_type not in simulation_service.CHANGE_LABELS:
+        return jsonify({"error": "change_type must be one of " + ", ".join(sorted(simulation_service.CHANGE_LABELS))}), 400
+    if not isinstance(result, dict):
+        return jsonify({"error": "Run the analysis before saving it as a scenario."}), 400
+    element_id = element.get("id")
+    if isinstance(element_id, bool) or not isinstance(element_id, int):
+        return jsonify({"error": "The scenario needs the element it was run on."}), 400
+    if not 0 < element_id <= 2147483647:
+        return jsonify({"error": "That element is not in your model."}), 404
+    from app.models import ArchiMateElement
+
+    found = ArchiMateElement.query.filter_by(id=element_id).first()
+    if found is None:
+        return jsonify({"error": "That element is not in your model."}), 404
+    try:
+        server = simulation_service.simulate_change(found.id, change_type)
+    except Exception:
+        current_app.logger.exception("Scenario analysis failed")
+        return jsonify({"error": "The scenario could not be saved. Try again in a moment."}), 500
+    result = _scenario_figures(server)
+    row = SavedScenario(
+        name=name,
+        element_id=found.id,
+        element_name=found.name,
+        element_type=found.type,
+        change_type=change_type,
+        change_label=simulation_service.change_label(change_type),
+        analysis_result=result,
+        created_by_id=current_user.id,
+    )
+    db.session.add(row)
+    db.session.commit()
+    return jsonify(_scenario_for_caller(row)), 201
+
+
+def _scenario_row(scenario_id):
+    """The organisation's own saved scenario for an id such as ``scenario-12``; another organisation's is not found."""
+    from app.models.saved_scenario import SavedScenario
+
+    text = str(scenario_id)
+    number = text[len("scenario-"):] if text.startswith("scenario-") else text
+    if not (number.isascii() and number.isdigit()) or not 0 < int(number) <= 2147483647:
+        return None
+    return SavedScenario.query.filter_by(id=int(number)).first()
+
+
+@strategic_bp.route("/api/scenarios/<scenario_id>", methods=["PATCH"])
+@login_required
+@require_role(*SCENARIO_SAVE_ROLES)
+@audit_log("scenario_rename")
+def api_rename_scenario(scenario_id):
+    """Give a saved scenario another name."""
+    row = _scenario_row(scenario_id)
+    if row is None:
+        return jsonify({"error": "That scenario is not saved for your organisation."}), 404
+    name = str((request.get_json(silent=True) or {}).get("name") or "").strip()
+    if not name:
+        return jsonify({"error": "Give the scenario a name so you can find it when you compare."}), 400
+    if len(name) > 200:
+        return jsonify({"error": "Use a name of 200 characters or fewer."}), 400
+    row.name = name
+    db.session.commit()
+    return jsonify(_scenario_for_caller(row))
+
+
+@strategic_bp.route("/api/scenarios/<scenario_id>", methods=["DELETE"])
+@login_required
+@require_role(*SCENARIO_SAVE_ROLES)
+@audit_log("scenario_delete")
+def api_delete_scenario(scenario_id):
+    """Remove a saved scenario. The model it was tried on is not touched."""
+    row = _scenario_row(scenario_id)
+    if row is None:
+        return jsonify({"error": "That scenario is not saved for your organisation."}), 404
+    db.session.delete(row)
+    db.session.commit()
+    return jsonify({"deleted": "scenario-%d" % row.id})
+
+
+@strategic_bp.route("/api/scenarios/export.csv", methods=["GET"])
+@login_required
+def api_export_scenarios_csv():
+    """The chosen saved scenarios side by side as a CSV file (ids as ``?ids=scenario-1,scenario-2``)."""
+    from flask import Response
+
+    from app.modules.solutions_strategic.v2.services.scenario_comparison_csv import comparison_csv
+
+    rows = []
+    for raw in str(request.args.get("ids") or "").split(",")[:3]:
+        row = _scenario_row(raw.strip()) if raw.strip() else None
+        if row is not None:
+            rows.append(row)
+    if not rows:
+        return jsonify({"error": "Choose at least one saved scenario to export."}), 400
+    return Response(
+        comparison_csv([_scenario_for_caller(r) for r in rows]),
+        mimetype="text/csv",
+        headers={"Content-Disposition": 'attachment; filename="scenario-comparison.csv"'})
 
 
 @strategic_bp.route("/api/impact-analysis/history", methods=["GET"])
@@ -289,6 +585,8 @@ def api_portfolio_impact():
 
         service = ImpactAnalysisService()
         analysis = service.analyze_portfolio_impact(change_scenarios)
+        if not costs_visible(current_user):
+            analysis = withhold_costs(analysis)
         return jsonify(analysis)
     except Exception:
         return jsonify({"error": "An internal error occurred"}), 500
@@ -404,24 +702,8 @@ def api_dependency_analysis():
 @strategic_bp.route("/technology-roadmap")
 @login_required
 def technology_roadmap():
-    """Technology roadmap dashboard."""
-    try:
-        service = TechnologyRoadmapService()
-        analysis = service.analyze_technology_portfolio(include_innovation=True)
-
-        return render_template(
-            "strategic/technology_roadmap.html",
-            technology_analyses=analysis["technology_analyses"],
-            critical_technology=analysis["critical_technology"],
-            high_technology=analysis["high_technology"],
-            medium_technology=analysis["medium_technology"],
-            low_technology=analysis["low_technology"],
-            portfolio_metrics=analysis["portfolio_metrics"],
-            roadmap_phases=analysis["roadmap_phases"],
-            recommendations=analysis["recommendations"],
-        )
-    except Exception:
-        return jsonify({"error": "An internal error occurred"}), 500
+    """The technology roadmap is the one roadmap, Technology view."""
+    return redirect_to_roadmap("technology")
 
 
 @strategic_bp.route("/api/technology-analysis")
@@ -521,7 +803,9 @@ def api_check_compliance():
 def api_create_initiative_from_health():
     """Create strategic initiative from capability health dashboard."""
     try:
-        data = request.get_json()
+        data = _plan_request("health")
+        if data is None:
+            return jsonify({"success": False, "error": "Choose an owner from your organisation."}), 400
         
         # Delegate to StrategicService
         result = StrategicService.create_initiative(data)
@@ -548,7 +832,9 @@ def api_create_initiative_from_health():
 def api_create_initiative_from_investment():
     """Create strategic initiative from investment matrix dashboard."""
     try:
-        data = request.get_json()
+        data = _plan_request("investment")
+        if data is None:
+            return jsonify({"success": False, "error": "Choose an owner from your organisation."}), 400
         
         # Delegate to StrategicService
         result = StrategicService.create_initiative(data)
@@ -575,7 +861,9 @@ def api_create_initiative_from_investment():
 def api_create_initiative_from_risk():
     """Create strategic initiative from risk assessment dashboard."""
     try:
-        data = request.get_json()
+        data = _plan_request("risk")
+        if data is None:
+            return jsonify({"success": False, "error": "Choose an owner from your organisation."}), 400
         
         # Delegate to StrategicService
         result = StrategicService.create_initiative(data)
@@ -602,7 +890,9 @@ def api_create_initiative_from_risk():
 def api_create_initiative_from_impact():
     """Create strategic initiative from impact analysis dashboard."""
     try:
-        data = request.get_json()
+        data = _plan_request("impact")
+        if data is None:
+            return jsonify({"success": False, "error": "Choose an owner from your organisation."}), 400
         
         # Delegate to StrategicService
         result = StrategicService.create_initiative(data)

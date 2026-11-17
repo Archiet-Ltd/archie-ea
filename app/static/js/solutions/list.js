@@ -56,8 +56,9 @@ window.deleteSolution = async function(solutionId, solutionName) {
             ]
         });
         Platform.modal.open(modalId);
-    } else {
-        if ((await window.confirm('Delete "' + solutionName + '"? This cannot be undone.'))) doDelete();
+    } else if (window.Platform && Platform.toast) {
+        // Without the dialog there is no way to ask first, so nothing is deleted; say so.
+        Platform.toast.error('The delete confirmation could not open. Reload the page and try again.');
     }
 };
 

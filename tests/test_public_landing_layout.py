@@ -37,6 +37,11 @@ from app.services.public_pages import (
 
 MODULE_ICONS = {
     "ai-chat": "message-square",
+    "answer-sources": "search",
+    "build-your-model-from-your-tools": "unplug",
+    "scenario-modelling": "git-compare",
+    "software-and-tool-discovery": "search",
+    "sysml-to-archimate": "route",
     "applications": "app-window",
     "arb": "gavel",
     "architecture-model": "boxes",
@@ -478,7 +483,11 @@ def test_every_landing_page_renders_hero_bands_and_closing(app):
             assert outline.h1_count == 1, f"{page.url}: {outline.h1_count} <h1> elements"
             assert 'data-testid="landing-hero"' in html, page.url
             assert 'data-testid="landing-closing"' in html, page.url
-            assert 'class="landing-bands"' in html, page.url
+            if page.family == "module":
+                # module pages render the home page's sections, not the landing bands
+                assert 'data-testid="module-questions"' in html, page.url
+            else:
+                assert 'class="landing-bands"' in html, page.url
             assert outline.hero_primary >= 1, f"{page.url}: no primary button in the hero"
             with app.test_request_context():
                 landing = build_landing(page)
@@ -486,16 +495,17 @@ def test_every_landing_page_renders_hero_bands_and_closing(app):
                 if section.cards:
                     # Rendered as a card grid, not left as a bullet list of links.
                     assert str(section.body_html) not in main.group(0), (page.url, section.id)
+                    card_class = "public-card" if page.family == "module" else "group flex"
                     for card in section.cards:
-                        assert f'href="{card.url}" class="group flex' in main.group(0), (page.url, card.url)
+                        assert f'href="{card.url}" class="{card_class}' in main.group(0), (page.url, card.url)
 
 
 def test_card_icons_follow_their_target_module(app):
     with app.test_client() as client:
-        html = client.get("/modules/arb").data.decode()
+        html = client.get("/use-cases/risk-blast-radius").data.decode()
     # Hero icon is the page's own, and a card to /modules/risk-register carries that module's icon.
     hero = html[html.index('data-testid="landing-hero"'):html.index('class="landing-bands"')]
-    assert 'data-lucide="gavel"' in hero
+    assert 'data-lucide="flame"' in hero
     card = html[html.index('href="/modules/risk-register" class="group flex'):]
     card = card[:card.index("</a>")]
     assert 'data-lucide="shield-alert"' in card
@@ -554,7 +564,8 @@ def test_landing_prose_lists_keep_their_marker_class(app, url, list_tag, heading
     wrapper_open_tag = html[wrapper_start:wrapper_tag_end]
     classes = re.search(r'class="([^"]*)"', wrapper_open_tag).group(1).split()
     assert "prose" in classes, (url, wrapper_open_tag)
-    assert "max-w-none" in classes, (url, wrapper_open_tag)
+    # a module page's detail sections read at the home page's width (max-w-3xl); every other landing is full width
+    assert ("max-w-3xl" if url.startswith("/modules/") else "max-w-none") in classes, (url, wrapper_open_tag)
 
 
 def test_landing_bands_all_carry_prose_on_their_content_wrapper(app):
@@ -564,13 +575,19 @@ def test_landing_bands_all_carry_prose_on_their_content_wrapper(app):
     """
     with app.test_client() as client:
         html = client.get("/modules/industry-apqc").data.decode()
-    bands = html[html.index('class="landing-bands"'):html.index('data-testid="landing-closing"')]
+    bands = html[html.index('data-testid="module-questions"'):html.index('data-testid="landing-closing"')]
     wrapper_classes = re.findall(r'<div class="(public-page-content[^"]*)"', bands)
     assert len(wrapper_classes) >= 5, "expected an intro band plus several section bands"
     for class_attr in wrapper_classes:
         classes = class_attr.split()
         assert "prose" in classes, class_attr
-        assert "max-w-none" in classes, class_attr
+        assert "max-w-3xl" in classes, class_attr
+
+    with app.test_client() as client:
+        html = client.get("/vs/leanix").data.decode()
+    bands = html[html.index('class="landing-bands"'):html.index('data-testid="landing-closing"')]
+    for class_attr in re.findall(r'<div class="(public-page-content[^"]*)"', bands):
+        assert "prose" in class_attr.split() and "max-w-none" in class_attr.split(), class_attr
 
 
 def test_pages_by_url_is_cached_across_calls(app, monkeypatch):
@@ -626,8 +643,8 @@ def test_waiting_list_page_hero_points_at_the_form(app):
     page = next(p for p in _landing_pages() if p.cta == "waiting_list")
     with app.test_client() as client:
         html = client.get(page.url).data.decode()
-    hero = html[html.index('data-testid="landing-hero"'):html.index('class="landing-bands"')]
-    assert re.search(r'<a href="#feature-interest" class="public-btn public-btn--primary">Tell us you need this</a>', hero)
+    hero = html[html.index('data-testid="landing-hero"'):html.index('data-testid="module-questions"')]
+    assert re.search(r'<a href="#feature-interest" class="public-btn public-btn--lg public-btn--primary">Tell us you need this</a>', hero)
     assert 'id="feature-interest"' in html
     assert 'data-testid="feature-interest-form"' in html
     assert "Start free" not in hero
@@ -635,12 +652,12 @@ def test_waiting_list_page_hero_points_at_the_form(app):
 
 def test_live_page_hero_offers_start_free(app):
     with app.test_client() as client:
-        html = client.get("/modules/arb").data.decode()
+        html = client.get("/use-cases/risk-blast-radius").data.decode()
     hero = html[html.index('data-testid="landing-hero"'):html.index('class="landing-bands"')]
     assert re.search(r'<a href="/account/register" class="public-btn public-btn--primary">Start free</a>', hero)
     assert re.search(r'class="public-btn public-btn--outline">See pricing</a>', hero)
     nav = hero[hero.index('aria-label="Breadcrumb"'):hero.index("</nav>")]
-    assert re.search(r'<a href="/features" class="[^"]*rounded-full[^"]*border-border[^"]*px-4 py-1.5[^"]*">', nav)
+    assert re.search(r'<a href="/use-cases" class="[^"]*rounded-full[^"]*border-border[^"]*px-4 py-1.5[^"]*">', nav)
     assert hero.index("</nav>") < hero.index("<h1")
     closing = html[html.index('data-testid="landing-closing"'):]
     assert "Import your model and get a free, cited answer to what breaks if a system fails, in minutes." in closing
@@ -648,6 +665,20 @@ def test_live_page_hero_offers_start_free(app):
     assert re.search(r'class="public-btn public-btn--outline">Get in touch</a>', closing)
     assert "text-center" in html[html.index('data-testid="landing-closing"') - 10:][:140]
     assert "bg-primary" not in html[html.index('data-testid="landing-closing"') - 10:][:140]
+
+
+def test_live_module_page_hero_offers_start_free(app):
+    with app.test_client() as client:
+        html = client.get("/modules/arb").data.decode()
+    hero = html[html.index('data-testid="landing-hero"'):html.index('data-testid="module-questions"')]
+    assert re.search(r'<a href="/account/register" class="public-btn public-btn--lg public-btn--primary">Start free</a>', hero)
+    assert re.search(r'class="public-btn public-btn--lg public-btn--outline">See pricing</a>', hero)
+    nav = hero[hero.index('aria-label="Breadcrumb"'):hero.index("</nav>")]
+    assert re.search(r'<a href="/features" class="text-muted-foreground hover:text-foreground">Features</a>', nav)
+    assert hero.index("</nav>") < hero.index("<h1")
+    closing = html[html.index('data-testid="landing-closing"'):]
+    assert "Connect your tools. Get a cited answer." in closing
+    assert 'href="/contact"' in closing
 
 
 def test_use_case_hero_names_its_segment(app):
@@ -779,7 +810,7 @@ def test_use_case_answer_figure_still_renders_without_a_figure_band_section(app,
 def test_every_module_page_declares_a_known_icon():
     module_dir = CONTENT_ROOT / "modules"
     files = sorted(module_dir.glob("*.md"))
-    assert len(files) == 27
+    assert len(files) == 32
     known = set(MODULE_ICONS.values())
     for md_file in files:
         front = md_file.read_text(encoding="utf-8").split("---", 2)[1]
@@ -830,3 +861,26 @@ def test_document_layout_unchanged_for_other_families(app, url):
         assert 'data-testid="pricing-plans"' in main
     else:
         assert '<article class="public-page-content' in main
+
+
+ROLE_SLUGS = ("enterprise-architects", "cto-and-cio", "it-portfolio-managers", "solution-architects")
+
+
+def test_home_and_role_pages_open_with_the_one_shared_hero(app):
+    """The home page and every role page render their opening through
+    public/_partials/_hero.html: the same grid, frame and figure markup, the role's own
+    captured screen in the frame, and exactly one primary action."""
+    with app.test_client() as client:
+        home = client.get("/").data.decode()
+        assert 'data-testid="home-hero"' in home and "home-frame__img" in home
+        for slug in ROLE_SLUGS:
+            html = client.get(f"/roles/{slug}").data.decode()
+            hero = html[html.index('data-testid="landing-hero"'): html.index('data-testid="landing-hero-figure"')]
+            assert "home-display" in html and "home-frame" in html, slug
+            assert hero.count("public-btn--primary") == 1, slug
+            figure = html[html.index('data-testid="landing-hero-figure"'):]
+            figure = figure[: figure.index("</figure>")]
+            assert f"/static/img/roles/{slug}.webp" in figure, slug
+            assert f"/static/img/roles/{slug}-mobile.webp" in figure, slug
+            assert 'data-testid="page-screenshot"' not in html, f"{slug}: screenshot repeated below the hero"
+            assert html.count("<h1") == 1, slug

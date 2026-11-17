@@ -33,8 +33,9 @@ answers the same way everywhere — ``rbac_service.is_org_admin``,
 
 import logging
 
-from flask import Blueprint, abort, flash, jsonify, redirect, render_template, request, url_for
+from flask import Blueprint, abort, flash, g, jsonify, redirect, render_template, request, url_for
 from flask_login import current_user, login_required
+from app.modules.account.mfa_flow import enrol_first
 
 from app import db
 from app.flask_email import mail_available
@@ -43,6 +44,7 @@ from app.models.user import ROLE_DISPLAY_NAMES, User
 from app.models.org_role import OrgRole, VALID_ORG_ROLES
 from app.services.rate_limiter import rate_limit
 from app.services.rbac_service import rbac_service
+from app.services.administrator_guard import LastAdministratorError, ensure_keeps_administrator
 
 logger = logging.getLogger(__name__)
 
@@ -50,8 +52,8 @@ team_bp = Blueprint("team", __name__)
 
 
 def _require_org_id():
-    """Return current user's org_id or abort 403."""
-    org_id = getattr(current_user, "organization_id", None)
+    """Return the organisation the person is working in (the active one), or abort 403."""
+    org_id = getattr(g, "current_org_id", None) or getattr(current_user, "organization_id", None)
     if org_id is None:
         abort(403)
     return org_id
@@ -83,9 +85,9 @@ def _permission_context(org_id, members):
         .order_by(PermissionGrant.id)
         .all()
     )
-    for g in grants:
+    for grant in grants:
         try:
-            uid = int(g.subject_key)
+            uid = int(grant.subject_key)
         except (TypeError, ValueError):
             continue
         if uid not in names:
@@ -94,9 +96,9 @@ def _permission_context(org_id, members):
             {
                 "user_id": uid,
                 "name": names[uid],
-                "action": g.action,
-                "object_type": g.object_type,
-                "allowed": bool(g.allowed),
+                "action": grant.action,
+                "object_type": grant.object_type,
+                "allowed": bool(grant.allowed),
             }
         )
     return {
@@ -107,7 +109,15 @@ def _permission_context(org_id, members):
     }
 
 
-def _render_team(org_id, error=None, status=200, tab=None):
+def _two_factor_required(org_id):
+    from app.models.organization import Organization
+    from app.services import mfa_service
+
+    org = Organization.query.filter_by(id=org_id).first()
+    return bool(((org.settings if org is not None else None) or {}).get(mfa_service.REQUIRE_SETTING))
+
+
+def _render_team(org_id, error=None, status=200, tab=None, member_error=None, form_values=None):
     from app.modules.account.services import invitation_service
 
     invitations = invitation_service.invitations_for(org_id)
@@ -135,7 +145,10 @@ def _render_team(org_id, error=None, status=200, tab=None):
         has_account_ids=has_account_ids,
         personas=[(p, ROLE_DISPLAY_NAMES.get(p, p)) for p in invitation_service.INVITABLE_PERSONAS],
         mail_is_available=mail_available(),
+        two_factor_required=_two_factor_required(org_id),
         invite_error=error,
+        member_error=member_error,
+        form_values=form_values,
     ), status
 
 
@@ -151,6 +164,7 @@ def team():
 
 @team_bp.route("/team/invite", methods=["POST"])
 @login_required
+@enrol_first("invite", back_endpoint="team.team")
 @rate_limit(20, "1m", methods=("POST",))  # SECURITY: each POST can send mail
 def team_invite():
     """Invite someone into the org by e-mail.
@@ -165,11 +179,12 @@ def team_invite():
     require_org_or_platform_admin(org_id)
     email = (request.form.get("email") or "").strip().lower()
     role = request.form.get("role", "viewer")
+    kept = {"email": email, "persona": request.form.get("persona") or "", "role": role}
 
     if not email:
-        return _render_team(org_id, "Cannot invite: email required.", 400)
+        return _render_team(org_id, "Cannot invite: email required.", 400, form_values=kept)
     if role not in VALID_ORG_ROLES:
-        return _render_team(org_id, f"Cannot invite: invalid role '{role}'.", 400)
+        return _render_team(org_id, f"Cannot invite: invalid role '{role}'.", 400, form_values=kept)
 
     from app.modules.account.services import invitation_service
 
@@ -184,12 +199,12 @@ def team_invite():
             )
         except invitation_service.InvitationError as exc:
             db.session.rollback()
-            return _render_team(org_id, exc.message, exc.status)
+            return _render_team(org_id, exc.message, exc.status, form_values=kept)
         except PlanLimitReached as exc:
             # Opening the invitee's account would take the organisation past
             # its plan; nothing is created and nothing is sent.
             db.session.rollback()
-            return _render_team(org_id, str(exc), 402)
+            return _render_team(org_id, str(exc), 402, form_values=kept)
         if delivered:
             flash(f"Invitation sent to {email}.", "success")
         else:
@@ -197,7 +212,7 @@ def team_invite():
         return redirect(url_for("team.team"))
 
     if OrgRole.get_role(org_id, user.id) is not None:
-        return _render_team(org_id, "This user is already a member of the organisation.", 409)
+        return _render_team(org_id, "This user is already a member of the organisation.", 409, form_values=kept)
 
     try:
         _, delivered, error = invitation_service.invite_existing_account(
@@ -205,7 +220,7 @@ def team_invite():
         )
     except invitation_service.InvitationError as exc:
         db.session.rollback()
-        return _render_team(org_id, exc.message, exc.status)
+        return _render_team(org_id, exc.message, exc.status, form_values=kept)
     # This person already has an account: the e-mailed link asks them to
     # sign in and accept. Without e-mail nobody can tell them, and the admin
     # is told exactly that.
@@ -213,8 +228,8 @@ def team_invite():
         flash(f"Invitation sent to {email}. They already have an account and accept it after signing in.", "success")
     elif delivered is None:
         flash(
-            f"{email} already has an account. E-mail is not available on this server, "
-            "so they have not been told about the invitation.",
+            f"{email} already has an account. E-mail is not set up on this server, so they have not been told. "
+            "The invitation is saved as not yet accepted; use Resend once e-mail is set up.",
             "error",
         )
     else:
@@ -224,6 +239,7 @@ def team_invite():
 
 @team_bp.route("/team/invitations/<int:invitation_id>/resend", methods=["POST"])
 @login_required
+@enrol_first("invite", back_endpoint="team.team")
 @rate_limit(20, "1m", methods=("POST",))  # SECURITY: each POST sends mail
 def team_invitation_resend(invitation_id):
     """Send a fresh link for an open invitation; the previous link stops working."""
@@ -266,6 +282,44 @@ def team_invitation_revoke(invitation_id):
     return redirect(url_for("team.team"))
 
 
+@team_bp.route("/team/require-two-factor", methods=["POST"])
+@login_required
+def team_require_two_factor():
+    """Turn the organisation's "require two-factor" rule on or off.
+
+    Turning it on takes the administrator to set up their own two-factor
+    sign-in at once; turning it off needs them to have set it up.
+    """
+    from app.models.organization import Organization
+    from app.modules.account import mfa_flow
+    from app.services import mfa_service
+
+    org_id = _require_org_id()
+    require_org_or_platform_admin(org_id)
+    turn_on = request.form.get("require") == "1"
+    needs_enrolment = mfa_service.step_up_needed(current_user)
+    if not turn_on and needs_enrolment:
+        return mfa_flow.send_to_enrolment("require", url_for("team.team"))
+
+    org = Organization.query.filter_by(id=org_id).first_or_404()
+    settings = dict(org.settings or {})
+    if turn_on:
+        settings[mfa_service.REQUIRE_SETTING] = True
+    else:
+        settings.pop(mfa_service.REQUIRE_SETTING, None)
+    org.settings = settings
+    db.session.commit()
+    if turn_on and needs_enrolment:
+        flash("Two-factor sign-in is now required. Set it up for your own account first.", "success")
+        return mfa_flow.send_to_enrolment("notice", url_for("team.team"))
+    flash(
+        "Everyone who administers this organisation must now use two-factor sign-in."
+        if turn_on else "The two-factor requirement is switched off.",
+        "success",
+    )
+    return redirect(url_for("team.team"))
+
+
 @team_bp.route("/team/role", methods=["POST"])
 @login_required
 def team_change_role():
@@ -283,6 +337,18 @@ def team_change_role():
     user = db.session.get(User, user_id)
     if user is None or user.organization_id != org_id:
         abort(404)
+
+    if role != "org_admin":
+        # Demoting the only Administrator would leave the organisation without
+        # anyone who can open its settings or members pages.
+        try:
+            ensure_keeps_administrator(org_id, [user_id])
+        except LastAdministratorError as exc:
+            if request.is_json or request.accept_mimetypes.best == "application/json":
+                return jsonify({"error": exc.message}), 409
+            db.session.rollback()
+            # Said once, at the top of the members list; nothing is changed.
+            return _render_team(org_id, member_error=exc.message, status=409)
 
     OrgRole.set_role(org_id, user_id, role, granted_by_id=current_user.id)
     # Keep the User.role (Permission.ADMINISTER authority) in step with the
@@ -408,18 +474,23 @@ def team_remove_member(user_id):
     if user_id == current_user.id:
         return jsonify({"error": "Cannot remove yourself from the org"}), 400
 
+    try:
+        ensure_keeps_administrator(org_id, [user_id], leaving=True)
+    except LastAdministratorError as exc:
+        return jsonify({"error": exc.message}), 409
+
     record = OrgRole.query.filter_by(
         organization_id=org_id, user_id=user_id
     ).first()
     if record:
         db.session.delete(record)
-        # Revoke the Administrator role for a user being removed from this
-        # organisation (a no-op for a platform admin — see
-        # User.revoke_org_admin), so rbac_service.is_org_admin() (which falls
-        # back to user.is_admin() for the user's own org) no longer answers
-        # True after membership is deleted.
+        # The Administrator role is global to the account, so it is revoked
+        # only when this organisation is the person's home one (a no-op for a
+        # platform admin — see User.revoke_org_admin). Someone invited in from
+        # another organisation loses only the role row deleted above and stays
+        # Administrator where they belong.
         user = db.session.get(User, user_id)
-        if user is not None and user.is_admin():
+        if user is not None and user.organization_id == org_id and user.is_admin():
             user.revoke_org_admin()
         db.session.commit()
     return jsonify({"status": "removed"})

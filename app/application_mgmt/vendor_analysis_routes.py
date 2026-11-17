@@ -9,18 +9,29 @@ import io
 import json
 from datetime import datetime
 
-from flask import abort, current_app, jsonify, render_template, request, send_file
+from flask import abort, current_app, flash, jsonify, redirect, render_template, request, send_file, url_for
 from flask_login import current_user, login_required
 
 from .. import db
 from . import application_mgmt
 from app.middleware.tenant_decorators import is_active_org_admin
+from app.services.cost_visibility import VENDOR_ANALYSIS_MONEY_KEYS, costs_visible, vendor_analysis_reply, withhold_costs
 from app.utils.pagination import safe_int_arg
 
 
 VALID_WEIGHT_KEYS = frozenset(
     ["cost", "capability_coverage", "risk", "strategic_fit", "implementation"]
 )
+
+
+def _vendor_catalogue_url():
+    """The vendor catalogue page's URL, or None if that blueprint has not
+    registered. Blueprints register non-fatally (see CLAUDE.md), so a cross-
+    module url_for() is guarded rather than left to BuildError the page.
+    """
+    if "unified_applications.vendors" in current_app.view_functions:
+        return url_for("unified_applications.vendors")
+    return None
 
 
 def _resolve_vendor_name(vendor_option):
@@ -33,6 +44,12 @@ def _resolve_vendor_name(vendor_option):
             f" - {vendor_option.vendor_product.name}"
         )
     return vendor_option.vendor_name or "Unknown"
+
+
+def _for_person(reply):
+    """A vendor analysis reply for the signed-in person: money left out and the one sentence said, when the
+    cost rule withholds it from them. The one place every reply of this module's analysis routes passes."""
+    return vendor_analysis_reply(reply, current_user)
 
 
 def _serialize_vendor_option(vo, include_extended=False):
@@ -107,18 +124,64 @@ def _check_analysis_access(analysis):
 # ---------------------------------------------------------------------------
 # PAGE ROUTES — render HTML templates for vendor analysis workflows
 # ---------------------------------------------------------------------------
-@application_mgmt.route("/vendor-analysis", methods=["GET"])
+@application_mgmt.route("/vendor-analysis", methods=["GET", "POST"])
 @login_required
 def vendor_analysis_list():
-    """Vendor Options Analysis list page."""
-    return render_template("application_mgmt/vendor_analysis_list.html")
+    """Vendor Options Analysis list page.
+
+    Rendered on the server from the same rows and counts as
+    /api/vendor-analyses (the signed-in user's own analyses). A POST with
+    ``?delete=<id>`` deletes one, behind the same access check as the JSON
+    delete, and comes back here.
+    """
+    from app.models.vendor_analysis import OptionsAnalysis
+
+    if request.method == "POST":
+        analysis = db.session.get(OptionsAnalysis, request.args.get("delete", type=int) or 0)
+        if analysis is None or _check_analysis_access(analysis) is not None:
+            flash("That analysis could not be deleted.", "error")
+        else:
+            name = analysis.name
+            db.session.delete(analysis)
+            db.session.commit()
+            flash(f'Deleted "{name}".', "success")
+        return redirect(url_for("application_mgmt.vendor_analysis_list", status=request.args.get("status") or None))
+
+    status_filter = request.args.get("status") or ""
+    mine = OptionsAnalysis.query.filter_by(created_by_id=current_user.id)
+    query = mine
+    if status_filter in ("approved", "rejected", "pending_approval"):
+        query = query.filter_by(approval_status=status_filter)
+    elif status_filter:
+        query = query.filter_by(status=status_filter)
+    analyses = []
+    for a in query.order_by(OptionsAnalysis.created_at.desc()).limit(500).all():
+        winner = a.get_winner()
+        analyses.append({
+            "analysis": a,
+            "vendor_count": len(a.vendor_options),
+            "recommended_vendor": _resolve_vendor_name(winner) if winner else None,
+        })
+    summary = {
+        "total": mine.count(),
+        "approved": mine.filter_by(approval_status="approved").count(),
+        "in_progress": mine.filter(OptionsAnalysis.status.in_(["draft", "running"])).count(),
+        "with_recommendation": mine.filter(OptionsAnalysis.recommendation_confidence.isnot(None)).count(),
+    }
+    return render_template(
+        "application_mgmt/vendor_analysis_list.html",
+        analyses=analyses, summary=summary, status=status_filter,
+    )
 
 
 @application_mgmt.route("/vendor-analysis/new", methods=["GET"])
 @login_required
 def vendor_analysis_new():
     """Create a new vendor analysis — redirects to detail page with id=0 (wizard mode)."""
-    return render_template("application_mgmt/vendor_analysis_detail.html", analysis_id=0)
+    return render_template(
+        "application_mgmt/vendor_analysis_detail.html",
+        analysis_id=0, vendor_catalogue_url=_vendor_catalogue_url(),
+    )
 
 
 @application_mgmt.route("/vendor-analysis/<int:analysis_id>", methods=["GET"])
@@ -137,7 +200,8 @@ def vendor_analysis_detail(analysis_id):
     if analysis.created_by_id != current_user.id and not is_active_org_admin(current_user):
         abort(403)
     return render_template(
-        "application_mgmt/vendor_analysis_detail.html", analysis_id=analysis_id
+        "application_mgmt/vendor_analysis_detail.html", analysis_id=analysis_id,
+        vendor_catalogue_url=_vendor_catalogue_url(),
     )
 
 
@@ -254,7 +318,7 @@ def api_get_vendor_analysis_detail(analysis_id):
         ]
 
         winner = analysis.get_winner()
-        return jsonify(
+        return jsonify(_for_person(
             {
                 "id": analysis.id,
                 "name": analysis.name,
@@ -290,7 +354,7 @@ def api_get_vendor_analysis_detail(analysis_id):
                     else None
                 ),
             }
-        )
+        ))
     except HTTPException:
         raise
     except Exception as e:
@@ -911,9 +975,9 @@ def api_get_vendor_comparison(analysis_id):
             for vo in analysis.vendor_options
         ]
 
-        return jsonify(
+        return jsonify(_for_person(
             {"vendors": vendors, "analysis_id": analysis.id, "analysis_name": analysis.name}
-        )
+        ))
 
     except HTTPException:
 
@@ -1287,7 +1351,7 @@ def api_get_vendor_results(analysis_id):
             else 0
         )
 
-        return jsonify(
+        return jsonify(_for_person(
             {
                 "vendors": vendors,
                 "total_vendors": len(vendors),
@@ -1299,7 +1363,7 @@ def api_get_vendor_results(analysis_id):
                 "analysis_id": analysis.id,
                 "analysis_name": analysis.name,
             }
-        )
+        ))
 
     except HTTPException:
 
@@ -1334,7 +1398,8 @@ def api_export_vendor_analysis(analysis_id):
             output = io.StringIO()
             writer = csv.writer(output)
 
-            # Write header
+            # Write header; the three money columns are left out for a person the cost rule withholds from
+            money_columns = costs_visible(current_user)
             writer.writerow(
                 [
                     "Rank",
@@ -1345,10 +1410,8 @@ def api_export_vendor_analysis(analysis_id):
                     "Risk Score",
                     "Strategic Fit",
                     "Implementation",
-                    "TCO (5yr)",
-                    "License Cost (Annual)",
-                    "Support Cost (Annual)",
                 ]
+                + (["TCO (5yr)", "License Cost (Annual)", "Support Cost (Annual)"] if money_columns else [])
             )
 
             # Write vendor data
@@ -1364,10 +1427,16 @@ def api_export_vendor_analysis(analysis_id):
                         vendor_option.risk_score or "",
                         vendor_option.strategic_fit_score or "",
                         vendor_option.implementation_score or "",
-                        vendor_option.tco_total or "",
-                        vendor_option.license_cost_annual or "",
-                        vendor_option.support_cost_annual or "",
                     ]
+                    + (
+                        [
+                            vendor_option.tco_total or "",
+                            vendor_option.license_cost_annual or "",
+                            vendor_option.support_cost_annual or "",
+                        ]
+                        if money_columns
+                        else []
+                    )
                 )
 
             output.seek(0)
@@ -1643,38 +1712,39 @@ def api_get_business_domains():
 @application_mgmt.route("/api/value-streams", methods=["GET"])
 @login_required
 def api_get_value_streams():
-    """Get value streams for a specific business domain."""
+    """Get the signed-in organisation's value streams.
+
+    Used to return a hard-coded "standard" list per business domain (a
+    handful of generic names such as "Customer Acquisition", with string ids
+    like "vs1" naming no real row) once a domain was chosen -- so a
+    selection here could never resolve to a mapped capability or a vendor,
+    whatever discovery route read it. ValueStream carries no real link to a
+    business domain (the picker's `domains` list is UnifiedCapability's, a
+    separate concept), so the domain lookup below is kept only to preserve
+    its existing contract (no domain filter is the honest empty state;
+    an unknown domain_id/domain_code still 404s, pinned by
+    tests/test_value_streams_dropdown_api.py) -- once a domain resolves,
+    every value stream in the organisation is returned, not a per-domain
+    fake list.
+    """
     try:
         domain_id = request.args.get("domain_id", type=int)
         domain_code = request.args.get("domain_code", type=str)
-        current_app.logger.info(
-            f"Value streams requested - domain_id: {domain_id}, domain_code: {domain_code}"
-        )
 
         if not domain_id and not domain_code:
-            # No domain filter chosen yet (e.g. the page's initial load,
-            # before the caller narrows by domain) — this is the honest
-            # empty state, not a lookup failure. It used to fall through to
-            # the "domain not found" branch below and answer 404 for a
-            # request that named no domain at all, which is what every one
-            # of this page's own initial loads did.
-            current_app.logger.info("Value streams requested with no domain filter — returning []")
+            # No domain filter chosen yet (e.g. the page's initial load) --
+            # the honest empty state, not a lookup failure.
             return jsonify([])
 
-        from app.models.unified_capability import BusinessDomain
+        from app.models.unified_capability import BusinessDomain, ValueStream
 
-        # Try to find domain by ID first, then by code
         domain = None
         if domain_id:
             domain = db.session.get(BusinessDomain, domain_id)
-
         if not domain and domain_code:
             domain = BusinessDomain.query.filter_by(code=domain_code).first()
 
         if not domain:
-            current_app.logger.error(
-                f"Domain not found - tried ID: {domain_id}, Code: {domain_code}"
-            )
             return (
                 jsonify(
                     {
@@ -1684,14 +1754,8 @@ def api_get_value_streams():
                 404,
             )
 
-        current_app.logger.info(f"Found domain: {domain.code} - {domain.name}")
-
-        # For now, return standard value streams based on domain
-        # In a full implementation, this would query actual value stream data
-        value_streams = get_standard_value_streams(domain.code)
-        current_app.logger.info(f"Returning {len(value_streams)} value streams for {domain.code}")
-
-        return jsonify(value_streams)
+        streams = ValueStream.query.order_by(ValueStream.name).all()
+        return jsonify([{"id": vs.id, "name": vs.name} for vs in streams])
 
     except HTTPException:
 
@@ -1699,9 +1763,6 @@ def api_get_value_streams():
 
     except Exception as e:
         current_app.logger.error(f"Error getting value streams: {str(e)}")
-        import traceback
-
-        current_app.logger.error(f"Traceback: {traceback.format_exc()}")
         return jsonify({"error": "An internal error occurred"}), 500
 
 
@@ -1788,65 +1849,6 @@ def api_get_related_capabilities():
 
         current_app.logger.error(f"Traceback: {traceback.format_exc()}")
         return jsonify({"error": "An internal error occurred"}), 500
-
-
-def get_standard_value_streams(domain_code):
-    """Get standard value streams for a business domain."""
-    # Standard value streams mapped to business domains
-    value_stream_map = {
-        "CUST": [
-            {"id": "vs1", "name": "Customer Acquisition"},
-            {"id": "vs2", "name": "Customer Onboarding"},
-            {"id": "vs3", "name": "Customer Service"},
-            {"id": "vs4", "name": "Customer Retention"},
-        ],
-        "PROD": [
-            {"id": "vs5", "name": "Product Development"},
-            {"id": "vs6", "name": "Product Manufacturing"},
-            {"id": "vs7", "name": "Quality Management"},
-            {"id": "vs8", "name": "Product Delivery"},
-        ],
-        "OPER": [
-            {"id": "vs9", "name": "Supply Chain Management"},
-            {"id": "vs10", "name": "Operations Planning"},
-            {"id": "vs11", "name": "Process Optimization"},
-            {"id": "vs12", "name": "Resource Management"},
-        ],
-        "TECH": [
-            {"id": "vs13", "name": "Technology Strategy"},
-            {"id": "vs14", "name": "Digital Transformation"},
-            {"id": "vs15", "name": "IT Operations"},
-            {"id": "vs16", "name": "Innovation Management"},
-        ],
-        "DATA": [
-            {"id": "vs17", "name": "Data Strategy"},
-            {"id": "vs18", "name": "Analytics & Insights"},
-            {"id": "vs19", "name": "Data Governance"},
-            {"id": "vs20", "name": "Information Management"},
-        ],
-        "FIN": [
-            {"id": "vs21", "name": "Financial Planning"},
-            {"id": "vs22", "name": "Risk Management"},
-            {"id": "vs23", "name": "Compliance Management"},
-            {"id": "vs24", "name": "Investment Management"},
-        ],
-        "RISK": [
-            {"id": "vs25", "name": "Risk Assessment"},
-            {"id": "vs26", "name": "Compliance Monitoring"},
-            {"id": "vs27", "name": "Internal Controls"},
-            {"id": "vs28", "name": "Audit Management"},
-        ],
-    }
-
-    return value_stream_map.get(
-        domain_code,
-        [
-            {"id": "vs_default1", "name": "Strategic Planning"},
-            {"id": "vs_default2", "name": "Operational Excellence"},
-            {"id": "vs_default3", "name": "Performance Management"},
-            {"id": "vs_default4", "name": "Continuous Improvement"},
-        ],
-    )
 
 
 @application_mgmt.route("/api/unified-capabilities", methods=["GET"])
@@ -2097,14 +2099,14 @@ def api_get_vendor_provenance(analysis_id):
                 "tco_total": float(vo.tco_total) if vo.tco_total else None,
             })
 
-        return jsonify({
+        return jsonify(_for_person({
             "success": True,
             "data": {
                 "analysis_id": analysis.id,
                 "analysis_name": analysis.name,
                 "results": results,
             },
-        })
+        }))
 
     except HTTPException:
 
@@ -2151,7 +2153,7 @@ def _compute_scenario_rankings(vendor_options, weights):
 
 def _serialize_scenario(scenario):
     """Serialize an AnalysisScenario to a JSON-safe dict."""
-    return {
+    data = {
         "id": scenario.id,
         "scenario_name": scenario.scenario_name,
         "description": scenario.description,
@@ -2165,6 +2167,7 @@ def _serialize_scenario(scenario):
         "cost_delta": float(scenario.cost_delta) if scenario.cost_delta else None,
         "created_at": scenario.created_at.isoformat() if scenario.created_at else None,
     }
+    return data if costs_visible(current_user) else withhold_costs(data, keys=VENDOR_ANALYSIS_MONEY_KEYS)
 
 
 @application_mgmt.route(
@@ -2354,8 +2357,9 @@ def api_list_stakeholders(analysis_id):
         from app.models.vendor_analysis import OptionsAnalysis
 
         analysis = db.session.get(OptionsAnalysis, analysis_id)
-        if not analysis:
-            return jsonify({"error": "Analysis not found"}), 404
+        denied = _check_analysis_access(analysis)
+        if denied:
+            return denied
 
         stakeholders = [_serialize_stakeholder(si) for si in analysis.stakeholder_inputs]
         return jsonify({"success": True, "stakeholders": stakeholders})
@@ -2376,8 +2380,9 @@ def api_invite_stakeholder(analysis_id):
         from app.models.vendor_analysis import OptionsAnalysis, StakeholderInput
 
         analysis = db.session.get(OptionsAnalysis, analysis_id)
-        if not analysis:
-            return jsonify({"error": "Analysis not found"}), 404
+        denied = _check_analysis_access(analysis)
+        if denied:
+            return denied
 
         data = request.get_json()
         stakeholder_id = data.get("stakeholder_id")
@@ -2480,8 +2485,9 @@ def api_get_stakeholder_consensus(analysis_id):
         from app.models.vendor_analysis import OptionsAnalysis
 
         analysis = db.session.get(OptionsAnalysis, analysis_id)
-        if not analysis:
-            return jsonify({"error": "Analysis not found"}), 404
+        denied = _check_analysis_access(analysis)
+        if denied:
+            return denied
 
         completed = [si for si in analysis.stakeholder_inputs if si.is_complete]
         total_invited = len(analysis.stakeholder_inputs)

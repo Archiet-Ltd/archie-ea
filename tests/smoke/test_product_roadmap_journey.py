@@ -1,12 +1,9 @@
 """A Solution Architect assigns a real epic to a roadmap horizon and it persists.
 
 /product-roadmap's primary write action is dragging an epic card between the
-Now/Next/Later columns, which calls productRoadmap()'s dropEpic(event,
-targetHorizon) -> PATCH /api/product-roadmap/epics/<id>/horizon. Real
-browser drag-and-drop is unreliable to script; dropEpic is invoked directly
-here via Alpine's own component instance (Alpine.$data on the root element)
-with a synthetic event object - this exercises the exact same code path a
-real drop would, just without simulating the mouse gesture.
+Now/Next/Later columns, which drops onto the shared board and sends
+PATCH /api/product-roadmap/epics/<id>/horizon. The drop is the native
+dragstart/dragover/drop sequence the board listens for.
 
 An "epic" is a Requirement row with requirement_type='epic' - created here
 directly via the ORM (this test suite's established pattern per conftest.py's
@@ -68,23 +65,14 @@ def test_assign_epic_horizon_survives_reload(browser, live_server, seeded):
     page.goto(live_server + "/product-roadmap", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
     page.wait_for_timeout(1500)
 
+    from .test_portfolio_kanban_journey import _drag_card
+
+    page.wait_for_selector(".kanban-card", timeout=PAGE_TIMEOUT)
     with page.expect_response(
         lambda r: ("/api/product-roadmap/epics/%d/horizon" % epic_id) in r.url and r.request.method == "PATCH",
         timeout=PAGE_TIMEOUT,
     ) as resp_info:
-        result = page.evaluate(
-            """(epicId) => {
-                const root = document.querySelector('[x-data="productRoadmap()"]');
-                const comp = window.Alpine.$data(root);
-                const epic = (comp.unscheduled || []).find(e => e.id === epicId);
-                if (!epic) return {ok: false, reason: 'epic not found in unscheduled', unscheduled: comp.unscheduled};
-                comp._dragging = epic;
-                comp.dropEpic({preventDefault(){}}, 'now');
-                return {ok: true};
-            }""",
-            epic_id,
-        )
-    assert result.get("ok"), "could not locate seeded epic in the component's own data: %r" % result
+        _drag_card(page, page.locator(".kanban-card").filter(has_text=title), "now")
     assert resp_info.value.status < 400, "horizon assignment PATCH failed: %d" % resp_info.value.status
     page.wait_for_timeout(1000)
 

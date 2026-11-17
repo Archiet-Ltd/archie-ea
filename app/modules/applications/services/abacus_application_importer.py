@@ -188,7 +188,11 @@ class AbacusApplicationUpsertHandler:
         self.conflict_resolutions = []
 
     def _apply_fields(self, app: ApplicationComponent, fields: Dict, is_new: bool = False):
-        """Apply transformed fields to ApplicationComponent instance."""
+        """Apply transformed fields to ApplicationComponent instance.
+
+        A deployment status that is not on the one list raises StatusRefused; the
+        caller refuses that application and keeps the others.
+        """
         for field, value in fields.items():
             if field.startswith("_"):  # Skip internal metadata like _connection_count
                 continue

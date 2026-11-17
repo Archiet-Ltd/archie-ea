@@ -33,6 +33,7 @@ from __future__ import annotations
 from typing import Any, Dict, Iterable, List, Optional, Set, Tuple
 
 from app.extensions import db
+from app.models.archimate_element_types import application_kind_types, is_application_kind
 from app.middleware.tenant_context import current_org_id
 
 TRACE_DEPTH = 4
@@ -239,6 +240,51 @@ class TraceabilityCheckService:
         }
 
 
+def broken_chains(organization_id: Optional[int] = None) -> Dict[str, Any]:
+    """Every chain in the organisation that stops short, one row per break.
+
+    Components are checked upward (a capability above them) and capabilities
+    downward (technology below them), each with ``TraceabilityCheckService.check``,
+    so the list is the per-element answer asked for every element of the two
+    types. ``checked`` is how many elements were asked; ``rows`` is the breaks.
+    """
+    from app.models import ArchiMateElement
+
+    org_id = organization_id if organization_id is not None else current_org_id()
+    if org_id is None:
+        return {"checked": 0, "rows": []}
+
+    elements = db.session.execute(
+        db.select(ArchiMateElement.id, ArchiMateElement.name, ArchiMateElement.type)
+        .where(
+            ArchiMateElement.organization_id == org_id,
+            ArchiMateElement.type.in_((*application_kind_types(), "Capability")),
+        )
+        .order_by(ArchiMateElement.name, ArchiMateElement.id)
+    ).all()
+
+    rows: List[Dict[str, Any]] = []
+    for element in elements:
+        answer = TraceabilityCheckService.check(element.id, org_id)
+        if answer.get("state") != "checked":
+            continue
+        is_component = is_application_kind(element.type)
+        block = answer["up"] if is_component else answer["down"]
+        if block["complete"]:
+            continue
+        stops = [c["stops_at"] for c in block["chains"] if not c["complete"] and c["stops_at"]]
+        rows.append(
+            {
+                "id": element.id,
+                "name": element.name,
+                "type": element.type,
+                "break": "no_capability" if is_component else "no_technology",
+                "stops_at": stops[0] if stops and stops[0]["id"] != element.id else None,
+            }
+        )
+    return {"checked": len(elements), "rows": rows}
+
+
 def _component_ids_for_element(element_id: int, org_id: int) -> List[int]:
     from app.models.application_portfolio import ApplicationComponent
 
@@ -414,6 +460,7 @@ def _parallel_table_candidates(
 
 __all__ = [
     "TraceabilityCheckService",
+    "broken_chains",
     "TRACE_DEPTH",
     "TRACE_RELATIONSHIP_TYPES",
     "normalise_relationship_type",

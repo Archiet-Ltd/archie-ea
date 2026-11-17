@@ -200,7 +200,9 @@ def _build_overview_context():
 @dashboard_bp.route("/overview")
 @login_required
 def overview():
-    return render_template("dashboards/overview.html", **_build_overview_context())
+    from app.modules.dashboard.services.overview_figures import overview_context
+
+    return render_template("dashboards/overview.html", **overview_context(current_user, g.current_org_id))
 
 
 @dashboard_bp.route("/api/overview/chart")

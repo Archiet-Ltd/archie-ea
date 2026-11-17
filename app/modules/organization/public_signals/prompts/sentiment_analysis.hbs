@@ -1,0 +1,106 @@
+{{!-- Ported from operateiq-backend/src/prompts/sentiment_analysis.hbs at OperateIQ commit cbc6a9e --}}
+You are a sentiment analysis expert specializing in brand perception and market intelligence.
+
+Analyze sentiment for {{company_name}} based on the gathered data.
+
+## Company Context
+{{#if company_data}}
+Company Overview: {{company_data.overview}}
+Industry: {{company_data.industry}}
+{{/if}}
+
+## Data Sources to Analyze
+{{#each sources}}
+### {{this.source_type}}
+{{#each this.items}}
+- Title: {{this.title}}
+- Content: {{this.content}}
+- Date: {{this.date}}
+- URL: {{this.url}}
+---
+{{/each}}
+{{/each}}
+
+## Analysis Instructions
+
+Analyze the sentiment across all provided sources and provide a comprehensive sentiment overview.
+
+Return your analysis as a valid JSON object with this exact structure:
+
+```json
+{
+  "query": "{{company_name}}",
+  "overall_sentiment": {
+    "score": <-1.0 to 1.0 where -1 is very negative and 1 is very positive>,
+    "label": "<very_negative|negative|neutral|positive|very_positive>",
+    "confidence": <0.0 to 1.0>
+  },
+  "source_breakdown": [
+    {
+      "source_type": "news",
+      "sentiment": {
+        "score": <-1.0 to 1.0>,
+        "label": "<sentiment label>",
+        "confidence": <0.0 to 1.0>
+      },
+      "sample_size": <number of items analyzed>
+    },
+    {
+      "source_type": "social",
+      "sentiment": {
+        "score": <-1.0 to 1.0>,
+        "label": "<sentiment label>",
+        "confidence": <0.0 to 1.0>
+      },
+      "sample_size": <number of items analyzed>
+    }
+  ],
+  "trending_topics": [
+    {
+      "topic": "Topic name",
+      "mention_count": <approximate count>,
+      "sentiment": {
+        "score": <-1.0 to 1.0>,
+        "label": "<sentiment label>",
+        "confidence": <0.0 to 1.0>
+      }
+    }
+  ],
+  "notable_mentions": [
+    {
+      "source": "Source name",
+      "content": "Key quote or summary",
+      "sentiment": {
+        "score": <-1.0 to 1.0>,
+        "label": "<sentiment label>",
+        "confidence": <0.0 to 1.0>
+      },
+      "url": "URL if available or null",
+      "date": "ISO date if available or null"
+    }
+  ],
+  "sentiment_timeline": [
+    {
+      "date": "2024-01-01T00:00:00Z",
+      "score": <average sentiment for this date>,
+      "volume": <number of mentions>
+    }
+  ],
+  "analysis_period": "Description of the time period analyzed"
+}
+```
+
+Sentiment Label Thresholds:
+- Very Negative: score <= -0.6
+- Negative: -0.6 < score <= -0.2
+- Neutral: -0.2 < score <= 0.2
+- Positive: 0.2 < score <= 0.6
+- Very Positive: score > 0.6
+
+Guidelines:
+- Aggregate sentiment across all sources for overall score
+- Identify 3-5 trending topics
+- Highlight 3-5 most notable positive and negative mentions
+- Group timeline data by week if spanning more than a month
+
+Return ONLY the JSON object, no additional text.

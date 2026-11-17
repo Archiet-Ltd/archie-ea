@@ -60,6 +60,16 @@ def test_dpo_scopes_assigns_and_erases_with_evidence(browser, live_server, seede
     try:
         _login(page, live_server, seeded["emails"]["security_architect"])
 
+        # Assert the signed-in user is the persona, not an administrator.
+        from app import create_app, db
+        from app.models.user import User
+        app = create_app("testing")
+        with app.app_context():
+            user = User.query.filter_by(email=seeded["emails"]["security_architect"]).first()
+            assert user.enterprise_role == "security_architect", user.enterprise_role
+            assert not user.is_admin(), "the journey must not run as an administrator"
+            db.session.remove()
+
         page.get_by_test_id("sidebar").get_by_role("link", name="Data Subject Requests", exact=True).click()
         page.wait_for_url("**/compliance/data-subject-requests", timeout=PAGE_TIMEOUT)
 

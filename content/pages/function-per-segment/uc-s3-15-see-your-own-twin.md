@@ -1,4 +1,5 @@
 ---
+wave: 2
 page_family: function-per-segment
 use_case_id: UC-S3-15
 segment_id: S3
@@ -25,7 +26,7 @@ Enter your company's website address, and see a generated twin — proposed pack
 and connector suggestions — clearly marked as a demonstration, never treated as your real data
 until you say so.
 
-Coming soon. Join the waiting list and we'll tell you the day it ships.
+Early access. Join the waiting list and we'll email you when you can use it.
 
 ## Related
 

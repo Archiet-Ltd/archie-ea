@@ -122,7 +122,7 @@ class TestArch064CapabilityMapLazyModals:
         org, admin = _make_org_and_admin(db_session)
         login_as(client, admin)
 
-        resp = client.get("/capability-map/")
+        resp = client.get("/capability-map/dashboard")
         assert resp.status_code == 200
         body = resp.data.decode("utf-8")
 

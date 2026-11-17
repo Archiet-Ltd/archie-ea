@@ -79,36 +79,23 @@ def test_modules_directory_includes_zone_sourced_link(app, db_session, make_org)
 
 
 def test_modules_directory_includes_curated_more_tools(app, db_session, make_org):
-    """Corrected 20 Sep 2026 — this test previously asserted "Stakeholder Map"
-    and "Batch Import" as proof the More-tools section itself renders.
-    Neither actually proves that: Stakeholder Map IS a zone link
-    (role_access.py's _MY_WORK_LINKS, several roles) and Batch Import IS a
-    zone link too (_ADMIN_LINKS, platform_admin's zone) — both are only
-    absent from More-tools for the default `enterprise_architect` test user
-    because the zone-vs-More-tools dedup correctly drops the More-tools copy
-    for whichever roles already have the zone copy. "Chief Architect
-    Synthesis" (solution_design.architect_synthesis) is verified absent from
-    every entry in role_access.py's SIDEBAR_ZONES (_HOME_LINKS,
-    _LIBRARY_LINKS, _GOVERNANCE_LINKS, _ADMIN_LINKS, _MY_WORK_LINKS) — it is
-    genuinely More-tools-only, so it actually tests what this test claims to
-    test."""
+    """The weekly briefing is listed under its own name, and the retired
+    workbench name is gone."""
     client = _make_logged_in_client(app, db_session, make_org)
     html = client.get("/modules").get_data(as_text=True)
-    assert "Chief Architect Synthesis" in html
+    assert "Weekly Briefing" in html
+    assert "Chief Architect Synthesis" not in html
 
 
-def test_modules_directory_includes_twin_map(app, db_session, make_org):
-    """A-20 (readiness table 5.1, 2026-09-22): the Twin map has no sidebar
-    link in any persona's zone by design (role_access.py's own comment --
-    reached only from an Ask result, kept out of the 31-link sidebar
-    budget), confirmed absent from every SIDEBAR_ZONES list the same way
-    "Chief Architect Synthesis" above is -- so its More-tools row is this
-    page's only findable home for it, not a dedup-hidden duplicate of a
-    zone link."""
+def test_modules_directory_sends_the_twin_map_to_the_composer(app, db_session, make_org):
+    """The twin map is the Composer's focus mode, so the directory lists the
+    Composer and no longer lists a Twin Map row or links to its old address."""
     client = _make_logged_in_client(app, db_session, make_org)
     html = client.get("/modules").get_data(as_text=True)
-    assert "Twin Map" in html
-    assert "/intelligence/twin-map" in html
+    assert "ArchiMate Composer" in html
+    assert "/archimate/composer" in html
+    assert "Twin Map" not in html
+    assert "/intelligence/twin-map" not in html
 
 
 def test_modules_directory_composer_link_carries_viewpoint_query_param(app, db_session, make_org):
@@ -188,6 +175,12 @@ def _make_user(db_session, org, *, enterprise_role, platform_admin=False):
     user.enterprise_role = enterprise_role
     user.confirmed = True
     user.is_platform_admin = platform_admin
+    if platform_admin:
+        # Platform authority is the flag plus the Administrator role, never the persona.
+        from app.models.user import Role
+
+        Role.insert_roles()
+        user.role = Role.query.filter_by(name="Administrator").first()
     user.password = "Directory!12345"
     db_session.add(user)
     db_session.flush()
@@ -296,15 +289,34 @@ def test_role_exclusive_sections_are_hidden_from_other_personas(
 ):
     """The admin / procurement / my-applications zones are EXCLUSIVE_SECTIONS
     in role_access.py. The directory unions every role's zones, so without a
-    filter it advertised all three to everyone."""
+    filter it advertised all three to everyone.
+
+    One real link is excluded from the "/admin/" sweep: Connections
+    (m365_connector.connectors_index) lives in the Workspace zone, not the
+    Admin zone (role_access.py's `_WORKSPACE_LINKS`), and is deliberately
+    gated by `requires="connections"` -- CONNECTION_ARCHITECT_ROLES includes
+    enterprise_architect, the persona that brings a source in -- not by
+    EXCLUSIVE_SECTIONS["administration"]. Its URL happens to sit under
+    `/admin/connectors` only because that is the connector blueprint's
+    `url_prefix`; the same accident is called out in
+    test_formula_register_still_shown_to_its_own_personas below for
+    formula_register's own /admin/ URL. Excluding this one known, intentional
+    link keeps the check aimed at a genuine admin-zone leak rather than at
+    every route whose blueprint happens to be registered under /admin/."""
     user = _make_user(db_session, org, enterprise_role="enterprise_architect")
     login_as(client, user)
+
+    with app.test_request_context():
+        from flask import url_for
+
+        connections_href = url_for("m365_connector.connectors_index")
 
     hrefs = _rendered_hrefs(client)
     leaked = [
         h
         for h in hrefs
         if h.startswith(("/admin/", "/procurement/", "/my-applications/"))
+        and h != connections_href
     ]
     assert not leaked, f"role-exclusive surfaces shown to a non-owner: {leaked}"
 

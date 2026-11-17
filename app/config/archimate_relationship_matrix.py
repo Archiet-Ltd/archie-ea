@@ -369,6 +369,7 @@ VALID_RELATIONSHIPS: Dict[Tuple[str, str], List[str]] = {
     ("Capability", "BusinessProcess"): ["realization", "association"],
     ("Capability", "BusinessFunction"): ["realization", "association"],
     ("Capability", "BusinessService"): ["realization", "association"],
+    ("Capability", "Outcome"): ["realization", "association"],
     # Course of Action relationships
     ("CourseOfAction", "Resource"): ["association"],
     ("CourseOfAction", "Capability"): ["association"],
@@ -1041,17 +1042,23 @@ VALID_RELATIONSHIPS: Dict[Tuple[str, str], List[str]] = {
     # MOTIVATION LAYER RELATIONSHIPS
     # =========================================================================
     # Stakeholder relationships
-    ("Stakeholder", "Stakeholder"): ["composition", "aggregation", "specialization", "association"],
-    ("Stakeholder", "Driver"): ["association"],
-    ("Stakeholder", "Assessment"): ["association"],
-    ("Stakeholder", "Goal"): ["association"],
-    ("Stakeholder", "Outcome"): ["association"],
-    ("Stakeholder", "Principle"): ["association"],
-    ("Stakeholder", "Requirement"): ["association"],
-    ("Stakeholder", "Constraint"): ["association"],
+    ("Stakeholder", "Stakeholder"): [
+        "composition",
+        "aggregation",
+        "influence",
+        "specialization",
+        "association",
+    ],
+    ("Stakeholder", "Driver"): ["influence", "association"],
+    ("Stakeholder", "Assessment"): ["influence", "association"],
+    ("Stakeholder", "Goal"): ["influence", "association"],
+    ("Stakeholder", "Outcome"): ["influence", "association"],
+    ("Stakeholder", "Principle"): ["influence", "association"],
+    ("Stakeholder", "Requirement"): ["influence", "association"],
+    ("Stakeholder", "Constraint"): ["influence", "association"],
     ("Stakeholder", "Value"): ["association"],
     # Driver relationships
-    ("Driver", "Stakeholder"): ["association"],
+    ("Driver", "Stakeholder"): ["influence", "association"],
     ("Driver", "Driver"): [
         "composition",
         "aggregation",
@@ -1059,15 +1066,15 @@ VALID_RELATIONSHIPS: Dict[Tuple[str, str], List[str]] = {
         "specialization",
         "association",
     ],
-    ("Driver", "Assessment"): ["association"],
+    ("Driver", "Assessment"): ["influence", "association"],
     ("Driver", "Goal"): ["influence", "association"],
     ("Driver", "Outcome"): ["influence", "association"],
     ("Driver", "Principle"): ["influence", "association"],
     ("Driver", "Requirement"): ["influence", "association"],
     ("Driver", "Constraint"): ["influence", "association"],
     # Assessment relationships
-    ("Assessment", "Stakeholder"): ["association"],
-    ("Assessment", "Driver"): ["association"],
+    ("Assessment", "Stakeholder"): ["influence", "association"],
+    ("Assessment", "Driver"): ["influence", "association"],
     ("Assessment", "Assessment"): [
         "composition",
         "aggregation",
@@ -1081,22 +1088,22 @@ VALID_RELATIONSHIPS: Dict[Tuple[str, str], List[str]] = {
     ("Assessment", "Requirement"): ["influence", "association"],
     ("Assessment", "Constraint"): ["influence", "association"],
     # Goal relationships
-    ("Goal", "Stakeholder"): ["association"],
-    ("Goal", "Driver"): ["association"],
-    ("Goal", "Assessment"): ["association"],
+    ("Goal", "Stakeholder"): ["influence", "association"],
+    ("Goal", "Driver"): ["influence", "association"],
+    ("Goal", "Assessment"): ["influence", "association"],
     ("Goal", "Goal"): ["composition", "aggregation", "influence", "specialization", "association"],
-    ("Goal", "Outcome"): ["realization", "influence", "association"],
-    ("Goal", "Principle"): ["realization", "influence", "association"],
-    ("Goal", "Requirement"): ["realization", "influence", "association"],
-    ("Goal", "Constraint"): ["realization", "influence", "association"],
+    ("Goal", "Outcome"): ["influence", "association"],
+    ("Goal", "Principle"): ["influence", "association"],
+    ("Goal", "Requirement"): ["influence", "association"],
+    ("Goal", "Constraint"): ["influence", "association"],
     ("Goal", "Value"): ["association"],
     ("Goal", "Meaning"): ["association"],
     ("Goal", "CourseOfAction"): ["association"],
     ("Goal", "Capability"): ["influence", "association"],
     ("Goal", "Resource"): ["influence", "association"],
     # Outcome relationships
-    ("Outcome", "Stakeholder"): ["association"],
-    ("Outcome", "Goal"): ["association"],
+    ("Outcome", "Stakeholder"): ["influence", "association"],
+    ("Outcome", "Goal"): ["realization", "influence", "association"],
     ("Outcome", "Outcome"): [
         "composition",
         "aggregation",
@@ -1109,9 +1116,9 @@ VALID_RELATIONSHIPS: Dict[Tuple[str, str], List[str]] = {
     ("Outcome", "Constraint"): ["influence", "association"],
     ("Outcome", "Value"): ["realization", "association"],
     # Principle relationships
-    ("Principle", "Stakeholder"): ["association"],
-    ("Principle", "Goal"): ["association"],
-    ("Principle", "Outcome"): ["influence", "association"],
+    ("Principle", "Stakeholder"): ["influence", "association"],
+    ("Principle", "Goal"): ["realization", "influence", "association"],
+    ("Principle", "Outcome"): ["realization", "influence", "association"],
     ("Principle", "Principle"): [
         "composition",
         "aggregation",
@@ -1119,13 +1126,13 @@ VALID_RELATIONSHIPS: Dict[Tuple[str, str], List[str]] = {
         "specialization",
         "association",
     ],
-    ("Principle", "Requirement"): ["realization", "influence", "association"],
-    ("Principle", "Constraint"): ["realization", "influence", "association"],
+    ("Principle", "Requirement"): ["influence", "association"],
+    ("Principle", "Constraint"): ["influence", "association"],
     # Requirement relationships
-    ("Requirement", "Stakeholder"): ["association"],
-    ("Requirement", "Goal"): ["association"],
-    ("Requirement", "Outcome"): ["influence", "association"],
-    ("Requirement", "Principle"): ["association"],
+    ("Requirement", "Stakeholder"): ["influence", "association"],
+    ("Requirement", "Goal"): ["realization", "influence", "association"],
+    ("Requirement", "Outcome"): ["realization", "influence", "association"],
+    ("Requirement", "Principle"): ["realization", "influence", "association"],
     ("Requirement", "Requirement"): [
         "composition",
         "aggregation",
@@ -1144,10 +1151,10 @@ VALID_RELATIONSHIPS: Dict[Tuple[str, str], List[str]] = {
     ("Requirement", "Node"): ["realization", "association"],
     ("Requirement", "TechnologyService"): ["realization", "association"],
     # Constraint relationships
-    ("Constraint", "Stakeholder"): ["association"],
-    ("Constraint", "Goal"): ["association"],
-    ("Constraint", "Outcome"): ["influence", "association"],
-    ("Constraint", "Principle"): ["association"],
+    ("Constraint", "Stakeholder"): ["influence", "association"],
+    ("Constraint", "Goal"): ["realization", "influence", "association"],
+    ("Constraint", "Outcome"): ["realization", "influence", "association"],
+    ("Constraint", "Principle"): ["realization", "influence", "association"],
     ("Constraint", "Requirement"): ["influence", "association"],
     ("Constraint", "Constraint"): [
         "composition",
@@ -1156,6 +1163,15 @@ VALID_RELATIONSHIPS: Dict[Tuple[str, str], List[str]] = {
         "specialization",
         "association",
     ],
+    # Influence towards Driver and Assessment from the rest of the motivation layer
+    ("Outcome", "Driver"): ["influence", "association"],
+    ("Outcome", "Assessment"): ["influence", "association"],
+    ("Principle", "Driver"): ["influence", "association"],
+    ("Principle", "Assessment"): ["influence", "association"],
+    ("Requirement", "Driver"): ["influence", "association"],
+    ("Requirement", "Assessment"): ["influence", "association"],
+    ("Constraint", "Driver"): ["influence", "association"],
+    ("Constraint", "Assessment"): ["influence", "association"],
     # Core element constraints
     ("Constraint", "BusinessProcess"): ["realization", "association"],
     ("Constraint", "BusinessFunction"): ["realization", "association"],
@@ -1424,8 +1440,28 @@ _CORE_ACTIVE_ELEMENTS = frozenset(
     + PHYSICAL_ACTIVE_ELEMENTS
 )
 
+# The exception is the implementation and migration layer. ArchiMate 3.2 (section on
+# implementation and migration elements relating to core elements, and Appendix B)
+# lets a work package realize deliverables and other elements, and a deliverable
+# realize core elements, and an artifact realize an application component. These
+# sources are added to the table here, then left alone by the sweep below.
+_REALIZING_SOURCES = ("WorkPackage", "Deliverable")
+_REALIZED_COMPONENTS = ("ApplicationComponent",)
+for _src in _REALIZING_SOURCES:
+    for _core in _REALIZED_COMPONENTS:
+        _types = VALID_RELATIONSHIPS.setdefault((_src, _core), [])
+        if "realization" not in _types:
+            _types.append("realization")
+_types = VALID_RELATIONSHIPS.setdefault(("Artifact", "ApplicationComponent"), [])
+if "realization" not in _types:
+    _types.append("realization")
+_REALIZATION_EXEMPT = frozenset(
+    [(_s, _c) for _s in _REALIZING_SOURCES for _c in _REALIZED_COMPONENTS]
+    + [("Artifact", "ApplicationComponent")]
+)
+
 for _pair, _types in VALID_RELATIONSHIPS.items():
-    if "realization" not in _types:
+    if "realization" not in _types or _pair in _REALIZATION_EXEMPT:
         continue
     _tgt = _pair[1]
     if _tgt in OTHER_ELEMENTS or _tgt in CONNECTOR_ELEMENTS:
@@ -1436,7 +1472,7 @@ for _pair, _types in VALID_RELATIONSHIPS.items():
     if _tgt in _CORE_ACTIVE_ELEMENTS:
         _types.remove("realization")
 
-del _pair, _types, _tgt
+del _pair, _types, _tgt, _src, _core
 
 # Association may connect any two concepts (ArchiMate 3.2 section 5.4.3 and
 # Appendix B). Applied last, over the finished table, and only ever added: no

@@ -287,3 +287,28 @@ def test_risk_page_does_not_claim_no_links_when_it_could_not_read_them(
     assert page.status_code == 200
     assert b"could not be worked out" in page.data
     assert b"No linked elements recorded" not in page.data
+
+
+def test_a_linked_capability_is_listed_once_not_again_as_its_own_element(db_session, make_org, tenant_ctx):
+    from app.models.application_portfolio import ApplicationComponent
+    from app.models.business_capabilities import BusinessCapability
+    from app.models.risk_entity_link import RiskEntityLink
+    from app.services.risk_service import ranked_risks
+
+    org = make_org("once")
+    own, app_element, cap_element = (_element(db_session, org.id, n) for n in ("Risk element", "Ledger", "Billing"))
+    _serves(db_session, org.id, app_element, cap_element)
+    application = ApplicationComponent(name="Ledger", organization_id=org.id, archimate_element_id=app_element.id)
+    capability = BusinessCapability(name="Billing", organization_id=org.id, archimate_element_id=cap_element.id)
+    db_session.add_all([application, capability])
+    db_session.flush()
+    risk = _risk(db_session, org.id, "Billing outage", 3, 3, own)
+    for kind, target in (("application", application), ("capability", capability)):
+        db_session.add(RiskEntityLink(risk_id=risk.id, entity_type=kind, entity_id=target.id, organization_id=org.id))
+    db_session.flush()
+
+    with tenant_ctx(org.id):
+        (row,) = ranked_risks()["rows"]
+    names = [t["name"] for t in row["touches"]]
+    assert names.count("Billing") == 1, names
+    assert "Ledger" in names

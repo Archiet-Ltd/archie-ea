@@ -6,13 +6,13 @@ import uuid
 
 
 
-def _make_user(db_session, org, *, email=None, enterprise_role=None):
+def _make_user(db_session, org, *, email=None, enterprise_role=None, administrator=True):
     from app.models.user import Role, User
 
-    admin_role = Role.query.filter_by(name="Administrator").first()
+    admin_role = Role.query.filter_by(name="Administrator" if administrator else "User").first()
     if admin_role is None:
         Role.insert_roles()
-        admin_role = Role.query.filter_by(name="Administrator").first()
+        admin_role = Role.query.filter_by(name="Administrator" if administrator else "User").first()
 
     user = User(
         email=email or f"t003-{uuid.uuid4().hex[:8]}@example.com",
@@ -20,7 +20,7 @@ def _make_user(db_session, org, *, email=None, enterprise_role=None):
         last_name="User",
         organization_id=org.id,
         role=admin_role,
-        is_org_admin=True,
+        is_org_admin=administrator,
         confirmed=True,
         enterprise_role=enterprise_role,
     )
@@ -650,7 +650,7 @@ def test_programme_endpoint_redacts_cost_for_a_role_without_budget_authority(
     from app.models.unified_work_package import UnifiedWorkPackage
 
     org = make_org("programme-route-redact")
-    user = _make_user(db_session, org, enterprise_role="solution_architect")
+    user = _make_user(db_session, org, enterprise_role="solution_architect", administrator=False)
     a = _make_element(db_session, org.id, "A")
     db_session.add(UnifiedWorkPackage(
         name="Migrate A", archimate_element_id=a.id, organization_id=org.id,
@@ -784,7 +784,7 @@ def test_strategy_endpoint_redacts_budget_for_a_role_without_budget_authority(
     from app.models.enterprise_intelligence import PortfolioInitiative
 
     org = make_org("strategy-route-redact")
-    user = _make_user(db_session, org, enterprise_role="business_architect")
+    user = _make_user(db_session, org, enterprise_role="business_architect", administrator=False)
     a = _make_element(db_session, org.id, "A")
     db_session.add(PortfolioInitiative(
         organization_id=a.organization_id,

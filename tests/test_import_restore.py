@@ -425,7 +425,7 @@ def test_editing_an_element_is_recorded_in_the_audit_trail(client, db_session, l
         environ_overrides={"REMOTE_ADDR": "198.51.100.8"},
     ).status_code == 200
     entry = AuditLog.query.filter(AuditLog.org_predicate(org.id), AuditLog.table_name == "archimate_elements",
-                                  AuditLog.record_id == el.id).one()
+                                  AuditLog.record_id == el.id, AuditLog.action == "update").one()
     assert entry.action == "update"
     assert entry.old_value == {"description": "one"} and entry.new_value == {"description": "two"}
     assert entry.ip_address == "198.51.100.8"
@@ -436,11 +436,6 @@ def test_a_chosen_later_custom_property_change_is_applied_again(client, db_sessi
     from flask import g
 
     from app.models.archimate_core import ArchiMateElement
-    from app.modules.architecture.routes.archimate_crud.routes import (
-        _archimate_element_state,
-        _record_element_update,
-    )
-
     org = make_org("props")
     user = make_user(db_session, org)
     db_session.add(ArchiMateElement(
@@ -459,10 +454,8 @@ def test_a_chosen_later_custom_property_change_is_applied_again(client, db_sessi
 
     with app.test_request_context("/"):
         g.current_org_id = org.id
-        before = _archimate_element_state(node, True)
+        # The audit trail records the edit itself; nothing is written by hand.
         node.custom_properties = {"classification": "restricted", "owner": "EA"}
-        after = _archimate_element_state(node, True)
-        _record_element_update(before, after)
         db_session.flush()
 
     login_as(client, user)

@@ -13,12 +13,47 @@ import uuid
 from .conftest import PAGE_TIMEOUT, PASSWORD
 
 
-def create_fresh_org(enterprise_role, *, org_admin=False, extra_roles=()):
+def add_administrator(org_id, suffix):
+    """Give an organisation a separate Administrator and return that person's id.
+
+    A persona under test often must not be an administrator, but every
+    organisation with members needs one. This adds one more person, who is
+    nobody's persona, so the persona keeps exactly the roles it asked for.
+    Adding the Administrator always moves the organisation to the enterprise
+    plan, whatever its head count, so a plan limit never refuses a persona.
+    Call it inside an app context.
+    """
+    from app import db
+    from app.models.org_role import OrgRole
+    from app.models.organization import Organization
+    from app.models.user import Role, User
+    from app.services.billing_plans import set_contract_plan
+
+    # The extra person must not be what takes the organisation past the people
+    # its Community plan admits, or the personas it was added beside are refused.
+    set_contract_plan(db.session.get(Organization, org_id), "enterprise", None)
+    db.session.commit()
+    admin = User(email="launch.admin.%s@example.com" % suffix, first_name="Launch", last_name="Admin",
+                 organization_id=org_id, enterprise_role="platform_admin", confirmed=True)
+    admin.role = Role.query.filter_by(name="Architect").one()
+    admin.is_org_admin = True
+    admin.password = PASSWORD
+    db.session.add(admin)
+    db.session.commit()
+    OrgRole.set_role(org_id, admin.id, "org_admin", granted_by_id=admin.id)
+    db.session.commit()
+    return admin.id
+
+
+def create_fresh_org(enterprise_role, *, org_admin=False, extra_roles=(), platform_role="Architect"):
     """Create an empty organisation and a person in it; return the ids.
 
     ``extra_roles`` adds more people to the same organisation (for a second
-    persona a journey hands work to). Returns
+    persona a journey hands work to). ``platform_role`` names the platform
+    role the first person holds; the others always hold Architect. Returns
     ``{"org_id", "suffix", "emails": {role: email}, "user_ids": {role: id}}``.
+    When ``org_admin`` is false a separate Administrator person is added, so the
+    organisation is never left without one and the personas keep their roles.
     """
     from app import create_app, db
 
@@ -32,6 +67,7 @@ def create_fresh_org(enterprise_role, *, org_admin=False, extra_roles=()):
 
         Role.insert_roles()
         architect_role = Role.query.filter_by(name="Architect").one()
+        first_role = Role.query.filter_by(name=platform_role).one()
         org = Organization(name="Launch Org %s" % suffix, slug="launch-%s" % suffix)
         db.session.add(org)
         db.session.commit()
@@ -41,7 +77,7 @@ def create_fresh_org(enterprise_role, *, org_admin=False, extra_roles=()):
             is_org_admin = bool(org_admin and role == enterprise_role)
             user = User(email=email, first_name="Launch", last_name=role[:12],
                         organization_id=org.id, enterprise_role=role, confirmed=True)
-            user.role = architect_role
+            user.role = first_role if role == enterprise_role else architect_role
             user.is_org_admin = is_org_admin
             user.password = PASSWORD
             db.session.add(user)
@@ -53,6 +89,8 @@ def create_fresh_org(enterprise_role, *, org_admin=False, extra_roles=()):
                 db.session.commit()
             out["emails"][role] = email
             out["user_ids"][role] = user_id
+        if not org_admin:
+            out["administrator_id"] = add_administrator(org.id, suffix)
         db.session.remove()
     return out
 
@@ -63,7 +101,7 @@ def sign_in(page, base, email):
     page.fill("#email", email)
     page.fill("#password", PASSWORD)
     page.locator("#submit").click()
-    page.wait_for_url(lambda url: "/account/login" not in url, timeout=PAGE_TIMEOUT)
+    page.wait_for_url(lambda url: "/account/login" not in url, wait_until="commit", timeout=PAGE_TIMEOUT)
     assert "/account/login" not in page.url, "could not sign in as %s" % email
 
 

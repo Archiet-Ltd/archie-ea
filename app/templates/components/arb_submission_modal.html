@@ -74,7 +74,7 @@ x-effect="document.getElementById('arb-submission') && document.getElementById('
         </div>
         <div>
             <h3 id="modal-arb-submission-title" class="text-base font-semibold text-foreground text-foreground">Submit to Architecture Review Board</h3>
-            <p class="text-sm text-muted-foreground mt-1" x-text="`Capability: ${capability.name || 'Unknown'}`"></p>
+            <p class="text-sm text-muted-foreground mt-1" x-show="capability.name" x-text="`Capability: ${capability.name}`"></p>
         </div>
     </div>
 
@@ -100,7 +100,7 @@ x-effect="document.getElementById('arb-submission') && document.getElementById('
                 </div>
                 <div>
                     <span class="text-muted-foreground">Est. Investment:</span>
-                    <span class="ml-2 font-medium" x-text="`$${capability.estimated_investment || 0}M`"></span>
+                    <span class="ml-2 font-medium" x-text="capability.estimated_investment == null ? 'Not estimated' : formatCurrencyMillions(capability.estimated_investment)"></span>
                 </div>
             </div>
             <div class="pt-2 border-t border-border">
@@ -189,8 +189,7 @@ x-effect="document.getElementById('arb-submission') && document.getElementById('
         <button type="button"
             @click="submitToARB()"
             :disabled="loading"
-            class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center"
-         aria-label="Submit">
+            class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
             <span x-show="!loading" x-cloak>
                 <i data-lucide="send" class="h-4 w-4 inline"></i>
                 Submit to ARB

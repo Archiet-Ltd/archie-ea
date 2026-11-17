@@ -9,15 +9,17 @@ import json
 import logging
 from datetime import datetime, timedelta
 
-from flask import jsonify, render_template, request
+from flask import g, jsonify, redirect, request, url_for
 from werkzeug.exceptions import HTTPException
 from flask_login import current_user, login_required
 
 from app import db
+from app.middleware.tenant_decorators import platform_admin_required
 from app.models.agentic_gaps import AgentConfiguration, AgentSchedule
 from app.services.archimate.agentic_gap_implementation_service import (
     AgenticGapImplementationService,
 )
+from app.services.gap_register_service import effective_severity, gap_register_query
 
 # Import main blueprint - use relative import to avoid circular dependency
 from .views import main
@@ -27,14 +29,14 @@ logger = logging.getLogger(__name__)
 
 
 @main.route("/agentic-gaps")
-@login_required
-def agentic_gaps_ui():
-    """UI for Agentic Gap Implementation."""
-    return render_template("main/agentic_gaps.html")
+def agentic_gaps_retired():
+    """The page is retired; an old address lands on the dashboard."""
+    return redirect(url_for("dashboard.overview"))
 
 
 @main.route("/api/agentic-gaps/implement-all", methods=["POST"])
 @login_required
+@platform_admin_required(hide=True)
 def implement_all_gaps():
     """API endpoint to implement all gaps using all agents."""
     try:
@@ -59,6 +61,7 @@ def implement_all_gaps():
 
 @main.route("/api/agentic-gaps/implement/<agent_name>", methods=["POST"])
 @login_required
+@platform_admin_required(hide=True)
 def implement_single_agent(agent_name):
     """API endpoint to implement gaps using a single agent."""
     try:
@@ -103,6 +106,7 @@ def implement_single_agent(agent_name):
 
 @main.route("/api/agentic-gaps/status", methods=["GET"])
 @login_required
+@platform_admin_required(hide=True)
 def get_implementation_status():
     """Get status of implemented models and services."""
     try:
@@ -206,6 +210,7 @@ def get_implementation_status():
 
 @main.route("/api/agentic-gaps/auto-implement", methods=["POST"])
 @login_required
+@platform_admin_required(hide=True)
 def auto_implement_from_gaps():
     """Automatically implement gaps based on gap discovery."""
     try:
@@ -225,6 +230,7 @@ def auto_implement_from_gaps():
 
 @main.route("/api/agentic-gaps/metrics", methods=["GET"])
 @login_required
+@platform_admin_required(hide=True)
 def get_agent_metrics():
     """Get analytics and metrics on agent executions."""
     try:
@@ -244,6 +250,7 @@ def get_agent_metrics():
 
 @main.route("/api/agentic-gaps/history", methods=["GET"])
 @login_required
+@platform_admin_required(hide=True)
 def get_execution_history():
     """Get execution history with filtering."""
     try:
@@ -264,6 +271,7 @@ def get_execution_history():
 
 @main.route("/api/agentic-gaps/review/<int:execution_id>", methods=["POST"])
 @login_required
+@platform_admin_required(hide=True)
 def review_generated_code(execution_id):
     """Review and approve/reject generated code."""
     try:
@@ -284,6 +292,7 @@ def review_generated_code(execution_id):
 
 @main.route("/api/agentic-gaps/rollback/<int:execution_id>", methods=["POST"])
 @login_required
+@platform_admin_required(hide=True)
 def rollback_execution(execution_id):
     """Rollback changes made by an agent execution."""
     try:
@@ -300,6 +309,7 @@ def rollback_execution(execution_id):
 
 @main.route("/api/agentic-gaps/config/<agent_name>", methods=["GET", "POST"])
 @login_required
+@platform_admin_required(hide=True)
 def agent_configuration(agent_name):
     """Get or update agent configuration."""
     try:
@@ -324,11 +334,6 @@ def agent_configuration(agent_name):
         else:
             # POST - update configuration. One row per agent name serves every organisation, so
             # changing it is a platform-admin action.
-            from app.middleware.tenant_decorators import is_platform_admin
-
-            if not is_platform_admin(current_user):
-                return jsonify({"success": False, "error": "Platform admin access required"}), 403
-
             data = request.get_json() or {}
 
             config = AgentConfiguration.query.filter_by(agent_name=agent_name).first()
@@ -385,6 +390,7 @@ def agent_configuration(agent_name):
 
 @main.route("/api/agentic-gaps/schedule", methods=["GET", "POST"])
 @login_required
+@platform_admin_required(hide=True)
 def manage_schedules():
     """Get or create agent schedules."""
     try:
@@ -474,6 +480,7 @@ def _calculate_next_run(schedule_type: str, schedule_config: dict):
 
 @main.route("/api/agentic-gaps/schedule/<int:schedule_id>", methods=["DELETE", "PUT"])
 @login_required
+@platform_admin_required(hide=True)
 def manage_single_schedule(schedule_id):
     """Delete or update a specific schedule."""
     try:
@@ -521,6 +528,7 @@ def manage_single_schedule(schedule_id):
 
 @main.route("/api/agentic-gaps/recommendations", methods=["GET"])
 @login_required
+@platform_admin_required(hide=True)
 def get_agent_recommendations():
     """Get recommendations on which agents to run based on architecture state."""
     try:
@@ -602,6 +610,7 @@ def get_agent_recommendations():
 
 @main.route("/api/agentic-gaps/execute-full-workflow", methods=["POST"])
 @login_required
+@platform_admin_required(hide=True)
 def execute_full_workflow():
     """
     Execute the complete LLM-driven gap resolution workflow.
@@ -660,6 +669,7 @@ def execute_full_workflow():
 
 @main.route("/api/agentic-gaps/reuse-candidates/<int:gap_id>", methods=["GET"])
 @login_required
+@platform_admin_required(hide=True)
 def get_reuse_candidates(gap_id):
     """
     Get reuse candidates for a specific gap.
@@ -685,13 +695,15 @@ def get_reuse_candidates(gap_id):
         max_candidates = request.args.get("max_candidates", 10, type=int)
 
         # Get the gap from database
-        from app.models.roadmap_models import ImplementationGap
+        from app.models.implementation_migration import Gap
         from app.models.unified_capability import UnifiedCapability
 
-        gap = ImplementationGap.query.get(gap_id)
+        gap = gap_register_query(g.current_org_id).filter(Gap.id == gap_id).first()
         if not gap:
             # Try looking up as capability_id instead
-            capability = UnifiedCapability.query.get(gap_id)
+            capability = UnifiedCapability.visible_to_organization(
+                gap_id, g.current_org_id
+            )
             if capability:
                 gap_dict = {
                     "id": capability.id,
@@ -709,7 +721,7 @@ def get_reuse_candidates(gap_id):
                 "capability_id": gap.source_capability_id,
                 "capability_name": gap.name,
                 "gap_type": gap.gap_type,
-                "severity": gap.priority,
+                "severity": effective_severity(gap) or gap.priority,
                 "gap_description": gap.description,
             }
 
@@ -744,6 +756,7 @@ def get_reuse_candidates(gap_id):
 
 @main.route("/api/agentic-gaps/reuse-recommendation", methods=["POST"])
 @login_required
+@platform_admin_required(hide=True)
 def get_reuse_recommendation():
     """
     Generate a reuse vs build recommendation for a gap.
@@ -770,12 +783,14 @@ def get_reuse_recommendation():
             return jsonify({"success": False, "error": "gap_id is required"}), 400
 
         # Get gap information
-        from app.models.roadmap_models import ImplementationGap
+        from app.models.implementation_migration import Gap
         from app.models.unified_capability import UnifiedCapability
 
-        gap = ImplementationGap.query.get(gap_id)
+        gap = gap_register_query(g.current_org_id).filter(Gap.id == gap_id).first()
         if not gap:
-            capability = UnifiedCapability.query.get(gap_id)
+            capability = UnifiedCapability.visible_to_organization(
+                gap_id, g.current_org_id
+            )
             if capability:
                 gap_dict = {
                     "id": capability.id,
@@ -793,7 +808,7 @@ def get_reuse_recommendation():
                 "capability_id": gap.source_capability_id,
                 "capability_name": gap.name,
                 "gap_type": gap.gap_type,
-                "severity": gap.priority,
+                "severity": effective_severity(gap) or gap.priority,
                 "gap_description": gap.description,
             }
 
@@ -834,6 +849,7 @@ def get_reuse_recommendation():
 
 @main.route("/api/agentic-gaps/validate-roadmap", methods=["POST"])
 @login_required
+@platform_admin_required(hide=True)
 def validate_roadmap():
     """
     Create validation request for stakeholder review.
@@ -873,6 +889,7 @@ def validate_roadmap():
 
 @main.route("/api/agentic-gaps/stakeholder-feedback", methods=["POST"])
 @login_required
+@platform_admin_required(hide=True)
 def process_feedback():
     """
     Process stakeholder feedback on a validation request.
@@ -928,6 +945,7 @@ def process_feedback():
 
 @main.route("/api/agentic-gaps/trigger-tests/<int:work_package_id>", methods=["POST"])
 @login_required
+@platform_admin_required(hide=True)
 def trigger_tests(work_package_id):
     """
     Trigger MCP test pipeline for a completed work package.
@@ -957,6 +975,7 @@ def trigger_tests(work_package_id):
 
 @main.route("/api/agentic-gaps/audit-trail/<int:execution_id>", methods=["GET"])
 @login_required
+@platform_admin_required(hide=True)
 def get_audit_trail(execution_id):
     """
     Get complete audit trail for a workflow execution.
@@ -1002,6 +1021,7 @@ def get_audit_trail(execution_id):
 
 @main.route("/api/agentic-gaps/decision-logs", methods=["GET"])
 @login_required
+@platform_admin_required(hide=True)
 def get_decision_logs():
     """
     Get LLM decision logs for audit purposes.
@@ -1028,13 +1048,10 @@ def get_decision_logs():
         if days:
             since = datetime.utcnow() - timedelta(days=days)
 
-        # Prompts and decisions are personal to the user who triggered them: everyone sees their
-        # own, and only a platform admin sees every user's.
-        from app.middleware.tenant_decorators import is_platform_admin
-
+        # Only a platform administrator reaches this route, and sees every user's decisions.
         logs = LLMService.get_decision_log(
             decision_type=decision_type,
-            user_id=None if is_platform_admin(current_user) else current_user.id,
+            user_id=None,
             limit=limit,
             since=since,
         )

@@ -29,7 +29,6 @@ LEGACY_ROUTE_MAP = {
     "admin.change_account_type":          {"url": "/admin/user/<int:user_id>/change-account-type", "v2": "admin.change_account_type",       "method": "GET,POST"},
     "admin.delete_user_request":          {"url": "/admin/user/<int:user_id>/delete",           "v2": "admin.delete_user_request",          "method": "GET"},
     "admin.delete_user":                  {"url": "/admin/user/<int:user_id>/_delete",          "v2": "admin.delete_user",                  "method": "POST"},
-    "admin.update_editor_contents":       {"url": "/admin/_update_editor_contents",             "v2": "admin.update_editor_contents",       "method": "POST"},
     "admin.api_settings":                 {"url": "/admin/api-settings",                        "v2": "admin.api_settings",                 "method": "GET,POST"},
     "admin.delete_api_settings":          {"url": "/admin/api-settings/<int:settings_id>/delete", "v2": "admin.delete_api_settings",        "method": "POST"},
     "admin.test_api_settings":            {"url": "/admin/api-settings/<int:settings_id>/test", "v2": "admin.test_api_settings",            "method": "POST"},

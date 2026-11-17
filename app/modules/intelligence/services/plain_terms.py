@@ -55,6 +55,8 @@ from __future__ import annotations
 from decimal import ROUND_HALF_UP, Decimal
 from typing import Dict, Optional, Tuple
 
+from app.models.constants import ArchiMateRelationshipType
+
 VERY_CONFIDENT_MIN = Decimal("0.90")
 FAIRLY_CONFIDENT_MIN = Decimal("0.70")
 
@@ -175,16 +177,20 @@ def link_sentence(
 
     The same wording and the same direction rule as ``plain_terms_sentence``,
     for a single recorded relationship rather than a worked-out one: "Portal
-    depends on Gateway." A missing name or a type with no wording gives
-    ``None``, never a sentence with a gap in it.
+    depends on Gateway." A missing name gives ``None``, never a sentence
+    with a gap in it; a type with no wording reads "A and B are linked".
     """
     source = _usable_name(source_name)
     target = _usable_name(target_name)
     if source is None or target is None:
         return None
-    wording = _WORDING.get(relation_type) if isinstance(relation_type, str) else None
+    # Stored spellings differ ("serving", "ServingRelationship"); read them as the one
+    # canonical type. A type with no wording is still a link, so it reads as "linked":
+    # a person is never shown a missing sentence.
+    canonical = ArchiMateRelationshipType.normalize(relation_type, pascal_case=True)
+    wording = _WORDING.get(canonical) if isinstance(canonical, str) else None
     if wording is None:
-        return None
+        return f"{source} and {target} are linked."
     _family, first_side, clause = wording
     first, second = (source, target) if first_side == SOURCE else (target, source)
     return clause.format(first=first, second=second) + "."

@@ -90,7 +90,7 @@ function llmRecommendationsComponent(dashboard) {
         openRatingModal(rec) {
             this.ratingRecommendation = rec;
             this.ratingData = {
-                rating: rec.user_rating || 0,
+                rating: rec.user_rating ?? null,
                 feedback_notes: rec.feedback_notes || '',
                 was_implemented: rec.was_implemented || false
             };
@@ -140,7 +140,7 @@ function llmRecommendationsComponent(dashboard) {
     <!-- Generate Button -->
     <div data-block="recommendations" class="rounded-lg border border-border bg-card text-card-foreground">
         <div class="p-6">
-            <div class="flex items-center justify-between mb-4">
+            <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
                 <div>
                     <h3 class="text-lg font-semibold">AI-Powered Recommendations</h3>
                     <p class="text-sm text-muted-foreground mt-1">
@@ -242,7 +242,8 @@ function llmRecommendationsComponent(dashboard) {
     
     <!-- Rating Modal -->
     <div x-show="ratingRecommendation !== null" x-cloak
-         x-cloak
+         @keydown.escape.window="ratingRecommendation = null; resetRatingForm()"
+         role="dialog" aria-modal="true" aria-label="Rate Recommendation"
          class="modal-root fixed inset-0 z-50 flex items-center justify-center p-4 bg-overlay/50"
          @click="ratingRecommendation = null; resetRatingForm()">
         

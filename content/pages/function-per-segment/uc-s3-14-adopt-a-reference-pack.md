@@ -1,4 +1,5 @@
 ---
+wave: 3
 page_family: function-per-segment
 use_case_id: UC-S3-14
 segment_id: S3
@@ -26,7 +27,7 @@ Curated reference packs for major platforms, adopted through a guided questionna
 CMDB, Jira, or spreadsheet data onto the pack's elements through a review queue that flags anything
 uncertain — with version upgrades that preserve your own customisations.
 
-Coming in an upcoming release. Join the waiting list and we'll tell you the day it ships.
+Early access. Join the waiting list and we'll email you when you can use it.
 
 ## Related
 

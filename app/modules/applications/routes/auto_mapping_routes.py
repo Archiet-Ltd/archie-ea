@@ -1252,7 +1252,7 @@ def estimate_auto_map_cost():
         config_status = LLMService.configuration_status()
 
         # Check if using paid provider (any provider in the list that charges API fees)
-        paid_providers = ["openai", "anthropic", "azure", "gemini", "deepseek"]
+        paid_providers = ["openai", "anthropic", "azure", "gemini"]
         providers_list = config_status.get("providers", [])
         using_paid_provider = any(p in paid_providers for p in providers_list)
 

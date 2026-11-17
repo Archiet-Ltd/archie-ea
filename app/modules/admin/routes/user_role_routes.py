@@ -61,5 +61,9 @@ def update_user_role(user_id):
     user.enterprise_role = new_role
     db.session.commit()
 
-    flash(f"Role updated: {old_role or 'None'} → {new_role}", "success")
+    flash(
+        "Role updated: %s → %s"
+        % (ROLE_DISPLAY_NAMES.get(old_role, old_role) if old_role else "None", ROLE_DISPLAY_NAMES.get(new_role, new_role)),
+        "success",
+    )
     return redirect(url_for("admin.user_info", user_id=user_id))

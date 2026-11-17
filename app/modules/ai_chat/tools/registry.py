@@ -11,6 +11,8 @@ Tools always accept names (not IDs) — the EntityResolver converts them.
 
 import re
 
+from app.services.application_status import APPLICATION_STATUS_VALUES
+
 TOOL_SCHEMAS = [
     {
         "name": "create_solution",
@@ -103,13 +105,13 @@ TOOL_SCHEMAS = [
     {
         "name": "link_application_to_capability",
         "surfaces": ["chat", "blueprint"],
-        "route": "ApplicationCapabilityMapping",
+        "route": "capability_support.record_capability_support",
         "fenced_fields": [],
         "risk_class": "write",
         "mutates": True,
-        "record_types_written": ["ApplicationCapabilityMapping"],
+        "record_types_written": ["ArchiMateRelationship"],
         "description": (
-            "Map an application to a business capability it supports. "
+            "Record that an application supports a capability. "
             "Use when the user wants to record which applications cover a capability."
         ),
         "parameters": {
@@ -123,10 +125,15 @@ TOOL_SCHEMAS = [
                     "type": "string",
                     "description": "Name of the business capability (fuzzy matched)",
                 },
-                "coverage_level": {
+                "how": {
                     "type": "string",
-                    "description": "Degree to which the application covers the capability",
-                    "enum": ["full", "partial", "planned"],
+                    "description": "Whether the application realizes the capability or serves it",
+                    "enum": ["realizes", "serves"],
+                },
+                "support_level": {
+                    "type": "string",
+                    "description": "How well the application supports the capability ('full' means primary)",
+                    "enum": ["primary", "secondary", "partial", "legacy", "planned", "linked", "full"],
                 },
                 "notes": {"type": "string"},
             },
@@ -197,7 +204,7 @@ TOOL_SCHEMAS = [
             "Update the deployment/lifecycle status of an application. "
             "Use when the user wants to mark an application as retiring, "
             "decommissioned, in production, strategic, etc. "
-            "REQUIRES USER CONFIRMATION before executing."
+            "The server checks and reviews the change, then applies it or declines it with reasons."
         ),
         "parameters": {
             "type": "object",
@@ -209,10 +216,7 @@ TOOL_SCHEMAS = [
                 "new_status": {
                     "type": "string",
                     "description": "New lifecycle/deployment status",
-                    "enum": [
-                        "design", "development", "testing",
-                        "production", "retiring", "decommissioned",
-                    ],
+                    "enum": list(APPLICATION_STATUS_VALUES),
                 },
                 "rationale": {
                     "type": "string",
@@ -233,7 +237,7 @@ TOOL_SCHEMAS = [
         "record_types_written": ["ARBReviewItem"],
         "description": (
             "Submit a solution for Architecture Review Board (ARB) governance review. "
-            "REQUIRES USER CONFIRMATION before executing."
+            "The server checks and reviews the change, then applies it or declines it with reasons."
         ),
         "parameters": {
             "type": "object",
@@ -296,7 +300,11 @@ TOOL_SCHEMAS = [
         "mutates": False,
         "record_types_written": [],
         "description": (
-            "Search for applications by name, lifecycle status, or capability. "
+            "Search for applications by name, lifecycle status, capability or ownership. "
+            "Each row lists its owners (name and ownership type) and has_owner, "
+            "read from the same ownership records the Applications pages show; "
+            "use ownership=unowned for 'which applications have no owner' and "
+            "ownership=owned for 'who owns what'. "
             "Returns lifecycle_status (planning/development/testing/operational/"
             "deprecated/retired — matches the Applications UI and "
             "/applications/api/list exactly) for each row. "
@@ -322,6 +330,11 @@ TOOL_SCHEMAS = [
                 "capability_name": {
                     "type": "string",
                     "description": "Return only apps linked to this capability",
+                },
+                "ownership": {
+                    "type": "string",
+                    "description": "owned: only applications with an accountable owner; unowned: only those without one.",
+                    "enum": ["owned", "unowned"],
                 },
                 "limit": {
                     "type": "integer",
@@ -453,7 +466,7 @@ TOOL_SCHEMAS = [
         "mutates": True,
         "record_types_written": ["RiskRegisterEntry"],
         "description": (
-            "Add a risk to a solution risk register. "
+            "Add a risk to the risk register, linked to the solution. "
             "Use when the user identifies a threat, concern, or uncertainty for the solution."
         ),
         "parameters": {
@@ -611,7 +624,7 @@ TOOL_SCHEMAS = [
         "record_types_written": ["BlueprintNarrative"],
         "description": (
             "Generate an AI narrative for a specific blueprint section. "
-            "REQUIRES USER CONFIRMATION — this overwrites existing section text. "
+            "This overwrites existing section text; the server checks and reviews it, then applies or declines it. "
             "section_id examples: sec-1 (Summary), sec-2 (Strategic), sec-3 (Business), "
             "sec-4 (Application), sec-5 (Options), sec-7 (Governance), sec-8 (Risks)."
         ),
@@ -737,7 +750,8 @@ TOOL_SCHEMAS = [
             "address. Use this for 'what breaks if X fails' (question=impact, with "
             "element_id), 'what breaks if these fail together' (question=set_impact, "
             "with element_ids or a filter) and 'which risks reach X' "
-            "(question=risk_propagation, with element_id). Read-only: the answer is "
+            "(question=risk_propagation, with element_id) and 'where does this data go' "
+            "(question=data_flow, with the data object's element_id). Read-only: the answer is "
             "stored as an immutable snapshot, nothing in the model changes. State "
             "only what the returned rows say, and name the records they name."
         ),
@@ -746,7 +760,7 @@ TOOL_SCHEMAS = [
             "properties": {
                 "question": {
                     "type": "string",
-                    "enum": ["impact", "set_impact", "risk_propagation"],
+                    "enum": ["impact", "set_impact", "risk_propagation", "data_flow"],
                     "description": "Which question to answer",
                 },
                 "element_id": {
@@ -777,6 +791,68 @@ TOOL_SCHEMAS = [
                 },
             },
             "required": ["question"],
+        },
+        "tier": "auto",
+    },
+    {
+        "name": "get_genome_slice",
+        "surfaces": ["chat", "mcp"],
+        "route": "app.modules.genome.slices.registry.get_slice",
+        "fenced_fields": [],
+        "risk_class": "read",
+        "mutates": False,
+        "record_types_written": [],
+        "description": (
+            "Read one domain of the organisation's model as citeable facts: 'business' "
+            "(capabilities, the applications that support each, and which capabilities "
+            "nothing supports), 'implementation' (plateaus and work packages, with the "
+            "capability each work package changes), 'security' (controls bound to "
+            "requirements) or 'ai_systems'. The same facts the Capability Coverage page "
+            "and the roadmap show. Every node has an id such as business:cap:7; cite each "
+            "record you state as [ref:<node id>] and the page shows its name as a link. "
+            "State only what the nodes say. Read-only."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "domain": {
+                    "type": "string",
+                    "enum": ["business", "implementation", "security", "ai_systems"],
+                    "description": "Which domain of the model to read",
+                },
+                "focus_ids": {
+                    "type": "array",
+                    "items": {"type": ["string", "integer"]},
+                    "maxItems": 20,
+                    "description": "Optional node ids (business:cap:7) or element ids to centre on",
+                },
+                "depth": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 2,
+                    "description": "Links to follow from the focus, 0 to 2 (default 1)",
+                },
+                "filters": {
+                    "type": "object",
+                    "description": "Optional filters the domain declares (kind, status, supported, framework)",
+                    "properties": {
+                        "kind": {"type": "string", "enum": ["cap", "app", "plateau", "wp", "control", "system"]},
+                        "supported": {"type": "boolean"},
+                        "status": {"type": "string", "maxLength": 40},
+                        "framework": {"type": "string", "maxLength": 40},
+                        "risk_class": {"type": "string", "maxLength": 40},
+                    },
+                    "additionalProperties": False,
+                },
+                "budget_tokens": {
+                    "type": "integer",
+                    "minimum": 500,
+                    "maximum": 6000,
+                    "description": "Size of the result, default 3000",
+                },
+            },
+            "required": ["domain"],
+            "additionalProperties": False,
         },
         "tier": "auto",
     },
@@ -935,6 +1011,35 @@ TOOL_SCHEMAS = [
                 },
             },
             "required": ["capability_name"],
+        },
+        "tier": "auto",
+    },
+    {
+        "name": "get_application_capabilities",
+        "surfaces": ["chat"],
+        "route": "ApplicationCapabilityMapping.query",
+        "fenced_fields": [],
+        "risk_class": "read",
+        "mutates": False,
+        "record_types_written": [],
+        "description": (
+            "Read which business capabilities one application supports, from the same "
+            "application-to-capability mapping the application's page shows and the chat's "
+            "own answer to 'which capabilities does X support' reads. Use it for every "
+            "phrasing of that question ('what capabilities does X have', 'tell me about X's "
+            "capabilities', 'list X's capabilities', 'which capabilities does X map to'). "
+            "Each row carries the capability's name and the link to its fact sheet; state "
+            "only the rows returned, and say so plainly when none are mapped. Read-only."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "application_name": {
+                    "type": "string",
+                    "description": "The application's name as the person wrote it",
+                },
+            },
+            "required": ["application_name"],
         },
         "tier": "auto",
     },
@@ -1108,8 +1213,8 @@ TOOL_SCHEMAS = [
             "Probes: Abacus API connector, LLM API endpoints, integration pattern URLs. "
             "Returns up/down status per endpoint, latency, and a delta summary of what's "
             "modelled in Entelim vs what's actually reachable. "
-            "REQUIRES USER CONFIRMATION — outbound network connections, including "
-            "model-supplied URLs."
+            "Makes outbound network connections, including to model-supplied URLs; "
+            "the server checks and reviews the request, then runs it or declines it."
         ),
         "parameters": {
             "type": "object",
@@ -1204,6 +1309,40 @@ TOOL_SCHEMAS = [
         "tier": "auto",
     },
     {
+        # Vendor detection: the products a person names are proposed into the approvals inbox, one per
+        # catalogue product, with their words as the evidence. Proposing writes no vendor, product or
+        # application; approving a proposal does (app/services/vendor_detection.py).
+        "name": "propose_vendors",
+        "surfaces": ["chat"],
+        "route": "vendor_detection.propose_from_names",
+        "fenced_fields": [],
+        "risk_class": "propose",
+        "mutates": False,
+        "record_types_written": [],
+        "description": (
+            "Propose the vendor products the user says the organisation uses (for example 'we use Okta, "
+            "Slack and Datadog'). Pass each product name as the user wrote it. Each one in the vendor "
+            "catalogue is queued in the approvals inbox for a person to confirm; nothing is recorded until "
+            "it is approved. Names not in the catalogue are returned so you can say so."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "names": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "The product names the user gave, e.g. ['Okta', 'Slack', 'Datadog'].",
+                },
+                "request": {
+                    "type": "string",
+                    "description": "The user's words, kept as the evidence for each proposal.",
+                },
+            },
+            "required": ["names"],
+        },
+        "tier": "auto",
+    },
+    {
         # ADR 0009 / 0010 — genome-as-substrate. The copilot proposes a
         # schema-validated, provenance-bearing PATCH to the enterprise genome
         # instead of doing direct CRUD. Proposing only QUEUES the patch for
@@ -1217,14 +1356,14 @@ TOOL_SCHEMAS = [
         "mutates": False,
         "record_types_written": [],
         "description": (
-            "Propose a change to the enterprise genome (the ArchiMate model) as a "
-            "structured, provenance-bearing PATCH. Use when the user asks to propose "
-            "a missing capability, a control, a driver, a requirement, or any "
-            "motivation/architecture element. Do NOT create elements directly — emit "
-            "a patch object and this tool validates it and queues it for human "
-            "approval. The patch MUST include target.organization_id, target.domain, "
-            "operation (add|modify), element (archimate_type, layer, name), and "
-            "provenance (proposed_by, rationale, archimate_anchor)."
+            "Propose a change to your model as a structured, provenance-bearing "
+            "proposal. Use when the user asks to propose a missing capability, a "
+            "control, a driver, a requirement, or any motivation/architecture "
+            "element. Do NOT create elements directly — emit a proposal object and "
+            "this tool validates it and queues it for human approval. The proposal "
+            "MUST include target.organization_id, target.domain, operation (add|modify), "
+            "element (archimate_type, layer, name), and provenance "
+            "(proposed_by, rationale, archimate_anchor)."
         ),
         "parameters": {
             "type": "object",
@@ -1236,7 +1375,7 @@ TOOL_SCHEMAS = [
                 "patch": {
                     "type": "object",
                     "description": (
-                        "The genome patch object conforming to GENOME_PATCH_SCHEMA: "
+                        "The proposal object conforming to GENOME_PATCH_SCHEMA: "
                         "{target:{organization_id,domain}, operation, "
                         "element:{archimate_type,layer,name,description?}, "
                         "provenance:{proposed_by,rationale,archimate_anchor}}."
@@ -1344,7 +1483,7 @@ TOOL_SCHEMAS = [
             "artifact the solution-architect charter centres on. Captures the "
             "context, the decision taken, its rationale and consequences. The "
             "ADR is created in status 'proposed' and moves through approve/reject "
-            "governance afterwards. REQUIRES USER CONFIRMATION before executing."
+            "governance afterwards. " + "The server checks and reviews the change, then applies it or declines it with reasons."
         ),
         "parameters": {
             "type": "object",
@@ -1409,7 +1548,7 @@ TOOL_SCHEMAS = [
             "that closes them. Writes current_maturity_level / target_maturity_level "
             "(and the derived maturity_gap) on the business capability, stamping the "
             "assessment date so the estate can tell an assessed capability from an "
-            "unassessed one. REQUIRES USER CONFIRMATION before executing."
+            "unassessed one. " + "The server checks and reviews the change, then applies it or declines it with reasons."
         ),
         "parameters": {
             "type": "object",
@@ -1452,7 +1591,7 @@ TOOL_SCHEMAS = [
             "health, TIME action, 7R disposition and readiness gate) and creates "
             "the benefits-tracker row. "
             "USE when the user asks to score, re-score, or record a disposition for "
-            "a specific application. REQUIRES USER CONFIRMATION before executing."
+            "a specific application. " + "The server checks and reviews the change, then applies it or declines it with reasons."
         ),
         "parameters": {
             "type": "object",
@@ -1486,8 +1625,8 @@ TOOL_SCHEMAS = [
             "organization; a capability cannot be merged into itself. "
             "USE when the user confirms two capabilities are the same record and "
             "asks to merge, consolidate, or de-duplicate them. This is a "
-            "DESTRUCTIVE governance action — REQUIRES USER CONFIRMATION before "
-            "executing, and you must never pick which one to keep on the user's "
+            "DESTRUCTIVE governance action: the server checks and reviews it before "
+            "applying it, and you must never pick which one to keep on the user's "
             "behalf without their agreement."
         ),
         "parameters": {
@@ -1526,7 +1665,7 @@ TOOL_SCHEMAS = [
             "tier); commercial terms and contracts are attached separately afterwards. "
             "NOTE: VendorOrganization is SHARED reference data by design (ADR-0003) — its "
             "name is globally unique, so a vendor is visible to every organisation, not "
-            "tenant-private. REQUIRES USER CONFIRMATION before executing."
+            "tenant-private. " + "The server checks and reviews the change, then applies it or declines it with reasons."
         ),
         "parameters": {
             "type": "object",
@@ -1615,7 +1754,7 @@ TOOL_SCHEMAS = [
             "result (updated, or skipped with a reason) — it never reports a "
             "fabricated success — and, if a large selection is capped, says so "
             "explicitly rather than dropping applications silently. Scoped to your "
-            "organisation. REQUIRES USER CONFIRMATION before executing."
+            "organisation. " + "The server checks and reviews the change, then applies it or declines it with reasons."
         ),
         "parameters": {
             "type": "object",
@@ -1675,8 +1814,7 @@ TOOL_SCHEMAS = [
             "contract — it is the commercial VendorContract. An end or renewal "
             "date before the start date is rejected; an invalid type/category/"
             "status is rejected; a missing start date defaults to today. "
-            "Tenant-scoped to your organisation. REQUIRES USER CONFIRMATION "
-            "before executing."
+            "Tenant-scoped to your organisation. " + "The server checks and reviews the change, then applies it or declines it with reasons."
         ),
         "parameters": {
             "type": "object",
@@ -1708,7 +1846,7 @@ TOOL_SCHEMAS = [
                 },
                 "value": {"type": "number", "description": "Total contract value"},
                 "annual_cost": {"type": "number", "description": "Annual cost"},
-                "currency": {"type": "string", "description": "Currency code (default USD)"},
+                "currency": {"type": "string", "description": "Currency code; when left out, the organisation's own currency"},
                 "start_date": {"type": "string", "description": "Start date YYYY-MM-DD (defaults to today if omitted)"},
                 "end_date": {"type": "string", "description": "End date YYYY-MM-DD (must be on/after start)"},
                 "renewal_date": {"type": "string", "description": "Renewal date YYYY-MM-DD (must be on/after start)"},
@@ -1737,7 +1875,7 @@ TOOL_SCHEMAS = [
             "measurable metric (name/unit/direction/baseline/target), and "
             "either a target_date or a stated reason none is available yet. "
             "Do not invent any of these values — ask the user for anything "
-            "not given. REQUIRES USER CONFIRMATION before executing."
+            "not given. " + "The server checks and reviews the change, then applies it or declines it with reasons."
         ),
         "parameters": {
             "type": "object",
@@ -1808,7 +1946,7 @@ TOOL_SCHEMAS = [
             "contract (contract_id), re-read through your organisation's predicate "
             "so it cannot be hung off another org's contract. Supply license_id to "
             "update an existing entitlement; omit it to create one. Tenant-scoped. "
-            "REQUIRES USER CONFIRMATION before executing."
+            "The server checks and reviews the change, then applies it or declines it with reasons."
         ),
         "parameters": {
             "type": "object",
@@ -1905,6 +2043,38 @@ TOOL_SCHEMAS.extend([
             "at a permanent address."
         ),
     },
+    {
+        # Two reads behind one name. With an element_id it returns the stored
+        # data-flow answer envelope from the answer service, as ask_impact does;
+        # without one, the organisation's data entities and the applications
+        # that handle personal data, from the data architecture route.
+        **_route_read_tool(
+            "ask_data_flow",
+            "GET /architecture/api/data-flows",
+            "",
+            {
+                "type": "object",
+                "properties": {
+                    "element_id": {
+                        "type": "integer",
+                        "description": (
+                            "The data object's ArchiMate element id (each entity in the "
+                            "list carries it). Omit it to list the entities."
+                        ),
+                    },
+                },
+            },
+        ),
+        "description": (
+            "Ask where data flows and who is accountable at each step. Without an "
+            "element_id: every data entity, whether it holds personal data, the "
+            "applications that create, read, update or delete it, its owner and "
+            "steward, and which applications handle personal data. With a data "
+            "object's element_id: the flow hop by hop (the applications that write "
+            "it, those that read it, the copies lineage records), each hop with its "
+            "owner and source, recorded or worked out, at a permanent address."
+        ),
+    },
     _route_read_tool(
         "ask_strategy",
         "GET /api/v1/intelligence/strategy/<element_id>",
@@ -1987,7 +2157,8 @@ TOOL_SCHEMAS.extend([
     _route_read_tool(
         "get_canvas",
         "GET /business-model/api/<canvas_id> | GET /business-case/api/<canvas_id>",
-        "Get the full detail of one Business Model Canvas or Business Case.",
+        "One canvas with every box's entries, prices and costs, as the canvas page shows them; "
+        "without canvas_id, the organisation's Business Model Canvas. Also gets one Business Case.",
         {
             "type": "object",
             "properties": {
@@ -1998,10 +2169,10 @@ TOOL_SCHEMAS.extend([
                 },
                 "canvas_id": {
                     "type": "integer",
-                    "description": "The canvas or business case id",
+                    "description": "The canvas or business case id; optional for a business_model canvas",
                 },
             },
-            "required": ["canvas_type", "canvas_id"],
+            "required": ["canvas_type"],
         },
     ),
 ])
@@ -2098,6 +2269,11 @@ def _archimate_element_schemas() -> list:
 
 
 TOOL_SCHEMAS.extend(_archimate_element_schemas())
+
+# Refresh the lookup in place now that every schema is in the list, so a tool
+# the chat is offered is always one the review loop and risk classifier can find.
+TOOL_SCHEMA_BY_NAME.clear()
+TOOL_SCHEMA_BY_NAME.update({s["name"]: s for s in TOOL_SCHEMAS})
 
 
 def mutating_tool_names() -> set:

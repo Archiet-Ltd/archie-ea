@@ -27,6 +27,19 @@ from app.services import session_registry
 
 _log = logging.getLogger(__name__)
 
+#: How long a Google or Microsoft account waits to be connected after the person proves their account.
+PENDING_LINK_SECONDS = 10 * 60
+
+
+class ExternalSignIn:
+    """The outcome of :meth:`AccountService.sign_in_external_identity`."""
+
+    def __init__(self, status, user=None, message=None, pending=None):
+        self.status = status
+        self.user = user
+        self.message = message
+        self.pending = pending
+
 
 def _queue_email(*args, **kwargs):
     """Send email via queue if available, otherwise send synchronously."""
@@ -90,6 +103,8 @@ class AccountService:
         user = User.find_by_email(email)
         if user is not None and getattr(user, "is_service_user", False):
             return None
+        if user is not None and user.disabled_at is not None:
+            return None
         if (
             user is not None
             and user.password_hash is not None
@@ -132,55 +147,136 @@ class AccountService:
 
     @staticmethod
     def register_user(first_name, last_name, email, password, confirmed=True):
-        """Register a new user in an organisation of their own, and sign them in.
+        """Register a new user, and sign them in.
 
-        ``confirmed`` is False when the address still has to be confirmed by
-        e-mail; ``sign_up`` below decides that from whether mail can be sent.
+        A confirmed person gets an organisation of their own at once. An unconfirmed one gets none:
+        they wait in the shared holding organisation, with no role and nothing seeded, until
+        ``create_workspace`` runs when the address is confirmed. ``sign_up`` below decides which.
 
         Returns the newly created User object.
         """
-        # Each self-serve sign-up gets its OWN organization (single-tenant isolation).
-        # Team members are invited into an existing org rather than registering here.
-        import re as _re
-        import uuid as _uuid
-        from app.models import Organization
         from app.modules.account.services.invitation_service import release_for_registration
 
         # An address held only by an invitation nobody took up is freed here.
         release_for_registration(email)
-        _label = ("{} {}".format(first_name or "", last_name or "").strip()
-                  or (email.split("@")[0] if email else "New"))
-        _base_slug = _re.sub(r"[^a-z0-9]+", "-",
-                             ((first_name or "") + (last_name or "") or email.split("@")[0]).lower()).strip("-") or "org"
-        _slug = _base_slug
-        while Organization.query.filter_by(slug=_slug).first():
-            _slug = "{}-{}".format(_base_slug, _uuid.uuid4().hex[:6])
-        org = Organization(name="{}'s Workspace".format(_label), slug=_slug)
-        db.session.add(org)
-        db.session.flush()
-
+        if confirmed:
+            org = AccountService._new_organisation(first_name, last_name, email)
         user = User(
             first_name=first_name,
             last_name=last_name,
             email=email,
             password=password,
             confirmed=confirmed,
-            organization_id=org.id,
+            # None sends an unconfirmed person to the holding organisation (see the User insert hook).
+            organization_id=org.id if confirmed else None,
         )
-        # The user owns the organisation just created for them, so granting
-        # org-admin here is always a grant in their own organisation.
-        user.grant_org_admin()
         db.session.add(user)
-        try:
-            db.session.flush()
-            OrgRole.set_role(org.id, user.id, "org_admin", granted_by_id=user.id)
-            db.session.commit()
-        except Exception:
-            db.session.rollback()
-            raise
+        if confirmed:
+            AccountService._make_owner(user, org)
+        else:
+            try:
+                db.session.commit()
+            except Exception:
+                db.session.rollback()
+                raise
         # Auto-login after registration
         session_registry.login_and_register(user)
         return user
+
+    @staticmethod
+    def _new_organisation(first_name, last_name, email):
+        """Create the organisation (and its agent charters) a sign-up owns. Flushed, not committed."""
+        # Each self-serve sign-up gets its OWN organization (single-tenant isolation).
+        # Team members are invited into an existing org rather than registering here.
+        import re as _re
+        import uuid as _uuid
+        from app.models import Organization
+
+        _label = ("{} {}".format(first_name or "", last_name or "").strip()
+                  or (email.split("@")[0] if email else "New"))
+        _base_slug = _re.sub(r"[^a-z0-9]+", "-",
+                              ((first_name or "") + (last_name or "") or email.split("@")[0]).lower()).strip("-") or "org"
+        _slug = _base_slug
+        from app.modules.organization.public_signals import PLACEHOLDER_ENDING
+        # Try the base slug first; when it collides (a concurrent sign-up, or an
+        # organisation already owns it), roll back inside a savepoint and append a
+        # short unique suffix. Up to five tries. The name is a stand-in until the
+        # person confirms their company name.
+        from sqlalchemy.exc import IntegrityError
+
+        org = None
+        for _attempt in range(5):
+            try:
+                with db.session.begin_nested():
+                    org = Organization(name="{}{}".format(_label, PLACEHOLDER_ENDING), slug=_slug, reporting_currency="GBP")
+                    db.session.add(org)
+                    db.session.flush()
+                break
+            except IntegrityError:
+                org = None
+                _slug = "{}-{}".format(_base_slug, _uuid.uuid4().hex[:6])
+        if org is None:
+            raise RuntimeError("could not find a free organisation address after five tries")
+        from app.commands.seed_agent_charters import ensure_charters
+
+        ensure_charters(org.id)
+        return org
+
+    @staticmethod
+    def _make_owner(user, org, commit=True):
+        """Make ``user`` the owner of ``org``, and commit unless the caller finishes the transaction."""
+        user.organization_id = org.id
+        # The user owns the organisation just created for them, so granting
+        # org-admin here is always a grant in their own organisation.
+        user.grant_org_admin()
+        # A self-serve owner is a startup CTO until they say otherwise: the lens shapes
+        # the dashboard and chat wording only and grants nothing, so no role question is
+        # asked at sign-up. It can be changed later.
+        user.persona_lens = User.DEFAULT_PERSONA_LENS
+        try:
+            db.session.flush()
+            OrgRole.set_role(org.id, user.id, "org_admin", granted_by_id=user.id)
+            if commit:
+                db.session.commit()
+        except Exception:
+            db.session.rollback()
+            raise
+
+    @staticmethod
+    def holds_no_workspace(user):
+        """True for a self-serve account that is still in the shared holding organisation."""
+        from app.models import Organization
+
+        from app.services.billing_plans import is_holding_slug
+
+        org = db.session.get(Organization, user.organization_id)
+        return org is not None and is_holding_slug(org.slug)
+
+    @staticmethod
+    def confirm_user(user, password=None, commit=True):
+        """Confirm an account and give it the workspace it was waiting for, in one transaction.
+
+        The one place an account becomes confirmed. A person still in the holding organisation gets
+        their organisation and seeded model at the same commit; if that fails nothing is saved, the
+        account stays unconfirmed and the caller can try again. A caller that has more to save in the same
+        transaction passes ``commit=False`` and commits itself. Returns True when a workspace was made.
+        """
+        try:
+            if password is not None:
+                user.password = password
+            user.confirmed = True
+            made = False
+            if AccountService.holds_no_workspace(user):
+                org = AccountService._new_organisation(user.first_name, user.last_name, user.email)
+                AccountService._make_owner(user, org, commit=False)
+                made = True
+            db.session.add(user)
+            if commit:
+                db.session.commit()
+            return made
+        except Exception:
+            db.session.rollback()
+            raise
 
     @staticmethod
     def sign_up(first_name, last_name, email, password):
@@ -218,7 +314,9 @@ class AccountService:
         if not mail_available():
             return "mail_unavailable"
         user = User.find_by_email(email)
-        if user is not None and user.password_hash is not None:
+        # A confirmed account that signs in only with Google or Microsoft has no
+        # password yet; the reset link is how it sets its first one.
+        if user is not None and (user.password_hash is not None or user.confirmed):
             # No one is signed in, so there is no session organisation: the token
             # row belongs to the account's own organisation (account_tokens is
             # fenced by row-level security), hence the platform scope.
@@ -247,6 +345,203 @@ class AccountService:
                 on_result=record,
             )
         return "requested"
+
+    # ------------------------------------------------------------------
+    # Continue with Google / Continue with Microsoft
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def sign_in_external_identity(provider, claims):
+        """Decide what a verified Google or Microsoft identity may do.
+
+        ``claims`` are the claims of an id_token that has already passed
+        signature, issuer, audience, expiry and nonce checks. Returns an
+        :class:`ExternalSignIn`:
+
+        * ``signed_in``: a person already connected to this provider account
+          (matched by the provider's subject, never by email).
+        * ``created``: a new person, confirmed at once, alone in an
+          organisation of their own.
+        * ``pending_link``: the verified address belongs to an existing
+          account; nothing is changed, and the connection is completed only
+          when that account is signed in to by a method it already has.
+        * ``refused``: nothing was stored; ``message`` says why.
+
+        This never mints a session. The route does that, after the
+        two-factor gate.
+        """
+        import time
+
+        from sqlalchemy.exc import IntegrityError
+
+        from app.auth import sso as platform
+        from app.models.sign_in_identity import SignInIdentity
+        from app.models.user import User
+
+        label = platform.PLATFORM_LABELS[provider]
+        missing = "{} did not return the details we need to sign you in.".format(label)
+        subject = platform.platform_subject(provider, claims)
+        if not subject:
+            return ExternalSignIn("refused", message=missing)
+        issuer = str(claims.get("iss") or "")[:255]
+
+        # tenant-scoping-ok: sign_in_identities holds a person's connected provider account and is read before any organisation is known
+        identity = SignInIdentity.query.filter_by(provider=provider, subject=subject).first()
+        if identity is not None:
+            # tenant-scoping-ok: pre-sign-in lookup of the person this identity names, no organisation known yet
+            user = db.session.get(User, identity.user_id)
+            reason = AccountService._external_refusal(user, label)
+            if reason:
+                return ExternalSignIn("refused", message=reason)
+            identity.last_used_at = AccountService._now_utc()
+            db.session.commit()
+            return ExternalSignIn("signed_in", user=user)
+
+        email = platform.platform_verified_email(provider, claims)
+        if not email:
+            if platform.platform_claims_an_email(claims):
+                return ExternalSignIn("refused", message=platform.unconfirmed_email_message(provider))
+            return ExternalSignIn("refused", message=missing)
+        email = User.normalize_email(email)
+        if len(email) > 64 or "@" not in email:
+            return ExternalSignIn("refused", message=missing)
+
+        own_sso = AccountService._own_sso_refusal(email)
+        if own_sso:
+            return ExternalSignIn("refused", message=own_sso)
+
+        existing = User.find_by_email(email)
+        if existing is not None:
+            reason = AccountService._external_refusal(existing, label)
+            if reason:
+                return ExternalSignIn("refused", message=reason)
+            # tenant-scoping-ok: pre-sign-in lookup by the person's own user id, no organisation known yet
+            if SignInIdentity.query.filter_by(user_id=existing.id, provider=provider).first() is not None:
+                return ExternalSignIn(
+                    "refused",
+                    message="This account is already connected to a different {} account.".format(label),
+                )
+            pending = {
+                "provider": provider, "issuer": issuer, "subject": subject, "email": existing.email,
+                "user_id": existing.id, "expires_at": time.time() + PENDING_LINK_SECONDS,
+            }
+            return ExternalSignIn("pending_link", user=existing, pending=pending)
+
+        first_name, last_name = AccountService._names_from_claims(claims)
+        try:
+            org = AccountService._new_organisation(first_name, last_name, email)
+            user = User(first_name=first_name, last_name=last_name, email=email, confirmed=True, organization_id=org.id)
+            db.session.add(user)
+            db.session.flush()
+            AccountService._make_owner(user, org, commit=False)
+            now = AccountService._now_utc()
+            db.session.add(SignInIdentity(
+                user_id=user.id, provider=provider, issuer=issuer, subject=subject,
+                email_at_link=email, created_at=now, last_used_at=now,
+            ))
+            db.session.commit()
+        except (IntegrityError, ValueError):
+            db.session.rollback()
+            return ExternalSignIn("refused", message=missing)
+        except Exception:
+            db.session.rollback()
+            raise
+        return ExternalSignIn("created", user=user)
+
+    @staticmethod
+    def _now_utc():
+        from datetime import datetime, timezone
+
+        return datetime.now(timezone.utc)
+
+    @staticmethod
+    def _names_from_claims(claims):
+        given = str(claims.get("given_name") or "").strip()
+        family = str(claims.get("family_name") or "").strip()
+        if not given and not family:
+            full = str(claims.get("name") or "").strip()
+            given, _, family = full.partition(" ")
+            family = family.strip()
+        return given[:64], family[:64]
+
+    @staticmethod
+    def _own_sso_refusal(email):
+        """The refusal for an address in a domain an organisation signs in to through its own SSO."""
+        from app.services.sso_service import SSODomainConflictError, SSOService
+
+        message = (
+            "Your organisation signs in through its own single sign-on. "
+            "Enter your work email on the sign-in page to continue."
+        )
+        try:
+            return message if SSOService().get_config_for_email(email) is not None else None
+        except SSODomainConflictError:
+            return message
+
+    @staticmethod
+    def _external_refusal(user, label):
+        """Why ``user`` may not sign in with a provider, or None."""
+        from app.models.sso_config import SSOConfig
+        from app.modules.account.services.invitation_service import is_unactivated
+
+        if user is None:
+            return "{} sign-in is not available for this account. Use your email and password.".format(label)
+        if user.is_platform_admin or user.disabled_at is not None or getattr(user, "is_service_user", False):
+            return "{} sign-in is not available for this account. Use your email and password.".format(label)
+        if is_unactivated(user):
+            return "You have an invitation waiting. Open the invitation email to join."
+        # tenant-scoping-ok: pre-sign-in check of the one organisation this person belongs to
+        if SSOConfig.query.filter_by(organization_id=user.organization_id, enabled=True).first() is not None:
+            return (
+                "Your organisation signs in through its own single sign-on. "
+                "Enter your work email on the sign-in page to continue."
+            )
+        return AccountService._own_sso_refusal(user.email)
+
+    @staticmethod
+    def complete_pending_link(user, pending):
+        """Connect the provider account a pending link names to ``user``, if ``user`` is who it was for.
+
+        Called by the call that mints every interactive session, after the
+        session is reset. The record is single use: the caller discards it
+        whatever happens here. Never raises, so a failed link cannot stop a
+        sign-in that has already succeeded.
+        """
+        import time
+
+        from app.auth import sso as platform
+        from app.models.sign_in_identity import SignInIdentity
+
+        try:
+            if not isinstance(pending, dict) or pending.get("user_id") != user.id:
+                return False
+            if float(pending.get("expires_at") or 0) < time.time():
+                return False
+            provider = pending["provider"]
+            if provider not in platform.PLATFORM_LABELS:
+                return False
+            # tenant-scoping-ok: sign_in_identities is read by provider, subject and person, never by organisation
+            taken = SignInIdentity.query.filter(
+                db.or_(
+                    db.and_(SignInIdentity.provider == provider, SignInIdentity.subject == pending["subject"]),
+                    db.and_(SignInIdentity.user_id == user.id, SignInIdentity.provider == provider),
+                )
+            ).first()
+            if taken is not None:
+                return False
+            now = AccountService._now_utc()
+            db.session.add(SignInIdentity(
+                user_id=user.id, provider=provider, issuer=str(pending.get("issuer") or "")[:255],
+                subject=pending["subject"], email_at_link=pending.get("email") or user.email,
+                created_at=now, last_used_at=now,
+            ))
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
+            _log.error("connecting a sign-in method for user %s failed", getattr(user, "id", None), exc_info=True)
+            return False
+        AccountService.notify_sign_in_method_connected(user, platform.PLATFORM_LABELS[provider])
+        return True
 
     @staticmethod
     def notify_sign_in_method_connected(user, provider_label):
@@ -314,6 +609,9 @@ class AccountService:
         # There is no acting session to preserve -- a reset happens
         # while logged out.
         AccountService._revoke_other_sessions(user.id, "password_change", except_sid=None)
+        from app.services import activity_record
+
+        activity_record.record_security_event("password_reset", user)
         return True, "Your password has been updated. Sign in with your new password."
 
     @staticmethod
@@ -436,9 +734,14 @@ class AccountService:
             if row is None:
                 db.session.rollback()
                 return None, "This confirmation link has expired or has already been used."
-            row.user.confirmed = True
-            db.session.commit()
-            return row.user, "Your e-mail address is confirmed."
+            user = row.user
+            try:
+                AccountService.confirm_user(user)
+            except Exception:
+                # confirm_user rolled back, which also un-uses the link.
+                _log.error("confirm e-mail: the workspace could not be created", exc_info=True)
+                return None, "We could not finish confirming your account. Open the link again in a moment to try once more."
+            return user, "Your e-mail address is confirmed."
 
     @staticmethod
     def accept_invitation(user, invitation_id):

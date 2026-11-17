@@ -93,6 +93,14 @@ let ComposerSearch = (function() {
 
                 if (data.viewpoint_name) self.activeViewpointName = data.viewpoint_name;
 
+                self.layerCards = [];
+                /* A model too large to draw readably opens as one card per layer. */
+                if (data.overview) {
+                    self._drawLayerOverview(data);
+                    return;
+                }
+                self.openedLayer = layer || '';
+
                 if (elements.length === 0) {
                     self.elementCount = 0;
                     self.relCount = 0;
@@ -104,30 +112,50 @@ let ComposerSearch = (function() {
                     return;
                 }
 
+                /* Draw once, after every node has its place. A synchronous paper
+                 * measures and re-routes each cell as it is added and again as the
+                 * banding moves it, which grows with the square of the element
+                 * count and held the tab for minutes on a populated model. */
                 let cellMap = {};
-                elements.forEach(function(el) {
-                    let layer = (el.layer || '').toLowerCase() || guessLayer(el.type);
-                    let node = createNode(el.id, el.name, el.type || 'ApplicationComponent', layer, 0, 0);
-                    self.graph.addCell(node);
-                    cellMap[el.id] = node;
-                    self.canvasElements[el.id] = el;
-                });
+                let cells = [];
+                self.paper.freeze();
+                try {
+                    elements.forEach(function(el) {
+                        let layer = (el.layer || '').toLowerCase() || guessLayer(el.type);
+                        let node = createNode(el.id, el.name, el.type || 'ApplicationComponent', layer, 0, 0);
+                        cells.push(node);
+                        cellMap[el.id] = node;
+                        self.canvasElements[el.id] = el;
+                    });
 
-                relationships.forEach(function(rel) {
-                    let srcCell = cellMap[rel.source_id];
-                    let tgtCell = cellMap[rel.target_id];
-                    if (!srcCell || !tgtCell) return;
-                    let link = createLink(srcCell, tgtCell, rel.type || 'association', rel.id);
-                    self.graph.addCell(link);
-                });
+                    relationships.forEach(function(rel) {
+                        let srcCell = cellMap[rel.source_id];
+                        let tgtCell = cellMap[rel.target_id];
+                        if (!srcCell || !tgtCell) return;
+                        cells.push(createLink(srcCell, tgtCell, rel.type || 'association', rel.id));
+                    });
 
-                /* Apply layer banding layout */
-                applyLayerBanding(self.graph);
+                    /* One reset instead of an add event per cell. */
+                    self.graph.resetCells(cells);
+
+                    /* Apply layer banding layout */
+                    applyLayerBanding(self.graph);
+                } finally {
+                    /* Draw in batches so the tab keeps answering while a large
+                     * model appears; a small one is drawn in the first batch. */
+                    self.paper.options.async = true;
+                    self.paper.unfreeze({ batchSize: 40 });
+                    self.paper.once('render:done', function() { self.paper.options.async = false; });
+                    self._scheduleMiniMapUpdate();
+                }
 
                 self.elementCount = elements.length;
                 self.relCount = relationships.length;
                 self.viewpointLoading = false;
                 self.statusText = self.activeViewpointName + ' — ' + elements.length + ' elements, ' + relationships.length + ' relationships';
+                if (data.omitted_note) self.statusText += ' (' + data.omitted_note + ' of ' + data.store_total + ' in your model)';
+                if (data.register_only_note) self.statusText += ' (' + data.register_only_note + ')';
+                if (data.layer_omitted_note) self.statusText += ' (' + data.layer_omitted_note + ')';
 
                 UndoStack.resume();
                 UndoStack.clear();
@@ -139,7 +167,7 @@ let ComposerSearch = (function() {
                  * loadSavedViewpoint(). */
                 self.viewpointDirty = false;
                 self.$nextTick(function() {
-                    self.fitCanvas();
+                    self.fitCanvasReadable();
                     if (window.lucide) lucide.createIcons();
                     if (self.intelligenceEnabled) self.fetchIntelligence();
                     /* GAP-CMP-002/003: Update validation badge + orphan highlights */
@@ -148,6 +176,7 @@ let ComposerSearch = (function() {
             })
             .catch(function(err) {
                 UndoStack.resume();
+                self.layerCards = [];
                 _toast('error', 'Failed to switch viewpoint');
                 // Platform.fetch already logged the error; we keep the inline error state
                 self.viewpointLoading = false;
@@ -157,10 +186,76 @@ let ComposerSearch = (function() {
             });
         },
 
+        /* One card per layer: its name and how many elements it holds. Opening a card
+           loads that layer's most connected elements. The cards are not elements, so
+           they carry no element id and the quality figure does not judge them. */
+        _drawLayerOverview: function(data) {
+            let self = this;
+            let representative = {
+                motivation: 'Goal', strategy: 'Capability', business: 'BusinessProcess',
+                application: 'ApplicationComponent', technology: 'Node', implementation: 'WorkPackage'
+            };
+            let canvasWidth = (document.getElementById('composer-canvas') || {}).clientWidth || 1000;
+            let cols = canvasWidth < 700 ? 2 : 3;
+            let cards = data.overview.map(function(row, i) {
+                let card = createNode(null, row.title, representative[row.layer] || 'ApplicationComponent',
+                    row.layer, 40 + (i % cols) * 240, 40 + Math.floor(i / cols) * 160);
+                let plural = row.count === 1 ? ' element' : ' elements';
+                card.attr('nameLabel/text', row.title);
+                card.attr('nameLabel/fontSize', 20);
+                card.attr('nameLabel/y', 28);
+                card.attr('nameLabel/textWrap', { width: -24, maxLineCount: 2, ellipsis: true });
+                card.attr('typeLabel/text', row.count + plural);
+                card.attr('typeLabel/fontSize', 20);
+                card.attr('typeLabel/y', row.title.length > 14 ? 96 : 72);
+                card.set('elName', row.title);
+                card.set('isLayerSummary', true);
+                card.set('summaryLayer', row.layer);
+                card.set('summaryCount', row.count);
+                return card;
+            });
+            self.graph.resetCells(cards);
+            self.canvasElements = {};
+            /* The same cards as buttons, so a keyboard or screen reader opens a layer too. */
+            self.layerCards = data.overview.map(function(row) {
+                let apart = row.not_on_model_map
+                    ? ', ' + row.not_on_model_map + ' of them entered in a register and not drawn' : '';
+                return { layer: row.layer, title: row.title, count: row.count,
+                         label: row.title + ', ' + row.count + (row.count === 1 ? ' element' : ' elements') + apart };
+            });
+            self.layerCardsTotal = data.store_total;
+            self.elementCount = 0;
+            self.relCount = 0;
+            self.openedLayer = '';
+            self.validationErrors = 0;
+            self.validationWarnings = 0;
+            self.viewpointLoading = false;
+            self.statusText = self.activeViewpointName + ' — ' + data.store_total + ' elements in ' + cards.length +
+                ' layers. Open a layer to see its most connected elements.';
+            UndoStack.resume();
+            UndoStack.clear();
+            self.viewpointDirty = false;
+            self.$nextTick(function() {
+                self.fitCanvas();
+                if (window.lucide) lucide.createIcons();
+            });
+        },
+
+        /* What the footer counts while the layer cards stand in for the drawing; empty when elements are drawn. */
+        overviewCounts: function() {
+            if (!this.layerCards || !this.layerCards.length) return '';
+            return this.layerCardsTotal + ' elements in ' + this.layerCards.length + (this.layerCards.length === 1 ? ' layer' : ' layers');
+        },
+
+        openLayer: function(layer) {
+            this.selectViewpoint(this.activeViewpoint, this.activeViewpointName, layer);
+        },
+
         clearViewpoint: function() {
             this.vpDropdownOpen = false;
             this.activeViewpoint = null;
             this.activeViewpointName = '';
+            this.layerCards = [];
             this.scopeFallback = false;
             this.mode = 'edit';
             this._clearNeighborFocus();
@@ -221,6 +316,7 @@ let ComposerSearch = (function() {
                     let el = { id: elem.id, name: elem.name || name, type: elem.type || type, layer: elem.layer || layer };
                     let node = createNode(el.id, el.name, el.type, el.layer, self.dropX, self.dropY);
                     self.graph.addCell(node);
+                    self.shellRecordPlacement(node);
                     self.canvasElements[el.id] = el;
                     self.elementCount++;
                     if (self.solutionId) self.linkElementToSolution(elem.id);
@@ -402,13 +498,13 @@ let ComposerSearch = (function() {
 
             let newName = oldName.replace(re, self.srReplaceText);
             cell.set('elName', newName);
-            cell.attr('label/text', newName);
+            cell.attr('nameLabel/text', newName);
 
             /* Push undo */
             if (typeof UndoStack !== 'undefined' && UndoStack.push) {
                 UndoStack.push({
-                    undo: function() { cell.set('elName', oldName); cell.attr('label/text', oldName); },
-                    redo: function() { cell.set('elName', newName); cell.attr('label/text', newName); },
+                    undo: function() { cell.set('elName', oldName); cell.attr('nameLabel/text', oldName); },
+                    redo: function() { cell.set('elName', newName); cell.attr('nameLabel/text', newName); },
                 });
             }
 
@@ -444,19 +540,19 @@ let ComposerSearch = (function() {
                 let oldName = cell.get('elName') || '';
                 let newName = oldName.replace(re, self.srReplaceText);
                 cell.set('elName', newName);
-                cell.attr('label/text', newName);
+                cell.attr('nameLabel/text', newName);
             });
 
             /* Push single undo for bulk replace */
             if (typeof UndoStack !== 'undefined' && UndoStack.push) {
                 UndoStack.push({
                     undo: function() {
-                        oldNames.forEach(function(o) { o.cell.set('elName', o.name); o.cell.attr('label/text', o.name); });
+                        oldNames.forEach(function(o) { o.cell.set('elName', o.name); o.cell.attr('nameLabel/text', o.name); });
                     },
                     redo: function() {
                         oldNames.forEach(function(o) {
                             let n = o.name.replace(re, self.srReplaceText);
-                            o.cell.set('elName', n); o.cell.attr('label/text', n);
+                            o.cell.set('elName', n); o.cell.attr('nameLabel/text', n);
                         });
                     },
                 });

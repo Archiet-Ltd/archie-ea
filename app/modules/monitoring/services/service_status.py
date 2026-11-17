@@ -20,6 +20,8 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import Optional
 
+import logging
+
 from app.extensions import db
 
 STATE_OPERATIONAL = "operational"
@@ -119,6 +121,122 @@ def current_status() -> dict:
 
 
 # --------------------------------------------------------------------------- #
+# Public component view (no organisation, no user: platform-wide facts only)
+# --------------------------------------------------------------------------- #
+
+COMPONENT_STATE_LABELS = {
+    STATE_OPERATIONAL: "Operational",
+    STATE_DEGRADED: "Degraded",
+    STATE_OUTAGE: "Down",
+    None: "Not checked",
+}
+
+
+@dataclass(frozen=True)
+class Component:
+    key: str
+    name: str
+    state: Optional[str]          # None: not checked
+    detail: str
+
+    @property
+    def label(self) -> str:
+        return COMPONENT_STATE_LABELS[self.state]
+
+
+def _objective(objectives: dict, name: str):
+    status = objectives.get(name) or {}
+    if not status.get("measured"):
+        return None
+    met = status.get("meets_availability_target") and status.get("meets_latency_target") is not False
+    return STATE_OPERATIONAL if met else STATE_DEGRADED
+
+
+def _component_checks() -> list[Component]:
+    """The five public components, from the checks the platform already runs."""
+    from app.modules.monitoring.services.health_service import HealthService
+
+    try:
+        from app.services.platform_slo_service import get_platform_slo_status
+
+        objectives = get_platform_slo_status().get("objectives", {})
+    except Exception:
+        objectives = {}
+
+    web_state = _objective(objectives, "api")
+    web = Component(
+        "web", "Web application",
+        web_state or STATE_OPERATIONAL,
+        "Within its availability and response-time targets" if web_state == STATE_OPERATIONAL
+        else "Missing its availability or response-time target" if web_state
+        else "Serving requests",
+    )
+
+    try:
+        database_ok = HealthService.check_database().get("status") == "healthy"
+        database = Component(
+            "database", "Database",
+            STATE_OPERATIONAL if database_ok else STATE_OUTAGE,
+            "Responding" if database_ok else "Not responding",
+        )
+    except Exception:
+        database = Component("database", "Database", None, "The check could not run")
+
+    try:
+        cache = HealthService.check_cache().get("status")
+    except Exception:
+        cache = "error"
+    if cache == "error":
+        jobs = Component("background-jobs", "Background jobs", None, "The check could not run")
+    elif cache == "healthy":
+        jobs = Component("background-jobs", "Background jobs", STATE_OPERATIONAL, "Job queue responding")
+    elif cache == "unhealthy":
+        jobs = Component("background-jobs", "Background jobs", STATE_OUTAGE, "Job queue not responding")
+    else:
+        jobs = Component("background-jobs", "Background jobs", None, "No job queue is configured to check")
+
+    answers = _objective(objectives, "answers")
+    ai = Component(
+        "ai-provider", "AI answers", answers,
+        "Within its availability and response-time targets" if answers == STATE_OPERATIONAL
+        else "Missing its availability or response-time target" if answers
+        else "No AI answers observed since the service started",
+    )
+
+    email = Component("email", "Email", None, "Email delivery is not probed from this page")
+    return [web, database, jobs, ai, email]
+
+
+def public_status() -> dict:
+    """Everything the public status page shows; renders even when the database is down."""
+    components = _component_checks()
+    incidents_checked = True
+    open_now, history = [], []
+    if next(c for c in components if c.key == "database").state == STATE_OPERATIONAL:
+        try:
+            open_now = open_incidents()
+            history = incident_history()
+        except Exception:
+            db.session.rollback()
+            incidents_checked = False
+    else:
+        incidents_checked = False
+    states = [c.state for c in components]
+    db_down = any(c.key == "database" and c.state == STATE_OUTAGE for c in components)
+    state = _worst([STATE_OUTAGE if db_down else (STATE_DEGRADED if s == STATE_OUTAGE else s) for s in states]
+                   + [i.impact for i in open_now])
+    return {
+        "state": state,
+        "label": STATE_LABELS[state],
+        "components": components,
+        "open_incidents": open_now,
+        "history": history,
+        "incidents_checked": incidents_checked,
+        "checked_at": datetime.utcnow(),
+    }
+
+
+# --------------------------------------------------------------------------- #
 # Subscription (the signed-in user's own preference row)
 # --------------------------------------------------------------------------- #
 
@@ -142,6 +260,59 @@ def set_subscribed(user_id: int, subscribed: bool) -> bool:
     return pref.notify_on_service_status
 
 
+_log = logging.getLogger(__name__)
+_IMPACT_WORDS = {"outage": "Down", "degraded": "Degraded"}
+
+
+def notify_subscribers(incident, resolved: bool) -> int:
+    """Email every active subscriber, one message each. Returns how many went out.
+
+    An incident is platform-wide, so subscribers in every organisation are told.
+    A failure is logged and never undoes the incident, which is already saved.
+    """
+    from flask import current_app
+
+    from app.flask_email import deliver_email, mail_available
+    from app.models.ai_suggestion import UserPreference
+    from app.models.user import User
+    from app.services.origin import canonical_origin
+
+    try:
+        if not mail_available():
+            return 0
+        users = (
+            User.query.join(UserPreference, UserPreference.user_id == User.id)  # tenant-scoping-ok: an incident is platform-wide, so every subscriber in every organisation is told
+            .filter(UserPreference.notify_on_service_status.is_(True), User.disabled_at.is_(None))
+            .all()
+        )
+        link = canonical_origin() + "/status"
+        when = (incident.resolved_at if resolved else incident.started_at) or datetime.utcnow()
+        subject = ("Resolved: " if resolved else "Incident: ") + incident.title
+        sent = 0
+        # The operator command runs outside a request; the shared page context
+        # processors expect one, so render inside a throwaway request context.
+        with current_app.test_request_context("/status"):
+            for user in users:
+                try:
+                    delivered, _error = deliver_email(
+                        user.email,
+                        subject,
+                        "monitoring/email/service_incident",
+                        incident=incident,
+                        resolved=resolved,
+                        impact_label=_IMPACT_WORDS.get(incident.impact, incident.impact),
+                        when=when,
+                        status_link=link,
+                    )
+                    sent += 1 if delivered else 0
+                except Exception:
+                    _log.error("service status email to one subscriber failed", exc_info=True)
+        return sent
+    except Exception:
+        _log.error("service status emails were not sent", exc_info=True)
+        return 0
+
+
 # --------------------------------------------------------------------------- #
 # Operator actions (the CLI)
 # --------------------------------------------------------------------------- #
@@ -158,6 +329,7 @@ def open_incident(title: str, impact: str, summary: Optional[str] = None):
     incident = ServiceIncident(title=title[:200], impact=impact, summary=(summary or None))
     db.session.add(incident)
     db.session.commit()
+    notify_subscribers(incident, resolved=False)
     return incident
 
 
@@ -170,4 +342,5 @@ def resolve_incident(incident_id: int):
     if incident.resolved_at is None:
         incident.resolved_at = datetime.utcnow()
         db.session.commit()
+        notify_subscribers(incident, resolved=True)
     return incident

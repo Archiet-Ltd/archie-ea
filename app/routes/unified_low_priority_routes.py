@@ -19,10 +19,13 @@ from flask import (
     redirect,
     render_template,
     request,
+    url_for,
 )
-from flask_login import login_required
+from flask_login import current_user, login_required
 
-from app.decorators import audit_log, require_roles
+from app.decorators import audit_log, require_roles, user_has_any_role
+from app.services.cost_visibility import PIPELINE_FIGURE_KEYS
+from app.modules.genome.services.roadmap_links import redirect_to_roadmap
 from sqlalchemy import or_, text
 
 from .. import db
@@ -37,6 +40,7 @@ from ..services.policy_monitoring_service import PolicyMonitoringService
 
 # Import new services
 from ..services.strategic_service import StrategicService
+from app.utils.plain_errors import render_plain_error
 
 # Initialize services
 strategic_service = StrategicService()
@@ -125,29 +129,25 @@ def architecture_relationships():
     template.
     """
     try:
-        rels = ArchiMateRelationship.query.order_by(ArchiMateRelationship.type).all()
-        element_ids = {
-            eid for rel in rels for eid in (rel.source_id, rel.target_id) if eid is not None
-        }
-        names_by_id = {}
-        if element_ids:
-            names_by_id = dict(
-                db.session.query(ArchiMateElement.id, ArchiMateElement.name)
-                .filter(ArchiMateElement.id.in_(element_ids))
-            )
-        relationships = [
-            {
-                "id": rel.id,
-                "type": rel.type,
-                "source_id": rel.source_id,
-                "target_id": rel.target_id,
-                "source_name": names_by_id.get(rel.source_id),
-                "target_name": names_by_id.get(rel.target_id),
-            }
-            for rel in rels
-        ]
+        from app.middleware.tenant_context import current_org_id
+        from app.modules.intelligence.services.query_service import (
+            RELATIONSHIP_PAGE_SIZES, relationship_sort_args, relationships_page,
+        )
+
+        page = request.args.get("page", 1, type=int)
+        per_page = request.args.get("per_page", 20, type=int)
+        if per_page not in RELATIONSHIP_PAGE_SIZES:
+            per_page = 20
+        sort, direction = relationship_sort_args(request.args)
+        listing = relationships_page(current_org_id(), max(page, 1), per_page, None, sort, direction)
         return render_template(
-            "architecture/relationships.html", relationships=relationships
+            "architecture/relationships.html",
+            relationship_page_sizes=RELATIONSHIP_PAGE_SIZES,
+            per_page=per_page,
+            focus_id=None,
+            sort=sort,
+            sort_dir=direction,
+            **listing,
         )
     except Exception as e:
         db.session.rollback()
@@ -155,7 +155,7 @@ def architecture_relationships():
         flash("Error loading architecture relationships", "error")
         return render_template(
             "architecture/relationships.html",
-            relationships=[],
+            relationships=[], total=0, page=1, pages=1, per_page=20, focus_id=None,
             load_error="ArchiMate relationships could not be read.",
         )
 
@@ -337,57 +337,8 @@ def capability_map_mapping():
 @unified_low_priority_bp.route("/strategic/roadmap")
 @login_required
 def strategic_roadmap():
-    """Strategic roadmap view with swimlane visualization"""
-    try:
-        # Get filter parameters
-        year = request.args.get("year", type=int)
-        quarter = request.args.get("quarter")
-
-        # Get roadmap data from services
-        roadmap_by_lane_result = strategic_service.get_roadmap_by_lane()
-        roadmap_items_result = strategic_service.get_roadmap_items(
-            year=year, quarter=quarter
-        )
-        health_scores_result = strategic_service.get_initiative_health_scores()
-
-        # Extract data using correct keys (not "data")
-        roadmap_by_lane = (
-            roadmap_by_lane_result.get("roadmap_by_lane", {})
-            if roadmap_by_lane_result.get("success")
-            else {}
-        )
-        roadmap_items = (
-            roadmap_items_result.get("roadmap_items", [])
-            if roadmap_items_result.get("success")
-            else []
-        )
-        health_scores = (
-            health_scores_result.get("health_scores", [])
-            if health_scores_result.get("success")
-            else []
-        )
-
-        return render_template(
-            "strategic/roadmap.html",
-            roadmap_items=roadmap_items,
-            roadmap_by_lane=roadmap_by_lane,
-            health_scores=health_scores,
-            year=year,
-            quarter=quarter,
-        )
-    except Exception as e:
-        db.session.rollback()
-        current_app.logger.exception("Strategic roadmap error: %s", e)
-        flash("Error loading strategic roadmap", "error")
-        return render_template(
-            "strategic/roadmap.html",
-            roadmap_items=[],
-            roadmap_by_lane={},
-            health_scores=[],
-            year=None,
-            quarter=None,
-            load_error="The strategic roadmap could not be read.",
-        )
+    """The enterprise strategic roadmap is the one roadmap, Strategic view."""
+    return redirect_to_roadmap("strategic")
 
 
 @unified_low_priority_bp.route("/strategic/initiatives")
@@ -413,11 +364,19 @@ def strategic_initiatives():
             else []
         )
 
+        from app.services.cost_visibility import COSTS_WITHHELD, costs_visible, withhold_costs
+
+        withheld = not costs_visible(current_user)
+        if withheld:
+            initiatives_list = withhold_costs(
+                initiatives_list)
         return render_template(
             "strategic/initiatives.html",
             initiatives=initiatives_list,
             health_scores=health_scores_list,
             status_filter=status_filter,
+            costs_withheld=withheld,
+            costs_withheld_sentence=COSTS_WITHHELD,
         )
     except Exception as e:
         db.session.rollback()
@@ -440,8 +399,11 @@ def strategic_initiatives():
 def consolidation_dashboard():
     """Application consolidation dashboard - renders existing consolidation list dashboard"""
     try:
+        from app.services.cost_visibility import COSTS_WITHHELD, costs_visible
+
         dashboard_data = consolidation_service.get_consolidation_dashboard_data()
         statistics = consolidation_service.get_consolidation_statistics()
+        withheld = not costs_visible(current_user)
 
         if dashboard_data.get("success"):
             data = dashboard_data["data"]
@@ -454,6 +416,7 @@ def consolidation_dashboard():
                 if statistics.get("success")
                 else {},
                 savings_forecast=data.get("savings_forecast", {}),
+                costs_withheld=withheld, costs_withheld_sentence=COSTS_WITHHELD,
             )
         else:
             return render_template(
@@ -461,11 +424,28 @@ def consolidation_dashboard():
                 total_applications=ApplicationComponent.query.count(),
                 duplicate_candidates=[],
                 consolidation_opportunities=[],
+                costs_withheld=withheld, costs_withheld_sentence=COSTS_WITHHELD,
             )
     except Exception as e:
         current_app.logger.error(f"Consolidation dashboard error: {str(e)}")
         flash("Error loading consolidation dashboard", "error")
         return redirect("/enterprise/")
+
+
+COMPARE_ROLES = ("admin", "architect", "business_architect")
+
+
+def _comparison_context():
+    """Who may run the comparison, and how many applications this organisation has to compare."""
+    try:
+        application_count = ApplicationComponent.query.count()
+    except Exception:
+        db.session.rollback()
+        application_count = None
+    return {
+        "may_find": user_has_any_role(current_user, *COMPARE_ROLES),
+        "application_count": application_count,
+    }
 
 
 @unified_low_priority_bp.route("/consolidation/candidates")
@@ -485,7 +465,7 @@ def consolidation_candidates():
             if isinstance(candidates_result, list)
             else (candidates_result.get("data", []) if candidates_result.get("success") else [])
         )
-        return render_template("consolidation/candidates.html", candidates=candidates)
+        return render_template("consolidation/candidates.html", candidates=candidates, **_comparison_context())
     except Exception as e:
         db.session.rollback()
         current_app.logger.exception("Consolidation candidates error: %s", e)
@@ -494,7 +474,57 @@ def consolidation_candidates():
             "consolidation/candidates.html",
             candidates=[],
             load_error="Consolidation candidates could not be read.",
+            **_comparison_context(),
         )
+
+
+@unified_low_priority_bp.route("/consolidation/candidates/find", methods=["POST"])
+@login_required
+@require_roles(*COMPARE_ROLES)
+@audit_log("consolidation_detect")
+def find_consolidation_candidates():
+    """Compare this organisation's applications and record the pairs that look alike."""
+    try:
+        result = consolidation_service.detect_duplicate_candidates()
+        if not result.get("success"):
+            flash("The comparison could not be run. Try again in a moment.", "error")
+        elif "applications_scanned" not in result:
+            flash("There are fewer than two applications to compare. Add at least two applications, then run the comparison again.", "info")
+        elif result.get("candidates_found"):
+            found = result["candidates_found"]
+            flash("The comparison found %d consolidation candidate%s." % (found, "" if found == 1 else "s"), "success")
+        else:
+            flash("The comparison ran across %d applications and found no pair that shares a capability or business function." % result.get("applications_scanned", 0), "info")
+        if result.get("candidates_dismissed"):
+            flash("%d earlier candidate%s with nothing in common %s dismissed." % (result["candidates_dismissed"], "" if result["candidates_dismissed"] == 1 else "s", "was" if result["candidates_dismissed"] == 1 else "were"), "info")
+    except Exception as e:
+        db.session.rollback()
+        current_app.logger.exception("Consolidation comparison error: %s", e)
+        flash("The comparison could not be run. Try again in a moment.", "error")
+    return redirect(url_for("unified_low_priority.consolidation_candidates"))
+
+
+@unified_low_priority_bp.route("/consolidation/candidates/<int:candidate_id>/dismiss", methods=["POST"])
+@login_required
+@require_roles(*COMPARE_ROLES)
+@audit_log("consolidation_dismiss")
+def dismiss_consolidation_candidate(candidate_id):
+    """Dismiss a candidate pair that is not really a duplicate, keeping the pair on record as rejected."""
+    result = consolidation_service.review_candidate(
+        candidate_id,
+        "reject",
+        notes=(request.form.get("notes") or "").strip() or None,
+        user_id=current_user.id,
+    )
+    if result.get("success"):
+        flash("The candidate was dismissed.", "success")
+    elif result.get("error") == "Candidate not found":
+        from werkzeug.exceptions import NotFound
+
+        raise NotFound()
+    else:
+        flash("The candidate could not be dismissed. Try again in a moment.", "error")
+    return redirect(url_for("unified_low_priority.consolidation_candidates"))
 
 
 @unified_low_priority_bp.route("/consolidation/opportunities")
@@ -519,10 +549,12 @@ def consolidation_opportunities():
             if isinstance(savings_forecast, dict) and savings_forecast.get("success")
             else (savings_forecast if isinstance(savings_forecast, dict) else {})
         )
+        ranked = _ranked_opportunities_for_page()
         return render_template(
             "consolidation/opportunities.html",
             opportunities=opportunities,
             savings_forecast=savings,
+            **ranked,
         )
     except Exception as e:
         db.session.rollback()
@@ -532,7 +564,29 @@ def consolidation_opportunities():
             "consolidation/opportunities.html",
             opportunities=[],
             load_error="Consolidation opportunities could not be read.",
+            ranked_items=[], ranked_total=0, ranked_error=None, with_cost=False,
         )
+
+
+def _ranked_opportunities_for_page():
+    """The opportunities the Opportunities page ranks, read through the same service and the same cost rule."""
+    from app.decorators.requires_role import may_see_spend_pages
+    from app.services import opportunity_service
+    from app.utils.tenant import current_organization_id
+
+    org_id = current_organization_id()
+    with_cost = may_see_spend_pages(current_user)
+    if org_id is None:
+        return {"ranked_items": [], "ranked_total": 0, "ranked_error": None, "with_cost": with_cost}
+    try:
+        found = opportunity_service.ranked_opportunities(org_id, with_cost=with_cost)
+        return {"ranked_items": found["items"], "ranked_total": found["total"], "ranked_error": None,
+                "with_cost": with_cost}
+    except Exception:  # noqa: BLE001
+        db.session.rollback()
+        current_app.logger.exception("Opportunities could not be worked out")
+        return {"ranked_items": [], "ranked_total": 0, "with_cost": with_cost,
+                "ranked_error": "The opportunities could not be worked out."}
 
 
 # === POLICY MONITORING ROUTES ===
@@ -541,8 +595,8 @@ def consolidation_opportunities():
 @unified_low_priority_bp.route("/policy-monitoring")
 @login_required
 def policy_monitoring_dashboard():
-    """Policy Monitoring Dashboard — compliance scan results and violation tracking."""
-    return render_template("policy_monitoring/dashboard.html")
+    """The old address of Controls: the one page is served at /policy-monitoring/."""
+    return redirect(url_for("policy_monitoring.policy_dashboard"))
 
 
 # === API ENDPOINTS ===
@@ -717,8 +771,10 @@ def api_detect_duplicates():
 def api_consolidation_statistics():
     """API endpoint for consolidation statistics"""
     try:
+        from app.services.cost_visibility import withhold_reply
+
         result = consolidation_service.get_consolidation_statistics()
-        return jsonify(result)
+        return jsonify(withhold_reply(result, keys=PIPELINE_FIGURE_KEYS))
     except Exception as e:
         current_app.logger.error(f"API consolidation statistics error: {str(e)}")
         return jsonify({"success": False, "error": "An internal error occurred"}), 500
@@ -747,22 +803,6 @@ def api_scan_compliance():
             return jsonify(result)
     except Exception as e:
         current_app.logger.error(f"API scan compliance error: {str(e)}")
-        return jsonify({"success": False, "error": "An internal error occurred"}), 500
-
-
-@unified_low_priority_bp.route("/api/policy-monitoring/violations", methods=["GET"])
-@login_required
-def api_get_violations():
-    """API endpoint for policy violations"""
-    try:
-        status_filter = request.args.get("status")
-        severity_filter = request.args.get("severity")
-        result = policy_monitoring_service.get_violations(
-            status_filter=status_filter, severity_filter=severity_filter
-        )
-        return jsonify(result)
-    except Exception as e:
-        current_app.logger.error(f"API get violations error: {str(e)}")
         return jsonify({"success": False, "error": "An internal error occurred"}), 500
 
 
@@ -853,14 +893,14 @@ def get_policy_monitoring_statistics():
 @unified_low_priority_bp.errorhandler(404)
 def not_found(error):
     """Handle 404 errors"""
-    return render_template("errors/404.html"), 404
+    return render_plain_error(404)
 
 
 @unified_low_priority_bp.errorhandler(500)
 def internal_error(error):
     """Handle 500 errors"""
     db.session.rollback()
-    return render_template("errors/500.html"), 500
+    return render_plain_error(500)
 
 
 

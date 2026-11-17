@@ -5,6 +5,7 @@
    empty_state and skeleton macros already carry role="status" (announced
    without any help from here), so they are not wrapped in a second status
    region. `loading_when` is the Alpine expression that shows the skeleton. #}
+{% from 'components/button.html' import button %}
 {% from 'components/empty_state.html' import empty_state %}
 {% from 'components/provenance.html' import provenance_badge %}
 {% from 'components/skeleton.html' import skeleton_list %}
@@ -31,6 +32,7 @@
     <div class="flex flex-wrap items-center gap-3">
         {{ provenance_badge('unavailable') }}
         <p class="text-sm text-foreground">We could not answer that just now.</p>
+        {{ button(text='Try again', variant='outline', size='sm', on_click='load(centreId)', testid='ask-retry') }}
     </div>
 </div>
 

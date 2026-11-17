@@ -2,19 +2,28 @@
 import logging
 from datetime import date
 
-from flask import Blueprint, abort, jsonify, render_template, request
+from flask import Blueprint, abort, flash, jsonify, redirect, render_template, request, url_for
 from flask_login import current_user, login_required
 
 from app import db
+from app.core.auth.permissions import may_change_model_element
+from app.decorators import audit_log
 from app.models.raid_item import RaidItem, RaidKind, RaidStatus
 from app.models.risk import Risk
 from app.models.risk_entity_link import ENTITY_TYPES
 from app.models.risk_score_history import SCORE_KINDS
-from app.services import risk_service
+from app.services import open_fair, risk_service
 
 logger = logging.getLogger(__name__)
 
 risk_bp = Blueprint("risk", __name__)
+
+
+def _refuse_unless_allowed(action):
+    """A 403 answer for a person whose role may read the register but not change it, else None."""
+    if may_change_model_element(current_user, action):
+        return None
+    return jsonify({"error": "Your role may read the register but not change it."}), 403
 
 
 # ---------------------------------------------------------------------------
@@ -37,13 +46,26 @@ def list_risks():
 @login_required
 def create_risk():
     """POST /api/risks — create a risk. Returns 201."""
+    refused = _refuse_unless_allowed("edit")
+    if refused:
+        return refused
     data = request.get_json(force=True) or {}
     required = ("title", "likelihood", "impact")
     missing = [f for f in required if not data.get(f)]
     if missing:
         return jsonify({"error": f"Missing fields: {', '.join(missing)}"}), 400
+    from app.middleware.tenant_context import current_org_id
+
+    links = data.get("links") or []
+    if not isinstance(links, list) or any(
+        not isinstance(link, dict) or link.get("entity_type") not in ENTITY_TYPES or not link.get("entity_id")
+        for link in links
+    ):
+        return jsonify({"error": f"links must be a list of entity_type (one of {ENTITY_TYPES}) and entity_id"}), 400
     try:
         risk = risk_service.create_risk(
+            links=[(link["entity_type"], link["entity_id"]) for link in links],
+            organization_id=current_org_id(),
             solution_id=data.get("solution_id"),
             title=data["title"],
             description=data.get("description"),
@@ -67,6 +89,9 @@ def update_risk(risk_id):
     Edit form both PATCH here, and a caller sending only `status` gets the
     original narrow behaviour unchanged.
     """
+    refused = _refuse_unless_allowed("edit")
+    if refused:
+        return refused
     data = request.get_json(force=True) or {}
     status = data.get("status")
     other_fields = {k: v for k, v in data.items() if k != "status"}
@@ -97,6 +122,9 @@ def get_risk(risk_id):
 def delete_risk(risk_id):
     """DELETE /api/risks/<id> — H2: the register could create a risk but
     never remove one, even a duplicate or a mistake."""
+    refused = _refuse_unless_allowed("delete")
+    if refused:
+        return refused
     Risk.query.get_or_404(risk_id)
     risk_service.delete_risk(risk_id)
     return jsonify({"success": True}), 200
@@ -110,7 +138,8 @@ def list_risk_links(risk_id):
     links = risk_service.list_risk_links(risk_id)
     return jsonify(
         [
-            {**link.to_dict(), "entity_label": _entity_label(link.entity_type, link.entity_id)}
+            {**link.to_dict(), "entity_label": _entity_label(link.entity_type, link.entity_id),
+             "entity_kind": _entity_kind(link.entity_type, link.entity_id)}
             for link in links
         ]
     ), 200
@@ -120,8 +149,11 @@ def list_risk_links(risk_id):
 @login_required
 def add_risk_link(risk_id):
     """POST /api/risks/<id>/links — H1: map a risk to an Application, Solution
-    or Programme. {"entity_type": "application"|"solution"|"programme",
+    Programme or Capability. {"entity_type": "application"|"solution"|"programme"|"capability",
     "entity_id": <int>}"""
+    refused = _refuse_unless_allowed("edit")
+    if refused:
+        return refused
     data = request.get_json(force=True) or {}
     entity_type = data.get("entity_type")
     entity_id = data.get("entity_id")
@@ -129,12 +161,17 @@ def add_risk_link(risk_id):
         return jsonify(
             {"error": f"entity_type (one of {ENTITY_TYPES}) and entity_id are required"}
         ), 400
+    from app.middleware.tenant_context import current_org_id
+
     try:
-        link = risk_service.add_risk_link(risk_id, entity_type, entity_id)
+        link = risk_service.add_risk_link(
+            risk_id, entity_type, entity_id, organization_id=current_org_id()
+        )
     except ValueError as exc:
         return jsonify({"error": str(exc)}), 400
     return jsonify(
-        {**link.to_dict(), "entity_label": _entity_label(link.entity_type, link.entity_id)}
+        {**link.to_dict(), "entity_label": _entity_label(link.entity_type, link.entity_id),
+         "entity_kind": _entity_kind(link.entity_type, link.entity_id)}
     ), 201
 
 
@@ -142,6 +179,9 @@ def add_risk_link(risk_id):
 @login_required
 def remove_risk_link(risk_id, link_id):
     """DELETE /api/risks/<id>/links/<link_id> — unmap a risk from an entity."""
+    refused = _refuse_unless_allowed("edit")
+    if refused:
+        return refused
     risk_service.remove_risk_link(risk_id, link_id)
     return jsonify({"success": True}), 200
 
@@ -157,6 +197,9 @@ def set_risk_score(risk_id):
     it is a later change.
     {"score_kind": "inherent"|"residual", "likelihood": 1-5, "impact": 1-5}
     """
+    refused = _refuse_unless_allowed("edit")
+    if refused:
+        return refused
     data = request.get_json(force=True) or {}
     score_kind = data.get("score_kind")
     likelihood = data.get("likelihood")
@@ -260,6 +303,9 @@ def list_raid_items():
 @login_required
 def create_raid_item():
     """POST /api/raid — create an Issue/Dependency. Returns 201."""
+    refused = _refuse_unless_allowed("edit")
+    if refused:
+        return refused
     data = request.get_json(force=True) or {}
     required = ("kind", "title")
     missing = [f for f in required if not data.get(f)]
@@ -304,6 +350,9 @@ def create_raid_item():
 @login_required
 def update_raid_item(item_id):
     """PATCH /api/raid/<id> — update status and/or resolution notes."""
+    refused = _refuse_unless_allowed("edit")
+    if refused:
+        return refused
     data = request.get_json(force=True) or {}
     item = db.session.get(RaidItem, item_id)
     if item is None:
@@ -324,6 +373,9 @@ def update_raid_item(item_id):
 @login_required
 def delete_raid_item(item_id):
     """DELETE /api/raid/<id> — remove a RAID item that was logged in error."""
+    refused = _refuse_unless_allowed("delete")
+    if refused:
+        return refused
     item = db.session.get(RaidItem, item_id)
     if item is None:
         return jsonify({"error": "RAID item not found"}), 404
@@ -375,6 +427,12 @@ def _entity_label(entity_type, entity_id):
         elif entity_type == "programme":
             from app.models.strategic import StrategicInitiative
             row = StrategicInitiative.query.get(entity_id)
+        elif entity_type == "capability":
+            from app.models.business_capabilities import BusinessCapability
+            row = BusinessCapability.query.filter_by(id=entity_id).first()
+        elif entity_type == "archimate_element":
+            from app.models.archimate_core import ArchiMateElement
+            row = ArchiMateElement.query.filter_by(id=entity_id).first()
         else:
             return None
         return getattr(row, "name", None) if row else None
@@ -384,6 +442,16 @@ def _entity_label(entity_type, entity_id):
 
 
 _ELEMENT_TYPE_WORD = {"ApplicationComponent": "application"}
+
+
+def _entity_kind(entity_type, entity_id):
+    """What a link points at, in a person's words: the element's type for an element link
+    (Product, Goal, Driver, Business actor), None for the kinds that name themselves."""
+    if entity_type != "archimate_element":
+        return None
+    from app.models.archimate_core import ArchiMateElement
+    element = ArchiMateElement.query.filter_by(id=entity_id).first()
+    return risk_service.element_type_word(element.type) if element else None
 
 
 def _prefetch_risk_context(risks):
@@ -480,7 +548,8 @@ def serialize_risk_row(risk, ctx=None):
         "inherent_impact": risk.inherent_impact,
         "residual_likelihood": risk.residual_likelihood,
         "residual_impact": risk.residual_impact,
-        "risk_score": risk.risk_score,
+        "risk_score": risk._effective_score,
+        "score_text": risk.score_text,
         "risk_level": risk.risk_level,
         "status": risk.status.value,
         "entity_links": [
@@ -491,6 +560,7 @@ def serialize_risk_row(risk, ctx=None):
                 # None (not a fabricated placeholder) when the linked row is
                 # gone -- the UI shows this distinctly, same rule as M4.
                 "entity_label": _entity_label(link.entity_type, link.entity_id),
+                "entity_kind": _entity_kind(link.entity_type, link.entity_id),
             }
             for link in links
         ] + ([touch] if touch else []),
@@ -529,18 +599,34 @@ def risk_register():
     )
     ctx = _prefetch_risk_context(risks)
     risk_rows = [serialize_risk_row(r, ctx) for r in risks]
+    # ?show=open|mitigated|critical|high|medium|low lists the risks a count card counts: the open risks, the
+    # mitigated ones, or the open risks of one level (the figures of risk_service.level_counts)
+    show = (request.args.get("show") or "").strip().lower()
+    if show == "open":
+        listed_rows = [r for r in risk_rows if r["status"] == "open"]
+    elif show == "mitigated":
+        listed_rows = [r for r in risk_rows if r["status"] == "mitigated"]
+    elif show in ("critical", "high", "medium", "low"):
+        listed_rows = [r for r in risk_rows if r["status"] == "open" and r["risk_level"] == show]
+    else:
+        show, listed_rows = "", risk_rows
     ranked = risk_service.ranked_risks()
     return render_template(
         "governance/risk_register.html",
         risks=risks,
-        risk_rows=risk_rows,
+        show=show,
+        listed_rows=listed_rows,
+        risk_rows=listed_rows,
         grid=heat_data.get("grid", []),
         total=len(risks),
         current_sort=sort_key if sort_key in _RISK_SORT_COLUMNS else "id",
         current_dir=direction if direction in ("asc", "desc") else "asc",
         ranked=ranked,
+        matrix=risk_service.register_matrix(),
+        counts=risk_service.level_counts(),
         raid_items=raid_items,
         raid_kinds=[k.value for k in RaidKind],
+        can_write=may_change_model_element(current_user, "edit"),
         programmes=[{"id": p.id, "name": p.name} for p in programmes],
     )
 
@@ -549,6 +635,7 @@ def risk_register():
 @login_required
 def risk_page(risk_id):
     """One risk on its own page: where it ranks and why, and what it touches."""
+    from app.core.auth.permissions import may_change_model_element
     from app.middleware.tenant_context import current_org_id
 
     org_id = current_org_id()
@@ -559,7 +646,42 @@ def risk_page(risk_id):
         abort(404)
     ranked = risk_service.ranked_risks()
     row = next((r for r in ranked["rows"] if r["risk_id"] == risk.id), None)
-    return render_template("governance/risk_page.html", risk=risk, row=row, rule=ranked["rule"])
+    loss = open_fair.losses_for_risks(org_id, [risk.id]).get(risk.id)
+    return render_template(
+        "governance/risk_page.html", risk=risk, row=row, rule=ranked["rule"],
+        loss=open_fair.describe(loss) if loss else None,
+        loss_factors=loss["factors"] if loss else {},
+        loss_fields=open_fair.FACTORS,
+        can_change_loss=may_change_model_element(current_user, "edit"),
+    )
+
+
+@risk_bp.route("/risks/<int:risk_id>/loss", methods=["POST"])
+@login_required
+@audit_log("risk_loss_assess")
+def risk_loss_save(risk_id):
+    """Put the risk in money: read the four factor ranges, run the simulation, save the result."""
+    from app.core.auth.permissions import may_change_model_element
+    from app.middleware.tenant_context import current_org_id
+
+    if not may_change_model_element(current_user, "edit"):
+        abort(403)
+
+    org_id = current_org_id()
+    raw = {
+        key: [request.form.get("%s_%s" % (key, part)) for part in ("min", "likely", "max")]
+        for key in open_fair.FACTORS
+    }
+    try:
+        open_fair.save_assessment(org_id, risk_id, raw, current_user.id)
+    except LookupError:
+        abort(404)
+    except open_fair.FactorError as exc:
+        db.session.rollback()
+        flash(str(exc), "error")
+    else:
+        flash("Yearly loss worked out and saved.", "success")
+    return redirect(url_for("risk.risk_page", risk_id=risk_id))
 
 
 @risk_bp.route("/solutions/<int:solution_id>/risks", methods=["GET"])

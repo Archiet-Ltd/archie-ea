@@ -19,6 +19,8 @@ import uuid
 
 import pytest
 
+from tests.test_change_review import PASS_ALL, FakeReviewer
+
 pytestmark = pytest.mark.usefixtures("db_session")
 
 
@@ -254,20 +256,53 @@ class TestApprovalGateAuthorizesApprover:
         db_session.flush()
         return approval
 
-    def test_requester_cannot_approve_own_operation(self, db_session, architect):
+    def test_requester_with_write_permission_may_confirm_own_operation(self, db_session, architect, monkeypatch):
+        """No change waits for a second person: the requester, who holds write permission, may ask for
+        their own change to be settled. It is applied once, and only because it passed review."""
+        from app.models.ai_chat_crud_approval import AIChatApprovalAuditLog, ApprovalStatus
         from app.modules.ai_chat.services.ai_chat_approval_service import AIChatApprovalService
+        from tests.test_change_review import PASS_ALL, FakeReviewer
 
+        reviewer = FakeReviewer([PASS_ALL]).install(monkeypatch)
         approval = self._queue(db_session, architect)
         service = AIChatApprovalService(architect.id)
         result = service.approve_and_execute(approval.id, architect.id)
 
-        assert result["success"] is False
-        assert result.get("code") == "APPROVAL_DENIED"
-        assert "own" in result["error"].lower()
-
+        assert result["success"] is True, result
+        assert len(reviewer.review_prompts) == 1, "the approve went through the review"
         db_session.refresh(approval)
+        assert approval.status == ApprovalStatus.APPROVED
+        assert approval.approved_by_id == architect.id, "recorded as approved by the person, after the review passed"
+        events = [(e.event, e.actor_user_id) for e in AIChatApprovalAuditLog.query.filter_by(approval_id=approval.id)]
+        assert ("settle_requested", architect.id) in events
+        assert "self_approval_refused" not in [e for e, _ in events]
+        assert [e for e, _ in events].count("executed") == 1
+
+        again = service.approve_and_execute(approval.id, architect.id)
+        assert again["success"] is False and again.get("code") == "CONFLICT", "a change is applied once"
+
+    def test_requesters_approve_without_a_passing_review_never_applies(self, db_session, architect, monkeypatch):
+        """The same approve, with a reviewer that fails the change or cannot be reached: nothing is applied."""
         from app.models.ai_chat_crud_approval import ApprovalStatus
-        assert approval.status == ApprovalStatus.PENDING, "a refused approval must stay PENDING, not silently execute"
+        from app.modules.ai_chat.services.ai_chat_approval_service import AIChatApprovalService
+        from tests.test_change_review import FakeReviewer, _fail
+
+        args = {"name": "x", "description": "x"}
+        failing = FakeReviewer([_fail(1, "Not what was asked.")] * 3,
+                               revisions=[{"arguments": args, "summary": "same"}] * 2).install(monkeypatch)
+        approval = self._queue(db_session, architect)
+        result = AIChatApprovalService(architect.id).approve_and_execute(approval.id, architect.id)
+        assert result["success"] is False, result
+        db_session.refresh(approval)
+        assert approval.status == ApprovalStatus.REJECTED, "a failed review declines the change"
+        assert failing.review_prompts, "the review ran"
+
+        FakeReviewer([], choice=None).install(monkeypatch)
+        waiting = self._queue(db_session, architect)
+        result = AIChatApprovalService(architect.id).approve_and_execute(waiting.id, architect.id)
+        assert result["success"] is False and result.get("code") == "IN_REVIEW", result
+        db_session.refresh(waiting)
+        assert waiting.status == ApprovalStatus.PENDING, "no reviewer, no change"
 
     def test_viewer_cannot_approve_someone_elses_operation(self, db_session, architect, viewer):
         """The requester isn't the only failure mode — the APPROVER must also hold write permission."""
@@ -280,11 +315,13 @@ class TestApprovalGateAuthorizesApprover:
         assert result["success"] is False
         assert result.get("code") == "FORBIDDEN"
 
-    def test_different_architect_can_approve(self, db_session, architect, another_architect):
+    def test_different_architect_can_approve(self, db_session, architect, another_architect, monkeypatch):
         from app.modules.ai_chat.services.ai_chat_approval_service import AIChatApprovalService
         from app.models.solution_models import Solution
 
         approval = self._queue(db_session, architect, payload={"name": f"QA-CrossApprove-{uuid.uuid4().hex[:6]}", "description": "x"})
+        # An approve is a request to settle the change: it is applied only because the review passes it.
+        FakeReviewer([PASS_ALL]).install(monkeypatch)
         service = AIChatApprovalService(another_architect.id)
         result = service.approve_and_execute(approval.id, another_architect.id)
 

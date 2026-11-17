@@ -1,4 +1,5 @@
 ---
+wave: 1
 page_family: function-per-segment
 use_case_id: UC-S4-06
 segment_id: S4
@@ -26,7 +27,7 @@ A clear boundary built into onboarding: what was read from your own pages, shown
 page it came from, versus what only you can tell us — with a plain next step for filling in each
 gap yourself.
 
-Coming soon. Join the waiting list and we'll tell you the day it ships.
+Early access. Join the waiting list and we'll email you when you can use it.
 
 ## Related
 

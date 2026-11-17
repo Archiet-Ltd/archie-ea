@@ -2,9 +2,9 @@
 
 The journey clicks the real control: open the application's Technology tab, see
 the honest empty state, type the node's name into the picker, choose it, reload
-and see it still listed, then open the Twin map on the node and see the
+and see it still listed, then open the node in the Composer and see the
 application among what depends on it. The link is an ArchiMate relationship, so
-the map needs no change of its own to show it.
+the Composer needs no change of its own to show it.
 """
 
 import uuid
@@ -94,12 +94,17 @@ def test_architect_maps_an_application_to_a_node_and_sees_it_in_the_blast_radius
     expect(panel.locator("[data-technology-list]")).to_contain_text(estate["node_name"])
     expect(panel.locator("[data-technology-empty]")).to_be_hidden()
 
-    # The node's blast radius on the Twin map now includes the application.
+    # The node's blast radius in the Composer now includes the application.
     with page.expect_navigation():
         panel.get_by_role("link", name="What depends on it").first.click()
-    assert "element=%d" % estate["node_element"] in page.url
-    page.wait_for_selector("[data-graph-nodes] button", state="visible")
-    expect(page.locator("[data-graph-nodes]")).to_contain_text(estate["app_name"])
+    assert "/archimate/composer" in page.url and "element=%d" % estate["node_element"] in page.url
+    page.wait_for_function(
+        """() => { const el = document.querySelector('[x-data^="composerApp"]'); const a = el && Alpine.$data(el);
+            return !!(a && a.focusView && a.graph.getElements().length >= 2); }""")
+    drawn = page.evaluate(
+        """() => Alpine.$data(document.querySelector('[x-data^="composerApp"]')).graph.getElements()
+            .map(c => c.get('elName'))""")
+    assert estate["app_name"] in drawn, drawn
 
 
 def test_an_application_with_no_technology_says_so(page, live_server, seeded):

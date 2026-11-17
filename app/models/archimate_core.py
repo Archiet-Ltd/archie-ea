@@ -27,6 +27,7 @@ if not _FAST_INIT:
 # mixin is imported unconditionally so the column exists in both the normal and
 # APP_FAST_INIT model graphs.
 from .mixins import TenantMixin
+from .relationship_guard import register_relationship_guard
 
 if _FAST_INIT:
 
@@ -101,7 +102,7 @@ if _FAST_INIT:
         last_confirmed = db.Column(db.DateTime, nullable=True)
 
         # Provenance origin: where this element came from.
-        # source_kind: 'manual', 'import', 'connector', 'derived'
+        # source_kind: 'manual', 'import', 'connector', 'derived', 'sample'
         # source_ref: import batch id, connector run id, or user id as text
         # source_label: file name, connector name, or person's display name
         # source_recorded_at: when the origin was recorded
@@ -189,7 +190,7 @@ if _FAST_INIT:
         sequence_order = db.Column(db.Integer, nullable=True)
 
         # Provenance origin: where this relationship came from.
-        # source_kind: 'manual', 'import', 'connector', 'derived'
+        # source_kind: 'manual', 'import', 'connector', 'derived', 'sample'
         # source_ref: import batch id, connector run id, or user id as text
         # source_label: file name, connector name, or person's display name
         # source_recorded_at: when the origin was recorded
@@ -212,6 +213,10 @@ if _FAST_INIT:
 
         def __repr__(self):
             return f"<ArchiMateRelationship {self.source_id} -> {self.target_id}>"
+
+    # The same guard the monolithic class carries (models.py): no code path
+    # may store a relationship whose two ends belong to different organisations.
+    register_relationship_guard(ArchiMateRelationship)
 
 
 # -----------------------------------------------------------------------
@@ -551,6 +556,9 @@ class SavedDiagramElement(db.Model):
     width = db.Column(db.Float, default=180)
     height = db.Column(db.Float, default=64)
     rendering_mode = db.Column(db.String(50), default="black_box")
+    # The box of a framework canvas this element sits in on this view. The box belongs to the view,
+    # not to the element, so one element can sit in a different box on another canvas.
+    canvas_box = db.Column(db.String(64), nullable=True)
 
 
 class SavedDiagramRelationship(db.Model):

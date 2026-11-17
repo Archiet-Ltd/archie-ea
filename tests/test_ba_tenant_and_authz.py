@@ -405,17 +405,18 @@ class TestBusinessModelCanvasCrossOrgIsolation:
             assert resp.status_code == 404
 
             resp = client.post(
-                f"/business-model/{canvas_id}/api/block",
-                json={"block": "key_partners", "content": "attacker content"},
+                f"/business-model/{canvas_id}/entries/add",
+                data={"box": "key_partners", "name": "Attacker partner"},
             )
             assert resp.status_code == 404
 
             with app.app_context():
+                from app.models.archimate_core import ArchiMateElement
                 from app.models.business_model import BusinessModelCanvas
 
                 canvas = db.session.get(BusinessModelCanvas, canvas_id)
                 assert canvas.name == "Org A Strategy Canvas"
-                assert canvas.get_block("key_partners") in (None, "")
+                assert ArchiMateElement.query.filter_by(name="Attacker partner").count() == 0
 
             # Positive control: the real owner succeeds.
             _login(client, user_a_id)

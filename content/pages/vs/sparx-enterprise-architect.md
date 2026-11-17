@@ -1,4 +1,5 @@
 ---
+wave: 1
 page_family: comparison
 competitor: Sparx Systems Enterprise Architect
 url_slug: archiet.ai/vs/sparx-enterprise-architect

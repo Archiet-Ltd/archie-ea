@@ -13,6 +13,7 @@ from flask import Blueprint, current_app, g, jsonify, request
 from flask_login import current_user, login_required
 
 from app import db
+from app.core.auth.permissions import can, can_change_model
 from app.decorators import audit_log
 from app.middleware.tenant_context import current_org_id
 from app.utils.tenant_users import same_user_id, user_in_org
@@ -126,12 +127,16 @@ def create_task():
     Body: { "title": str, "phase": str, "priority": str, "card_type": str, "description": str }
     Returns: { "success": True, "card": {...} }
     """
+    from app.core.auth.permissions import is_read_only_member
     from app.models.adm_kanban import ADMPhase, KanbanBoard, KanbanCard
 
     data = request.get_json() or {}
     title = (data.get("title") or "").strip()
     if not title:
         return jsonify({"success": False, "error": "Title is required"}), 400
+
+    if is_read_only_member(current_user):
+        return jsonify({"success": False, "error": "Your role can read but not change this organisation's records."}), 403
 
     phase_code = (data.get("phase") or "A").strip().upper()
     priority = data.get("priority", "medium")
@@ -145,6 +150,9 @@ def create_task():
     target_plateau_id = data.get("target_plateau_id") or None
     # backward-compat: card_type mirrors arch_element_type
     card_type_val = arch_element_type
+    if arch_element_type == "Gap" and not can_change_model(current_user):
+        # A gap made on the board is a gap register record: refused before anything is added.
+        return jsonify({"success": False, "error": "Your role may read the register but not change it."}), 403
 
     phase = ADMPhase.query.filter_by(code=phase_code).first()
     if not phase:
@@ -203,6 +211,11 @@ def create_task():
     card.acceptance_criteria = data.get('acceptance_criteria')
     card.progress_pct = data.get('progress_pct', 0)
     db.session.add(card)
+    if arch_element_type == "Gap":
+        # A gap made on the board is recorded in the one gap register as well.
+        from app.services.gap_register_service import create_gap
+
+        create_gap(current_org_id(), title, description=description)
     db.session.commit()
 
     # Phase G: auto-push to Jira if enabled
@@ -228,6 +241,11 @@ def move_card(card_ref):
     card_ref format: "{type}:{id}" e.g. "solution:42"
     Body: { "to_column": "review" }
     """
+    from app.core.auth.permissions import is_read_only_member
+
+    if is_read_only_member(current_user):
+        return jsonify({"success": False, "error": "Your role can read but not change this organisation's records."}), 403
+
     if ":" not in card_ref:
         return (
             jsonify(
@@ -405,6 +423,11 @@ def update_task(card_ref):
     Body: { "title"?, "description"?, "priority"?, "phase"? }
     Returns: { "success": True, "card": {...} }
     """
+    from app.core.auth.permissions import is_read_only_member
+
+    if is_read_only_member(current_user):
+        return jsonify({"success": False, "error": "Your role can read but not change this organisation's records."}), 403
+
     if ":" not in card_ref:
         return jsonify({"success": False, "error": "Invalid card reference"}), 400
 
@@ -486,7 +509,18 @@ def update_task(card_ref):
     if "acceptance_criteria" in data:
         card.acceptance_criteria = data["acceptance_criteria"]
     if "progress_pct" in data:
-        card.progress_pct = data["progress_pct"]
+        raw = data["progress_pct"]
+        if raw is None or (isinstance(raw, str) and not raw.strip()):
+            # No progress recorded is kept as no progress, not turned into 0%.
+            card.progress_pct = None
+        else:
+            try:
+                progress = int(raw)
+            except (TypeError, ValueError):
+                return jsonify({"success": False, "error": "Progress must be a whole number from 0 to 100"}), 400
+            if not 0 <= progress <= 100:
+                return jsonify({"success": False, "error": "Progress must be a whole number from 0 to 100"}), 400
+            card.progress_pct = progress
 
     db.session.commit()
 
@@ -504,6 +538,11 @@ def delete_task(card_ref):
     card_ref format: "task:{id}"
     Returns: { "success": True, "deleted_id": "task:42" }
     """
+    from app.core.auth.permissions import is_read_only_member
+
+    if is_read_only_member(current_user):
+        return jsonify({"success": False, "error": "Your role can read but not change this organisation's records."}), 403
+
     if ":" not in card_ref:
         return jsonify({"success": False, "error": "Invalid card reference"}), 400
 
@@ -542,13 +581,15 @@ def push_to_gantt(card_ref):
     from app.utils.tenant import current_organization_id
     from datetime import datetime
 
+    if not can(current_user, "create", "work_package"):
+        return jsonify({"success": False, "error": "Your role may read work packages but not create them. Administrators and architects may create, edit and delete work packages."}), 403
     if not card_ref.startswith("task:"):
         return jsonify({"success": False, "error": "Invalid card ref"}), 400
     try:
         card_id = int(card_ref.split(":")[1])
     except (ValueError, TypeError, IndexError):
         return jsonify({"success": False, "error": "Invalid card ref"}), 400
-    card = db.session.get(KanbanCard, card_id)
+    card = KanbanCard.query.filter_by(id=card_id, organization_id=current_org_id()).first()
     if not card:
         return jsonify({"success": False, "error": "Card not found"}), 404
 
@@ -629,54 +670,108 @@ def push_to_gantt(card_ref):
                     "gantt_url": "/roadmap-builder"}), 201
 
 
-@adm_kanban_v2_bp.route("/phases/<phase>/deliverables", methods=["GET"])
+@adm_kanban_v2_bp.route("/solutions/<int:solution_id>/deliverables", methods=["GET"])
 @login_required
-def get_phase_deliverables(phase):
+def get_solution_deliverables(solution_id):
     """
-    List TOGAF standard deliverables for an ADM phase with checked state.
+    A solution's own deliverables against the TOGAF template of its phase.
 
-    Query params: board_id (optional int)
-    Response: { success, phase, deliverables: [...], total, checked }
+    Response: { success, solution_id, phase, checklist: [...], also_produced: [...],
+                total, complete }
     """
+    from app.models.solution_models import Solution
     from app.services.adm_deliverable_service import (
-        get_phase_deliverables as _get,
         seed_deliverables,
+        solution_checklist,
     )
 
-    board_id = request.args.get("board_id", type=int)
+    solution = Solution.query.filter_by(id=solution_id).first()
+    if solution is None:
+        return jsonify({"success": False, "error": "Solution not found"}), 404
     seed_deliverables()  # idempotent — no-op if already seeded
-    items = _get(phase.upper(), board_id=board_id)
-    checked_count = sum(1 for i in items if i["checked"])
-    return jsonify(
-        {
-            "success": True,
-            "phase": phase.upper(),
-            "deliverables": items,
-            "total": len(items),
-            "checked": checked_count,
-        }
-    )
+    return jsonify({"success": True, "solution_id": solution.id, **solution_checklist(solution)})
 
 
-@adm_kanban_v2_bp.route("/deliverables/<int:deliverable_id>/check", methods=["PATCH"])
+@adm_kanban_v2_bp.route("/deliverables/<int:deliverable_id>/complete", methods=["PATCH"])
 @login_required
-def check_deliverable(deliverable_id):
+@audit_log("kanban_deliverable_complete")
+def complete_deliverable(deliverable_id):
     """
-    Toggle deliverable checked state for a board.
+    Mark a solution deliverable complete (or back in progress).
 
-    Body: { "board_id": int|null, "checked": bool }
-    Returns: { "success": true, "check": {...} }
+    Body: { "complete": bool }
+    Returns: { "success": true, "deliverable": {...} }
     """
-    from app.services.adm_deliverable_service import toggle_deliverable
+    from app.core.auth.permissions import is_read_only_member, may_write
+    from app.services.adm_deliverable_service import set_complete
 
+    # Ticking a deliverable records progress on the architecture: a person who may change the
+    # model, or the persona that edits it. A viewer never writes, whatever their persona.
+    if is_read_only_member(current_user):
+        return jsonify({"success": False, "error": "Your role can read the checklist but not change it."}), 403
+    if not (may_write(current_user) or can_change_model(current_user)):
+        return jsonify({"success": False, "error": "Your role can read the checklist but not change it."}), 403
     data = request.get_json() or {}
-    checked = bool(data.get("checked", False))
-    board_id = data.get("board_id") or None
     try:
-        check = toggle_deliverable(deliverable_id, board_id, checked)
+        item = set_complete(deliverable_id, bool(data.get("complete", False)))
     except ValueError as e:
         return jsonify({"success": False, "error": str(e)}), 404
-    return jsonify({"success": True, "check": check})
+    return jsonify({"success": True, "deliverable": item})
+
+
+@adm_kanban_v2_bp.route("/requirements", methods=["GET"])
+@login_required
+def get_board_requirements():
+    """The organisation's requirements with the phase and solution each drives."""
+    from app.services.adm_requirement_service import board_requirements
+
+    rows = board_requirements()
+    return jsonify({"success": True, "requirements": rows, "total": len(rows)})
+
+
+@adm_kanban_v2_bp.route("/requirements/<int:requirement_id>/solution", methods=["PATCH"])
+@login_required
+@audit_log("kanban_requirement_link")
+def link_board_requirement(requirement_id):
+    """
+    Link a requirement to the solution it serves (or to none).
+
+    Body: { "solution_id": int | null }
+    Returns: { "success": true, "requirement": {...} }
+    """
+    from app.core.auth.permissions import is_read_only_member
+    from app.modules.capabilities.routes.enterprise_api_routes import (
+        _may_change_requirements,
+        _may_override_solution_owner,
+    )
+    from app.models.solution_models import Solution
+    from app.services.adm_requirement_service import link_requirement
+
+    if is_read_only_member(current_user):
+        return jsonify({
+            "success": False,
+            "error": "Your role can read requirements but not change them. Ask an architect or an administrator.",
+        }), 403
+    if not _may_change_requirements("edit"):
+        return jsonify({
+            "success": False,
+            "error": "Your role can read requirements but not change them. Ask an architect or an administrator.",
+        }), 403
+    data = request.get_json() or {}
+    solution_id = data.get("solution_id")
+    if solution_id is not None:
+        try:
+            solution_id = int(solution_id)
+        except (TypeError, ValueError):
+            return jsonify({"success": False, "error": "Choose a solution from the list."}), 422
+        target = Solution.query.filter_by(id=solution_id).first()
+        if target is not None and target.created_by_id != current_user.id and not _may_override_solution_owner():
+            return jsonify({"success": False, "error": "You can only link requirements to your own solutions."}), 403
+    try:
+        item = link_requirement(requirement_id, solution_id)
+    except LookupError as e:
+        return jsonify({"success": False, "error": str(e)}), 404
+    return jsonify({"success": True, "requirement": item})
 
 
 @adm_kanban_v2_bp.route("/metrics", methods=["GET"])

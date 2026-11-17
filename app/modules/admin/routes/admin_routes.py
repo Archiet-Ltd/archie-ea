@@ -10,7 +10,9 @@ Complex routes (API settings, feature flags, abacus, seed) retain inline logic
 for Phase 0.5 parity; service extraction planned for Phase 2.
 """
 
+from app.modules.ai_chat.services.model_defaults import DEFAULT_MODELS
 from app.models.models import ExternalSystem
+import re
 import hashlib
 import hmac
 import json
@@ -37,6 +39,7 @@ from flask import (
     url_for,
 )
 from flask_login import current_user, login_required
+from app.modules.account.mfa_flow import enrol_first
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import aliased, joinedload
 from app.utils.pagination import safe_int_arg
@@ -62,11 +65,12 @@ from ..forms.admin_forms import (
 from app.modules.account.forms.account_forms import CreatePasswordForm
 from app.decorators import admin_required, audit_log, governance_gate_reader_required
 from app.middleware.tenant_decorators import platform_admin_required
-from app.models import APISettings, EditableHTML, Permission, Role, User
+from app.models import APISettings, Permission, Role, User
 from app.models.organization import Organization
 from app.models.feature_flags import FeatureFlag, FeatureState, FeatureType
 from app.services.llm_service import test_api_key
 from app.services.rbac_service import rbac_service
+from app.services.administrator_guard import LastAdministratorError, ensure_keeps_administrator
 from app.utils.sidebar_parser import SidebarSubmenu, parse_sidebar_template
 from ..services.admin_user_service import AdminUserService
 
@@ -157,6 +161,7 @@ def _plan_limit():
 
 @admin_bp.route("/new-user", methods=["GET", "POST"])
 @login_required
+@enrol_first("invite")
 @rbac_service.require_role("org_admin")
 @admin_required
 @audit_log("admin_user_create")
@@ -185,6 +190,7 @@ def new_user():
 
 @admin_bp.route("/invite-user", methods=["GET", "POST"])
 @login_required
+@enrol_first("invite")
 @rbac_service.require_role("org_admin")
 @admin_required
 @audit_log("admin_user_invite")
@@ -252,6 +258,7 @@ def registered_users():
         users=users,
         roles=roles,
         current_org=current_org,
+        member_roles=rbac_service.member_role_labels(g.current_org_id, users),
     )
 
 
@@ -301,7 +308,12 @@ def change_account_type(user_id):
     user = _svc.get_user_or_404(user_id)
     form = ChangeAccountTypeForm()
     if form.validate_on_submit():
-        _svc.change_user_role(user, form.role.data)
+        try:
+            _svc.change_user_role(user, form.role.data)
+        except LastAdministratorError as exc:
+            db.session.rollback()
+            flash(exc.message, "error")
+            return render_template("admin/manage_user.html", user=user, form=form)
         role_name = user.role.name if user.role else "No Role"
         flash(
             "Role for user {} successfully changed to {}.".format(
@@ -367,6 +379,10 @@ def delete_user(user_id):
                 ip_address=request.remote_addr,
                 description=f"admin_user_delete via {request.path}",
             )
+        except LastAdministratorError as exc:
+            db.session.rollback()
+            flash(exc.message, "error")
+            return redirect(url_for("admin.user_info", user_id=user_id))
         except IntegrityError:
             db.session.rollback()
             flash(
@@ -378,31 +394,7 @@ def delete_user(user_id):
 
 
 # ============================================================================
-# Editor Contents
-# ============================================================================
-
-
-@admin_bp.route("/_update_editor_contents", methods=["POST"])
-@login_required
-@platform_admin_required
-@audit_log("admin_editor_update")
-def update_editor_contents():
-    """Update the contents of an editor."""
-    edit_data = request.form.get("edit_data")
-    editor_name = request.form.get("editor_name")
-
-    editor_contents = EditableHTML.query.filter_by(editor_name=editor_name).first()
-    if editor_contents is None:
-        editor_contents = EditableHTML(editor_name=editor_name)
-    editor_contents.value = edit_data
-
-    db.session.add(editor_contents)
-    db.session.commit()
-    return "OK", 200
-
-
-# ============================================================================
-# API Settings
+# AI settings
 # ============================================================================
 
 
@@ -424,7 +416,7 @@ def api_settings():
         "anthropic":   ("sk-ant-",),
         "huggingface": ("hf_",),
         "gemini":      ("AIza",),
-        "deepseek":    ("sk-",),
+        "nvidia":      ("nvapi-",),
         "openrouter":  ("sk-or-",),
         "azure":       (),          # Azure uses a 32-char GUID-style key — no reliable prefix
         "jira":        (),          # JIRA tokens vary; skip prefix check
@@ -526,7 +518,7 @@ def api_settings():
                     "error",
                 )
         else:
-            flash(f"API settings for {provider} saved successfully.", "success")
+            flash(f"AI settings for {provider} saved successfully.", "success")
 
         db.session.commit()
         return redirect(url_for("admin.api_settings"))
@@ -565,7 +557,7 @@ def delete_api_settings(settings_id):
     provider = settings.provider
     db.session.delete(settings)
     db.session.commit()
-    flash(f"API settings for {provider} deleted successfully.", "success")
+    flash(f"AI settings for {provider} deleted successfully.", "success")
     return redirect(url_for("admin.api_settings"))
 
 
@@ -599,7 +591,7 @@ def preview_env_keys():
         "ANTHROPIC_API_KEY": "anthropic",
         "GOOGLE_API_KEY": "gemini",
         "GEMINI_API_KEY": "gemini",
-        "DEEPSEEK_API_KEY": "deepseek",
+        "NVIDIA_API_KEY": "nvidia",
         "HUGGINGFACE_API_KEY": "huggingface",
         "HF_TOKEN": "huggingface",
         "AZURE_OPENAI_API_KEY": "azure",
@@ -610,10 +602,10 @@ def preview_env_keys():
         "openai": "gpt-4o",
         "anthropic": "claude-opus-5",
         "gemini": "gemini-2.0-flash-exp",
-        "deepseek": "deepseek-chat",
+        "nvidia": DEFAULT_MODELS["nvidia"],
         "huggingface": "meta-llama/Llama-3.1-8B-Instruct",
         "azure": "gpt-4",
-        "openrouter": "google/gemini-2.5-flash-preview:free",
+        "openrouter": "google/gemma-4-31b-it:free",
     }
 
     existing = {s.provider for s in APISettings.query.all()}
@@ -691,7 +683,7 @@ def load_env_keys():
         "ANTHROPIC_API_KEY": "anthropic",
         "GOOGLE_API_KEY": "gemini",
         "GEMINI_API_KEY": "gemini",
-        "DEEPSEEK_API_KEY": "deepseek",
+        "NVIDIA_API_KEY": "nvidia",
         "HUGGINGFACE_API_KEY": "huggingface",
         "HF_TOKEN": "huggingface",
         "AZURE_OPENAI_API_KEY": "azure",
@@ -702,10 +694,10 @@ def load_env_keys():
         "openai": "gpt-4o",
         "anthropic": "claude-opus-5",
         "gemini": "gemini-2.0-flash-exp",
-        "deepseek": "deepseek-chat",
+        "nvidia": DEFAULT_MODELS["nvidia"],
         "huggingface": "meta-llama/Llama-3.1-8B-Instruct",
         "azure": "gpt-4",
-        "openrouter": "google/gemini-2.5-flash-preview:free",
+        "openrouter": "google/gemma-4-31b-it:free",
     }
 
     requested_keys = data["keys"]
@@ -771,7 +763,7 @@ def load_env_keys():
 
 @admin_bp.route("/consolidation")
 @login_required
-@admin_required
+@platform_admin_required
 def consolidation_status():
     """Blueprint Consolidation Status Dashboard"""
     from app.api_registry import (
@@ -2303,6 +2295,10 @@ def api_bulk_delete_users():
     safe_ids = [int(i) for i in ids if int(i) != cu.id]
     if not safe_ids:
         return jsonify({"deleted": 0})
+    try:
+        ensure_keeps_administrator(g.current_org_id, safe_ids, leaving=True)
+    except LastAdministratorError as exc:
+        return jsonify({"error": exc.message}), 409
 
     # Tables where rows BELONG to the user → delete them entirely
     _DELETE_OWNED = [
@@ -3516,6 +3512,31 @@ def export_portfolio_pptx():
 # ============================================================================
 
 
+_PRICING_DATETIME_CELL = re.compile(r"^(\d{4}-\d{2}-\d{2})[ T]\d{2}:\d{2}:\d{2}(\.\d+)?$")
+
+
+def _pricing_normalise_dates(rows):
+    """Excel date cells arrive as 'YYYY-MM-DD 00:00:00'; stage them as ISO dates
+    so confirm can read them with date.fromisoformat."""
+    for row in rows:
+        for key, value in list(row.items()):
+            if isinstance(value, str):
+                match = _PRICING_DATETIME_CELL.match(value.strip())
+                if match:
+                    row[key] = match.group(1)
+    return rows
+
+
+def _pricing_parse_error(exc):
+    """A plain sentence for a spreadsheet that could not be read, never raw exception text."""
+    text = str(exc).lower()
+    if "codec" in text or "utf-8" in text or "decode" in text:
+        return "This file isn't UTF-8 encoded. Save it as CSV UTF-8 and upload again."
+    if "zip" in text or "excel" in text or "workbook" in text or "xlsx" in text:
+        return "This doesn't look like an Excel workbook."
+    return "We couldn't read this file. Check it is a CSV or XLSX file with the columns listed above."
+
+
 @admin_bp.route("/vendor-pricing/import", methods=["GET", "POST"])
 @login_required
 @admin_required
@@ -3539,25 +3560,23 @@ def vendor_pricing_import():
         filename = secure_filename(file.filename)
         ext = filename.rsplit(".", 1)[-1].lower() if "." in filename else ""
 
-        if ext in ("csv", "xlsx", "xls"):
+        if ext == "xls":
+            upload_error = "Legacy .xls files are not supported. Save the file as .xlsx (Excel Workbook) and upload again."
+
+        elif ext in ("csv", "xlsx"):
             try:
                 from app.services.import_core.file_parser import ImportFileParser
 
                 parser = ImportFileParser()
-                rows, errors = parser.parse_file(file, filename)
-                if errors:
-                    upload_error = "; ".join(errors[:5])
+                rows, headers = parser.parse_file(file, filename.lower())
+                required = {"vendor_name", "product_name", "tier", "annual_cost"}
+                validation = parser.validate_file_structure(rows, headers, required)
+                if not validation.get("valid"):
+                    upload_error = "; ".join(validation.get("errors", [])[:5])
                 else:
-                    required = {"vendor_name", "product_name", "tier", "annual_cost"}
-                    validation = parser.validate_file_structure(
-                        rows, list(rows[0].keys()) if rows else [], required
-                    )
-                    if not validation.get("valid"):
-                        upload_error = "; ".join(validation.get("errors", [])[:5])
-                    else:
-                        staging_items = rows
+                    staging_items = _pricing_normalise_dates(rows)
             except Exception as exc:
-                upload_error = f"Parse error: {exc}"
+                upload_error = _pricing_parse_error(exc)
 
         elif ext in ("pdf", "docx", "txt", "md"):
             try:
@@ -3570,11 +3589,12 @@ def vendor_pricing_import():
                 if result["success"]:
                     staging_items = result["items"]
                 else:
-                    upload_error = result.get("error", "Extraction failed")
-            except Exception as exc:
-                upload_error = f"Extraction error: {exc}"
+                    upload_error = "We couldn't read this document. Try a CSV or XLSX file instead."
+            except Exception:
+                logger.exception("Pricing document extraction failed")
+                upload_error = "We couldn't read this document. Try a CSV or XLSX file instead."
         else:
-            upload_error = f"Unsupported file type: .{ext}"
+            upload_error = f"Unsupported file type: .{ext}. Use CSV, XLSX, PDF, or DOCX."
 
     return render_template(
         "admin/vendor_pricing_import.html",
@@ -3651,7 +3671,9 @@ def vendor_pricing_confirm():
         tier = item.get("tier", "Standard")
         annual_cost = item.get("annual_cost")
         existing = VendorProductPricing.query.filter_by(
-            product_id=product.id, tier_name=tier
+            product_id=product.id,
+            tier_name=tier,
+            organization_id=current_user.organization_id,
         ).first()
 
         if existing:
@@ -3663,7 +3685,6 @@ def vendor_pricing_confirm():
             existing.implementation_fee = item.get("implementation_fee")
             existing.source = "Contract Import"
             existing.last_verified_at = _dt.now(timezone.utc)
-            existing.organization_id = 1
             if item.get("expiry_date"):
                 try:
                     from datetime import date as _date
@@ -3689,7 +3710,7 @@ def vendor_pricing_confirm():
                 typical_discount_percent=item.get("discount_percent"),
                 data_source_type="contract_verified",
                 last_verified_at=_dt.now(timezone.utc),
-                organization_id=1,
+                organization_id=current_user.organization_id,
                 created_by_id=current_user.id,
             )
             if item.get("expiry_date"):

@@ -76,6 +76,49 @@ def stale_carrying_organization_ids() -> list[int]:
     return [int(row[0]) for row in rows]
 
 
+def changed_since_last_run_organization_ids() -> list[int]:
+    """Organisation ids holding a relationship added or changed since their last run,
+    or holding relationships and no run at all.
+
+    Adding a relationship flags no derived row (no existing chain contains its id),
+    and a model that was never derived has no rows to flag, so the stale marker alone
+    never brings either organisation into the sweep. The run record and the
+    relationship timestamps do. Same no-tenant-context discipline as
+    ``stale_carrying_organization_ids``.
+    """
+    from app.models import ArchiMateRelationship
+    from app.modules.intelligence.models.derivation_run import DerivationRun
+    from app.modules.intelligence.services.derived_facts import utc_naive
+
+    with platform_scope("derived facts sweep: which organisations changed since their last run"):
+        last_run = (
+            db.select(
+                DerivationRun.organization_id.label("organization_id"),
+                db.func.max(db.func.coalesce(DerivationRun.started_at, DerivationRun.finished_at)).label("ran_at"),
+            )
+            .group_by(DerivationRun.organization_id)
+            .subquery()
+        )
+        rel = ArchiMateRelationship
+        changed_at = utc_naive(db.func.coalesce(rel.updated_at, rel.created_at))
+        stmt = (
+            db.select(rel.organization_id)
+            .outerjoin(last_run, last_run.c.organization_id == rel.organization_id)
+            .where(rel.organization_id.is_not(None))
+            .group_by(rel.organization_id, last_run.c.ran_at)
+            .having(db.or_(last_run.c.ran_at.is_(None), db.func.max(changed_at) > last_run.c.ran_at))
+            .order_by(rel.organization_id)
+        )
+        rows = db.session.execute(stmt).all()
+    return [int(row[0]) for row in rows]
+
+
+def organization_ids_needing_recompute() -> list[int]:
+    """Every organisation the scheduled sweep should visit: stale rows, changes
+    since the last run, or never worked out."""
+    return sorted(set(stale_carrying_organization_ids()) | set(changed_since_last_run_organization_ids()))
+
+
 def _recompute_one_tenant(organization_id: int, *, trigger: str) -> dict:
     """The per-tenant work function ``run_for_each_tenant`` calls.
 
@@ -108,14 +151,15 @@ def _recompute_one_tenant(organization_id: int, *, trigger: str) -> dict:
 
 
 def recompute_derived_facts(app) -> JobRun:
-    """The scheduled sweep (DE-4). Visits only stale-carrying tenants.
+    """The scheduled sweep (DE-4). Visits tenants with stale rows, with changes
+    since their last run, or never worked out.
 
     Must be called with a real Flask ``app`` -- ``run_for_each_tenant`` opens
     its own ``app.app_context()``. Enumerates BEFORE entering tenant scope,
     same discipline as ``active_organization_ids``.
     """
     with app.app_context():
-        organization_ids = stale_carrying_organization_ids()
+        organization_ids = organization_ids_needing_recompute()
 
     return run_for_each_tenant(
         app,
@@ -194,5 +238,7 @@ __all__ = [
     "per_tenant_lock_name",
     "recompute_derived_facts",
     "recompute_derived_facts_on_demand",
+    "changed_since_last_run_organization_ids",
+    "organization_ids_needing_recompute",
     "stale_carrying_organization_ids",
 ]

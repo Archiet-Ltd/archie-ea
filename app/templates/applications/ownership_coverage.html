@@ -1,6 +1,10 @@
+{# design-block: dashboard #}
 {% extends 'layouts/admin_base.html' %}
+{# design-block: dashboard #}
+{% from 'components/table.html' import table %}
 {% from "components/page_header.html" import page_header %}
 {% from "components/empty_state.html" import empty_state %}
+{% from "components/provenance.html" import result_footer %}
 
 {% block title %}Ownership Coverage{% endblock %}
 
@@ -27,6 +31,11 @@
     <div data-slot="card" class="rounded-lg border border-border bg-card p-6">
       <p class="text-sm text-muted-foreground">Total applications</p>
       <p class="text-3xl font-bold text-foreground mt-1">{{ total_apps }}</p>
+      {% set left_out_parts = [] %}
+      {% if left_out.decommissioned %}{% set _ = left_out_parts.append(left_out.decommissioned ~ ' decommissioned') %}{% endif %}
+      {% if left_out.duplicate %}{% set _ = left_out_parts.append(left_out.duplicate ~ ' duplicate') %}{% endif %}
+      {% if left_out.repository %}{% set _ = left_out_parts.append(left_out.repository ~ (' imported repository nobody owns yet' if left_out.repository == 1 else ' imported repositories nobody owns yet')) %}{% endif %}
+      {% if left_out_parts %}<p class="text-xs text-muted-foreground mt-1" data-testid="left-out-note">Leaves out {{ left_out_parts | join(', ') }}, as the Overview does.</p>{% endif %}
     </div>
     <div data-slot="card" class="rounded-lg border border-border bg-card p-6">
       <p class="text-sm text-muted-foreground">With named owner</p>
@@ -43,29 +52,31 @@
     </div>
   </div>
 
+  <div class="mb-6" data-testid="coverage-answer-footer">{{ result_footer(footer) }}</div>
+
   {# Table #}
   <div data-slot="card" class="rounded-lg border border-border bg-card overflow-hidden">
     <div class="overflow-x-auto">
-      <table class="dense-table w-full text-sm">
+      {% call table(class="dense-table w-full text-sm") %}
         <thead>
           <tr class="border-b border-border bg-muted/50">
-            <th class="text-left px-6 py-3 font-medium text-muted-foreground">Business unit</th>
-            <th class="text-right px-6 py-3 font-medium text-muted-foreground">Applications</th>
-            <th class="text-right px-6 py-3 font-medium text-muted-foreground">With owner</th>
-            <th class="text-right px-6 py-3 font-medium text-muted-foreground">Coverage</th>
+            <th class="text-left px-3 py-3 sm:px-6 max-sm:!whitespace-normal max-sm:!tracking-normal text-xs sm:text-sm font-medium text-muted-foreground">Business unit</th>
+            <th class="text-right px-3 py-3 sm:px-6 max-sm:!whitespace-normal max-sm:!tracking-normal text-xs sm:text-sm font-medium text-muted-foreground"><span class="sm:hidden"><abbr title="Applications">Apps</abbr></span><span class="hidden sm:inline">Applications</span></th>
+            <th class="text-right px-3 py-3 sm:px-6 max-sm:!whitespace-normal max-sm:!tracking-normal text-xs sm:text-sm font-medium text-muted-foreground">With owner</th>
+            <th class="text-right px-3 py-3 sm:px-6 max-sm:!whitespace-normal max-sm:!tracking-normal text-xs sm:text-sm font-medium text-muted-foreground">Coverage</th>
           </tr>
         </thead>
         <tbody class="divide-y divide-border">
           {% for row in rows %}
           <tr class="hover:bg-muted/30">
-            <td class="px-6 py-3 font-medium text-foreground">{{ row.unit_name }}</td>
-            <td class="px-6 py-3 text-right text-foreground">
+            <td class="px-3 py-3 sm:px-6 font-medium text-foreground">{{ row.unit_name }}</td>
+            <td class="px-3 py-3 sm:px-6 text-right text-foreground">
               {% if row.total_apps > 0 %}{{ row.total_apps }}{% else %}<span class="text-muted-foreground">&mdash;</span>{% endif %}
             </td>
-            <td class="px-6 py-3 text-right text-foreground">
+            <td class="px-3 py-3 sm:px-6 text-right text-foreground">
               {% if row.total_apps > 0 %}{{ row.owned }}{% else %}<span class="text-muted-foreground">&mdash;</span>{% endif %}
             </td>
-            <td class="px-6 py-3 text-right">
+            <td class="px-3 py-3 sm:px-6 text-right">
               {% if row.coverage_pct is not none %}
                 <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-xs font-medium
                   {%- if row.coverage_pct >= 80 %} bg-success/10 text-success-emphasis
@@ -77,6 +88,9 @@
                 <span class="text-muted-foreground">&mdash;</span>
               {% endif %}
             </td>
+          </tr>
+          <tr class="hover:bg-transparent">
+            <td colspan="4" class="px-3 pb-3 pt-0 whitespace-normal sm:px-6"><div class="w-0 min-w-full">{{ result_footer(row.footer) }}</div></td>
           </tr>
           {% else %}
           <tr>
@@ -91,9 +105,23 @@
           </tr>
           {% endfor %}
         </tbody>
-      </table>
+      {% endcall %}
     </div>
   </div>
+
+  {% if outside_count %}
+  <p class="text-xs text-muted-foreground mt-4" data-testid="outside-unit-note">
+    {{ outside_count }} application{{ '' if outside_count == 1 else 's' }} {{ 'are' if outside_count != 1 else 'is' }} outside every business unit{% if unmatched_domains %}, including those in {{ unmatched_domains | join(', ') }}{% endif %}.
+    Set an application's business domain to a unit's name to move it into that unit's row.
+  </p>
+  {% endif %}
+
+  {% if merged_units %}
+  <p class="text-xs text-muted-foreground mt-4" data-testid="merged-units-note">
+    {% for kept_name, merged_name in merged_units %}"{{ merged_name }}" and "{{ kept_name }}" are the same unit once case and spacing are ignored{% if not loop.last %}; {% endif %}{% endfor %}.
+    Their applications are counted once, under the unit whose name sorts first.
+  </p>
+  {% endif %}
 
   <p class="text-xs text-muted-foreground mt-4">
     An application counts as having a named owner when a business owner is recorded

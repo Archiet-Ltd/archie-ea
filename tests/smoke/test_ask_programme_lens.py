@@ -14,7 +14,7 @@ import uuid
 import pytest
 from playwright.sync_api import expect
 
-from .conftest import PAGE_TIMEOUT, PASSWORD, type_and_wait
+from .chat_ask import ask, sign_in_as
 
 pytestmark = [pytest.mark.smoke, pytest.mark.journey]
 
@@ -68,65 +68,26 @@ def programme_graph(seeded, live_server):
     return _seed_programme_graph(seeded["ids"]["org"])
 
 
-def _login(page, base, email):
-    # Sign in from a signed-out browser: switching persona mid-test otherwise
-    # lands on the login page already authenticated, which redirects away.
-    page.context.clear_cookies()
-    page.goto(base + "/account/login", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
-    page.fill("#email", email)
-    page.fill("#password", PASSWORD)
-    try:
-        page.click("#submit", no_wait_after=True)
-    except TypeError:
-        page.locator("#submit").click()
-    try:
-        page.wait_for_url(lambda url: "/account/login" not in url, timeout=PAGE_TIMEOUT)
-    except Exception:
-        pass
-    assert "/account/login" not in page.url, "could not sign in as %s" % email
-
-
-def _ready(page, factory):
-    page.wait_for_function(
-        "(f) => { const el = document.querySelector('[x-data=\"' + f + '()\"]');"
-        " return !!(el && el._x_dataStack); }",
-        arg=factory,
-    )
+def _question(name):
+    return "What's changing at %s and is it on track" % name
 
 
 def test_the_programme_question_shows_the_seeded_work_package(
     page, live_server, seeded, programme_graph
 ):
-    # A user WITH budget authority (CTO) sees the financial figure.
-    _login(page, live_server, seeded["emails"]["cto"])
-    page.goto(live_server + "/intelligence/ask", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
-    _ready(page, "askSurface")
-
-    page.locator("#ask-question-programme").click()
-    expect(page.locator("#ask-picker-input")).to_be_focused()
-    type_and_wait(page, "ask", programme_graph["noun"])
-    page.locator("#ask-picker-listbox [role=option]", has_text="Service").click()
-
-    page.wait_for_selector("[data-ask-programme-row]")
-    row = page.locator("[data-ask-programme-row]")
+    service = "%s Service" % programme_graph["noun"]
+    # The CTO has budget authority and sees the financial figure.
+    sign_in_as(page, live_server, seeded, "cto")
+    row = ask(page, live_server, _question(service)).locator("[data-lens-row]")
+    expect(row).to_have_count(1)
     expect(row).to_contain_text("cloud migration")
     expect(row).to_contain_text("55% complete")
     expect(row).to_contain_text("Cost variance")
     expect(row).to_contain_text("1 connection")
 
-    # A user WITHOUT budget authority (solution architect) sees the
-    # restricted message and never the financial figure.
-    _login(page, live_server, seeded["emails"]["solution_architect"])
-    page.goto(live_server + "/intelligence/ask", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
-    _ready(page, "askSurface")
-
-    page.locator("#ask-question-programme").click()
-    expect(page.locator("#ask-picker-input")).to_be_focused()
-    type_and_wait(page, "ask", programme_graph["noun"])
-    page.locator("#ask-picker-listbox [role=option]", has_text="Service").click()
-
-    page.wait_for_selector("[data-ask-programme-row]")
-    row = page.locator("[data-ask-programme-row]")
+    # The solution architect has none: the restricted note, never the figure.
+    sign_in_as(page, live_server, seeded, "solution_architect")
+    row = ask(page, live_server, _question(service)).locator("[data-lens-row]")
     expect(row).to_contain_text("cloud migration")
     expect(row).to_contain_text("55% complete")
     expect(row).to_contain_text("Restricted to roles with budget authority")
@@ -137,38 +98,21 @@ def test_the_programme_question_shows_the_seeded_work_package(
 def test_an_element_with_no_work_packages_reads_as_an_honest_empty_state(
     page, live_server, seeded, programme_graph
 ):
-    _login(page, live_server, seeded["emails"]["solution_architect"])
-    page.goto(live_server + "/intelligence/ask", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
-    _ready(page, "askSurface")
-
-    page.locator("#ask-question-programme").click()
-    expect(page.locator("#ask-picker-input")).to_be_focused()
-    type_and_wait(page, "ask", programme_graph["noun"])
-    # Gateway has no work package seeded on it, only Service does.
-    page.locator("#ask-picker-listbox [role=option]", has_text="Gateway").click()
-
-    expect(page.get_by_text("No work packages recorded against this element.")).to_be_visible()
-    assert page.locator("[data-ask-programme-row]").count() == 0
+    sign_in_as(page, live_server, seeded, "solution_architect")
+    card = ask(page, live_server, _question("%s Gateway" % programme_graph["noun"]))
+    expect(card.get_by_text("No work packages recorded against this element")).to_be_visible()
+    assert card.locator("[data-lens-row]").count() == 0
 
 
-def test_all_four_questions_keep_their_own_answers_separate(
+def test_the_programme_and_impact_questions_keep_their_own_answers_separate(
     page, live_server, seeded, programme_graph
 ):
-    """Regression guard: four questions now share one picker component."""
-    _login(page, live_server, seeded["emails"]["solution_architect"])
-    page.goto(live_server + "/intelligence/ask", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
-    _ready(page, "askSurface")
-
-    page.locator("#ask-question-impact").click()
-    type_and_wait(page, "ask", programme_graph["noun"])
-    page.locator("#ask-picker-listbox [role=option]", has_text="Service").click()
-    page.wait_for_selector("[data-ask-row]")
-    expect(page.locator("#ask-results")).to_be_visible()
-    expect(page.locator("#ask-programme-results")).to_be_hidden()
-
-    page.locator("#ask-question-programme").click()
-    type_and_wait(page, "ask", programme_graph["noun"])
-    page.locator("#ask-picker-listbox [role=option]", has_text="Service").click()
-    page.wait_for_selector("[data-ask-programme-row]")
-    expect(page.locator("#ask-programme-results")).to_be_visible()
-    expect(page.locator("#ask-results")).to_be_hidden()
+    service = "%s Service" % programme_graph["noun"]
+    sign_in_as(page, live_server, seeded, "solution_architect")
+    impact = ask(page, live_server, "What breaks if %s fails" % service)
+    assert impact.locator("[data-answer-row]").count() >= 1
+    assert impact.locator("[data-lens-row]").count() == 0
+    programme = ask(page, live_server, _question(service), fresh=False)
+    assert programme.locator("[data-lens-row]").count() == 1
+    assert programme.locator("[data-answer-row]").count() == 0
+    assert impact.locator("[data-answer-row]").count() >= 1

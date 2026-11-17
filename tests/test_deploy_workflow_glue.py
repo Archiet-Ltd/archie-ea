@@ -110,6 +110,7 @@ class Job:
             "GITHUB_STEP_SUMMARY": self.files["summary"].as_posix(),
             "FAKE_STATE": self.d.state.as_posix(),
             "DROPLET": "root@fake-droplet",
+            "DEPLOY_BACKUP_COMMAND": "true",
             "APP_DIR": self.d.app.as_posix(),
         }
         for line in self.files["env"].read_text().splitlines():  # what earlier steps put in GITHUB_ENV

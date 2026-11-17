@@ -31,8 +31,11 @@ from flask import (
     url_for,
 )
 from flask_login import current_user, login_required  # dead-code-ok
+from app.core.auth.permissions import can
 from app.middleware.tenant_context import current_org_id
+from app.modules.genome.services.roadmap_links import redirect_to_roadmap
 from sqlalchemy import case, or_  # dead-code-ok
+from app.services.gap_register_service import effective_severity_expr
 from sqlalchemy.exc import SQLAlchemyError
 
 from .. import db
@@ -43,7 +46,6 @@ from ..exceptions import (  # dead-code-ok
 from ..utils.api_helpers import api_error
 from ..models import (  # dead-code-ok
     ConceptualDataModel,
-    Contract,
     DesignPattern,
     LogicalDataModel,
     PhysicalDataModel,
@@ -60,7 +62,7 @@ from ..models.implementation_migration import Gap
 from ..models.implementation_migration import Plateau
 from ..models.unified_work_package import UnifiedWorkPackage
 from ..models.implementation_migration import WorkPackage  # dead-code-ok
-from app.services import work_package_service
+from app.services import result_footer_service, work_package_service
 from app.utils.pagination import safe_int_arg
 from app.utils.tenant import current_organization_id
 from app.models.archimate_element_types import application_kind_types
@@ -202,27 +204,8 @@ def api_data_models():
 @enterprise_bp.route("/solutions_architecture_dashboard")
 @login_required
 def solutions_architecture_dashboard():
-    """Solutions Architecture Dashboard"""
-    try:
-        solution_count = Solution.query.count()
-        pattern_count = SolutionPattern.query.count()
-        contract_count = Contract.query.count()
-
-        return render_template(
-            "enterprise/solutions_architecture_dashboard.html",
-            solution_count=solution_count,
-            pattern_count=pattern_count,
-            contract_count=contract_count,
-        )
-    except SQLAlchemyError as e:
-        current_app.logger.error(
-            f"Database error loading solutions architecture dashboard: {e}"
-        )
-        raise DatabaseError(
-            message=f"Failed to load solutions dashboard: {str(e)}",
-            user_message="Unable to load the solutions architecture dashboard.",
-            recovery_action="Refresh the page. If the problem persists, contact support.",
-        )
+    """The Enterprise page's link: the one Solutions Architecture dashboard, the page the sidebar opens."""
+    return redirect(url_for("architecture.solutions_architecture_dashboard"))
 
 
 @enterprise_bp.route("/api/solutions")
@@ -232,7 +215,10 @@ def api_solutions():
     try:
         solutions = Solution.query.limit(500).all()
         patterns = SolutionPattern.query.limit(500).all()
-        contracts = Contract.query.limit(500).all()
+        from app.decorators.requires_role import may_see_contract_pages
+        from app.services.vendor_register import register_contracts
+
+        contracts = register_contracts(current_user.organization_id)[:500] if may_see_contract_pages(current_user) else []
 
         return jsonify(
             {
@@ -255,7 +241,7 @@ def api_solutions():
                         "name": p.name,
                         "description": p.description,
                         "pattern_category": p.pattern_category,
-                        "applicability": p.applicability,
+                        "pattern_type": p.pattern_type,
                         "created_at": p.created_at.isoformat()
                         if p.created_at
                         else None,
@@ -265,9 +251,9 @@ def api_solutions():
                 "contracts": [
                     {
                         "id": c.id,
-                        "name": c.name,
+                        "name": c.contract_name,
                         "contract_type": c.contract_type,
-                        "provider": c.provider,
+                        "provider": c.vendor.name if c.vendor else None,
                         "status": c.status,
                         "created_at": c.created_at.isoformat()
                         if c.created_at
@@ -402,10 +388,6 @@ def strategic_planning_dashboard():
         from app.services.gap_register_service import count_gaps
 
         gap_count = count_gaps(current_org_id())
-        if gap_count == 0:
-            gap_count = ArchiMateElement.query.filter(
-                ArchiMateElement.type.in_(["Gap", "GAP"])
-            ).count()
 
         plateau_count = 0
         try:
@@ -477,74 +459,80 @@ def capability_health():
 @enterprise_bp.route("/strategic/investment-matrix")
 @login_required
 def investment_matrix():
-    """Investment Matrix"""
-    try:
-        capabilities = BusinessCapability.query.limit(500).all()
-        return render_template(
-            "enterprise/investment_matrix.html", capabilities=capabilities
-        )
-    except Exception as e:
-        current_app.logger.error(f"Error loading investment matrix: {e}")
-        flash("Error loading investment matrix", "error")
-        return redirect(url_for("enterprise.strategic_planning_dashboard"))
+    """The earlier address of the investment matrix; the one prioritisation lives at /strategic."""
+    return redirect(url_for("strategic.investment_matrix"), code=301)
 
 
 @enterprise_bp.route("/strategic/risk-assessment")
 @login_required
 def risk_assessment():
-    """Risk Assessment"""
-    try:
-        gaps = Gap.query.filter(Gap.gap_kind != "plateau_transition").limit(500).all()
+    """The earlier address of the gaps by severity; the gap register is the one place for them.
 
-        return render_template("enterprise/risk_assessment.html", gaps=gaps)
-    except SQLAlchemyError as e:
-        current_app.logger.error(f"Database error loading risk assessment: {e}")
-        raise DatabaseError(
-            message=f"Failed to load risk assessment: {str(e)}",
-            user_message="Unable to load risk assessment data.",
-            recovery_action="Return to the dashboard and try again.",
-        )
+    A severity it knows is kept, so the register opens on the open gaps of that severity (the page this
+    address was always a count of); anything else is dropped."""
+    severity = (request.args.get("severity") or "").strip().lower()
+    if severity not in _GAP_SEVERITIES:
+        return redirect(url_for("enterprise.gap_analysis"), code=301)
+    return redirect(url_for("enterprise.gap_analysis", severity=severity, status="open"), code=301)
 
 
 @enterprise_bp.route("/strategic/technology-roadmap")
 @login_required
 def technology_roadmap():
-    """Technology Roadmap"""
-    try:
-        workpackages = WorkPackage.query.limit(500).all()
-
-        return render_template(
-            "enterprise/technology_roadmap.html", workpackages=workpackages
-        )
-    except SQLAlchemyError as e:
-        current_app.logger.error(f"Database error loading technology roadmap: {e}")
-        raise DatabaseError(
-            message=f"Failed to load technology roadmap: {str(e)}",
-            user_message="Unable to load technology roadmap.",
-            recovery_action="Return to the dashboard and try again.",
-        )
+    """The enterprise technology roadmap is the one roadmap, Technology view."""
+    return redirect_to_roadmap("technology")
 
 
-# ============================================================================
-# IMPLEMENTATION PLANNING ROUTES
-# ============================================================================
-
-
-# implementation_planning_dashboard removed — empty shell page, frozen sidebar link
-
-
-@enterprise_bp.route("/implementation/work-packages")
+@enterprise_bp.route("/implementation/work-packages", methods=["GET", "POST"])
 @login_required
 def work_packages():
     """Work Packages Management.
 
-    The page is an Alpine table (`workPackagesTable()` in
-    static/js/enterprise/work_packages_table.js) that loads rows from
-    `/enterprise/api/work-packages` below. It never read a server-rendered
-    `workpackages` variable, so the hardcoded `workpackages=[]` that used to
-    be passed here was dead — and read as a permanently-empty page (S-11).
+    The list is rendered on the server from the one work package store (the
+    list table filters, sorts and pages it in the browser). A POST deletes the
+    selected rows (form field ``ids``, or ``?delete=<id>`` for one row's menu),
+    with the same organisation fence and audit entry as the JSON delete below.
     """
-    return render_template("enterprise/work_packages.html")
+    org_id = current_organization_id()
+    if request.method == "POST":
+        single = bool(request.args.getlist("delete")) and not request.form.getlist("ids")
+        if not can(current_user, "delete" if single else "bulk_delete", "work_package"):
+            flash("Your role may not delete these work packages. Administrators may delete several at once; architects may delete one at a time.", "error")
+            return redirect(url_for("enterprise.work_packages"))
+        ids = request.form.getlist("ids") or request.args.getlist("delete")
+        deleted = 0
+        for raw_id in ids:
+            try:
+                wp = work_package_service.get_work_package(int(raw_id), org_id)
+            except (TypeError, ValueError):
+                continue
+            if wp is None:
+                continue
+            wp_id, wp_name = wp.id, wp.name
+            work_package_service.delete_work_package(wp_id, organization_id=org_id)
+            deleted += 1
+            _audit_wp("delete", wp_id, wp_name, severity=AuditEventSeverity.HIGH)
+        db.session.commit()
+        if deleted:
+            flash("Deleted %d work package%s." % (deleted, "" if deleted == 1 else "s"), "success")
+        else:
+            flash("Select at least one work package to delete.", "warning")
+        return redirect(url_for("enterprise.work_packages"))
+
+    UWP = UnifiedWorkPackage
+    rows = (
+        work_package_service.query_for(org_id)
+        .order_by(UWP.created_at.desc(), UWP.id.asc())
+        .limit(500)
+        .all()
+    )
+    return render_template(
+        "enterprise/work_packages.html",
+        work_packages=rows,
+        gaps_by_wp=work_package_service.gaps_for_work_packages(rows, org_id),
+        progress_by_wp={wp.id: work_package_service.progress_percent(wp) for wp in rows},
+        footer=result_footer_service.roadmap_footer(rows, len(rows)),
+    )
 
 
 @enterprise_bp.route("/api/work-packages", methods=["GET"])
@@ -649,7 +637,7 @@ def _milestones_for(wp):
 @enterprise_bp.route("/api/work-packages/gantt", methods=["GET"])
 @login_required
 def api_work_packages_gantt():
-    """Work packages in the shape the Gantt component consumes.
+    """Work packages in the shape a timeline chart consumes.
 
     Separate from api_list_work_packages because that endpoint is a paginated
     table feed (row_number, summary, percent_complete) while the Gantt needs a
@@ -680,13 +668,18 @@ def api_work_packages_gantt():
                 "status": wp.status or "planned",
                 "start_date": wp.start_date.isoformat() if wp.start_date else None,
                 "end_date": wp.end_date.isoformat() if wp.end_date else None,
-                "progress_percentage": wp.progress_percentage or 0,
+                "progress_percentage": work_package_service.progress_percent(wp),
                 "estimated_cost": wp.estimated_cost,
                 "layer": wp.layer or wp.element_type or "implementation",
                 "milestones": _milestones_for(wp),
             })
 
-        return jsonify({"work_packages": items, "total": len(items)})
+        from app.services.cost_visibility import costs_visible, withhold_costs
+
+        reply = {"work_packages": items, "total": len(items)}
+        if not costs_visible(current_user):
+            reply = withhold_costs(reply)
+        return jsonify(reply)
     except Exception:
         logger.exception("Failed to build Gantt work-package feed")
         return jsonify({"error": "Failed to load work packages"}), 500
@@ -769,6 +762,8 @@ def _audit_wp(action, wp_id, name, status=None, severity=AuditEventSeverity.MEDI
 @login_required
 def api_create_work_package():
     """Create a new work package in the one store. PROD-008"""
+    if not can(current_user, "create", "work_package"):
+        return api_error("Your role may read work packages but not create them. Administrators and architects may create, edit and delete work packages.", "FORBIDDEN", 403)
     data = request.get_json(force=True) or {}
 
     if not data.get("name", "").strip():
@@ -795,6 +790,8 @@ def api_create_work_package():
 @login_required
 def api_update_work_package(wp_id):
     """Update a work package. PROD-008"""
+    if not can(current_user, "edit", "work_package"):
+        return api_error("Your role may read work packages but not update them. Administrators and architects may create, edit and delete work packages.", "FORBIDDEN", 403)
     data = request.get_json(force=True) or {}
 
     try:
@@ -818,6 +815,8 @@ def api_update_work_package(wp_id):
 @login_required
 def api_bulk_delete_work_packages():
     """Bulk delete work packages (this organisation's own only)."""
+    if not can(current_user, "bulk_delete", "work_package"):
+        return api_error("Your role may read work packages but not delete them. Only administrators may delete several work packages at once.", "FORBIDDEN", 403)
     data = request.get_json() or {}
     ids = data.get("ids", [])
     if not ids or not isinstance(ids, list):
@@ -846,6 +845,8 @@ def api_delete_work_package(wp_id):
     delete at all -- only the bulk path existed. Mirrors the bulk handler:
     another organisation's id is answered as a missing one, and the deletion
     is audit-logged with the same SOC2 flag."""
+    if not can(current_user, "delete", "work_package"):
+        return api_error("Your role may read work packages but not delete them. Administrators and architects may create, edit and delete work packages.", "FORBIDDEN", 403)
     org_id = current_organization_id()
     wp = work_package_service.get_work_package(wp_id, org_id)
     if wp is None:
@@ -878,15 +879,21 @@ def plateaus():
         )
 
 
+_GAP_SEVERITIES = ("critical", "high", "medium", "low", "unrated")
+
 _GAP_SORT_COLUMNS = {
     "name": Gap.name,
     "gap_type": Gap.gap_type,
     # critical sorts above high, not alphabetically; an unrecorded severity ranks below low
-    "severity": case({"low": 1, "medium": 2, "high": 3, "critical": 4}, value=Gap.severity, else_=0),
+    "severity": case({"low": 1, "medium": 2, "high": 3, "critical": 4}, value=effective_severity_expr(), else_=0),
     "priority": Gap.priority,
     "resolution_status": Gap.resolution_status,
     "impact": Gap.impact,
 }
+
+
+_GAP_STATUS_FILTERS = ("open", "closed", "in_progress")
+_GAP_PAGE_SIZE = 500
 
 
 @enterprise_bp.route("/implementation/gap-analysis")
@@ -908,16 +915,45 @@ def gap_analysis():
     column = _GAP_SORT_COLUMNS.get(sort_key, Gap.name)
     order = column.desc() if direction == "desc" else column.asc()
     try:
-        from app.services.gap_register_service import count_gaps, get_gaps_not_addressed
+        from app.services.gap_register_service import count_gaps, gap_register_query, get_gaps_not_addressed
 
-        gaps = (
-            Gap.query.filter(Gap.gap_kind != "plateau_transition")
-            .order_by(order, Gap.id)
-            .limit(500)
-            .all()
+        # ?severity=high lists only the gaps of that severity (the links on Architecture Intelligence);
+        # ?status=open|closed|in_progress and ?work=covered|none list the gaps a count card counts.
+        severity_filter = (request.args.get("severity") or "").strip().lower()
+        if severity_filter not in _GAP_SEVERITIES:
+            severity_filter = ""
+        status_filter = (request.args.get("status") or "").strip().lower()
+        if status_filter not in _GAP_STATUS_FILTERS:
+            status_filter = ""
+        work_filter = (request.args.get("work") or "").strip().lower()
+        if work_filter not in ("covered", "none"):
+            work_filter = ""
+        org_id = current_org_id()
+        query = gap_register_query(
+            org_id, severity_filter or None,
+            closed={"open": False, "closed": True}.get(status_filter),
+            in_progress=status_filter == "in_progress",
+            has_work_package={"covered": True, "none": False}.get(work_filter),
         )
-        total_gap_count = count_gaps(current_org_id())
-        not_addressed_gaps = get_gaps_not_addressed(current_org_id())
+        # Every figure is a count query over the register; the list below is one page of the rows it counts.
+        listed_count = query.order_by(None).count()
+        # a page past the end shows the last page, and a huge number never reaches the database as an offset
+        last_page = max(1, -(-listed_count // _GAP_PAGE_SIZE))
+        page_number = safe_int_arg("page", 1, minimum=1, maximum=last_page)
+        gaps = query.order_by(order, Gap.id).limit(_GAP_PAGE_SIZE).offset((page_number - 1) * _GAP_PAGE_SIZE).all()
+        open_by_severity = {level: count_gaps(org_id, severity=level, closed=False) for level in _GAP_SEVERITIES}
+        gap_counts = {
+            "recorded": count_gaps(org_id),
+            "critical": count_gaps(org_id, severity="critical"),
+            "critical_open": count_gaps(org_id, severity="critical", closed=False),
+            "in_progress": count_gaps(org_id, in_progress=True),
+            "resolved": count_gaps(org_id, closed=True),
+        }
+        total_gap_count = gap_counts["recorded"]
+        closed_gap_count = gap_counts["resolved"]
+        # the open gaps with no work package, whole register: the board's "No work planned" figure and rows
+        not_addressed_gaps = sorted(get_gaps_not_addressed(org_id), key=lambda g: ((g.name or "").lower(), g.id))
+        unclosed_gap_count = len(not_addressed_gaps)
         work_packages_by_gap = work_package_service.work_packages_for_gaps(
             [g.id for g in gaps], current_org_id())
 
@@ -925,6 +961,16 @@ def gap_analysis():
             "enterprise/gap_analysis.html", gaps=gaps,
             work_packages_by_gap=work_packages_by_gap,
             total_gap_count=total_gap_count,
+            closed_gap_count=closed_gap_count,
+            gap_counts=gap_counts,
+            open_by_severity=open_by_severity,
+            listed_count=listed_count,
+            page_number=page_number,
+            page_size=_GAP_PAGE_SIZE,
+            unclosed_gap_count=unclosed_gap_count,
+            severity_filter=severity_filter,
+            status_filter=status_filter,
+            work_filter=work_filter,
             not_addressed_gaps=not_addressed_gaps,
             current_sort=sort_key if sort_key in _GAP_SORT_COLUMNS else "name",
             current_dir=direction if direction in ("asc", "desc") else "asc",
@@ -949,7 +995,6 @@ def ai_architecture_analysis():
     """AI Architecture Analysis — displays architectural intelligence dashboard"""
     try:
         from app.models.ai_recommendations import AIRecommendation
-        from app.models.implementation_migration import Gap
         from app.models.application_portfolio import ApplicationComponent
 
         # Fetch recent AI recommendations
@@ -960,38 +1005,62 @@ def ai_architecture_analysis():
         )
 
         # Count gaps by severity
-        _cap_gaps = Gap.query.filter(Gap.gap_kind != "plateau_transition")
-        gaps_by_severity = {
-            "critical": _cap_gaps.filter_by(severity="critical").count(),
-            "high": _cap_gaps.filter_by(severity="high").count(),
-            "medium": _cap_gaps.filter_by(severity="medium").count(),
-            "low": _cap_gaps.filter_by(severity="low").count(),
-        }
+        from app.services.gap_register_service import count_gaps as _count_gaps
 
-        # Fetch applications needing review
-        apps_needing_review = (
-            ApplicationComponent.query.filter_by(lifecycle_status="under_review")
-            .order_by(ApplicationComponent.name)
-            .limit(10)
-            .all()
-        )
+        # open gaps only: a resolved gap is not an open one, whatever its severity
+        gaps_by_severity = {
+            level: _count_gaps(current_org_id(), severity=level, closed=False) for level in _GAP_SEVERITIES}
+
+        # Applications needing review: the ones marked for review and the ones in their sunset stage, which
+        # the recommendations ask a person to plan the retirement of
+        from app.models.application_portfolio import SUNSET_STAGE_PATTERN, lifecycle_label
+        from app.modules.dashboard.services.overview_figures import _active_applications
+
+        stage = db.func.btrim(ApplicationComponent.lifecycle_status)
+        needs_review = _active_applications().where(db.or_(
+            db.func.lower(stage) == "under_review",
+            stage.op("~*")(SUNSET_STAGE_PATTERN),
+        ))
+        # the card states how many there are; the list shows the first ten
+        review_count = db.session.execute(
+            db.select(db.func.count()).select_from(needs_review.subquery())
+        ).scalar_one()
+        apps_needing_review = db.session.execute(
+            needs_review.order_by(ApplicationComponent.name).limit(10)
+        ).scalars().all()
+        review_stages = {a.id: lifecycle_label(a.lifecycle_status) for a in apps_needing_review}
 
         # Total counts
         from app.services.gap_register_service import count_gaps
 
-        total_recommendations = AIRecommendation.query.count()
-        total_gaps = count_gaps(current_org_id())
+        from app.modules.dashboard.services.overview_figures import _active_applications
+        from app.services import recommendation_service
+
+        # the same recommendations the Recommendations page lists, and the same application total the
+        # overview and the application list state (duplicates, decommissioned and unclaimed repositories left out)
+        total_recommendations = recommendation_service.recommendations(current_org_id())["total"]
+        application_count = db.session.execute(
+            db.select(db.func.count()).select_from(
+                _active_applications().where(ApplicationComponent.organization_id == current_org_id()).subquery()
+            )
+        ).scalar_one()
+        total_gaps = count_gaps(current_org_id(), closed=False)
 
         from app.services.priority_action_service import limit_for, prioritised_actions
+        from app.services.risk_service import footers_by_risk
 
         return render_template(
             "enterprise/ai_architecture_analysis.html",
-            priority_actions=prioritised_actions(current_org_id(), limit=limit_for(request.args)),
+            priority_actions=prioritised_actions(current_org_id(), limit=limit_for(request.args),
+                                             risk_footers=footers_by_risk(current_org_id())),
             ai_recommendations=ai_recommendations,
             gaps_by_severity=gaps_by_severity,
             apps_needing_review=apps_needing_review,
+            review_count=review_count,
+            review_stages=review_stages,
             total_recommendations=total_recommendations,
             total_gaps=total_gaps,
+            application_count=application_count,
         )
     except Exception as e:
         current_app.logger.error(f"Error loading AI architecture analysis: {e}")
@@ -1008,59 +1077,77 @@ def ai_architecture_analysis():
 @enterprise_bp.route("/analysis/impact-analysis")
 @login_required
 def impact_analysis():
-    """Impact Analysis — assess downstream impact of architecture changes"""
+    """Impact Analysis — what breaks if one element of the model fails.
+
+    Picking an element here asks the same question, through the same
+    ``cross_layer_impact`` walk and answer envelope, that the AI chat answers
+    for "what breaks if X fails" — so the two can never disagree (ADR 0008's
+    one-system-of-record rule). No second traversal and no second answer card
+    are written here.
+    """
     try:
+        from app.models import ArchiMateElement
         from app.models.traceability import ImpactAnalysisResult
-        from app.models.application_portfolio import ApplicationComponent
-        from app.models.business_capabilities import BusinessCapability
-        from sqlalchemy import func
+        from app.modules.intelligence.services import answer_envelope as envelope
+        from app.services.priority_action_service import limit_for, prioritised_actions
+        from app.services.risk_service import footers_by_risk
+        from app.utils.role_access import may_connect_github, may_load_sample_company
 
-        # Get filter parameters from query string
-        selected_element_type = request.args.get(
-            "element_type"
-        )  # 'application' or 'capability'
-        selected_element_id = request.args.get("element_id", type=int)
+        element_id = request.args.get("element", type=int)
+        has_elements = ArchiMateElement.query.count() > 0
+        model_empty = not has_elements
 
-        # Fetch all applications and capabilities for dropdowns (id + name only)
-        applications = (
-            db.session.query(ApplicationComponent.id, ApplicationComponent.name)
-            .order_by(ApplicationComponent.name)
-            .all()
-        )
+        answer = None
+        element_not_found = False
+        if element_id is not None:
+            try:
+                record = envelope.ask_and_store(
+                    envelope.KIND_IMPACT,
+                    {"element_id": element_id, "include_derived": True, "max_depth": 3},
+                    user_id=current_user.id,
+                    store=False,
+                )
+                answer = envelope.present(record)
+            except (envelope.AnswerParamError, envelope.AnswerNotAskable):
+                element_not_found = True
 
-        capabilities = (
-            db.session.query(BusinessCapability.id, BusinessCapability.name)
-            .order_by(BusinessCapability.name)
-            .all()
-        )
+        # The runs this organisation has saved, from the one answer store
+        # (newest first). Viewing the answer above writes nothing; a run is
+        # stored only by impact_analysis_save.
+        recorded_runs = []
+        for stored in envelope.recent_answers(20, kind=envelope.KIND_IMPACT):
+            shown = envelope.present(stored, include_rows=False)
+            shown["element_name"] = (
+                (stored.elements or {}).get(str((stored.params or {}).get("element_id"))) or {}
+            ).get("name")
+            recorded_runs.append(shown)
 
-        # Impact analyses have no organisation column: they belong to the
-        # organisation of the user who ran them, so every read below starts
-        # from the organisation-scoped query.
+        # The record of formal impact-analysis runs (Analyze Impact / the v1
+        # endpoint) -- a different, already-correctly-scoped concern from the
+        # live answer above. Impact analyses have no organisation column: they
+        # belong to the organisation of the user who ran them, so every read
+        # below starts from the organisation-scoped query.
+        legacy_element_type = request.args.get("element_type")
+        legacy_element_id = request.args.get("element_id", type=int)
         organization_id = current_user.organization_id
 
-        # Fetch recent impact analyses (last 20)
         recent_analyses = (
             ImpactAnalysisResult.for_organization(organization_id)
             .order_by(ImpactAnalysisResult.created_at.desc())
             .limit(20)
             .all()
         )
-
-        # Filter analyses if element type and id provided
         filtered_analyses = None
-        if selected_element_type and selected_element_id:
+        if legacy_element_type and legacy_element_id:
             filtered_analyses = (
                 ImpactAnalysisResult.for_organization(organization_id)
                 .filter_by(
-                    trigger_element_type=selected_element_type,
-                    trigger_element_id=selected_element_id,
+                    trigger_element_type=legacy_element_type,
+                    trigger_element_id=legacy_element_id,
                 )
                 .order_by(ImpactAnalysisResult.created_at.desc())
                 .all()
             )
-
-        # Calculate summary metrics
         total_analyses = ImpactAnalysisResult.for_organization(organization_id).count()
         critical_count = (
             ImpactAnalysisResult.for_organization(organization_id)
@@ -1072,8 +1159,8 @@ def impact_analysis():
             .filter_by(overall_severity="high")
             .count()
         )
+        from sqlalchemy import func
 
-        # Calculate average affected applications
         avg_result = (
             ImpactAnalysisResult.for_organization(organization_id)
             .with_entities(func.avg(ImpactAnalysisResult.affected_applications_count))
@@ -1081,18 +1168,25 @@ def impact_analysis():
         )
         avg_affected_applications = round(avg_result, 1) if avg_result else 0
 
+        priority_actions = prioritised_actions(current_org_id(), limit=limit_for(request.args),
+                                               risk_footers=footers_by_risk(current_org_id()))
+
         return render_template(
             "enterprise/impact_analysis.html",
+            answer=answer,
+            element_not_found=element_not_found,
+            has_elements=has_elements,
+            model_empty=model_empty,
+            may_connect_github=may_connect_github(current_user, current_org_id()),
+            may_load_sample_company=may_load_sample_company(current_user),
+            priority_actions=priority_actions,
             recent_analyses=recent_analyses,
-            applications=applications,
-            capabilities=capabilities,
-            selected_element_type=selected_element_type,
-            selected_element_id=selected_element_id,
             filtered_analyses=filtered_analyses,
             total_analyses=total_analyses,
             critical_count=critical_count,
             high_count=high_count,
             avg_affected_applications=avg_affected_applications,
+            recorded_runs=recorded_runs,
         )
     except Exception as e:
         current_app.logger.error(f"Error loading impact analysis: {e}")
@@ -1101,6 +1195,27 @@ def impact_analysis():
             user_message="Unable to load impact analysis.",
             recovery_action="Return to the dashboard and try again.",
         )
+
+
+@enterprise_bp.route("/analysis/impact-analysis/save", methods=["POST"])
+@login_required
+def impact_analysis_save():
+    """Store the impact answer for one element as a recorded run (CSRF-protected
+    by the app-wide protection). The only writer of impact runs on this page."""
+    from app.modules.intelligence.services import answer_envelope as envelope
+
+    element_id = request.form.get("element", type=int)
+    if element_id is None:
+        return redirect(url_for("enterprise.impact_analysis"))
+    try:
+        envelope.ask_and_store(
+            envelope.KIND_IMPACT,
+            {"element_id": element_id, "include_derived": True, "max_depth": 3},
+            user_id=current_user.id,
+        )
+    except (envelope.AnswerParamError, envelope.AnswerNotAskable):
+        pass  # same outcome as the GET: the page says the element was not found
+    return redirect(url_for("enterprise.impact_analysis", element=element_id))
 
 
 @enterprise_bp.route("/analysis/process-optimization")

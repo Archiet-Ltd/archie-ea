@@ -109,7 +109,7 @@ class TestScopeEnforcedOnToolCall:
         token = _mint_token_with_scope(current_app, user, org, scope="")
 
         for tool_name, arguments in (
-            ("list_canvases", {}),
+            ("get_element", {"element_id": 1}),
             ("search_elements", {"query": "anything", "limit": 5}),
         ):
             status, body = _mcp_call(client, token, tool_name, arguments)
@@ -140,6 +140,10 @@ class TestScopeEnforcedOnToolCall:
             ("get_element", {"element_id": element.id}),
             ("list_canvases", {}),
         ]
+        from app.modules.ai_chat.tools.route_read_tools import tool_released
+
+        # a tool the wave map holds back cannot answer at the released wave
+        calls = [call for call in calls if tool_released(call[0])]
         for tool_name, arguments in calls:
             status, body = _mcp_call(client, token, tool_name, arguments)
             assert status == 200, (tool_name, body)

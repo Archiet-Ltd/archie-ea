@@ -1,4 +1,4 @@
-"""Routes for the Business Model Canvas + Operating Model module.
+"""Routes for the canvases: the Business Model Canvas + Operating Model and the other framework canvases.
 
 Blueprint: business_model_bp, url_prefix="/business-model".
 Index endpoint (linked from the sidebar by the orchestrator post-merge):
@@ -7,21 +7,29 @@ Index endpoint (linked from the sidebar by the orchestrator post-merge):
 
 import logging
 
-from flask import Blueprint, Response, redirect, render_template, request, url_for
-from flask_login import login_required
+from flask import Blueprint, Response, flash, redirect, render_template, request, url_for
+from flask_login import current_user, login_required
 
 # Destructive and mutating routes were guarded by @login_required only, so any
 # authenticated user could delete another user's records. Matches the gating
 # already used by app/modules/capabilities/routes/enterprise_crud_routes.py.
 from app.decorators import require_roles
 
+from app import db
 from app.config.archimate_viewpoints import CANVAS_TEMPLATES
 from app.models.business_model import CANVAS_BLOCKS, OPERATING_MODEL_TYPES
+from app.models.price_plan import BILLING_PERIODS
 from app.utils.api_response import error_response, not_found_response, success_response
 
-from . import service
+from werkzeug.exceptions import HTTPException
+
+from app.services.cost_visibility import costs_visible
+
+from . import model_service, service
 
 logger = logging.getLogger(__name__)
+
+EDIT_ROLES = ("admin", "architect", "business_architect")
 
 business_model_bp = Blueprint(
     "business_model", __name__, url_prefix="/business-model"
@@ -37,23 +45,27 @@ def index():
         "business_model/index.html",
         canvases=canvases,
         operating_model_types=OPERATING_MODEL_TYPES,
+        canvas_types=model_service.canvas_types(),
+        type_names=dict(model_service.canvas_types()),
     )
 
 
 @business_model_bp.route("/create", methods=["POST"])
 @login_required
-@require_roles("admin", "architect", "business_architect")
+@require_roles(*EDIT_ROLES)
 def create():
     """Create a new canvas and redirect to its detail/canvas view."""
     name = (request.form.get("name") or "").strip()
     description = (request.form.get("description") or "").strip() or None
     operating_model_type = request.form.get("operating_model_type") or None
+    canvas_type = request.form.get("canvas_type") or None
 
     try:
         canvas = service.create_canvas(
             name=name or "Untitled Canvas",
             description=description,
             operating_model_type=operating_model_type,
+            canvas_type=canvas_type,
         )
     except ValueError as exc:
         logger.warning("Invalid canvas create payload: %s", exc)
@@ -62,33 +74,229 @@ def create():
     return redirect(url_for("business_model.detail", canvas_id=canvas.id))
 
 
+def _can_edit():
+    """Whether this person may change the canvas: the same role gate the
+    write routes carry, asked without running a route."""
+    try:
+        require_roles(*EDIT_ROLES)(lambda: True)()
+    except HTTPException:
+        return False
+    return True
+
+
+def _note_entry(canvas, box_key, entry, editable):
+    note = {
+        "id": entry["id"], "text": entry["name"], "type": entry["type"], "box": box_key,
+        "href": entry["url"],
+    }
+    if editable:
+        note["remove_url"] = url_for("business_model.remove_entry", canvas_id=canvas.id, element_id=entry["id"])
+        note["rename_url"] = url_for("business_model.rename_entry", canvas_id=canvas.id, element_id=entry["id"])
+    return note
+
+
+def _canvas_boxes(canvas):
+    """The notes of every box, formatted from the one canvas reader the JSON route and the chat also read."""
+    editable = _can_edit()
+    contents = model_service.canvas_contents(canvas.organization_id, canvas.id)
+    if not costs_visible(current_user):
+        contents = model_service.withhold_cost_lines(contents)
+    boxes = {}
+    for box in contents["boxes"]:
+        key = box["key"].replace("_", "-")
+        if box["key"] == model_service.PRICE_BOX:
+            boxes[key] = [
+                {
+                    "id": plan["plan_id"], "box": box["key"], "text": plan["text"], "href": plan["url"],
+                    **({"remove_url": url_for("business_model.remove_price", canvas_id=canvas.id, plan_id=plan["plan_id"])} if editable else {}),
+                }
+                for plan in box["prices"]
+            ]
+        elif box["costs"] is not None and box["costs"].get("withheld"):
+            boxes[key] = []
+            boxes[key + ":withheld"] = box["empty_reason"]
+        elif box["costs"] is not None:
+            boxes[key] = [{"text": line["text"], "href": line["url"]} for line in box["costs"]["lines"]]
+            if box["costs"]["text"]:
+                boxes[key + ":total"] = box["costs"]["text"]
+        else:
+            boxes[key] = [
+                _note_entry(canvas, box["key"], entry, editable) for entry in box["entries"]
+            ]
+            if editable:
+                boxes[key + ":suggest"] = True
+    return boxes
+
+
 @business_model_bp.route("/<int:canvas_id>")
 @login_required
 def detail(canvas_id):
-    """The 9-box Business Model Canvas view for a single canvas."""
+    """A framework canvas (the Business Model Canvas by default), drawn from the organisation's model."""
     canvas = service.get_canvas_or_none(canvas_id)
     if canvas is None:
         return render_template("business_model/not_found.html", canvas_id=canvas_id), 404
 
-    # The Lean order applies once a saved diagram's viewpoint_type is
-    # "lean_canvas" (a later change). No such column exists yet, so every
-    # canvas renders in Business Model Canvas order and zone data comes from
-    # that template's zones, keyed by box_key.
-    canvas_zones = {z["box_key"]: z for z in CANVAS_TEMPLATES["business_model_canvas"]["zones"]}
+    key = model_service.template_key(canvas)
+    boxes = _canvas_boxes(canvas)
+    zones = model_service.zones(canvas)
+    pickers = {
+        box: [{"id": el.id, "name": el.name, "type": el.type} for el in model_service.candidates(canvas, box)]
+        for box in model_service.element_boxes(canvas)
+    }
+    vision = None
+    if canvas.vision_element_id:
+        from app.models.archimate_core import ArchiMateElement
 
-    from app.services.composer_export_formats import resolve_canvas_saved_diagram_id
-
-    saved_diagram_id = resolve_canvas_saved_diagram_id(canvas, "business_model_canvas")
-
+        vision = ArchiMateElement.query.filter_by(
+            id=canvas.vision_element_id, organization_id=canvas.organization_id
+        ).first()
+    vpc_id = None
+    has_segment = False
+    if key == model_service.TEMPLATE_KEY:
+        existing = model_service.value_proposition_canvas_for(canvas)
+        vpc_id = existing.id if existing else None
+        has_segment = bool(boxes.get("customer-segments"))
+    shared = []
+    bmc_href = url_for("business_model.index")
+    if key == "value_proposition_canvas":
+        bmc = next((c for c in service.list_canvases() if model_service.template_key(c) == model_service.TEMPLATE_KEY), None)
+        if bmc is not None:
+            bmc_href = url_for("business_model.detail", canvas_id=bmc.id)
+        segments = model_service.entries(canvas, "customer_segments")
+        elsewhere = model_service.other_canvases_showing(canvas, segments)
+        shared = [
+            {"name": el.name, "href": model_service.element_href(el), "canvases": [
+                {"name": c.name or "Untitled Canvas", "type": CANVAS_TEMPLATES[model_service.template_key(c)]["name"],
+                 "href": url_for("business_model.detail", canvas_id=c.id)} for c in elsewhere.get(el.id, [])]}
+            for el in segments
+        ]
     return render_template(
         "business_model/detail.html",
         canvas=canvas,
-        canvas_blocks=CANVAS_BLOCKS,
+        canvas_key=key,
+        shared_segments=shared,
+        vpc_id=vpc_id,
+        has_segment=has_segment,
+        no_segment_reason=model_service.NO_SEGMENT_REASON,
+        bmc_href=bmc_href,
+        canvas_type_name=CANVAS_TEMPLATES[key]["name"],
+        is_bmc=key == model_service.TEMPLATE_KEY,
+        boxes=boxes,
+        zones=zones,
+        pickers=pickers,
+        name_limit=model_service.ELEMENT_NAME_LENGTH,
+        vision=vision,
+        vision_href=model_service.element_href(vision) if vision else None,
+        can_edit=_can_edit(),
         operating_model_types=OPERATING_MODEL_TYPES,
-        canvas_zones=canvas_zones,
-        canvas_unclassified_count=0,
-        canvas_saved_diagram_id=saved_diagram_id,
+        billing_periods=BILLING_PERIODS,
+        priceable_box_key=model_service.priceable_box(canvas),
+        priceable=boxes.get(model_service.priceable_box(canvas).replace("_", "-"), []) if model_service.priceable_box(canvas) else [],
     )
+
+
+@business_model_bp.route("/<int:canvas_id>/value-proposition")
+@login_required
+def value_proposition(canvas_id):
+    """The old read-only page: on to the editable Value Proposition Canvas for this canvas's segment."""
+    canvas = service.get_canvas_or_none(canvas_id)
+    if canvas is None or model_service.template_key(canvas) != model_service.TEMPLATE_KEY:
+        return render_template("business_model/not_found.html", canvas_id=canvas_id), 404
+    vpc = model_service.value_proposition_canvas_for(canvas)
+    if vpc is None:
+        flash("Create a Value Proposition Canvas from this canvas.", "info")
+        return redirect(url_for("business_model.detail", canvas_id=canvas.id))
+    return redirect(url_for("business_model.detail", canvas_id=vpc.id), code=301)
+
+
+@business_model_bp.route("/<int:canvas_id>/value-proposition/create", methods=["POST"])
+@login_required
+@require_roles(*EDIT_ROLES)
+def create_value_proposition(canvas_id):
+    """Open this canvas's Value Proposition Canvas, making it from its segment and propositions when there is none."""
+    canvas = service.get_canvas_or_none(canvas_id)
+    if canvas is None or model_service.template_key(canvas) != model_service.TEMPLATE_KEY:
+        return not_found_response("Business Model Canvas")
+    try:
+        vpc = model_service.value_proposition_canvas_for(canvas) or model_service.create_value_proposition_canvas(canvas)
+    except model_service.CanvasError as exc:
+        db.session.rollback()
+        flash(str(exc), "error")
+        return _back(canvas.id)
+    return redirect(url_for("business_model.detail", canvas_id=vpc.id))
+
+
+def _back(canvas_id, box=None):
+    return redirect(url_for("business_model.detail", canvas_id=canvas_id) + (f"#box-{box}" if box else ""))
+
+
+def _canvas_write(canvas_id, action):
+    canvas = service.get_canvas_or_none(canvas_id)
+    if canvas is None:
+        return None, not_found_response("Business Model Canvas")
+    try:
+        action(canvas)
+    except model_service.CanvasError as exc:
+        db.session.rollback()
+        flash(str(exc), "error")
+    return canvas, None
+
+
+@business_model_bp.route("/<int:canvas_id>/entries/add", methods=["POST"])
+@login_required
+@require_roles(*EDIT_ROLES)
+def add_entry(canvas_id):
+    box = request.form.get("box", "")
+    canvas, missing = _canvas_write(
+        canvas_id,
+        lambda c: model_service.add_entry(
+            c, box, element_id=request.form.get("element_id") or None, name=request.form.get("name"),
+        ),
+    )
+    return missing or _back(canvas_id, box.replace("_", "-"))
+
+
+@business_model_bp.route("/<int:canvas_id>/entries/<int:element_id>/rename", methods=["POST"])
+@login_required
+@require_roles(*EDIT_ROLES)
+def rename_entry(canvas_id, element_id):
+    box = request.form.get("box", "")
+    canvas, missing = _canvas_write(
+        canvas_id, lambda c: model_service.rename_entry(c, box, element_id, request.form.get("name"))
+    )
+    return missing or _back(canvas_id, box.replace("_", "-"))
+
+
+@business_model_bp.route("/<int:canvas_id>/entries/<int:element_id>/remove", methods=["POST"])
+@login_required
+@require_roles(*EDIT_ROLES)
+def remove_entry(canvas_id, element_id):
+    box = request.form.get("box", "")
+    canvas, missing = _canvas_write(canvas_id, lambda c: model_service.remove_entry(c, box, element_id))
+    return missing or _back(canvas_id, box.replace("_", "-"))
+
+
+@business_model_bp.route("/<int:canvas_id>/prices/add", methods=["POST"])
+@login_required
+@require_roles(*EDIT_ROLES)
+def add_price(canvas_id):
+    form = request.form
+    canvas, missing = _canvas_write(
+        canvas_id,
+        lambda c: model_service.add_price_plan(
+            c, form.get("element_id"), form.get("name"), form.get("price"),
+            form.get("currency"), form.get("billing_period"), form.get("pricing_mechanism"),
+        ),
+    )
+    return missing or _back(canvas_id, "revenue-streams")
+
+
+@business_model_bp.route("/<int:canvas_id>/prices/<int:plan_id>/remove", methods=["POST"])
+@login_required
+@require_roles(*EDIT_ROLES)
+def remove_price(canvas_id, plan_id):
+    canvas, missing = _canvas_write(canvas_id, lambda c: model_service.remove_price_plan(c, plan_id))
+    return missing or _back(canvas_id, "revenue-streams")
 
 
 @business_model_bp.route("/<int:canvas_id>/export", methods=["GET"])
@@ -113,12 +321,12 @@ def export_canvas(canvas_id):
         resolve_canvas_saved_diagram_id,
     )
 
-    saved_diagram_id = resolve_canvas_saved_diagram_id(canvas, "business_model_canvas")
+    key = model_service.template_key(canvas)
+    saved_diagram_id = resolve_canvas_saved_diagram_id(canvas, key)
     body, mimetype, ext = export_canvas_viewpoint(
-        "business_model_canvas", saved_diagram_id, fmt,
-        name=canvas.name or "Business Model Canvas",
+        key, saved_diagram_id, fmt, name=canvas.name or CANVAS_TEMPLATES[key]["name"],
     )
-    filename = f"business-model-canvas-{canvas_id}.{ext}"
+    filename = f"{key.replace('_', '-')}-{canvas_id}.{ext}"
     return Response(
         body, status=200, mimetype=mimetype,
         headers={"Content-Disposition": f"attachment; filename={filename}"},
@@ -127,7 +335,7 @@ def export_canvas(canvas_id):
 
 @business_model_bp.route("/<int:canvas_id>/update", methods=["POST"])
 @login_required
-@require_roles("admin", "architect", "business_architect")
+@require_roles(*EDIT_ROLES)
 def update_canvas(canvas_id):
     """Update canvas name / description / operating model type (JSON API)."""
     canvas = service.get_canvas_or_none(canvas_id)
@@ -149,7 +357,15 @@ def update_canvas(canvas_id):
     except ValueError as exc:
         return error_response(str(exc), code="VALIDATION_ERROR", status_code=400)
 
-    return success_response(canvas.to_dict())
+    if not request.is_json:
+        return _back(canvas_id)
+    contents = model_service.canvas_contents(canvas.organization_id, canvas.id)
+    if not costs_visible(current_user):
+        contents = model_service.withhold_cost_lines(contents)
+    # Text kept from before a canvas listed elements. It is shown apart, never as a box's entries.
+    flat = canvas.to_dict()
+    contents["earlier_text"] = {key: flat[key] for key in CANVAS_BLOCKS if flat.get(key)}
+    return success_response(contents)
 
 
 @business_model_bp.route("/<int:canvas_id>/delete", methods=["POST"])
@@ -160,7 +376,7 @@ def update_canvas(canvas_id):
 # canvas got a 403 (full-page error, since this route redirects rather than
 # returning JSON) trying to delete their own record. Same roles as
 # create/update/save_block.
-@require_roles("admin", "architect", "business_architect")
+@require_roles(*EDIT_ROLES)
 def delete_canvas(canvas_id):
     """Delete a canvas."""
     canvas = service.get_canvas_or_none(canvas_id)
@@ -169,33 +385,6 @@ def delete_canvas(canvas_id):
 
     service.delete_canvas(canvas)
     return redirect(url_for("business_model.index"))
-
-
-@business_model_bp.route("/<int:canvas_id>/api/block", methods=["POST", "PUT"])
-@login_required
-@require_roles("admin", "architect", "business_architect")
-def save_block(canvas_id):
-    """Save one of the 9 Business Model Canvas blocks.
-
-    Payload: {"block": "key_partners", "content": "..."}
-    """
-    canvas = service.get_canvas_or_none(canvas_id)
-    if canvas is None:
-        return not_found_response("Business Model Canvas")
-
-    payload = request.get_json(silent=True) or {}
-    block_key = payload.get("block")
-    content = payload.get("content", "")
-
-    if not block_key:
-        return error_response("Missing 'block' field", code="VALIDATION_ERROR", status_code=400)
-
-    try:
-        canvas = service.save_block(canvas, block_key, content)
-    except ValueError as exc:
-        return error_response(str(exc), code="VALIDATION_ERROR", status_code=400)
-
-    return success_response(canvas.to_dict())
 
 
 @business_model_bp.route("/api/list")
@@ -209,6 +398,9 @@ def api_list():
             "name": c.name or "",
             "description": c.description or "",
             "operating_model_type": c.operating_model_type,
+            "canvas_type": model_service.template_key(c),
+            "type_name": CANVAS_TEMPLATES[model_service.template_key(c)]["name"],
+            "url": url_for("business_model.detail", canvas_id=c.id),
             "updated_at": c.updated_at.isoformat() if c.updated_at else None,
         }
         for c in canvases
@@ -222,7 +414,13 @@ def api_detail(canvas_id):
     canvas = service.get_canvas_or_none(canvas_id)
     if canvas is None:
         return not_found_response("Business Model Canvas")
-    return success_response(canvas.to_dict())
+    contents = model_service.canvas_contents(canvas.organization_id, canvas.id)
+    if not costs_visible(current_user):
+        contents = model_service.withhold_cost_lines(contents)
+    # Text kept from before a canvas listed elements. It is shown apart, never as a box's entries.
+    flat = canvas.to_dict()
+    contents["earlier_text"] = {key: flat[key] for key in CANVAS_BLOCKS if flat.get(key)}
+    return success_response(contents)
 
 
 # Import AI block-draft route — adds POST /api/<id>/ai-draft-block to this

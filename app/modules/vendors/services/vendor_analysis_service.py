@@ -625,7 +625,7 @@ class VendorAnalysisService:
                     "products": [],
                     "total_products": 0,
                     "total_cost": Decimal(0),
-                    "avg_readiness": vendor.enterprise_readiness_score or 0,
+                    "avg_readiness": vendor.enterprise_readiness_score,
                     "strategic_tier": vendor.strategic_tier,
                 }
 

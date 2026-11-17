@@ -236,26 +236,6 @@ def register_sap_import_routes(app=None) -> None:
             except (ValueError, TypeError):
                 return jsonify({"ok": False, "error": "solution_id must be an integer"}), 400
 
-            # Resolve solution → architecture model, creating one if absent.
-            from app.models.archimate_core import ArchitectureModel  # noqa: PLC0415
-            arch_model = (
-                ArchitectureModel.query
-                .filter_by(solution_id=solution_id)
-                .order_by(ArchitectureModel.id.asc())
-                .first()
-            )
-            if arch_model is None:
-                arch_model = ArchitectureModel(
-                    name=f"SAP Architecture — Solution {solution_id}",
-                    version="1.0",
-                    solution_id=solution_id,
-                )
-                db.session.add(arch_model)
-                db.session.flush()  # get PK before we need it
-                logger.info("Created architecture model %s for solution %s", arch_model.id, solution_id)
-
-            architecture_id = arch_model.id
-
             mock = bool(body.get("mock", False))
             config = body.get("config") if not mock else None
 
@@ -268,6 +248,41 @@ def register_sap_import_routes(app=None) -> None:
                 role_limit = int(body.get("role_limit", 50))
             except (ValueError, TypeError):
                 return jsonify({"ok": False, "error": "table_limit, tcode_limit and role_limit must be integers"}), 400
+
+            # The solution must belong to the signed-in organisation. A missing and a foreign
+            # id answer the same 404, and nothing is written before this check passes.
+            from app.models.archimate_core import ArchitectureModel  # noqa: PLC0415
+            from app.models.solution_models import Solution  # noqa: PLC0415
+            from app.utils.tenant import current_organization_id  # noqa: PLC0415
+
+            org_id = current_organization_id()
+            solution = (
+                Solution.query.filter_by(id=solution_id, organization_id=org_id).first()
+                if org_id is not None
+                else None
+            )
+            if solution is None:
+                return jsonify({"ok": False, "error": "Solution not found"}), 404
+
+            # Resolve solution → architecture model, creating one if absent.
+            arch_model = (
+                ArchitectureModel.query
+                .filter_by(solution_id=solution_id, organization_id=org_id)
+                .order_by(ArchitectureModel.id.asc())
+                .first()
+            )
+            if arch_model is None:
+                arch_model = ArchitectureModel(
+                    name=f"SAP Architecture — Solution {solution_id}",
+                    version="1.0",
+                    solution_id=solution_id,
+                    organization_id=org_id,
+                )
+                db.session.add(arch_model)
+                db.session.flush()  # get PK before we need it
+                logger.info("Created architecture model %s for solution %s", arch_model.id, solution_id)
+
+            architecture_id = arch_model.id
 
             result = SapImporter.run_import(
                 architecture_id=int(architecture_id),

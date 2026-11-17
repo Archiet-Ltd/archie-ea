@@ -1,0 +1,14 @@
+{
+ "quotes": [
+  {
+   "symbol": "NWF",
+   "quoteType": "EQUITY",
+   "longname": "Northwind Freight Inc."
+  },
+  {
+   "symbol": "NWFX",
+   "quoteType": "ETF",
+   "longname": "Northwind Fund"
+  }
+ ]
+}

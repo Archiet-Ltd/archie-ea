@@ -2373,7 +2373,7 @@
                 let self = this;
                 _fetch(API_BASE + '/' + self.solutionId + '/domain-completeness')
                     .then(function (data) {
-                        self.domainCoverage = data.domain_coverage || 0;
+                        self.domainCoverage = data.domain_coverage ?? 0; // zero-fallback-ok: a tally of domains with elements, read as a number by the step gate
                         // Merge backend blockers with client-side threshold blockers:
                         // if a domain has a client-side property_below_threshold entry
                         // (from a 422 on confirm), keep it instead of the backend's
@@ -3634,8 +3634,8 @@
                     const coverage = costData ? costData.cost_coverage_pct : null;
                     if (annual > 0) {
                         self.copilotMessage = 'Cost estimate: $' + Math.round(annual).toLocaleString() +
-                            '/year operating, $' + Math.round(tco || 0).toLocaleString() +
-                            ' 5-year TCO (' + (coverage || 0) + '% coverage). Detecting gaps...';
+                            '/year operating, ' + (tco == null ? Platform.figure.NOT_RECORDED : '$' + Math.round(tco).toLocaleString()) +
+                            ' 5-year TCO (' + Platform.figure.percent(coverage) + ' coverage). Detecting gaps...';
                     } else if (costData) {
                         self.copilotMessage = 'No cost data available for linked applications. Detecting gaps...';
                     } else {
@@ -3695,7 +3695,7 @@
                         headers: { 'Content-Type': 'application/json' }
                     });
                 }).then(function (data) {
-                    self.reasoningCompleteness = data.completeness || 0;
+                    self.reasoningCompleteness = data.completeness ?? 0; // zero-fallback-ok: the panel that reads it is hidden until a recommendation exists
                     self.domainsPopulated = true;
                     self.completedSteps.push(6);
                     self.loading = false;

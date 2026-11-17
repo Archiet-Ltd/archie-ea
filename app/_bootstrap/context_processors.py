@@ -305,6 +305,13 @@ def init_context_processors(app):
             return {"applications": [], "vendors": []}
 
     @app.context_processor
+    def inject_costs_withheld_sentence():
+        """The one sentence a page says when the cost rule withholds figures from the signed-in person."""
+        from app.services.cost_visibility import COSTS_WITHHELD
+
+        return {"costs_withheld_sentence": COSTS_WITHHELD}
+
+    @app.context_processor
     def inject_flask():
         """Make flask object available to all templates to fix flash messaging issues"""
         return {"flask": flask}
@@ -357,6 +364,26 @@ def init_context_processors(app):
             return {"nav_counts": dict(_EMPTY_NAV_COUNTS)}
 
     @app.context_processor
+    def inject_two_factor_window():
+        """The first-week banner: set only for a signed-in person who has not
+        enrolled and whose window is open, with the date it ends."""
+        from flask_login import current_user
+
+        try:
+            if not current_user.is_authenticated:
+                return {"two_factor_window": None}
+            from app.services import mfa_service
+
+            user = current_user._get_current_object()
+            ends = mfa_service.window_ends_at(user) if not user.mfa_enabled else None
+            if ends is None:
+                return {"two_factor_window": None}
+            return {"two_factor_window": {"ends_on": ends, "days_left": mfa_service.window_days_left(user)}}
+        except Exception as e:  # noqa: BLE001 — a reminder must not 500 a page
+            app.logger.warning(f"two-factor window unavailable: {e}")
+            return {"two_factor_window": None}
+
+    @app.context_processor
     def inject_active_organization():
         """Expose the active organisation and memberships to templates."""
         from flask_login import current_user
@@ -383,6 +410,21 @@ def init_context_processors(app):
         from app.services.legal_pages import legal_links
 
         return {"legal_links": legal_links()}
+
+    @app.context_processor
+    def inject_site_registry():
+        """The public navbar and footer read one registry. Handed over as a
+        callable so only the pages that render the navbar or footer pay for it."""
+        from app.services.site_registry import registry_entry, site_registry
+
+        return {"site_registry": site_registry, "registry_entry": registry_entry}
+
+    @app.context_processor
+    def inject_released_path():
+        """`is_released_path('/api/sprints')` lets a page skip a control whose feature the released waves keep closed."""
+        from app.release_waves import is_released_path
+
+        return {"is_released_path": is_released_path}
 
     @app.context_processor
     def inject_feature_flags():
@@ -629,6 +671,14 @@ def init_context_processors(app):
 
     app.jinja_env.globals["flask"] = flask
 
+    def _template_payment_open():
+        """Whether a paid plan can be bought here; the billing page reads the same switch."""
+        from app.services import billing_plans
+
+        return billing_plans.payment_is_open()
+
+    app.jinja_env.globals["payment_open"] = _template_payment_open
+
     # One permission matrix: the `can(action, object_type)` template global reads the
     # same answer require_permission gives the server.
     from flask_login import current_user as _matrix_user
@@ -640,6 +690,114 @@ def init_context_processors(app):
 
     app.jinja_env.globals["can"] = _template_can
 
+    from app.services.application_status import status_options as _status_options
+
+    # The one deployment-status list, for every form that offers a choice.
+    app.jinja_env.globals["status_options"] = _status_options
+
+    from app.services.application_status import match_status as _match_status
+
+    app.jinja_env.globals["match_status"] = _match_status
+
+    from app.services.application_status import is_end_of_life as _is_end_of_life
+
+    app.jinja_env.globals["is_end_of_life"] = _is_end_of_life
+
+    from app.core.auth.permissions import can_change_model as _can_change_model
+
+    def _template_can_change_model():
+        return _can_change_model(_matrix_user)
+
+    def _template_is_platform_administrator():
+        from app.middleware.tenant_decorators import is_platform_admin
+
+        return bool(_matrix_user.is_authenticated and is_platform_admin(_matrix_user))
+
+    def _template_may_open_procurement():
+        from app.decorators.requires_role import may_open_procurement
+
+        return may_open_procurement(_matrix_user)
+
+    def _template_procurement_role_names():
+        from app.decorators.requires_role import procurement_role_names
+
+        return procurement_role_names()
+
+    app.jinja_env.globals["procurement_role_names"] = _template_procurement_role_names
+
+    def _template_may_open_role_page(member=None):
+        """True when the role page of ``member`` (the signed-in person when omitted) opens for the signed-in person.
+
+        The page asks for the Administrator permission, authority in the active organisation, and
+        a member of that organisation to edit; an administrator invited into another organisation
+        fails the first or the second and would meet a 403, and a member of another organisation
+        is a 404.
+        """
+        from flask import g as _g
+
+        from app.middleware.tenant_decorators import is_active_org_admin
+        from app.models import Permission
+
+        member = member if member is not None else _matrix_user
+        return bool(
+            _matrix_user.is_authenticated
+            and _matrix_user.can(Permission.ADMINISTER)
+            and is_active_org_admin()
+            and member.organization_id == getattr(_g, "current_org_id", None)
+        )
+
+    def _template_home_url():
+        """The signed-in person's own home: the administration home only for an administrator."""
+        from flask import url_for as _flask_url_for
+
+        if (
+            _matrix_user.is_authenticated
+            and _matrix_user.is_admin()
+            and "admin.dashboard" in app.view_functions
+        ):
+            return _flask_url_for("admin.dashboard")
+        return _flask_url_for("dashboard.overview")
+
+    def _template_may_manage_owned_applications():
+        from app.decorators.requires_role import may_manage_owned_applications
+
+        return may_manage_owned_applications(_matrix_user)
+
+    app.jinja_env.globals["may_manage_owned_applications"] = _template_may_manage_owned_applications
+    def _template_can_modify_solution(solution):
+        """Edit and export are for the person who made the solution and the organisation's administrator."""
+        from app.middleware.tenant_decorators import is_active_org_admin
+
+        return bool(
+            _matrix_user.is_authenticated
+            and (solution.created_by_id == _matrix_user.id or is_active_org_admin())
+        )
+
+    def _template_can_open_code_workbench(solution):
+        from app.modules.codegen.routes._helpers import _check_access
+
+        return bool(_matrix_user.is_authenticated and _check_access(solution))
+
+    def _template_may_see_licence_pages():
+        from app.decorators.requires_role import may_see_licence_pages
+
+        return may_see_licence_pages(_matrix_user)
+
+    app.jinja_env.globals["can_modify_solution"] = _template_can_modify_solution
+    app.jinja_env.globals["can_open_code_workbench"] = _template_can_open_code_workbench
+    app.jinja_env.globals["can_change_model"] = _template_can_change_model
+    app.jinja_env.globals["is_platform_administrator"] = _template_is_platform_administrator
+    app.jinja_env.globals["may_open_procurement"] = _template_may_open_procurement
+    app.jinja_env.globals["may_see_licence_pages"] = _template_may_see_licence_pages
+    app.jinja_env.globals["may_open_role_page"] = _template_may_open_role_page
+    app.jinja_env.globals["home_url"] = _template_home_url
+
+    from app.modules.business_model_canvas.box_meta import canvas_box_meta
+    app.jinja_env.globals["canvas_box_meta"] = canvas_box_meta
+
+    from app.services.public_pages import help_clip
+    app.jinja_env.globals["help_clip"] = help_clip
+
     # NS-006: Register role-based access functions for persona navigation
     from app.utils.role_access import get_sidebar_zones, role_access_context_processor
     role_funcs = role_access_context_processor()
@@ -650,6 +808,59 @@ def init_context_processors(app):
     # template (components/admin_sidebar.html) renders from this only — see
     # app/utils/role_access.py for the single source of truth.
     app.jinja_env.globals["get_sidebar_zones"] = get_sidebar_zones
+
+    # Navigation v3: the sidebar, its search and the breadcrumb trail read the one
+    # registry (app/navigation/registry.py). Callables, so only the pages that draw the
+    # shell pay for them.
+    def _template_navigation(user=None):
+        from flask import g, has_request_context, request
+        from flask_login import current_user as signed_in
+
+        from app.navigation import registry
+
+        # The template passes the user it renders for (the page's current_user).
+        current_user = user if user is not None else signed_in
+
+        endpoint = request.endpoint if has_request_context() else None
+        values = {**request.args.to_dict(), **(request.view_args or {})} if has_request_context() else {}
+        remembered = registry.remembered_items(request.cookies, current_user) if has_request_context() else {}
+        nav = registry.sidebar_for(current_user, endpoint, values, remembered)
+        nav["cookie_name"] = registry.remembered_cookie_name(current_user)
+        org_id = getattr(g, "current_org_id", None) if has_request_context() else None
+        if org_id is None:
+            org_id = getattr(current_user, "organization_id", None)
+        nav["connected"] = registry.has_connected_source(org_id)
+        nav["connect_url"] = registry.connect_url(current_user)
+        return nav
+
+    def _template_nav_trail():
+        from flask import has_request_context, request
+        from flask_login import current_user
+
+        from app.navigation import registry
+
+        return registry.trail(current_user, request.endpoint if has_request_context() else None)
+
+    app.jinja_env.globals["sidebar_navigation"] = _template_navigation
+    app.jinja_env.globals["nav_trail"] = _template_nav_trail
+
+    def _template_page_trail():
+        from flask import has_request_context, request
+        from flask_login import current_user
+
+        from app.navigation import registry
+
+        if not has_request_context():
+            return {"trail": [], "path": None}
+        # a page filtered the way a sidebar item filters (?layer=motivation) is a view of its own, not the
+        # unfiltered entry's page, so its address carries the filter when the header compares the two
+        filtered = any(k in request.args for k in registry.filter_keys())
+        path = request.full_path.rstrip("?") if filtered else request.path
+        return {"trail": registry.page_trail(current_user, request.endpoint, request.args), "path": path}
+
+    app.jinja_env.globals["page_trail"] = _template_page_trail
+    from app.navigation import registry as _registry
+    app.jinja_env.globals["close_trail"] = _registry.close_trail
 
     # E2E-7: the header's role badge (components/admin_header.html) read
     # current_user.role.name -- the legacy Flask-Base Role/Permission table,
@@ -669,12 +880,31 @@ def init_context_processors(app):
     from app.utils.template_utils import humanize_error
     app.jinja_env.filters["humanize_error"] = humanize_error
 
+    # Plain words for an ArchiMate element type ("ApplicationComponent" ->
+    # "Application component"), the same split the Model sidebar uses for its
+    # own type links, so a badge and a sidebar entry never name a type two ways.
+    from app.navigation.registry import element_type_label
+    app.jinja_env.filters["type_label"] = element_type_label
+
+    # A page for a person the cost rule withholds from passes the text of a record through this filter.
+    from app.services.cost_visibility import without_amounts
+
+    app.jinja_env.filters["without_amounts"] = without_amounts
+
     # Register date/datetime formatting filters
     def _filter_format_date(value, fmt='%d %b %Y'):
         if value is None:
             return ''
         if hasattr(value, 'strftime'):
             return value.strftime(fmt)
+        if isinstance(value, str) and len(value) >= 10:
+            # An ISO date or timestamp text (a JSON-shaped record) is a date too.
+            try:
+                import datetime as _datetime
+
+                return _datetime.date.fromisoformat(value[:10]).strftime(fmt)
+            except ValueError:
+                pass
         return str(value)
 
     def _filter_format_datetime(value, fmt='%d %b %Y %H:%M'):
@@ -693,7 +923,7 @@ def init_context_processors(app):
     # template renders an em dash, never a fabricated 0.
     def _filter_format_currency(value, show_code=False, currency=None):
         # A missing amount renders as an em dash, never a blank cell and
-        # never a fabricated 0 (CLAUDE.md).
+        # never a fabricated 0.
         if value is None:
             return EM_DASH
         from flask import has_request_context
@@ -708,7 +938,7 @@ def init_context_processors(app):
             organization = None
         cfg = CurrencyConfig.get_org_currency_config(organization)
         if currency:
-            cfg = dict(cfg, code=currency)
+            cfg = CurrencyConfig.SUPPORTED_CURRENCIES.get(str(currency).upper()) or dict(cfg, code=currency)
         try:
             amount = float(value)
         except (TypeError, ValueError):
@@ -728,16 +958,21 @@ def init_context_processors(app):
     # when there is nothing to compare.
     def _days_until(value):
         import datetime as _dt
+        from app.services.vendor_register import days_until as _days_to
+
         if value is None:
             return None
         try:
             if isinstance(value, _dt.datetime):
                 value = value.date()
-            return (value - _dt.date.today()).days
+            return _days_to(value)
         except TypeError:
             return None
 
     app.jinja_env.globals["days_until"] = _days_until
+    from app.services.vendor_register import renewal_band as _renewal_band
+
+    app.jinja_env.globals["renewal_band"] = _renewal_band
 
     # Cache-busting: single build identifier shared with app/_bootstrap/assets.py
     # and the /version endpoint (ARCH-062) — see build_info.get_build_id().
@@ -791,3 +1026,46 @@ def init_context_processors(app):
     def inject_posthog_key():
         import os
         return {"posthog_key": os.environ.get("POSTHOG_API_KEY", "")}
+
+    @app.context_processor
+    def inject_sample_company_indicator():
+        """Sample company restore point ID for the removal link.
+
+        When the sample company is loaded (detected by the Payments service
+        marker), finds its restore point so the indicator can link to it.
+        """
+        from flask import g, has_request_context
+
+        if not has_request_context():
+            return {"sample_company_restore_point_id": None}
+
+        org_id = getattr(g, "current_org_id", None)
+        if not org_id:
+            return {"sample_company_restore_point_id": None}
+
+        try:
+            from app.models.archimate_core import ArchiMateElement
+            from app.models.archimate_element_types import application_kind_types
+            sample_marker = ArchiMateElement.query.filter(
+                ArchiMateElement.name == "Payments service",
+                ArchiMateElement.type.in_(application_kind_types())
+            ).first()
+
+            if not sample_marker:
+                return {"sample_company_restore_point_id": None}
+
+            # Find the most recent restore point (sample was the most recent import)
+            from app.services import import_snapshot_service
+            points = import_snapshot_service.restore_points(org_id)
+            if points and len(points) > 0:
+                return {"sample_company_restore_point_id": points[0].id}
+
+            return {"sample_company_restore_point_id": None}
+        except Exception:
+            return {"sample_company_restore_point_id": None}
+
+    @app.context_processor
+    def inject_canonical_origin():
+        """Make the canonical origin available to all templates."""
+        from app.services.origin import canonical_origin
+        return {"canonical_origin": canonical_origin()}

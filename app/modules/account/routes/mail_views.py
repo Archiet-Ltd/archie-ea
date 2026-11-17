@@ -16,7 +16,10 @@ from app.modules.account.forms.account_forms import (
     RequestResetPasswordForm,
 )
 from app.modules.account.services.account_service import AccountService
-from app.services import buy_intent
+from app.services import buy_intent, signup_attribution, signup_guard
+from app.services.rate_limiter import apply_headers, count_hit, wait_phrase
+
+CONFIRMATION_RESENDS_PER_HOUR = 3
 
 MAIL_UNAVAILABLE_RESET = (
     "E-mail is not available on this server, so a reset link cannot be sent. "
@@ -34,10 +37,24 @@ def _link_expired(title, message, action_label, action_href):
     ), 410
 
 
+def _education_url(user):
+    """The eligibility page for a person whose confirmed address is at a listed university or
+    college, when the address was confirmed from a mailed link; otherwise None."""
+    from app.services import academic_domains
+
+    if "education.eligibility" not in current_app.view_functions or academic_domains.match(user.email) is None:
+        return None
+    return url_for("education.eligibility")
+
+
 def _after_confirmation_url(user):
-    """Where a newly confirmed person goes: an owner lands on inviting the team."""
-    if "team.team" in current_app.view_functions and getattr(user, "is_org_admin", False):
-        return url_for("team.team")
+    """Where a newly confirmed person goes: a university or college address lands on Education,
+    an owner on inviting the team."""
+    education = _education_url(user)
+    if education:
+        return education
+    if "account.welcome" in current_app.view_functions and getattr(user, "is_org_admin", False):
+        return url_for("account.welcome")
     return url_for("dashboard.overview")
 
 
@@ -48,7 +65,7 @@ def register_view():
         return redirect("/pricing")
     if chosen is not None and current_user.is_authenticated:
         # Already has an account and is signed in: straight to that plan.
-        return redirect(buy_intent.target_url(*chosen))
+        return redirect(buy_intent.target_url(*chosen, offer=buy_intent.requested_offer()))
     form = RegistrationForm()
     if request.method == "GET":
         # A visitor reaching the sign-up form, not a retry after a failed
@@ -56,13 +73,21 @@ def register_view():
         from app.services.public_analytics_service import log_signup_started
 
         log_signup_started()
+    if request.method == "POST":
+        reason = signup_guard.refusal()
+        if reason is not None:
+            # Nothing is created: no account, no organisation, no message.
+            flash(signup_guard.MESSAGES[reason], "form-error")
+            return _register_page(form, chosen), 400
     if form.validate_on_submit():
+        origin = signup_attribution.held()  # read before sign-in starts a fresh session
         _user, confirmation = AccountService.sign_up(
             first_name=form.first_name.data,
             last_name=form.last_name.data,
             email=form.email.data,
             password=form.password.data,
         )
+        signup_attribution.record(_user, origin)
         from app.services.public_analytics_service import log_signup_completed
 
         log_signup_completed()
@@ -78,18 +103,30 @@ def register_view():
                 "error",
             )
             return redirect(url_for("account.unconfirmed"))
+        # On the way into the welcome steps the notice is a line on the page, so it never covers the step
+        # heading on a phone; on the other routes it stays a toast.
         flash(
-            "Account created. Welcome to {}! E-mail is not available on this "
-            "server, so no confirmation message was sent.".format(current_app.config['APP_NAME']),
-            "info",
+            "Account created. Welcome to {}! Your account is ready to use, "
+            "with no confirmation message to wait for.".format(current_app.config['APP_NAME']),
+            "signup-notice" if chosen is None and "account.welcome" in current_app.view_functions else "info",
         )
         if chosen is not None:
             # Usable at once: sign in and go straight to that plan's checkout.
-            return redirect(url_for("account.login", plan=chosen[0], interval=chosen[1]))
+            return redirect(url_for("account.login", plan=chosen[0], interval=chosen[1], offer=buy_intent.requested_offer()))
+        if "account.welcome" in current_app.view_functions:
+            # Signed in at once: the second step of sign-up.
+            return redirect(url_for("account.welcome"))
         return redirect(url_for("main.index"))
+    return _register_page(form, chosen)
+
+
+def _register_page(form, chosen):
+    # Drawn afresh each time, so the minimum wait counts from the form the person is looking at.
+    form.form_issued.data = signup_guard.issue_form_token()
     return render_template(
-        "account/register.html", form=form,
-        signin_args={"plan": chosen[0], "interval": chosen[1]} if chosen else {},
+        "account/register.html", form=form, step=1,
+        signin_args={"plan": chosen[0], "interval": chosen[1], "offer": buy_intent.requested_offer()} if chosen else {},
+        turnstile_site_key=current_app.config["TURNSTILE_SITE_KEY"] if signup_guard.turnstile_enabled() else None,
     )
 
 
@@ -156,11 +193,24 @@ def confirm_request_view():
         return redirect(url_for("main.index"))
     if request.method != "POST":
         return redirect(url_for("account.unconfirmed"))
-    delivered, error = AccountService.send_confirmation_email(current_user)
+    verdict = count_hit("confirmation-resend", (current_user.email or "").strip().lower(),
+                        CONFIRMATION_RESENDS_PER_HOUR, 3600)
+    if not verdict.allowed:
+        flash(
+            "A confirmation link has already been sent to {} several times this hour. "
+            "Check your inbox and spam folder, or try again in {}.".format(
+                current_user.email, wait_phrase(verdict.retry_after)),
+            "error",
+        )
+        return apply_headers(redirect(url_for("account.unconfirmed")), verdict)
+    delivered, _error = AccountService.send_confirmation_email(current_user)
     if delivered:
         flash("A new confirmation link has been sent to {}.".format(current_user.email), "success")
     else:
-        flash("No message was sent: {}".format(error), "error")
+        flash(
+            "We could not send a confirmation link just now. Please try again in a few minutes.",
+            "error",
+        )
     return redirect(url_for("account.unconfirmed"))
 
 
@@ -191,7 +241,8 @@ def confirm_view(token):
         return redirect(_after_confirmation_url(user))
     flash(message + " Sign in to continue.", "form-success")
     # The chosen plan stays in the session; signing in lands on its checkout.
-    return redirect(url_for("account.login"))
+    education = _education_url(user)
+    return redirect(url_for("account.login", next=education) if education else url_for("account.login"))
 
 
 def _invitation_gone():

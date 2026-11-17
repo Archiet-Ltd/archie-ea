@@ -1,0 +1,28 @@
+{# Vendored from flask-basecoat, branch feat/canvases-capability-map, commit 2b02744, flask_basecoat/templates/basecoat/canvas/ ansoff-matrix.html. Adapted only to Entelim macro names. #}
+{# Ansoff matrix, C2. After H. Igor Ansoff (HBR, 1957): products across (Existing, New), markets down (Existing, New). Growth risk rises from Market Penetration to Diversification. #}
+{% import 'components/canvas/_frame.html' as f with context %}
+{% import 'components/canvas/_ui.html' as ui with context %}
+{% set SPEC = {
+  'form': 'C2', 'name': 'Ansoff matrix', 'grid': 'grid-cols-11',
+  'hint': 'Scroll sideways on a narrow screen to see both product columns.',
+  'boxes': [
+    {'key': 'market-penetration', 'title': 'Market Penetration', 'icon': 'target', 'question': 'Existing products, existing markets. Lowest risk.', 'empty': 'No courses of action yet. Add how to sell more of what you have to the customers you have.', 'area': 'col-span-4 col-start-4 row-start-3'},
+    {'key': 'product-development', 'title': 'Product Development', 'icon': 'lightbulb', 'question': 'New products, existing markets. Medium risk.', 'empty': 'No courses of action yet. Add the new products for your current customers.', 'area': 'col-span-4 col-start-8 row-start-3'},
+    {'key': 'market-development', 'title': 'Market Development', 'icon': 'map', 'question': 'Existing products, new markets. Medium risk.', 'empty': 'No courses of action yet. Add the new markets for your current products.', 'area': 'col-span-4 col-start-4 row-start-4'},
+    {'key': 'diversification', 'title': 'Diversification', 'icon': 'shuffle', 'question': 'New products, new markets. Highest risk.', 'empty': 'No courses of action yet. Add the new products for new markets.', 'area': 'col-span-4 col-start-8 row-start-4'},
+  ]} %}
+{% macro ansoff_matrix(data, id='ansoff-matrix') -%}
+{% call f.grid_canvas(SPEC, data, id) %}
+      <div class="col-start-4 col-span-8 row-start-1 flex items-center justify-center gap-2 text-sm font-semibold">{{ ui.lucide('package', 'size-4 text-muted-foreground') }}Products</div>
+      <div class="col-start-4 col-span-4 row-start-2 flex justify-center text-sm text-muted-foreground">Existing products</div>
+      <div class="col-start-8 col-span-4 row-start-2 flex justify-center text-sm text-muted-foreground">New products</div>
+      <div class="col-start-1 row-start-3 row-span-2 flex items-center justify-center text-sm font-semibold">Markets</div>
+      <div class="col-start-2 col-span-2 row-start-3 flex items-center justify-end px-2 text-sm text-muted-foreground">Existing markets</div>
+      <div class="col-start-2 col-span-2 row-start-4 flex items-center justify-end px-2 text-sm text-muted-foreground">New markets</div>
+      <div class="col-span-11 row-start-5 flex flex-wrap items-center gap-3 px-2 pt-1 text-xs text-muted-foreground">
+        {{ ui.badge(text='Lowest risk', variant='outline') }}<span>Market Penetration</span>{{ ui.lucide('arrow-right', 'size-4') }}
+        {{ ui.badge(text='Medium risk', variant='secondary') }}<span>Product Development, Market Development</span>{{ ui.lucide('arrow-right', 'size-4') }}
+        {{ ui.badge(text='Highest risk', variant='default') }}<span>Diversification</span>
+      </div>
+{% endcall %}
+{%- endmacro %}

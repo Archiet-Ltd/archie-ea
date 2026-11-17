@@ -82,7 +82,7 @@ function vendorSuggestionsMixin() {
             const badges = {
                 'api_synced':           'inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium bg-green-500/10 text-green-600 border border-green-500/30',
                 'contract_verified':    'inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium bg-green-500/10 text-green-600 border border-green-500/30',
-                'architect_confirmed':  'inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium bg-blue-500/10 text-blue-600 border border-blue-500/30',
+                'architect_confirmed':  'inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium bg-info/10 text-info-emphasis border border-info/30',
                 'seeded':               'inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium bg-gray-500/10 text-gray-600 border border-gray-500/30',
                 'llm_proposed':         'inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium bg-purple-500/10 text-purple-600 border border-purple-500/30'
             };

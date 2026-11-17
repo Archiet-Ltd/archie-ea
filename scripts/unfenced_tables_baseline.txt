@@ -5,11 +5,8 @@ acm_cross_domain_rules
 acm_domain_templates
 acm_property_templates
 adm_audit_logs
-adm_audit_summaries
 adm_board_portfolio_links
 adm_compliance_checkpoints
-adm_data_retention_policies
-adm_deliverable_checks
 adm_deliverables
 adm_phase_steps
 adm_phases
@@ -158,9 +155,7 @@ compliance_requirements_model
 compliance_scan_reports
 composite_structures
 confidence_thresholds
-consolidation_candidates
 consolidation_list_entries
-consolidation_opportunities
 consolidation_recommendations
 constraints
 consulting_partners
@@ -322,7 +317,6 @@ salesforce_config_metadata
 sap_metadata
 saved_diagram_elements
 saved_diagram_relationships
-savings_realizations
 scoring_configs
 scoring_configurations
 security_scans
@@ -385,7 +379,6 @@ spec_webhooks
 sprints
 sso_configs
 staging_elements
-stakeholder_communications
 stakeholder_inputs
 strategy_resources
 structural_groupings
@@ -418,7 +411,6 @@ uml_attributes
 uml_elements
 uml_methods
 uml_models
-unified_application_capability_mapping
 unified_capability_application_mappings
 unified_capability_process_mapping
 unified_capability_technology_mapping

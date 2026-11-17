@@ -676,6 +676,7 @@ def driver_add(id):
 
 @unified_applications_bp.route("/<int:id>/work-packages/add", methods=["POST"])
 @require_permission("edit", "application")
+@require_permission("edit", "work_package")
 @audit_log("element_link")
 def work_package_add(id):
     """Link existing Work Package to Application (direct FK)"""

@@ -11,8 +11,10 @@ real .xml file with real element data comes back, not just that a handler
 exists in source.
 """
 
+import pathlib
 import re
 import uuid
+import xml.etree.ElementTree as ET
 
 import pytest
 from playwright.sync_api import expect
@@ -20,6 +22,7 @@ from playwright.sync_api import expect
 from tests.smoke.conftest import PASSWORD
 
 PAGE_TIMEOUT = 30000
+ARCHI_MODEL = "{http://www.archimatetool.com/archimate}model"
 
 
 def _login(page, base, email):
@@ -70,13 +73,24 @@ def test_export_archimate_xml_from_primary_menu_downloads_real_data(browser, liv
     # overlay instead of the intended button; dispatching the click event
     # directly on the target node sidesteps the hit-test entirely.
     toolbar = page.locator("nav[aria-label='Composer toolbar']")
-    toolbar.get_by_role("button", name=re.compile("^Export$")).dispatch_event("click")
-    with page.expect_download(timeout=PAGE_TIMEOUT) as download_info:
-        page.get_by_role("button", name="Export ArchiMate XML").dispatch_event("click")
-    download = download_info.value
 
+    def export_with(menu_label):
+        toolbar.get_by_role("button", name=re.compile("^Export$")).dispatch_event("click")
+        with page.expect_download(timeout=PAGE_TIMEOUT) as download_info:
+            page.get_by_role("menuitem", name=menu_label, exact=True).click()
+        return download_info.value
+
+    # The ArchiMate exchange file (XML): real XML naming the element on the canvas.
+    download = export_with("ArchiMate exchange file (XML)")
     assert download.suggested_filename.endswith(".xml")
-    path = download.path()
-    content = path.read_text(encoding="utf-8")
+    content = pathlib.Path(download.path()).read_text(encoding="utf-8")
     assert "<?xml" in content or "<model" in content.lower(), "export must be real XML, not an error page"
     assert element_name in content, "the exported file must contain the element actually on the canvas"
+
+    # Archi (.archimate) on the same populated canvas: a valid Archi model naming the element.
+    download = export_with("Archi (.archimate)")
+    assert download.suggested_filename.endswith(".archimate"), download.suggested_filename
+    root = ET.parse(download.path()).getroot()
+    assert root.tag == ARCHI_MODEL, "the file is not an Archi model: %s" % root.tag
+    names = [el.get("name") for el in root.iter() if el.get("name")]
+    assert element_name in names, "the Archi model must contain the element on the canvas"

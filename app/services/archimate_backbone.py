@@ -36,6 +36,8 @@ in it.
 from __future__ import annotations
 
 import logging
+from contextlib import contextmanager
+from contextvars import ContextVar
 from typing import Any, Dict, Optional
 
 logger = logging.getLogger(__name__)
@@ -86,8 +88,22 @@ NAME_FIELDS = ("name", "title", "risk_name", "goal_name", "driver_name",
                "constraint_name", "requirement_text", "description",
                "control_name", "contract_name")
 
-# ArchiMateElement.name is String(100).
+# The default cut for a name a caller did not ask to keep whole. The column itself holds
+# ELEMENT_NAME_LENGTH (migrations/versions/20260926_widen_element_name.py).
 MAX_NAME = 100
+ELEMENT_NAME_LENGTH = 500
+
+
+class NameTooLong(ValueError):
+    """A name is longer than the element column holds."""
+
+
+def fit_name(name, limit=ELEMENT_NAME_LENGTH):
+    """A name kept whole up to ``limit`` characters; a longer one is refused in plain words, never cut."""
+    name = " ".join((name or "").split())
+    if len(name) > limit:
+        raise NameTooLong(f"Use {limit} characters or fewer. This name has {len(name)}.")
+    return name
 
 # Where each model keeps its display description. Checked in order.
 DESCRIPTION_FIELDS = ("description", "contract_description", "risk_description",
@@ -121,7 +137,25 @@ def _resolve_org_id(obj: Any) -> Optional[int]:
         return None
 
 
-def create_backbone_element(*, element_type, layer, name, description=None, organization_id, session=None, provenance=None, flush=True):
+_new_element_origin = ContextVar("new_element_origin", default=None)
+
+
+@contextmanager
+def new_elements_originate_from(origin):
+    """Give every element the backbone creates inside the block this origin from its first write.
+
+    ``origin`` maps the origin columns (``source_kind``, ``source_ref``, ``source_label``,
+    ``source_recorded_at``) to their values. An origin set after the insert is a second change in
+    the history and the insert, the one a count of records added reads, would name none.
+    """
+    token = _new_element_origin.set(origin)
+    try:
+        yield
+    finally:
+        _new_element_origin.reset(token)
+
+
+def create_backbone_element(*, element_type, layer, name, description=None, organization_id, session=None, provenance=None, flush=True, keep_whole=False, origin=None):
     """Create an ArchiMate element for the backbone.
 
     Returns the ArchiMateElement. Raises ValueError when name is blank/missing,
@@ -129,6 +163,10 @@ def create_backbone_element(*, element_type, layer, name, description=None, orga
     `serial`/`SERIAL` primary keys in this codebase start at 1, so 0 is never
     a real organization id -- it is rejected explicitly here rather than being
     passed through to a foreign-key constraint failure later.
+
+    A name over MAX_NAME is shortened with an ellipsis (the original is kept in
+    ``source_name``), unless ``keep_whole`` is set: then it is stored as given up to
+    ELEMENT_NAME_LENGTH and a longer one raises NameTooLong with nothing written.
 
     When ``flush=True`` (default) the element is flushed immediately so its
     ``id`` is available.  Pass ``flush=False`` when called from inside a
@@ -153,7 +191,10 @@ def create_backbone_element(*, element_type, layer, name, description=None, orga
 
     properties = dict(provenance or {})
     properties.setdefault("source_model", element_type)
-    stored_name = name.strip() if len(name.strip()) <= MAX_NAME else name.strip()[: MAX_NAME - 1] + "\u2026"
+    if keep_whole:
+        stored_name = fit_name(name)
+    else:
+        stored_name = name.strip() if len(name.strip()) <= MAX_NAME else name.strip()[: MAX_NAME - 1] + "\u2026"
     if stored_name != name.strip():
         properties["source_name"] = name.strip()
 
@@ -165,6 +206,7 @@ def create_backbone_element(*, element_type, layer, name, description=None, orga
         description=description,
         scope="enterprise",
         custom_properties=properties,
+        **(origin or _new_element_origin.get() or {}),
     )
     session.add(element)
     if flush:
@@ -341,6 +383,56 @@ def _pending_map(session):
     return _PENDING[sid]
 
 
+_NEW_GAP_ELEMENTS = "new_gap_elements"
+
+
+def _note_gap_element(session, element):
+    """Remember a new element; a Gap element of an organisation gets its gap record when the work is committed."""
+    if (element.type or "").lower() == "gap":
+        session.info.setdefault(_NEW_GAP_ELEMENTS, []).append(element)
+
+
+def _on_before_commit(session):
+    """Give each Gap element written in this transaction its gap record, unless a record already points at it.
+
+    Whoever writes the element (Composer, model map, import, create form) writes the record with it, so the
+    Gaps page lists it and a read of the register writes nothing. It runs at commit because a writer that
+    makes its own record links the element to it after the element is flushed. No other transaction can see
+    the element before this commit, so two records for one element cannot be made here at the same time."""
+    if session.new or session.dirty or session.deleted:
+        session.flush()  # the elements still waiting for the commit's own flush are noted here
+    elements = session.info.pop(_NEW_GAP_ELEMENTS, None)
+    if not elements:
+        return
+    from app import db
+    from app.services.gap_register_service import gap_record_for_element
+
+    live = [e for e in elements
+            if e.id is not None and e.organization_id and e.superseded_at is None and e in session]
+    if not live:
+        return
+    # Asked of the table directly, by each element's own organisation: the ORM's tenant filter shows only the
+    # signed-in organisation's rows, and a record this commit cannot see would be written a second time.
+    claimed = {
+        row[0] for row in session.execute(
+            db.text(
+                "SELECT archimate_element_id FROM gaps "
+                "WHERE archimate_element_id = ANY(:ids) AND organization_id = ANY(:orgs)"
+            ),
+            {"ids": [e.id for e in live], "orgs": sorted({e.organization_id for e in live})},
+        )
+    }
+    for element in live:
+        if element.id not in claimed:
+            claimed.add(element.id)
+            session.add(gap_record_for_element(element))
+    session.flush()
+
+
+def _forget_gap_elements(session, *_):
+    session.info.pop(_NEW_GAP_ELEMENTS, None)
+
+
 def _on_before_flush(session, flush_context, instances):
     """Create ArchiMate elements for newly inserted domain records.
 
@@ -356,6 +448,9 @@ def _on_before_flush(session, flush_context, instances):
     pending = _pending_map(session)
     for obj in list(session.new):
         type_name = type(obj).__name__
+        if type_name == "ArchiMateElement":
+            _note_gap_element(session, obj)
+            continue
         if type_name not in FLUSH_LISTENER_ALLOW_LIST:
             continue
         if getattr(obj, "archimate_element_id", None):
@@ -413,6 +508,10 @@ def register_archimate_listeners():
         _sa_event.listen(db.session, "after_flush", _on_after_flush)
     if not _sa_event.contains(db.session, "after_rollback", _on_after_rollback):
         _sa_event.listen(db.session, "after_rollback", _on_after_rollback)
+    if not _sa_event.contains(db.session, "before_commit", _on_before_commit):
+        _sa_event.listen(db.session, "before_commit", _on_before_commit)
+    if not _sa_event.contains(db.session, "after_soft_rollback", _forget_gap_elements):
+        _sa_event.listen(db.session, "after_soft_rollback", _forget_gap_elements)
 
 
 def _on_after_rollback(session):

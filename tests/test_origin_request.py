@@ -1,0 +1,121 @@
+"""OAuth and MCP metadata answer on both hosts with each host's own origin.
+
+With PUBLIC_BASE_URL=https://entelim.tech and PUBLIC_BASE_URL_ALIASES=https://entelim.org:
+- on host entelim.tech, metadata names https://entelim.tech (issuer, every endpoint, resource https://entelim.tech/mcp)
+- on host entelim.org, metadata names https://entelim.org
+- with a forged Host header (evil.example) and with the server's IP name, metadata names https://entelim.tech
+
+Requires MCP_ENABLED=true before the app fixture is created.
+"""
+
+from __future__ import annotations
+
+from contextlib import contextmanager
+
+import pytest
+
+
+@contextmanager
+def _set_config(app, **pairs) -> None:
+    """Override app config for one test, then restore it."""
+    before = {k: app.config.get(k) for k in pairs}
+    for k, v in pairs.items():
+        app.config[k] = v
+    try:
+        yield
+    finally:
+        for k, v in before.items():
+            app.config[k] = v
+
+
+def _metadata_on_host(client, app, host: str, scheme: str = "https"):
+    """Fetch both well-known metadata documents on a given host."""
+    base_url = f"{scheme}://{host}"
+    pr = client.get(f"{base_url}/.well-known/oauth-protected-resource")
+    as_ = client.get(f"{base_url}/.well-known/oauth-authorization-server")
+    assert pr.status_code == 200, f"protected resource on {host}: {pr.status_code}"
+    assert as_.status_code == 200, f"authorization server on {host}: {as_.status_code}"
+    return pr.get_json(), as_.get_json()
+
+
+def test_metadata_on_entelim_tech_names_entelim_tech(client, app):
+    """On host entelim.tech, metadata names https://entelim.tech."""
+    with _set_config(app,
+                     PUBLIC_BASE_URL="https://entelim.tech",
+                     PUBLIC_BASE_URL_ALIASES="https://entelim.org"):
+        pr, as_ = _metadata_on_host(client, app, "entelim.tech")
+        assert pr["resource"] == "https://entelim.tech/mcp", pr
+        assert pr["authorization_servers"] == ["https://entelim.tech"], pr
+        assert as_["issuer"] == "https://entelim.tech", as_
+        assert as_["authorization_endpoint"] == "https://entelim.tech/oauth/authorize", as_
+        assert as_["token_endpoint"] == "https://entelim.tech/oauth/token", as_
+        assert as_["revocation_endpoint"] == "https://entelim.tech/oauth/revoke", as_
+        assert as_["registration_endpoint"] == "https://entelim.tech/oauth/register", as_
+
+
+def test_metadata_on_entelim_org_names_entelim_org(client, app):
+    """On host entelim.org (an alias), metadata names https://entelim.org."""
+    with _set_config(app,
+                     PUBLIC_BASE_URL="https://entelim.tech",
+                     PUBLIC_BASE_URL_ALIASES="https://entelim.org"):
+        pr, as_ = _metadata_on_host(client, app, "entelim.org")
+        assert pr["resource"] == "https://entelim.org/mcp", pr
+        assert pr["authorization_servers"] == ["https://entelim.org"], pr
+        assert as_["issuer"] == "https://entelim.org", as_
+        assert as_["authorization_endpoint"] == "https://entelim.org/oauth/authorize", as_
+        assert as_["token_endpoint"] == "https://entelim.org/oauth/token", as_
+        assert as_["revocation_endpoint"] == "https://entelim.org/oauth/revoke", as_
+        assert as_["registration_endpoint"] == "https://entelim.org/oauth/register", as_
+
+
+def test_metadata_on_forged_host_names_canonical(client, app):
+    """Forged Host header (evil.example) gets the canonical origin."""
+    with _set_config(app,
+                     PUBLIC_BASE_URL="https://entelim.tech",
+                     PUBLIC_BASE_URL_ALIASES="https://entelim.org"):
+        pr, as_ = _metadata_on_host(client, app, "evil.example")
+        assert pr["resource"] == "https://entelim.tech/mcp", pr
+        assert pr["authorization_servers"] == ["https://entelim.tech"], pr
+        assert as_["issuer"] == "https://entelim.tech", as_
+
+
+def test_metadata_on_server_ip_names_canonical(client, app):
+    """Server's IP address name gets the canonical origin."""
+    with _set_config(app,
+                     PUBLIC_BASE_URL="https://entelim.tech",
+                     PUBLIC_BASE_URL_ALIASES="https://entelim.org"):
+        pr, as_ = _metadata_on_host(client, app, "127.0.0.1", scheme="http")
+        assert pr["resource"] == "https://entelim.tech/mcp", pr
+        assert pr["authorization_servers"] == ["https://entelim.tech"], pr
+        assert as_["issuer"] == "https://entelim.tech", as_
+
+
+def test_the_token_endpoint_accepts_only_listed_addresses_as_the_resource(client, app):
+    with _set_config(
+        app,
+        PUBLIC_BASE_URL="https://entelim.tech",
+        PUBLIC_BASE_URL_ALIASES="https://entelim.org",
+    ):
+        def refusal(resource):
+            response = client.post(
+                "/oauth/token",
+                data={"grant_type": "refresh_token", "resource": resource},
+            )
+            return response.status_code, (response.get_json() or {}).get("error")
+
+        assert refusal("https://unlisted.example/mcp") == (400, "invalid_target")
+        assert refusal("https://entelim.tech.unlisted.example/mcp") == (400, "invalid_target")
+        assert refusal("https://entelim.tech/mcp")[1] != "invalid_target"
+        assert refusal("https://entelim.org/mcp")[1] != "invalid_target"
+
+
+def test_a_token_for_an_unlisted_address_does_not_open_the_connector(app):
+    from app.modules.oauth_provider import identity
+
+    with _set_config(
+        app,
+        PUBLIC_BASE_URL="https://entelim.tech",
+        PUBLIC_BASE_URL_ALIASES="https://entelim.org",
+    ):
+        with app.app_context():
+            assert identity.allowed_origins() == ["https://entelim.tech", "https://entelim.org"]

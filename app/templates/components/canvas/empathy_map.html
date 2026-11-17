@@ -1,0 +1,19 @@
+{# Vendored from flask-basecoat, branch feat/canvases-capability-map, commit 2b02744, flask_basecoat/templates/basecoat/canvas/ empathy-map.html. Adapted only to Entelim macro names. #}
+{# Empathy Map, C4. Dave Gray, XPLANE (2009), in the four-quadrant form: the user at the centre, Says and Thinks above, Does and Feels below, Pains and Gains as two halves of a strip underneath. #}
+{% import 'components/canvas/_frame.html' as f with context %}
+{% set SPEC = {
+  'form': 'C4', 'name': 'Empathy map', 'grid': 'grid-cols-12 grid-rows-[auto_auto_auto]',
+  'hint': 'Scroll sideways on a narrow screen to see the whole map.',
+  'credit': 'Empathy Map by Dave Gray, XPLANE.',
+  'boxes': [
+    {'key': 'user', 'title': 'User', 'icon': 'user', 'question': 'Who are we empathising with?', 'empty': 'No user yet. Add the role or stakeholder this map is about.', 'area': 'col-span-4 col-start-5 row-span-2 row-start-1 justify-center'},
+    {'key': 'says', 'title': 'Says', 'icon': 'message-circle', 'question': 'What do we hear them say out loud?', 'empty': 'No quotes yet. Add what you heard, as evidence records.', 'area': 'col-span-4 col-start-1 row-start-1'},
+    {'key': 'thinks', 'title': 'Thinks', 'icon': 'brain', 'question': 'What might they be thinking but not saying?', 'empty': 'No thoughts yet. Add what research suggests they think.', 'area': 'col-span-4 col-start-9 row-start-1'},
+    {'key': 'does', 'title': 'Does', 'icon': 'footprints', 'question': 'What do we see them do?', 'empty': 'No behaviour yet. Add the workarounds you saw them use.', 'area': 'col-span-4 col-start-1 row-start-2'},
+    {'key': 'feels', 'title': 'Feels', 'icon': 'heart', 'question': 'What are they feeling?', 'empty': 'No feelings yet. Add what research shows they feel.', 'area': 'col-span-4 col-start-9 row-start-2'},
+    {'key': 'pains', 'title': 'Pains', 'icon': 'triangle-alert', 'question': 'Fears, frustrations and obstacles.', 'empty': 'No pains yet. Add the frustrations and obstacles.', 'area': 'col-span-6 col-start-1 row-start-3'},
+    {'key': 'gains', 'title': 'Gains', 'icon': 'trending-up', 'question': 'Wants, needs and measures of success.', 'empty': 'No gains yet. Add what they want to achieve.', 'area': 'col-span-6 col-start-7 row-start-3'},
+  ]} %}
+{% macro empathy_map(data, id='empathy-map') -%}
+{{ f.grid_canvas(SPEC, data, id) }}
+{%- endmacro %}

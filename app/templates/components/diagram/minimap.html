@@ -1,0 +1,18 @@
+{# Minimap: the whole diagram at a glance with the visible area marked; drag to move around.
+   Uses composerApp's miniMapPointer* handlers and the #minimap-canvas the engine paints into.
+
+   Usage: {% from 'components/diagram/minimap.html' import diagram_minimap with context %}
+          {{ diagram_minimap() }} #}
+{% from 'components/button.html' import button %}
+
+{% macro diagram_minimap() %}
+<div class="mini-map absolute bottom-4 left-4 z-20 rounded-md border border-border bg-card" x-show="elementCount > 0" x-cloak data-testid="diagram-minimap"
+     @mousedown.prevent="miniMapPointerDown($event)" @mousemove.prevent="miniMapPointerMove($event)"
+     @mouseup.prevent="miniMapPointerUp()" @mouseleave="miniMapPointerUp()">
+  <div class="flex items-center justify-between px-2.5 pt-1.5 pb-0.5">
+    <span class="text-xs font-medium text-muted-foreground">Overview</span>
+    {% call button(variant='ghost', size='icon-xs', aria_label='Show or hide the overview', attrs_dict={'@click.stop': "miniMapExpanded = !miniMapExpanded; try { window.localStorage.setItem('archie.composer.miniMapExpanded', miniMapExpanded); } catch (e) { /* swallow-ok: localStorage is unavailable in private browsing */ }", 'x-text': "miniMapExpanded ? '−' : '+'"}) %}{% endcall %}
+  </div>
+  <canvas id="minimap-canvas" x-show="miniMapExpanded" x-cloak :width="miniMapExpanded ? 152 : 0" :height="miniMapExpanded ? 100 : 0" class="mx-auto mb-1 block cursor-crosshair rounded-md"></canvas>
+</div>
+{% endmacro %}

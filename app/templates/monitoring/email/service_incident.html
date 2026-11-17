@@ -1,0 +1,15 @@
+{# smoke-coverage-ok: an email template, rendered and checked in tests/test_service_status_notify.py #}
+<p>{{ 'An incident has been resolved.' if resolved else 'A service incident has been opened.' }}</p>
+
+<p><strong>{{ incident.title }}</strong><br>
+Impact: {{ impact_label }}<br>
+{{ 'Resolved' if resolved else 'Started' }}: {{ when.strftime('%d %b %Y at %H:%M') }} UTC</p>
+{% if incident.summary %}<p>{{ incident.summary }}</p>{% endif %}
+
+<p>Current status: <a href="{{ status_link }}">{{ status_link }}</a></p>
+
+<p>You receive this because you subscribed to service status updates. You can unsubscribe on the status page.</p>
+
+<p>The {{ config.APP_NAME }} Team</p>
+
+<p><small>Note: replies to this email address are not monitored.</small></p>

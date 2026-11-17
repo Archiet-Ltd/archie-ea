@@ -5,6 +5,7 @@ Handles application data import (CSV, Excel, JSON, manual) and import history.
 """
 
 import re
+from app.services.change_source import records_changes_as
 import csv
 import io
 import json
@@ -44,6 +45,7 @@ logger = logging.getLogger(__name__)
 
 @application_mgmt.route("/applications/import", methods=["POST"])
 @login_required
+@records_changes_as("import")
 def application_import():
     """Import Application Components from CSV or JSON"""
     if "file" not in request.files:
@@ -164,6 +166,11 @@ def application_import():
                         failed += 1
                         continue
 
+                    if cleaned["status_error"]:
+                        row_errors.append((index, cleaned["status_error"]))
+                        failed += 1
+                        continue
+
                     # Normalize name for duplicate checking (case-insensitive)
                     name_lower = name.lower()
 
@@ -206,7 +213,8 @@ def application_import():
                         ]
                         existing_app.technology_stack = cleaned["technology_stack"]
                         existing_app.version = cleaned["version"]
-                        existing_app.deployment_status = cleaned["deployment_status"]
+                        if cleaned["deployment_status"]:
+                            existing_app.deployment_status = cleaned["deployment_status"]
                         existing_app.business_domain = cleaned["business_domain"]
                         existing_app.business_owner = cleaned["business_owner"]
                         existing_app.development_team = cleaned["development_team"]
@@ -382,6 +390,11 @@ def application_import():
                         failed += 1
                         continue
 
+                    if cleaned["status_error"]:
+                        row_errors.append((index, cleaned["status_error"]))
+                        failed += 1
+                        continue
+
                     # Normalize name for duplicate checking (case-insensitive)
                     name_lower = name.lower()
 
@@ -412,7 +425,8 @@ def application_import():
                         ]
                         existing_app.technology_stack = cleaned["technology_stack"]
                         existing_app.version = cleaned["version"]
-                        existing_app.deployment_status = cleaned["deployment_status"]
+                        if cleaned["deployment_status"]:
+                            existing_app.deployment_status = cleaned["deployment_status"]
                         existing_app.business_domain = cleaned["business_domain"]
                         existing_app.business_owner = cleaned["business_owner"]
                         existing_app.development_team = cleaned["development_team"]
@@ -2912,6 +2926,7 @@ def auto_create_vendors():
 
 @application_mgmt.route("/applications/upload-excel", methods=["POST"])
 @login_required
+@records_changes_as("import")
 def upload_excel_applications():
     """
     Upload and process Excel, CSV, or JSON file for application import.
@@ -4351,6 +4366,7 @@ def _manual_import_payload(data):
 
 @application_mgmt.route("/applications/import-manual", methods=["POST"])
 @login_required
+@records_changes_as("import")
 def import_manual_applications():
     """Process manual entry applications"""
     import json

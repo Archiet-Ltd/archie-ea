@@ -51,7 +51,17 @@ WATCHED_FIELDS: Dict[str, tuple] = {
         "infrastructure_cost",
         "support_cost",
     ),
-    "application_owner": ("user_id", "ownership_type", "application_id", "element_type", "element_id"),
+    # A named person without an account is described by name and role. Their
+    # email is personal data and is never put in the feed.
+    "application_owner": (
+        "user_id",
+        "person_name",
+        "person_role",
+        "ownership_type",
+        "application_id",
+        "element_type",
+        "element_id",
+    ),
     "cost_fact": ("amount", "currency", "kind", "category", "element_type", "element_id"),
     "risk": (
         "title",
@@ -132,7 +142,8 @@ def _owner_ids_of(element_type: Optional[str], element_id: Optional[int], organi
         rows = ApplicationOwner.get_display_rows_for_application(element_id, organization_id)
     else:
         rows = ApplicationOwner.get_display_rows_for_element(element_type, element_id, organization_id)
-    return sorted({row["user_id"] for row in rows})
+    # A person recorded with no account has no user id and is never told.
+    return sorted({row["user_id"] for row in rows if row["user_id"] is not None})
 
 
 def owner_user_ids(entity_type: str, target: object, organization_id: int, action: str) -> List[int]:
@@ -153,6 +164,31 @@ def owner_user_ids(entity_type: str, target: object, organization_id: int, actio
             application_id = _application_for_element(getattr(target, "id", None), organization_id)
             return _owner_ids_of("application", application_id, organization_id)
     return []
+
+
+def subject_of(entity_type: str, target: object, organization_id: int) -> Dict[str, Any]:
+    """The application an owner record or a cost fact is about: its name, for
+    the alert's wording, and its ArchiMate id, for the link to its answer."""
+    if entity_type == "application_owner":
+        application_id = getattr(target, "application_id", None)
+    elif entity_type == "cost_fact" and getattr(target, "element_type", None) == "application":
+        application_id = getattr(target, "element_id", None)
+    else:
+        return {}
+    if application_id is None:
+        return {}
+    from app import db
+    from app.models.application_portfolio import ApplicationComponent
+
+    row = db.session.execute(
+        db.select(ApplicationComponent.name, ApplicationComponent.archimate_element_id)
+        .where(ApplicationComponent.id == application_id)
+        .where(ApplicationComponent.organization_id == organization_id)
+        .limit(1)
+    ).first()
+    if row is None:
+        return {}
+    return {"subject_name": row.name, "archimate_element_id": row.archimate_element_id}
 
 
 def _signed_in_user_id() -> Optional[int]:
@@ -245,6 +281,10 @@ def describe_change(
         logger.exception("change feed: could not read owners for %s", entity_type)
     if entity_type == "application_component":
         extra["archimate_element_id"] = getattr(target, "archimate_element_id", None)
+    try:
+        extra.update(subject_of(entity_type, target, organization_id))
+    except Exception:  # noqa: BLE001 - the write must go through without a subject
+        logger.exception("change feed: could not read the subject of %s", entity_type)
     return scrub_payload(extra)
 
 

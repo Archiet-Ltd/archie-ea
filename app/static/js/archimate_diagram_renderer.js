@@ -29,7 +29,7 @@
  */
 class ArchiMateDiagramRenderer {
 
-    // ── ArchiMate layer colors (matches knowledge_graph_viewer.js) ────────
+    // ── ArchiMate layer colors ────────
     static LAYER_COLORS = {
         business:       '#FFB74D',
         application:    '#4FC3F7',

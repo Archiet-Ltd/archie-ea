@@ -1,4 +1,6 @@
-{% macro impact_scenario_comparison_modal() %}
+{% import 'basecoat/index.html' as ui %}
+
+{% macro impact_scenario_comparison_modal(can_save=false, save_roles='architects', list_limit=200) %}
 <!-- Impact Analysis Scenario Comparison Modal -->
 <div 
     x-data="{
@@ -6,6 +8,21 @@
         scenarios: [],
         selectedScenarios: [],
         loading: false,
+        loadError: '',
+        exportError: '',
+        carriedNotice: '',
+        goneCount: 0,
+        refusedCount: 0,
+        retryCount: 0,
+        goneItems: [],
+        renamingId: null,
+        renameText: '',
+        renameError: '',
+        deletingId: null,
+        manageError: '',
+        listLimit: {{ list_limit | int }},
+        canSave: {{ 'true' if can_save else 'false' }},
+        saveRoles: '{{ save_roles | e }}',
         
         openScenarioModal() {
             this.loadScenarios();
@@ -16,15 +33,140 @@
             Platform.modal.close('impact-scenario-comparison-modal');
             this.selectedScenarios = [];
         },
+
+        // A figure the analysis never produced is stated as missing, never shown as 0.
+        countOf(list) {
+            return Array.isArray(list) ? list.length : null;
+        },
+
+        riskCost(s) {
+            const cost = s && s.analysis_result ? s.analysis_result.estimated_risk_cost : null;
+            return typeof cost === 'number' && isFinite(cost) ? cost : null;
+        },
+
+        // Why a scenario's Processes figure is 0, from the lists saved with it
+        processesReason(s) {
+            const r = s && s.analysis_result;
+            if (!r || !Array.isArray(r.impacted_processes) || r.impacted_processes.length > 0) return '';
+            const n = (Array.isArray(r.dependencies) ? r.dependencies.length : 0) + (Array.isArray(r.indirect_dependencies) ? r.indirect_dependencies.length : 0);
+            if (n === 0) return 'This change reaches no other element.';
+            return 'None of the ' + n + (n === 1 ? ' element' : ' elements') + ' reached is a business process.';
+        },
+
+        countLabel(list) {
+            const n = this.countOf(list);
+            return n === null ? 'Not scored' : String(n);
+        },
+
+        // The same formatter the page uses, so one figure reads the same on the screen and in this dialog
+        money(value) {
+            return (window.currencyManager && window.currencyManager.format) ? window.currencyManager.format(value) : value.toLocaleString();
+        },
+
+        costsWithheld(s) {
+            return !!(s && s.analysis_result && s.analysis_result.costs_withheld);
+        },
+
+        costLabel(s) {
+            if (this.costsWithheld(s)) return s.analysis_result.financial_risk_reason;
+            const cost = this.riskCost(s);
+            return cost === null ? 'Not recorded' : this.money(cost);
+        },
+
+        // Every selected scenario needs a severity and a cost before one can be called the best.
+        canRank() {
+            const picked = this.getComparisonData();
+            return picked.length > 1 && picked.every(s =>
+                ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'].includes(s.analysis_result && s.analysis_result.severity)
+                && this.riskCost(s) !== null);
+        },
         
-        loadScenarios() {
-            // Load scenarios from localStorage
-            const saved = localStorage.getItem('impactAnalysisScenarios');
-            if (saved) {
-                this.scenarios = JSON.parse(saved);
-            } else {
-                this.scenarios = [];
+        // Scenarios saved in this browser before they were kept for the organisation: an architect's
+        // visit moves them across (the server works out their figures again), anyone else is told.
+        carryAcross() {
+            const key = 'impactAnalysisScenarios';
+            let old = [];
+            try { old = JSON.parse(localStorage.getItem(key) || '[]'); } catch (e) { old = []; }
+            if (!Array.isArray(old) || old.length === 0) { return Promise.resolve(); }
+            if (!this.canSave) {
+                this.carriedNotice = old.length + (old.length === 1 ? ' scenario was' : ' scenarios were') +
+                    ' saved in this browser before scenarios were shared. Ask ' + this.saveRoles + ' to open this dialog in this browser and move ' +
+                    (old.length === 1 ? 'it' : 'them') + ' across.';
+                return Promise.resolve();
             }
+            // Each scenario leaves browser storage as soon as it is saved, so leaving part-way
+            // never sends one twice. One whose element is not found stays until it is dismissed; one
+            // that could not be checked (the server or the network failed) stays and is tried again.
+            const savedNow = [];
+            const gone = [];
+            const refused = [];
+            const retry = [];
+            return old.reduce((chain, item) => chain.then(() =>
+                Platform.fetch.post('/strategic/api/scenarios', {
+                    name: item.name,
+                    element: { id: item.element && item.element.id },
+                    change_type: item.change_type,
+                    analysis_result: item.analysis_result || {}
+                }, { silent: true }).then(() => {
+                    savedNow.push(item);
+                    this.forgetCarried(item);
+                    // say how many have moved so far, so a long list is not a blank wait
+                    this.carriedNotice = savedNow.length + (savedNow.length === 1 ? ' scenario' : ' scenarios') + ' saved earlier in this browser ' + (savedNow.length === 1 ? 'was' : 'were') + ' moved to your organisation. ';
+                }).catch(error => {
+                    const status = error && error.status;
+                    if (status === 404) { gone.push(item); } else if (status === 400) { refused.push(item); } else { retry.push(item); }
+                })
+            ), Promise.resolve()).then(() => {
+                const moved = savedNow.length;
+                this.refusedCount = refused.length;
+                this.goneCount = gone.length + refused.length;
+                this.retryCount = retry.length;
+                this.goneItems = gone.concat(refused);
+                this.carriedNotice = (moved ? moved + (moved === 1 ? ' scenario' : ' scenarios') + ' saved earlier in this browser ' + (moved === 1 ? 'was' : 'were') + ' moved to your organisation. ' : '') +
+                    (gone.length ? gone.length + (gone.length === 1 ? ' could not be moved (its element may no longer exist). ' : ' could not be moved (their elements may no longer exist). ') : '') +
+                    (refused.length ? refused.length + (refused.length === 1 ? ' was' : ' were') + ' refused by the server and cannot be moved as ' + (refused.length === 1 ? 'it is' : 'they are') + '. ' : '') +
+                    (retry.length ? retry.length + (retry.length === 1 ? ' scenario' : ' scenarios') + ' could not be checked right now and ' + (retry.length === 1 ? 'is' : 'are') + ' still in this browser.' : '');
+            });
+        },
+
+        // One carried scenario leaves browser storage the moment it has been saved.
+        forgetCarried(item) {
+            const key = 'impactAnalysisScenarios';
+            let rest = [];
+            try { rest = JSON.parse(localStorage.getItem(key) || '[]'); } catch (e) { rest = []; }
+            if (!Array.isArray(rest)) { rest = []; }
+            const at = rest.findIndex(x => JSON.stringify(x) === JSON.stringify(item));
+            if (at > -1) { rest.splice(at, 1); }
+            if (rest.length) { localStorage.setItem(key, JSON.stringify(rest)); } else { localStorage.removeItem(key); }
+        },
+
+        // Dismiss clears only the scenarios whose element is not found; the ones still to be tried stay.
+        dismissUnmoved() {
+            this.goneItems.forEach(item => this.forgetCarried(item));
+            this.goneItems = [];
+            this.goneCount = 0;
+            this.refusedCount = 0;
+            if (this.retryCount === 0) { this.carriedNotice = ''; return; }
+            this.carriedNotice = this.retryCount + (this.retryCount === 1 ? ' scenario' : ' scenarios') + ' could not be checked right now and ' + (this.retryCount === 1 ? 'is' : 'are') + ' still in this browser.';
+        },
+
+        loadScenarios() {
+            // The scenarios the organisation has saved, the same for every colleague who signs in
+            this.loading = true;
+            this.loadError = '';
+            this.carriedNotice = '';
+            return this.carryAcross()
+                .then(() => Platform.fetch.get('/strategic/api/scenarios', null, { silent: true }))
+                .then(saved => {
+                    this.scenarios = Array.isArray(saved) ? saved : [];
+                })
+                .catch(() => {
+                    this.scenarios = [];
+                    this.loadError = 'The saved scenarios could not be loaded. Close this dialog and open it again.';
+                })
+                .finally(() => {
+                    this.loading = false;
+                });
         },
         
         toggleScenario(scenarioId) {
@@ -48,31 +190,97 @@
             return this.selectedScenarios.map(id => this.getScenario(id)).filter(Boolean);
         },
         
+        // The file is written on the server, by the writer every other export uses, from the saved scenarios.
         exportToCSV() {
-            const comparison = this.getComparisonData();
-            if (comparison.length === 0) return;
-            
-            let csv = 'Metric,' + comparison.map(s => s.name).join(',') + '\\n';
-            
-            csv += 'Change Type,' + comparison.map(s => s.change_type).join(',') + '\\n';
-            csv += 'Element,' + comparison.map(s => s.element.name).join(',') + '\\n';
-            csv += 'Severity,' + comparison.map(s => s.analysis_result.severity).join(',') + '\\n';
-            csv += 'Affected Capabilities,' + comparison.map(s => (s.analysis_result.impacted_capabilities?.length || 0)).join(',') + '\\n';
-            csv += 'Affected Processes,' + comparison.map(s => (s.analysis_result.impacted_processes?.length || 0)).join(',') + '\\n';
-            csv += 'Financial Risk ($),' + comparison.map(s => (s.analysis_result.estimated_risk_cost || 0)).join(',') + '\\n';
-            csv += 'Dependencies,' + comparison.map(s => (s.analysis_result.dependencies?.length || 0)).join(',') + '\\n';
-            
-            const blob = new Blob([csv], { type: 'text/csv' });
-            const url = window.URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = 'impact-scenario-comparison-' + Date.now() + '.csv';
-            a.click();
+            if (this.selectedScenarios.length === 0) return Promise.resolve();
+            this.exportError = '';
+            const url = '/strategic/api/scenarios/export.csv?ids=' + this.selectedScenarios.map(encodeURIComponent).join(',');
+            /* The reply is read here, so a refusal is worded in the dialog and the tab stays on the page. */
+            return Platform.fetch.get(url, null, { silent: true }).then(text => {
+                const link = document.createElement('a');
+                link.href = URL.createObjectURL(new Blob([text], { type: 'text/csv' }));
+                link.download = 'scenario-comparison.csv';
+                document.body.appendChild(link);
+                link.click();
+                link.remove();
+                URL.revokeObjectURL(link.href);
+            }).catch(err => {
+                /* a refusal carries the server's sentence; anything else is a failure to reach it */
+                this.exportError = (err && err.type === 'HttpError' && err.message) || 'The file could not be written. Try again in a moment.';
+            });
         },
-        
-        getBestScenario() {
+
+        // What each run worked out about the model: the same figures the Scenarios screen showed, one row for each
+        figureLabels() {
+            const labels = [];
+            this.getComparisonData().forEach(s => ((s.analysis_result && s.analysis_result.figures) || []).forEach(f => {
+                if (labels.indexOf(f.label) === -1) labels.push(f.label);
+            }));
+            return labels;
+        },
+
+        figureOf(s, label) {
+            return ((s && s.analysis_result && s.analysis_result.figures) || []).find(f => f.label === label) || null;
+        },
+
+        figureValue(f, value) {
+            if (value === null || value === undefined) return 'Not worked out';
+            return f.money ? this.money(value) : String(value);
+        },
+
+        // Worded as the Scenarios screen words a change: Up, Down or No change
+        figureLine(s, label) {
+            const f = this.figureOf(s, label);
+            if (!f) return 'Not saved with this scenario';
+            if (f.withheld) return f.note;
+            let change = '';
+            if (f.change !== null && f.change !== undefined) {
+                change = f.change === 0 ? ' (No change)' : ' (' + (f.change > 0 ? 'Up ' : 'Down ') + this.figureValue(f, Math.abs(f.change)) + ')';
+            }
+            const unknown = (f.before === null || f.before === undefined || f.after === null || f.after === undefined) && f.note;
+            return this.figureValue(f, f.before) + ' to ' + this.figureValue(f, f.after) + change + (unknown ? ' (' + f.note + ')' : '');
+        },
+
+        startRename(scenario) {
+            this.deletingId = null; this.manageError = ''; this.renameError = '';
+            this.renamingId = scenario.id;
+            this.renameText = scenario.name;
+        },
+
+        saveRename(scenario) {
+            const name = (this.renameText || '').trim();
+            if (!name) { this.renameError = 'Give the scenario a name so you can find it when you compare.'; return Promise.resolve(); }
+            return Platform.fetch.patch('/strategic/api/scenarios/' + encodeURIComponent(scenario.id), { name: name }, { silent: true })
+                .then(kept => {
+                    scenario.name = (kept && kept.name) || name;
+                    this.renamingId = null;
+                    this.renameError = '';
+                })
+                .catch(error => {
+                    this.renameError = (error && error.message) || 'The scenario could not be renamed. Try again in a moment.';
+                });
+        },
+
+        askDelete(scenario) {
+            this.renamingId = null; this.manageError = '';
+            this.deletingId = scenario.id;
+        },
+
+        confirmDelete(scenario) {
+            return Platform.fetch.delete('/strategic/api/scenarios/' + encodeURIComponent(scenario.id), { silent: true })
+                .then(() => {
+                    this.scenarios = this.scenarios.filter(x => x.id !== scenario.id);
+                    this.selectedScenarios = this.selectedScenarios.filter(id => id !== scenario.id);
+                    this.deletingId = null;
+                })
+                .catch(error => {
+                    this.manageError = (error && error.message) || 'The scenario could not be deleted. Try again in a moment.';
+                });
+        },
+
+        getBestScenarios() {
             const comparison = this.getComparisonData();
-            if (comparison.length === 0) return null;
+            if (!this.canRank()) return null;
             
             // Score: Lower financial risk + lower severity = better
             const scores = comparison.map(s => {
@@ -81,9 +289,9 @@
                     'MEDIUM': 2,
                     'HIGH': 3,
                     'CRITICAL': 4
-                }[s.analysis_result.severity] || 2;
+                }[s.analysis_result.severity];
                 
-                const financialScore = (s.analysis_result.estimated_risk_cost || 0) / 100000;
+                const financialScore = this.riskCost(s) / 100000;
                 
                 return {
                     scenario: s,
@@ -92,7 +300,21 @@
             });
             
             scores.sort((a, b) => a.score - b.score);
-            return scores[0].scenario;
+            return scores.filter(x => Math.abs(x.score - scores[0].score) < 1e-9).map(x => x.scenario);
+        },
+
+        getBestScenario() {
+            const best = this.getBestScenarios();
+            return best ? best[0] : null;
+        },
+
+        recommendation() {
+            const best = this.getBestScenarios();
+            if (!best) return '';
+            const names = best.map(s => s.name);
+            if (names.length === 1) return names[0] + ' has the lowest combined risk score based on severity and financial impact.';
+            const listed = names.slice(0, -1).join(', ') + ' and ' + names[names.length - 1];
+            return listed + ' tie on the lowest combined risk score based on severity and financial impact.';
         },
         
         getSeverityColor(severity) {
@@ -105,8 +327,8 @@
             return colors[severity] || 'bg-muted text-foreground/80 border-border';
         }
     }"
-    @open-impact-scenario-comparison.window="Platform.modal.open('impact-scenario-comparison-modal')"
-    @keydown.escape.window="Platform.modal.close('impact-scenario-comparison-modal')"
+    @open-impact-scenario-comparison.window="openScenarioModal()"
+    @keydown.escape.window="closeScenarioModal()"
     id="impact-scenario-comparison-modal"
     data-modal-id="impact-scenario-comparison-modal"
     class="relative z-50"
@@ -123,12 +345,12 @@
          x-transition:leave-start="opacity-100"
          x-transition:leave-end="opacity-0"
          class="modal-backdrop fixed inset-0 bg-overlay/50" aria-hidden="true"
-         @click="Platform.modal.close('impact-scenario-comparison-modal')"
+         @click="closeScenarioModal()"
      ></div>
 
     <!-- Modal -->
-    <div x-show="$store.modal && $store.modal['impact-scenario-comparison-modal']" x-cloak class="overflow-y-auto fixed inset-0" >
-        <div class="flex min-h-full items-center justify-center p-4">
+    <div x-show="$store.modal && $store.modal['impact-scenario-comparison-modal']" x-cloak class="modal-panel pointer-events-none fixed inset-0">
+        <div class="flex h-full items-center justify-center p-4">
             <div
                 x-show="$store.modal && $store.modal['impact-scenario-comparison-modal']"
                 x-transition:enter="transition ease-out duration-300"
@@ -141,10 +363,10 @@
                 role="dialog"
                 aria-modal="true"
                 aria-labelledby="impact-scenario-comparison-title"
-                class="relative w-full max-w-6xl bg-background rounded-lg max-h-[90vh] overflow-y-auto border border-border"
+                class="relative w-full max-w-6xl bg-background rounded-lg max-h-[90vh] flex flex-col overflow-hidden pointer-events-auto border border-border"
             >
                 <!-- Header -->
-                <div class="sticky top-0 z-10 bg-background flex items-center justify-between px-6 py-4 border-b border-border">
+                <div class="shrink-0 bg-background flex items-center justify-between px-6 py-4 border-b border-border">
                     <div class="flex items-center gap-3">
                         <div class="p-2 bg-accent rounded-lg">
                             <i data-lucide="git-compare" class="h-5 w-5 text-primary"></i>
@@ -165,12 +387,13 @@
                 </div>
 
                 <!-- Content -->
-                <div class="p-6 space-y-6">
+                <div class="min-h-0 flex-1 overflow-y-auto p-6 space-y-6">
                     <!-- Scenario Selection -->
                     <div>
                         <label class="block text-sm font-medium text-foreground/80 mb-3">
                             Select Scenarios to Compare (up to 3)
                         </label>
+                        <p x-show="scenarios.length >= listLimit" x-cloak data-testid="scenarios-capped" class="mb-3 text-sm text-muted-foreground" x-text="'Showing your ' + listLimit + ' most recent scenarios. Older ones are not listed.'"></p>
                         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                             <template x-for="scenario in scenarios" :key="scenario.id">
                                 <div
@@ -194,28 +417,57 @@
                                             :class="getSeverityColor(scenario.analysis_result.severity)"
                                             x-text="scenario.analysis_result.severity"
                                         ></span>
-                                        <span class="px-2 py-0.5 text-xs bg-muted text-foreground/80 rounded" x-text="scenario.change_type"></span>
+                                        <span class="px-2 py-0.5 text-xs bg-muted text-foreground/80 rounded" x-text="scenario.change_label || scenario.change_type"></span>
+                                    </div>
+                                    <div x-show="canSave" x-cloak @click.stop class="mt-3 space-y-2 border-t border-border pt-3">
+                                        <div x-show="renamingId !== scenario.id && deletingId !== scenario.id" class="flex gap-2">
+                                            {{ ui.button(text='Rename', variant='outline', size='sm', attrs={'type': 'button', 'data-testid': 'scenario-rename', '@click': 'startRename(scenario)', ':aria-label': "'Rename ' + scenario.name"}) }}
+                                            {{ ui.button(text='Delete', variant='outline', size='sm', attrs={'type': 'button', 'data-testid': 'scenario-delete', '@click': 'askDelete(scenario)', ':aria-label': "'Delete ' + scenario.name"}) }}
+                                        </div>
+                                        <form x-show="renamingId === scenario.id" x-cloak @submit.prevent="saveRename(scenario)" class="space-y-2">
+                                            {{ ui.input(type='text', attrs={'x-model': 'renameText', 'data-testid': 'scenario-rename-input', 'aria-label': 'New name for the scenario', 'maxlength': '200'}) }}
+                                            <div class="text-sm text-destructive" role="alert" x-show="renameError" x-cloak x-text="renameError"></div>
+                                            <div class="flex gap-2">
+                                                {{ ui.button(text='Save name', size='sm', type='submit', attrs={'data-testid': 'scenario-rename-save'}) }}
+                                                {{ ui.button(text='Cancel', variant='outline', size='sm', attrs={'type': 'button', '@click': 'renamingId = null'}) }}
+                                            </div>
+                                        </form>
+                                        <div x-show="deletingId === scenario.id" x-cloak class="space-y-2">
+                                            <p class="text-sm text-foreground">Delete this saved scenario for everyone in your organisation? Your model is not changed.</p>
+                                            <div class="flex gap-2">
+                                                {{ ui.button(text='Delete scenario', variant='destructive', size='sm', attrs={'type': 'button', 'data-testid': 'scenario-delete-confirm', '@click': 'confirmDelete(scenario)'}) }}
+                                                {{ ui.button(text='Keep it', variant='outline', size='sm', attrs={'type': 'button', '@click': 'deletingId = null'}) }}
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
                             </template>
                         </div>
+                        <div x-show="manageError" x-cloak role="alert" class="mt-3 text-sm text-destructive" x-text="manageError"></div>
                         
-                        <div x-show="scenarios.length === 0" x-cloak class="text-center py-12 text-muted-foreground">
+                        <div x-show="scenarios.length === 0 && !loading && !loadError" x-cloak class="text-center py-12 text-muted-foreground">
                             <i data-lucide="inbox" class="h-16 w-16 mx-auto mb-3 text-muted-foreground/50"></i>
                             <p class="text-lg font-medium mb-1">No Saved Scenarios</p>
-                            <p class="text-sm">Run an analysis and save it to compare scenarios</p>
+                            <p class="text-sm" data-testid="empty-next-step" x-text="canSave ? 'Run an analysis and save it to compare scenarios' : 'Nothing has been saved yet. Ask ' + saveRoles + ' to run an analysis and save it; saved scenarios then appear here to compare.'"></p>
                         </div>
+                        <div x-show="loading" x-cloak role="status" data-testid="scenarios-loading" class="py-12 text-center text-sm text-muted-foreground">Loading the saved scenarios…</div>
+                        <div x-show="carriedNotice" x-cloak role="status" data-testid="carried-notice" class="mb-3 rounded-lg border bg-muted px-4 py-3 text-sm text-foreground" >
+                            <span x-text="carriedNotice"></span>
+                            {{ ui.button(text='Dismiss', variant='link', class='ml-2', attrs={'type': 'button', 'x-show': 'goneCount > 0', 'x-cloak': '', 'data-testid': 'dismiss-unmoved', '@click': 'dismissUnmoved()'}) }}
+                            {{ ui.button(text='Try again', variant='link', class='ml-2', attrs={'type': 'button', 'x-show': 'retryCount > 0', 'x-cloak': '', 'data-testid': 'try-moving-again', '@click': 'loadScenarios()'}) }}
+                        </div>
+                        <div x-show="loadError" x-cloak role="alert" class="py-12 text-center text-sm text-destructive" x-text="loadError"></div>
                     </div>
 
                     <!-- Comparison Table -->
-                    <div x-show="selectedScenarios.length > 0" x-cloak class="border rounded-lg overflow-hidden">
-                        <div class="overflow-x-auto">
-                            <table class="dense-table w-full">
+                    <div x-show="selectedScenarios.length > 0" x-cloak class="min-w-0 max-w-full border rounded-lg overflow-hidden">
+                        <div class="min-w-0 max-w-full overflow-x-auto">
+                            <table class="dense-table w-full min-w-[36rem]">
                                 <thead class="bg-muted">
                                     <tr>
-                                        <th class="px-4 py-3 text-left text-sm font-semibold text-foreground/80 w-48">Metric</th>
+                                        <th class="px-4 py-3 text-left text-sm font-semibold text-foreground/80 whitespace-nowrap min-w-[10rem]">Metric</th>
                                         <template x-for="(scenarioId, index) in selectedScenarios" :key="scenarioId">
-                                            <th class="px-4 py-3 text-left text-sm font-semibold text-foreground/80">
+                                            <th data-slot="table-head" class="px-4 py-3 text-left text-sm font-semibold text-foreground/80">
                                                 <div class="flex items-center gap-2">
                                                     <span class="inline-flex items-center justify-center w-6 h-6 rounded-full bg-primary text-primary-foreground text-xs font-bold" x-text="index + 1"></span>
                                                     <span class="truncate" x-text="getScenario(scenarioId)?.name"></span>
@@ -227,27 +479,27 @@
                                 <tbody class="divide-y divide-border">
                                     <!-- Element -->
                                     <tr>
-                                        <td class="px-4 py-3 text-sm font-medium text-foreground">Element</td>
+                                        <td class="px-4 py-3 text-sm font-medium text-foreground whitespace-nowrap">Element</td>
                                         <template x-for="scenarioId in selectedScenarios" :key="'elem-' + scenarioId">
-                                            <td class="px-4 py-3 text-sm text-foreground/80" x-text="getScenario(scenarioId)?.element.name"></td>
+                                            <td data-slot="table-cell" class="px-4 py-3 text-sm text-foreground/80" x-text="getScenario(scenarioId)?.element.name"></td>
                                         </template>
                                     </tr>
                                     
                                     <!-- Change Type -->
                                     <tr class="bg-muted">
-                                        <td class="px-4 py-3 text-sm font-medium text-foreground">Change Type</td>
+                                        <td class="px-4 py-3 text-sm font-medium text-foreground whitespace-nowrap">Change Type</td>
                                         <template x-for="scenarioId in selectedScenarios" :key="'type-' + scenarioId">
-                                            <td class="px-4 py-3 text-sm">
-                                                <span class="px-2 py-1 bg-primary/10 text-info-emphasis rounded text-xs font-medium" x-text="getScenario(scenarioId)?.change_type"></span>
+                                            <td data-slot="table-cell" class="px-4 py-3 text-sm">
+                                                <span class="px-2 py-1 bg-primary/10 text-info-emphasis rounded text-xs font-medium" x-text="getScenario(scenarioId)?.change_label || getScenario(scenarioId)?.change_type"></span>
                                             </td>
                                         </template>
                                     </tr>
                                     
                                     <!-- Severity -->
                                     <tr>
-                                        <td class="px-4 py-3 text-sm font-medium text-foreground">Impact Severity</td>
+                                        <td class="px-4 py-3 text-sm font-medium text-foreground whitespace-nowrap">Impact Severity</td>
                                         <template x-for="scenarioId in selectedScenarios" :key="'sev-' + scenarioId">
-                                            <td class="px-4 py-3 text-sm">
+                                            <td data-slot="table-cell" class="px-4 py-3 text-sm">
                                                 <span 
                                                     class="px-2 py-1 rounded text-xs font-medium border"
                                                     :class="getSeverityColor(getScenario(scenarioId)?.analysis_result.severity)"
@@ -259,61 +511,78 @@
                                     
                                     <!-- Affected Capabilities -->
                                     <tr class="bg-muted">
-                                        <td class="px-4 py-3 text-sm font-medium text-foreground">Affected Capabilities</td>
+                                        <td class="px-4 py-3 text-sm font-medium text-foreground whitespace-nowrap">Affected Capabilities</td>
                                         <template x-for="scenarioId in selectedScenarios" :key="'cap-' + scenarioId">
-                                            <td class="px-4 py-3 text-lg font-bold text-primary" x-text="getScenario(scenarioId)?.analysis_result.impacted_capabilities?.length || 0"></td>
+                                            <td data-slot="table-cell" class="px-4 py-3 text-lg font-bold text-primary" x-text="countLabel(getScenario(scenarioId)?.analysis_result.impacted_capabilities)"></td>
                                         </template>
                                     </tr>
                                     
                                     <!-- Affected Processes -->
                                     <tr>
-                                        <td class="px-4 py-3 text-sm font-medium text-foreground">Affected Processes</td>
+                                        <td class="px-4 py-3 text-sm font-medium text-foreground whitespace-nowrap">Affected Processes</td>
                                         <template x-for="scenarioId in selectedScenarios" :key="'proc-' + scenarioId">
-                                            <td class="px-4 py-3 text-lg font-bold text-primary" x-text="getScenario(scenarioId)?.analysis_result.impacted_processes?.length || 0"></td>
+                                            <td data-slot="table-cell" class="px-4 py-3 text-lg font-bold text-primary" >
+                                                <span x-text="countLabel(getScenario(scenarioId)?.analysis_result.impacted_processes)"></span>
+                                                <span class="block text-xs font-normal text-muted-foreground" data-testid="compare-processes-reason" x-show="processesReason(getScenario(scenarioId))" x-text="processesReason(getScenario(scenarioId))"></span>
+                                            </td>
                                         </template>
                                     </tr>
                                     
                                     <!-- Financial Risk -->
                                     <tr class="bg-muted">
-                                        <td class="px-4 py-3 text-sm font-medium text-foreground">Financial Risk</td>
+                                        <td class="px-4 py-3 text-sm font-medium text-foreground whitespace-nowrap">Financial Risk</td>
                                         <template x-for="scenarioId in selectedScenarios" :key="'cost-' + scenarioId">
-                                            <td class="px-4 py-3 text-lg font-bold text-destructive">
-                                                <span x-text="'$' + ((getScenario(scenarioId)?.analysis_result.estimated_risk_cost || 0) / 1000).toFixed(0) + 'k'"></span>
+                                            <td data-slot="table-cell" class="px-4 py-3 text-lg font-bold text-destructive">
+                                                <span x-text="costLabel(getScenario(scenarioId))"></span>
                                             </td>
                                         </template>
                                     </tr>
                                     
                                     <!-- Dependencies -->
                                     <tr>
-                                        <td class="px-4 py-3 text-sm font-medium text-foreground">Direct Dependencies</td>
+                                        <td class="px-4 py-3 text-sm font-medium text-foreground whitespace-nowrap">Direct Dependencies</td>
                                         <template x-for="scenarioId in selectedScenarios" :key="'dep-' + scenarioId">
-                                            <td class="px-4 py-3 text-sm font-semibold text-foreground/80" x-text="getScenario(scenarioId)?.analysis_result.dependencies?.length || 0"></td>
+                                            <td data-slot="table-cell" class="px-4 py-3 text-sm font-semibold text-foreground/80" x-text="countLabel(getScenario(scenarioId)?.analysis_result.dependencies)"></td>
                                         </template>
                                     </tr>
+
+                                    <!-- What each run worked out about the model -->
+                                    <template x-for="label in figureLabels()" :key="'fig-' + label">
+                                        <tr data-testid="compare-figure-row">
+                                            <td class="px-4 py-3 text-sm font-medium text-foreground whitespace-normal min-w-[10rem]" x-text="label"></td>
+                                            <template x-for="scenarioId in selectedScenarios" :key="'fig-' + label + scenarioId">
+                                                <td data-slot="table-cell" class="px-4 py-3 text-sm text-foreground/80 whitespace-normal" x-text="figureLine(getScenario(scenarioId), label)"></td>
+                                            </template>
+                                        </tr>
+                                    </template>
                                 </tbody>
                             </table>
                         </div>
                     </div>
 
                     <!-- Recommendation -->
-                    <div x-show="selectedScenarios.length > 1" x-cloak class="bg-success/5 border border-success/20 rounded-lg p-4">
+                    <div x-show="selectedScenarios.length > 1 && canRank()" x-cloak class="bg-success/5 border border-success/20 rounded-lg p-4">
                         <div class="flex items-start gap-3">
                             <div class="p-2 bg-success/10 rounded-lg">
                                 <i data-lucide="lightbulb" class="h-5 w-5 text-success"></i>
                             </div>
                             <div>
-                                <h4 class="font-semibold text-success-emphasis mb-1">Recommended Scenario</h4>
+                                <h4 class="font-semibold text-success-emphasis mb-1" data-testid="scenario-recommendation-heading" x-text="(getBestScenarios() || []).length > 1 ? 'Scenarios tie' : 'Recommended Scenario'"></h4>
                                 <p class="text-sm text-success-emphasis">
-                                    <span class="font-medium" x-text="getBestScenario()?.name"></span> 
-                                    has the lowest combined risk score based on severity and financial impact.
+                                    <span class="font-medium" data-testid="scenario-recommendation" x-text="recommendation()"></span>
                                 </p>
                             </div>
                         </div>
                     </div>
+                    <div x-show="selectedScenarios.length > 1 && !canRank()" x-cloak class="bg-muted border border-border rounded-lg p-4">
+                        <p class="text-sm text-muted-foreground" x-show="!getComparisonData().some(costsWithheld)">These scenarios cannot be ranked: at least one has no severity or no recorded financial risk. Run the analysis again and save it to compare them.</p>
+                        <p class="text-sm text-muted-foreground" x-show="getComparisonData().some(costsWithheld)" x-cloak>These scenarios are not ranked because ranking uses cost figures, which are withheld for your role.</p>
+                    </div>
                 </div>
 
                 <!-- Footer -->
-                <div class="sticky bottom-0 bg-background flex items-center justify-end gap-3 px-6 py-4 border-t border-border">
+                <div class="shrink-0 bg-background flex items-center justify-end gap-3 px-6 py-4 border-t border-border">
+                    <p class="mr-auto text-sm text-destructive" data-testid="export-error" role="status" x-show="exportError" x-cloak x-text="exportError"></p>
                     <button type="button"
                         @click="exportToCSV()"
                         :disabled="selectedScenarios.length === 0"
@@ -324,7 +593,7 @@
                     </button>
                     <button type="button"
                         @click="closeScenarioModal()"
-                        class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                        class="inline-flex h-9 items-center justify-center rounded-md border border-input bg-background px-4 text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                      aria-label="Close">
                         Close
                     </button>

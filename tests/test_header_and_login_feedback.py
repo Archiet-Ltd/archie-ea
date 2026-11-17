@@ -134,14 +134,11 @@ def test_dashboard_header_has_no_model_provider_selector(app, db_session, make_o
     )
 
 
-def test_admin_page_has_exactly_one_mobile_sidebar_trigger(app, db_session, make_org):
-    """ARCH-103: layouts/admin_base.html renders a "Global mobile sidebar
-    opener" button (x-show gated on the sidebar being closed) AND
-    components/admin_header.html used to render its own always-visible
-    ``lg:hidden`` hamburger toggling the same ``$store.sidebar.open`` — both
-    included on every admin page, so two triggers could render at once on
-    mobile. Only one trigger (the global one, which is x-show/x-cloak gated)
-    should remain."""
+def test_admin_page_has_exactly_one_sidebar_trigger(app, db_session, make_org):
+    """The shell is the library's sidebar-07: one SidebarTrigger, in the header. It
+    folds the sidebar to its icon rail on a desktop and opens the drawer on a phone, so
+    there is no second always-visible hamburger beside it (ARCH-103) and no leftover
+    $store.sidebar wiring for the old overlay."""
     user, _ = _make_user(db_session, make_org, "hamburger")
     client = app.test_client()
     _login(client, user.id)
@@ -150,12 +147,12 @@ def test_admin_page_has_exactly_one_mobile_sidebar_trigger(app, db_session, make
     assert resp.status_code == 200, resp.get_data(as_text=True)[:2000]
     html = resp.get_data(as_text=True)
 
-    assert html.count("$store.sidebar.open = true") == 1, (
-        "expected exactly one mobile sidebar-open trigger; found "
-        f"{html.count('$store.sidebar.open = true')} — a duplicate hamburger "
-        "would render alongside the global one from admin_base.html"
+    assert html.count('data-slot="sidebar-trigger"') == 1, (
+        "expected exactly one sidebar trigger; found "
+        f"{html.count('data-slot=\"sidebar-trigger\"')}"
     )
-    assert "aria-label=\"Open sidebar\"" in html
+    assert 'aria-label="Toggle sidebar"' in html
+    assert "$store.sidebar" not in html
 
 
 def test_login_success_message_appears_at_most_once(app, db_session, make_org):
@@ -223,47 +220,22 @@ def test_ai_chat_settings_still_exposes_model_choice(app, db_session, make_org):
 
 
 def test_ctrl_b_hint_matches_wired_handler(app, db_session, make_org):
-    """Wave 1 final review, IMPORTANT 2: the sidebar footer's collapse button
-    advertises "Collapse sidebar (Ctrl+B)" (components/admin_sidebar.html).
-
-    layouts/admin_base.html already bound the key
-    (`@keydown.ctrl.b.window.prevent="$store.sidebar.toggle()"`, next to the
-    root `x-data` at the top of the layout) — that half was NOT broken,
-    contrary to the initial finding. The actual gap was
-    layouts/composer_base.html, included by every full-bleed tool page
-    (ArchiMate Composer, the codegen workflow designer): it renders the same
-    admin_sidebar.html footer and the same admin_header.html collapse
-    button (both call `$store.sidebar.toggle()`), but its own
-    `Alpine.store('sidebar', { open: false })` had no `collapsed` field and
-    no `toggle()` method at all — clicking the button there would throw
-    "toggle is not a function", and no Ctrl+B binding existed on that
-    layout either. Fixed by mirroring admin_base.html's store definition
-    (same `archie_sidebar_collapsed` localStorage key) and adding the same
-    `@keydown.ctrl.b.window.prevent` directive.
-
-    Pin both layouts: the kbd hint text is present, the store exposes
-    `collapsed`/`toggle()`, and the keydown directive exists — on both
-    admin_base.html-rendered pages and composer_base.html-rendered pages.
-    """
+    """The trigger advertises "Toggle sidebar (Ctrl+B)", so the script that binds
+    Ctrl+B (js/sidebar/sidebar_shell.js) must be on every page that renders the
+    sidebar: the admin layout and the full-bleed composer layout both."""
     user, _ = _make_user(db_session, make_org, "ctrlb")
     client = app.test_client()
     _login(client, user.id)
 
     def _assert_ctrl_b_wired(html, page_label):
-        assert "Collapse sidebar (Ctrl+B)" in html or "Expand sidebar (Ctrl+B)" in html, (
-            f"{page_label}: sidebar footer/header no longer advertises the Ctrl+B hint"
+        assert "Toggle sidebar (Ctrl+B)" in html, (
+            f"{page_label}: the sidebar trigger no longer advertises the Ctrl+B hint"
         )
-        assert "$store.sidebar.toggle()" in html, (
-            f"{page_label}: expected the sidebar collapse button(s) to call "
-            "$store.sidebar.toggle()"
+        assert "js/sidebar/sidebar_shell.js" in html, (
+            f"{page_label}: the script that binds Ctrl+B and the trigger is not loaded"
         )
-        assert "@keydown.ctrl.b.window.prevent=\"$store.sidebar.toggle()\"" in html, (
-            f"{page_label}: no @keydown.ctrl.b binding drives $store.sidebar.toggle() "
-            "— the Ctrl+B hint is unwired on this layout"
-        )
-        assert "collapsed:" in html and "toggle()" in html, (
-            f"{page_label}: $store.sidebar must define collapsed/toggle() itself, "
-            "not just be toggled by callers"
+        assert 'data-collapsible-mode="icon"' in html, (
+            f"{page_label}: the sidebar does not fold to an icon rail"
         )
 
     resp = client.get("/dashboard/overview")

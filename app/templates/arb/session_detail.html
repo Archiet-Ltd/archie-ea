@@ -1,8 +1,15 @@
+{# design-block: record-detail #}
 {% extends "layouts/admin_base.html" %}
 {% from "components/page_header.html" import page_header %}
 {% from "components/card.html" import card, card_header, card_title, card_description, card_content %}
 {% from "components/status_badge.html" import status_badge %}
-{% from "components/sol_confirm_modal.html" import sol_confirm_modal %}
+{% from "components/button.html" import button %}
+{% from "components/list_table.html" import list_table %}
+{% from "components/form_field.html" import form_group %}
+{% from "components/select.html" import native_select %}
+{% from "components/checkbox.html" import checkbox %}
+{% from "basecoat/table.html" import table_cell %}
+{% from "components/confirmation_dialog.html" import confirmation_dialog %}
 
 {% block title %}ARB Session {{ session.board_number }}{% endblock %}
 
@@ -22,31 +29,27 @@
         ]
     ) }}
 
+    <meta name="csrf-token" content="{{ csrf_token() }}">
+
     <div class="flex items-center justify-end gap-2">
         {% set status_variant_map = {'completed': 'success', 'scheduled': 'primary', 'cancelled': 'error', 'draft': 'warning'} %}
         {{ status_badge(session.status|title, status_variant_map[session.status]|default('neutral')) }}
-        {% if session.status in ['scheduled', 'draft'] %}
-        <form method="POST" action="{{ url_for('arb.cancel_session', id=session.id) }}" class="inline"
-              data-confirm="Cancel this session?">
+        {% if may_run_board and session.status in ['scheduled', 'draft'] %}
+        <form method="POST" action="{{ url_for('arb.cancel_session', id=session.id) }}" class="inline">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-            <button type="submit"
-                    class="px-3 py-1.5 text-xs font-medium text-warning-emphasis border border-warning/40 rounded-lg hover:bg-warning/10">
-                Cancel Session
-            </button>
+            {{ button(text='Cancel Session', type='submit', variant='outline', size='sm', class='text-warning-emphasis border-warning/40 hover:bg-warning/10') }}
         </form>
         {% endif %}
-        {% if session.status in ['draft', 'cancelled'] %}
-        <div x-data="{ activeModal: null, _formAction: '{{ url_for('arb.delete_session', id=session.id) }}' }">
-            <button type="button"
-                    @click="activeModal = 'confirm-delete-arb-session'"
-                    class="px-3 py-1.5 text-xs font-medium text-destructive-emphasis border border-destructive/30 rounded-lg hover:bg-destructive/5">
-                Delete
-            </button>
-            {{ sol_confirm_modal(
-                'confirm-delete-arb-session',
-                'Delete ARB Session',
-                '"Delete this session? This cannot be undone."',
-                confirm_handler="$el.closest('div').querySelector('form').submit()"
+        {% if may_run_board and session.status in ['draft', 'cancelled'] %}
+        <div x-data>
+            {{ button(text='Delete', type='button', variant='outline', size='sm', class='text-destructive-emphasis border-destructive/30 hover:bg-destructive/5', attrs_dict={'@click': "window.dispatchEvent(new CustomEvent('open-confirm-delete-arb-session', {detail: {callback: function(){var f=document.getElementById('arb-delete-form-" ~ session.id ~ "');var i=document.createElement('input');i.type='hidden';i.name='csrf_token';i.value=document.querySelector('meta[name=csrf-token]').content;f.appendChild(i);f.submit();}}}))"}) }}
+            {{ confirmation_dialog(
+                id='delete-arb-session',
+                title='Delete ARB Session',
+                message='Delete this session? This cannot be undone.',
+                confirm_text='Delete',
+                cancel_text='Cancel',
+                variant='destructive'
             ) }}
             <form id="arb-delete-form-{{ session.id }}" method="POST" action="{{ url_for('arb.delete_session', id=session.id) }}" class="hidden">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
@@ -90,11 +93,15 @@
                     </div>
                     <div class="flex justify-between">
                         <dt class="text-muted-foreground">Secretary</dt>
-                        <dd class="text-foreground">{{ session.secretary.first_name if session.secretary else 'None' }} {{ session.secretary.last_name if session.secretary else '' }}</dd>
+                        <dd class="text-foreground">{{ session.secretary.first_name if session.secretary else 'Unassigned' }} {{ session.secretary.last_name if session.secretary else '' }}</dd>
                     </div>
                     <div class="flex justify-between">
                         <dt class="text-muted-foreground">Board Members</dt>
                         <dd class="text-foreground">{{ session.board_members|length if session.board_members else 0 }}</dd>
+                    </div>
+                    <div class="flex justify-between">
+                        <dt class="text-muted-foreground">Voting seats</dt>
+                        <dd class="text-foreground">{{ session.board_members|selectattr('voting_member', 'ne', false)|list|length }}</dd>
                     </div>
                 </dl>
             {% endcall %}
@@ -109,6 +116,44 @@
             {% endcall %}
         {% endcall %}
     </div>
+
+    {% call card() %}
+        {% call card_header() %}
+            {% call card_title() %}Board members{% endcall %}
+            {% call card_description() %}Only voting seats count toward the three a session needs to be completed.{% endcall %}
+        {% endcall %}
+        {% call card_content() %}
+            <div class="space-y-6">
+                {% call(m) list_table(rows=session.board_members, columns=[('Name', ''), {'label': 'Seat', 'class': 'hidden sm:table-cell'}, ('Vote', '')], caption='Board members of this session', testid='board-members-table', row_testid='board-member-row', toolbar=false, empty_message='No one is seated on this board yet.' ~ (' Add a voting member below.' if may_run_board and people else '')) %}
+                    {% call table_cell(class='font-medium') %}{{ m.user.full_name() if m.user else 'Unknown person' }}<span class="block text-xs font-normal text-muted-foreground sm:hidden">{{ (m.role or '')|replace('_', ' ')|capitalize }}</span>{% endcall %}
+                    {% call table_cell(class='hidden sm:table-cell') %}{{ (m.role or '')|replace('_', ' ')|capitalize }}{% endcall %}
+                    {% call table_cell() %}{{ 'Non-voting' if m.voting_member is false else 'Voting' }}{% endcall %}
+                {% endcall %}
+                {% if may_run_board and session.status in ['scheduled', 'draft'] %}
+                <form method="POST" action="{{ url_for('arb.add_board_member', session_id=session.id) }}" class="grid gap-4 sm:grid-cols-2" data-testid="add-board-member-form">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    {% if people %}
+                    {% call form_group(id='member-user', label='Person', required=true, help_text='People of your organisation not yet on this board.') %}
+                        {% call native_select(id='member-user', name='user_id', aria_label='Person', class='w-full text-foreground', attrs_dict={'required': true}) %}
+                            <option value="">Choose a person</option>
+                            {% for u in people %}<option value="{{ u.id }}">{{ u.full_name() }}</option>{% endfor %}
+                        {% endcall %}
+                    {% endcall %}
+                    {% call form_group(id='member-role', label='Seat', required=true) %}
+                        {% call native_select(id='member-role', name='role', aria_label='Seat', class='w-full text-foreground', options=board_roles, selected='enterprise_architect') %}{% endcall %}
+                    {% endcall %}
+                    {{ checkbox(id='member-voting', name='voting_member', label='Voting member', description='A voting seat counts toward completing the session.', checked=true) }}
+                    <div class="sm:col-span-2 flex justify-end">
+                        {{ button(text='Add member', type='submit') }}
+                    </div>
+                    {% else %}
+                    <p class="sm:col-span-2 text-sm text-muted-foreground">Everyone in your organisation already has a seat on this board.</p>
+                    {% endif %}
+                </form>
+                {% endif %}
+            </div>
+        {% endcall %}
+    {% endcall %}
 
     {% call card() %}
         {% call card_header() %}
@@ -145,15 +190,7 @@
                 <h3 class="text-sm font-semibold text-foreground">AI Agenda Draft</h3>
                 <span class="text-xs px-2 py-0.5 rounded-full bg-primary/10 text-info-emphasis font-medium">AI-suggested draft</span>
             </div>
-            <button type="button" @click="generate()" :disabled="loading"
-                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center"
-                aria-label="Generate AI agenda draft">
-                <svg x-show="loading" x-cloak class="animate-spin h-3.5 w-3.5" viewBox="0 0 24 24" fill="none">
-                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
-                </svg>
-                <span x-text="loading ? 'Drafting…' : (agenda ? 'Regenerate' : 'Draft agenda')"></span>
-            </button>
+            {{ button(text='Draft agenda', type='button', attrs_dict={'@click': 'generate()', ':disabled': 'loading', 'x-text': "loading ? 'Drafting\u2026' : (agenda ? 'Regenerate' : 'Draft agenda')"}) }}
         </div>
         <p class="text-xs text-muted-foreground mt-1">
             AI-suggested time allocation and focus for this session's review items. Advisory only — it does
@@ -192,15 +229,7 @@
                 <h3 class="text-sm font-semibold text-foreground">AI Minutes Draft</h3>
                 <span class="text-xs px-2 py-0.5 rounded-full bg-primary/10 text-info-emphasis font-medium">AI-suggested draft</span>
             </div>
-            <button type="button" @click="generate()" :disabled="loading"
-                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center"
-                aria-label="Generate AI minutes draft">
-                <svg x-show="loading" x-cloak class="animate-spin h-3.5 w-3.5" viewBox="0 0 24 24" fill="none">
-                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
-                </svg>
-                <span x-text="loading ? 'Drafting…' : (minutesText ? 'Regenerate' : 'Draft minutes')"></span>
-            </button>
+            {{ button(text='Draft minutes', type='button', attrs_dict={'@click': 'generate()', ':disabled': 'loading', 'x-text': "loading ? 'Drafting\u2026' : (minutesText ? 'Regenerate' : 'Draft minutes')"}) }}
         </div>
         <p class="text-xs text-muted-foreground mt-1">
             AI-drafted minutes from this session's already-recorded decisions. Advisory only — copy the text
@@ -210,9 +239,7 @@
         <div x-show="error" x-cloak class="mt-3 text-sm text-destructive-emphasis bg-destructive/10 border border-destructive/30 rounded-md px-3 py-2" x-text="error"></div>
 
         <div x-show="minutesText" x-cloak class="mt-4">
-            <textarea readonly rows="12" x-text="minutesText"
-                class="w-full rounded-md border border-input bg-muted/30 px-3 py-2 text-sm font-mono text-foreground"
-                aria-label="Draft minutes (copyable)"></textarea>
+            <pre x-text="minutesText" class="w-full rounded-md border border-input bg-muted/30 px-3 py-2 text-sm font-mono text-foreground whitespace-pre-wrap overflow-auto max-h-80" aria-label="Draft minutes (copyable)"></pre>
         </div>
     </div>
 </div>
@@ -237,10 +264,6 @@ function arbAgendaDraftPanel(sessionId) {
                 this.agenda = d.agenda;
             } catch (e) {
                 this.error = e.message || 'AI agenda draft failed';
-                // The call site paints its own inline error state, so we pass silent:true to avoid duplicate toast.
-                // However we still need to surface the failure to the user via this.error.
-                // Platform.fetch already threw a structured PlatformError; we catch it and set the error state.
-                // No fallback value is provided; the UI will show the error message.
             } finally {
                 this.loading = false;
                 if (window.lucide) lucide.createIcons();
@@ -267,10 +290,6 @@ function arbMinutesDraftPanel(sessionId) {
                 this.minutesText = this.assemble(d.minutes);
             } catch (e) {
                 this.error = e.message || 'AI minutes draft failed';
-                // The call site paints its own inline error state, so we pass silent:true to avoid duplicate toast.
-                // However we still need to surface the failure to the user via this.error.
-                // Platform.fetch already threw a structured PlatformError; we catch it and set the error state.
-                // No fallback value is provided; the UI will show the error message.
             } finally {
                 this.loading = false;
                 if (window.lucide) lucide.createIcons();

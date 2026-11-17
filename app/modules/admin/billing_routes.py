@@ -6,6 +6,7 @@ URL prefix: /admin/billing  (registered in app/modules/admin/__init__.py)
 
 Routes:
   GET  /admin/billing                   — plan, limits, plans to buy, invoices, billing details
+  POST /admin/billing/startup-credit    — claim 90 days of Startup, free
   POST /admin/billing/upgrade           — start hosted checkout for a plan
   GET  /admin/billing/checkout/complete — return from checkout; apply the plan at once
   POST /admin/billing/change-plan       — switch the live subscription's plan / seats
@@ -18,11 +19,15 @@ Routes:
 
 import logging
 
-from flask import Blueprint, flash, jsonify, redirect, render_template, request, url_for
+from flask import Blueprint, abort, flash, g, jsonify, redirect, render_template, request, url_for
 from flask_login import login_required
+from app.modules.account.mfa_flow import enrol_first
 
+from app import db
 from app.extensions import csrf
-from app.decorators import admin_required
+
+
+from app.middleware.tenant_decorators import org_admin_required
 
 logger = logging.getLogger(__name__)
 
@@ -55,7 +60,7 @@ def _back(plan=None, interval=None):
 
 @billing_bp.route("/")
 @login_required
-@admin_required
+@org_admin_required
 def billing_index():
     from app.services import billing_plans, monelytics_provider
     from app.services.billing_service import BillingError, BillingService
@@ -66,18 +71,19 @@ def billing_index():
             "admin/billing.html",
             subscription=None,
             error="No organisation found for your account.",
+            contact_sales_url=billing_plans.CONTACT_SALES_URL,
         )
 
     refresh_error = None
-    if monelytics_provider.configured():
-        config = monelytics_provider.configuration_status()
-        if config["ready"]:
-            try:
-                BillingService.refresh_from_monelytics(org)
-            except BillingError as exc:
-                refresh_error = str(exc)
-    else:
-        config = billing_plans.configuration_status()
+    config = billing_plans.payment_status()
+    if monelytics_provider.configured() and config["ready"]:
+        try:
+            BillingService.refresh_from_monelytics(org)
+        except BillingError as exc:
+            refresh_error = str(exc)
+
+    # The buy form on this page is answered with a redirect to the provider's hosted checkout.
+    g.csp_form_action_extra = " ".join(BillingService.checkout_origins())
 
     sub = billing_plans.current_subscription(org)
     selected = request.args.get("plan")
@@ -105,16 +111,29 @@ def billing_index():
         except BillingError as exc:
             details_error = str(exc)
 
+    from app.services import billing_offers
+
+    current = billing_plans.effective_plan(sub)
+    live = BillingService.has_live_subscription(sub)
+    credit = billing_offers.startup_credit_state(org)
     return render_template(
         "admin/billing.html",
         subscription=sub,
+        credit=credit,
+        credit_declared=billing_offers.declared_answers(sub),
+        credit_website=billing_offers.website_on_file(org),
+        credit_raised_answers=billing_offers.RAISED_ANSWERS,
         org=org,
-        plan=billing_plans.effective_plan(sub),
+        plan=current,
+        renewal=billing_plans.renewal_summary(sub, current, live),
+        education=billing_plans.education_summary(sub, current),
+        plan_prices={p.key: billing_plans.price_lines(p) for p in billing_plans.PLANS},
         limits=billing_plans.user_limit_status(org.id),
-        plans=billing_plans.PLANS,
-        config=config,
-        stripe_configured=config["ready"],
-        has_live_subscription=BillingService.has_live_subscription(sub),
+        ai=billing_plans.ai_usage_status(org.id),
+        plans=billing_plans.listed_plans(),
+        payment=config,
+        payment_ready=config["ready"],
+        has_live_subscription=live,
         error=refresh_error,
         selected_plan=selected_plan,
         selected_interval=interval,
@@ -127,9 +146,39 @@ def billing_index():
     )
 
 
+@billing_bp.route("/startup-credit", methods=["POST"])
+@login_required
+@org_admin_required
+def billing_startup_credit():
+    """Claim 90 days of Startup, free, for the active organisation."""
+    from flask_login import current_user
+
+    from app.middleware.tenant_decorators import is_active_org_admin
+    from app.services import billing_offers
+
+    if not is_active_org_admin():
+        abort(403)
+    org = _org()
+    if org is None:
+        return redirect(url_for("billing.billing_index"))
+    declaration = {
+        "website": request.form.get("website", ""),
+        "founded": request.form.get("founded", ""),
+        "raised": request.form.get("raised", ""),
+    }
+    result = billing_offers.grant_startup_credit(org, current_user, declaration)
+    if not result.granted:
+        db.session.rollback()
+        flash(result.reason, "error")
+        return redirect(url_for("billing.billing_index") + "#startup-credit")
+    db.session.commit()
+    flash("Your 90 days of Startup have started.", "success")
+    return redirect(url_for("billing.billing_index"))
+
+
 @billing_bp.route("/upgrade", methods=["POST"])
 @login_required
-@admin_required
+@org_admin_required
 def billing_upgrade():
     """Start the provider's hosted checkout for the chosen plan."""
     org = _org()
@@ -164,7 +213,7 @@ def billing_upgrade():
 
 @billing_bp.route("/checkout/complete")
 @login_required
-@admin_required
+@org_admin_required
 def billing_checkout_complete():
     """Where the provider returns the administrator after paying."""
     org = _org()
@@ -184,7 +233,8 @@ def billing_checkout_complete():
 
 @billing_bp.route("/change-plan", methods=["POST"])
 @login_required
-@admin_required
+@enrol_first("billing", back_endpoint="billing.billing_index")
+@org_admin_required
 def billing_change_plan():
     org = _org()
     if org is None:
@@ -213,7 +263,8 @@ def billing_change_plan():
 
 @billing_bp.route("/cancel", methods=["POST"])
 @login_required
-@admin_required
+@enrol_first("billing", back_endpoint="billing.billing_index")
+@org_admin_required
 def billing_cancel():
     org = _org()
     if org is None:
@@ -233,7 +284,7 @@ def billing_cancel():
 
 @billing_bp.route("/resume", methods=["POST"])
 @login_required
-@admin_required
+@org_admin_required
 def billing_resume():
     org = _org()
     if org is None:
@@ -252,7 +303,8 @@ def billing_resume():
 
 @billing_bp.route("/details", methods=["POST"])
 @login_required
-@admin_required
+@enrol_first("billing", back_endpoint="billing.billing_index")
+@org_admin_required
 def billing_details():
     org = _org()
     if org is None:
@@ -273,7 +325,8 @@ def billing_details():
 
 @billing_bp.route("/portal")
 @login_required
-@admin_required
+@enrol_first("billing")
+@org_admin_required
 def billing_portal():
     """Redirect to the provider's customer portal for self-service billing."""
     org = _org()

@@ -15,6 +15,7 @@ from flask_login import current_user, login_required
 from app.modules.transformation_room.domain import ActorContext, TransformationError
 from app.modules.transformation_room.programme_service import TransformationProgrammeService
 from app.modules.transformation_room.read_models import STAGE_ROUTES, TransformationRoomReadModel
+from app.utils.plain_errors import render_plain_error
 
 
 def actor_from_request() -> ActorContext:
@@ -42,10 +43,10 @@ def actor_from_request() -> ActorContext:
 
 def _render_error(error: TransformationError):
     if error.http_status == 404:
-        return render_template("errors/404.html"), 404
+        return render_plain_error(404)
     if error.http_status == 403:
-        return render_template("errors/403.html"), 403
-    return render_template("errors/500.html"), error.http_status
+        return render_plain_error(403)
+    return render_plain_error(500)
 
 
 def _lead_options(programme_id: int):
@@ -155,7 +156,7 @@ def register_transformation_room_routes(blueprint) -> None:
     @login_required
     def transformation_workstream_stage(programme_id, workstream_id, stage):
         if stage not in STAGE_ROUTES:
-            return render_template("errors/404.html"), 404
+            return render_plain_error(404)
         try:
             actor = actor_from_request()
             if request.method == "POST":
@@ -220,7 +221,7 @@ def register_transformation_room_routes(blueprint) -> None:
         from app.modules.transformation_room.gate_service import TransformationGateService
 
         if stage not in STAGE_ROUTES:
-            return render_template("errors/404.html"), 404
+            return render_plain_error(404)
         target_stage = TransformationGateService.NEXT_STAGE.get(stage)
         if target_stage is None:
             abort(404)

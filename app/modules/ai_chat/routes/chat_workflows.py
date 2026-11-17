@@ -18,6 +18,7 @@ from app.core.auth.permissions import can
 from app.decorators import audit_log
 from app.services.rate_limiter import rate_limit
 from app.models.application_portfolio import ApplicationComponent
+from app.modules.ai_chat.services.failure_messages import ASSISTANT_UNAVAILABLE
 from . import unified_ai_chat_bp
 
 # Baseline annual infrastructure cost used for rough vendor TCO estimates when
@@ -563,56 +564,72 @@ def actionable_gap_analysis():
 
         elif analysis_type == "process":
             # Find APQC processes without application support
-            from app.models.apqc_process import APQCProcess
+            from app.models.apqc_process import APQCProcess, ProcessApplicationMapping
 
             # Hierarchy level <= 3 in SQL terms: process_code has at most 3
             # dot-separated segments (level 4+ has 3+ dots, e.g. "4.1.1.1").
             # APQCProcess.level is a computed property (no column), so it can't
             # be used in a query filter directly.
-            all_processes = (
-                APQCProcess.query.filter(
-                    APQCProcess.process_code.isnot(None),
-                    ~APQCProcess.process_code.like("%.%.%.%"),
-                )
-                .limit(100)
-                .all()
-            )
+            #
             # ProcessApplicationMapping has no organization_id of its own --
             # fence through ApplicationComponent (its owning application),
             # or every organisation's mapped processes count as "mapped"
             # here, hiding real gaps for the caller's own organisation
             # (pr306-v1 review, DEFECT D4).
+            #
+            # The unsupported processes are computed in SQL (not-mapped in the
+            # caller's organisation) and returned in a defined order, all of
+            # them, so the answer is complete however large the shared
+            # catalogue is (rviso05 defect 1: a blind first-100 limit).
+            from app.models.apqc_process import process_code_sort_key
             from app.services.apqc_mapping_tenant_fence import (
                 fenced_application_mappings_query,
             )
 
-            mapped_process_ids = set(
-                m.apqc_process_id for m in fenced_application_mappings_query().all()
+            mapped_ids = fenced_application_mappings_query().with_entities(
+                ProcessApplicationMapping.apqc_process_id
+            ).filter(ProcessApplicationMapping.apqc_process_id.isnot(None))
+            all_processes = (
+                APQCProcess.query.filter(
+                    APQCProcess.process_code.isnot(None),
+                    ~APQCProcess.process_code.like("%.%.%.%"),
+                    ~APQCProcess.id.in_(mapped_ids.subquery().select()),
+                )
+                .order_by(APQCProcess.id)
+                .all()
+            )
+            # Natural code order, then id. The database collation ignores the
+            # dots (10.0 before 1.1), so the order is applied here, before the
+            # stable severity sort below.
+            all_processes.sort(
+                key=lambda proc: (process_code_sort_key(proc.process_code), proc.id)
             )
 
             for proc in all_processes:
-                if proc.id not in mapped_process_ids:
-                    gaps.append(
-                        {
-                            "type": "process_gap",
-                            "severity": "medium",
-                            "name": proc.process_name,
-                            "process_code": proc.process_code,
-                            "process_id": proc.id,
-                            "description": f"No application supports process: {proc.process_code} {proc.process_name}",
-                            "recommendation": "Identify or implement supporting application",
-                            "actions": [
-                                "create_roadmap_item",
-                                "find_vendors",
-                                "evaluate_options",
-                            ],
-                        }
-                    )
+                gaps.append(
+                    {
+                        "type": "process_gap",
+                        "severity": "medium",
+                        "name": proc.process_name,
+                        "process_code": proc.process_code,
+                        "process_id": proc.id,
+                        "description": f"No application supports process: {proc.process_code} {proc.process_name}",
+                        "recommendation": "Identify or implement supporting application",
+                        "actions": [
+                            "create_roadmap_item",
+                            "find_vendors",
+                            "evaluate_options",
+                        ],
+                    }
+                )
 
         # Limit and sort by severity
         severity_order = {"critical": 0, "high": 1, "medium": 2, "low": 3}
         gaps.sort(key=lambda x: severity_order.get(x.get("severity", "low"), 3))
-        gaps = gaps[:20]  # Limit to top 20 gaps
+        if analysis_type != "process":
+            gaps = gaps[:20]  # Limit to top 20 gaps
+        # The process analysis returns every unsupported process, so its total
+        # is the full count.
 
         return jsonify(
             {
@@ -1584,7 +1601,7 @@ def generate_archimate_from_description():
 
     except ConnectionError as e:
         current_app.logger.error(f"ENT-122: LLM connection error: {e}")
-        return jsonify({"success": False, "error": "AI service unavailable. Check API configuration in Admin > API Settings."}), 503
+        return jsonify({"success": False, "error": ASSISTANT_UNAVAILABLE}), 503
     except Exception as e:
         current_app.logger.error(f"ENT-122: Error generating ArchiMate from description: {e}", exc_info=True)
         return jsonify({"success": False, "error": "An internal error occurred"}), 500
@@ -1595,14 +1612,13 @@ def generate_archimate_from_description():
 # ============================================================================
 
 def _refuse_unless_can_write():
-    """403 for a caller without write permission, else None.
+    """403 for a caller who may not change the model, else None.
 
-    Same predicate every non-AI write route uses (``Permission.GENERAL``); a
-    Viewer carries permissions=0 and fails it.
+    The one write rule (``may_write``), the same the write guard and the assistant ask.
     """
-    from app.models.user import Permission
+    from app.core.auth.permissions import may_write
 
-    if not current_user.can(Permission.GENERAL):
+    if not may_write(current_user):
         return jsonify({"success": False, "error": "You do not have permission to modify workspaces."}), 403
     return None
 

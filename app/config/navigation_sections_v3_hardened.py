@@ -259,13 +259,6 @@ AI_ANALYSIS_SECTION = NavigationSectionV3(
             order=2,
         ),
         NavigationItemV3(
-            label="Gap Discovery",
-            icon="search",
-            endpoint="main.agentic_gaps_ui",
-            url_fallback="/agentic-gaps",
-            order=3,
-        ),
-        NavigationItemV3(
             label="Market Intelligence",
             icon="trending-up",
             endpoint="architect_ui.market_intelligence",
@@ -308,7 +301,7 @@ ARCHITECTURE_TOOLS_SECTION = NavigationSectionV3(
             label="Roadmap Builder",
             icon="map",
             endpoint="strategic_routes.roadmap_index",
-            url_fallback="/strategic/roadmap",
+            url_fallback="/genome/roadmap/",
             order=2,
         ),
         NavigationItemV3(
@@ -482,7 +475,7 @@ TOOLS_UTILITIES_SECTION = NavigationSectionV3(
             visibility=ItemVisibility.ADMIN_ONLY,
         ),
         NavigationItemV3(
-            label="API Settings",
+            label="AI settings",
             icon="key",
             endpoint="admin.api_settings",
             url_fallback="/admin/api-settings",

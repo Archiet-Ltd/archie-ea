@@ -11,6 +11,9 @@ from typing import Any, Dict
 from flask import current_app, render_template
 from flask_login import current_user, login_required
 
+from app.modules.ai_chat.services import model_defaults
+from app.modules.ai_chat.services.customer_words import known_pages
+from app.modules.ai_chat.services.failure_messages import FEATURE_INTROS, failure_table_for_page
 from app.services.multi_domain_chat_service import MultiDomainChatService
 from . import unified_ai_chat_bp
 
@@ -148,12 +151,54 @@ def index():
         get_default_chat_persona,
     )
 
+    # The lens the person chose (or sign-up set) is read first, then the assigned role,
+    # the same order the dashboard uses; display only, never a permission.
     default_chat_persona = get_default_chat_persona(
-        getattr(current_user, "enterprise_role", None)
+        getattr(current_user, "enterprise_role", None),
+        getattr(current_user, "persona_lens", None),
     )
     from app.services.feature_flag_service import FeatureFlagService
 
     llm_provider_info = FeatureFlagService.get_configured_provider_info()
+
+    # A startup with nothing recorded is shown what to do next (the same two steps as its
+    # dashboard), to the people those steps open for. A larger company keeps the portfolio
+    # prompt, and the company kind defaults to startup until it is set.
+    from flask import g
+
+    from app.models.organization import Organization
+    from app.utils.role_access import may_connect_github, may_load_sample_company
+
+    company_kind = None
+    try:
+        org = Organization.query.get(g.current_org_id)
+        company_kind = ((org.settings or {}).get("company_context") or {}).get("kind") if org else None
+    except Exception:  # noqa: BLE001 - the kind only chooses which empty state shows
+        company_kind = None
+    startup_first_steps = {
+        "show": (company_kind or "startup") == "startup",
+        "connect": may_connect_github(current_user, g.current_org_id),
+        "sample": may_load_sample_company(current_user),
+    }
+    # An organisation whose applications are recorded but not how they connect is shown the two
+    # ways to change that, to the people each opens for.
+    from app.core.auth.permissions import can as _can
+
+    linkless_next_steps = {
+        "connect": startup_first_steps["connect"],
+        "record": bool(_can(current_user, "create", "relationship")),
+    }
+
+    from app.services import mfa_service, signup_attribution
+
+    two_factor_notice = None
+    if mfa_service.may_defer_enrolment(current_user) and signup_attribution.first_answer_at(current_user):
+        two_factor_notice = {
+            "ends_on": mfa_service.window_ends_at(current_user),
+            "days_left": mfa_service.window_days_left(current_user),
+        }
+
+    from app.modules.ai_chat.services.llm_service_impl import _PROVIDER_LABELS
 
     chat_service = get_chat_service()
     if chat_service is None:
@@ -176,14 +221,35 @@ def index():
     # AI_CHAT_CONTEXT_LIMIT (default 50) rows each on every page load and pass
     # them to a template that referenced context_data zero times. The chat loads
     # its context on demand from /ai-chat/context/<domain> instead.
+    # The link to the provider keys after a failed reply is for an administrator whose organisation
+    # has a key of its own; the sign-up's own-key check decides, so the built-in AI never shows it.
+    from app.modules.account.services.onboarding_service import own_key_provider
+
+    try:
+        own_key_admin = bool(current_user.is_admin() and own_key_provider())
+    except Exception:
+        current_app.logger.warning("Could not read the organisation's own AI key", exc_info=True)
+        own_key_admin = False
     return render_template(
         "ai_chat/index.html",
+        own_key_admin=own_key_admin,
+        not_set_up_sentence=FEATURE_INTROS["chat"],
+        failure_table=failure_table_for_page(),
+        known_pages=known_pages(current_app, current_user),
+        lookup_abort_ms=int(
+            (model_defaults.PROVIDER_FIRST_TOKEN_SECONDS + model_defaults.CHAT_TURN_MARGIN_SECONDS) * 1000
+        ),
         domain_config=domain_config,
         persona_config=persona_config,
         chat_bootstrap_error=chat_bootstrap_error,
         default_chat_persona=default_chat_persona,
         llm_configured=llm_provider_info["configured"],
+        provider_labels=_PROVIDER_LABELS,
+        llm_paused=bool(llm_provider_info.get("paused")),
         llm_provider=llm_provider_info.get("provider"),
+        startup_first_steps=startup_first_steps,
+        linkless_next_steps=linkless_next_steps,
+        two_factor_notice=two_factor_notice,
         chat_persona_preference_key=f"archie_chat_persona_v2:{current_user.id}",
     )
 
@@ -194,7 +260,10 @@ def document_upload_view():
     """Document upload lives INSIDE the chat (floating panel). The old standalone
     route rendered a macro-only template — a blank page (UIQA-004). Redirect into
     the chat with the panel auto-opened."""
-    from flask import redirect, url_for
+    from flask import redirect, request, url_for
+    vendor_id = request.args.get("vendor", type=int)
+    if vendor_id:
+        return redirect(url_for("unified_ai_chat.index", panel="docs", vendor=vendor_id))
     return redirect(url_for("unified_ai_chat.index", panel="docs"))
 
 

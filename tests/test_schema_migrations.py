@@ -280,6 +280,51 @@ def test_upgrade_on_an_empty_database_builds_the_full_schema(scratch_databases, 
     assert built["constraints"] == deployed["constraints"]
 
 
+def test_schema_upgrade_relaxes_a_long_lived_deliverables_not_null(deployed_db):
+    """Every deliverable seed_demo_company creates has no work_packages
+    parent: app/models/implementation_migration.py's Deliverable.work_package_id
+    is the legacy key, only set when a work_packages row exists for the work
+    package; unified_work_package_id is the key every reader uses, nullable
+    since R1-B04 PR 2.
+
+    Regression: no revision in this chain ever relaxed the live
+    deliverables.work_package_id column. The one place that happened was the
+    one-shot merge-work-package-stores data step
+    (app/commands/consolidate_work_packages.py's
+    _ensure_deliverable_legacy_key_nullable), which every already-deployed
+    database has had run against it -- but a database stamped past the
+    baseline before that model fix landed, and only ever advanced forward by
+    schema-upgrade since (a real production database, or a migration-built
+    template kept current by applying new revisions rather than being
+    rebuilt -- exactly what a review seat's build-machine template was,
+    29 Oct 2026), keeps the column's original NOT NULL forever: baseline's
+    own create_all step is checkfirst and does not touch a table that
+    already exists. deployed_db (built by init-db, so already past what
+    baseline would do) is regressed here to that original shape, the same
+    way test_example_revisions_are_idempotent_and_reversible_without_data_loss
+    regresses application_owners/archimate_elements to simulate a database
+    predating their own fixes.
+    """
+    url = deployed_db
+    engine = create_engine(url)
+    with engine.begin() as conn:
+        conn.execute(text(
+            "ALTER TABLE deliverables ALTER COLUMN work_package_id SET NOT NULL"
+        ))
+    engine.dispose()
+    assert tuple(_column(url, "deliverables", "work_package_id")) == (None, "NO")
+
+    _flask(url, ["schema-upgrade"])
+
+    assert tuple(_column(url, "deliverables", "work_package_id")) == (None, "YES")
+
+    _seed(url, [("deliverables", {"work_package_id": None})])
+
+    assert _conn_scalar(
+        url, "SELECT count(*) FROM deliverables WHERE work_package_id IS NULL"
+    ) == 1
+
+
 # ------------------------------------------------- deploy-schema.sh ordering
 
 

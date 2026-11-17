@@ -247,8 +247,12 @@ def test_the_rendered_sidebar_links_to_the_page_for_a_business_architect(
     user = _user(db_session, org.id)
     login_as(client, user)
     html = client.get(PAGE).get_data(as_text=True)
-    assert f'href="{PAGE}"' in html
-    assert "Value Streams at Risk" in html
+    assert "Value Streams at Risk" in html or "Value streams at risk" in html
+    # Navigation v3: the page sits under Impact (marked current while it is open) and
+    # is found by name from the one search box.
+    assert 'data-nav-key="impact"' in html
+    hits = client.get("/api/sidebar/search", query_string={"q": "value streams at risk"}).get_json()["results"]
+    assert PAGE in [h["url"] for h in hits if h["type"] == "module"]
 
 
 def test_the_page_reuses_the_shared_table_component_via_its_macro():

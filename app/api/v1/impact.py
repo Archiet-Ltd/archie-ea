@@ -141,6 +141,7 @@ def analyze_impact():
                 element_id=element_id,
                 change_type=change_type,
                 scenario=scenario,
+                record=False,
             )
             result = _normalise_element_result(raw)
 
@@ -148,6 +149,12 @@ def analyze_impact():
             return error_response("Impact analysis returned no result", status_code=404)
 
         contract = _to_contract_shape(result)
+        from flask_login import current_user
+
+        from app.services.cost_visibility import costs_visible, withhold_costs
+
+        if not costs_visible(current_user):
+            contract = withhold_costs(contract)
 
         # T-004 (API-3/DE-10): additive only, and only on the element_id
         # branch -- the app_id branch has no equivalent projection today and
@@ -222,10 +229,14 @@ def _derived_elements_for_element(element_id: int, *, include_derived: bool, max
     above), which returns a proper 500 -- a bug looks like a bug, not like
     an un-run derivation.
     """
-    from app.modules.intelligence.services.query_service import IntelligenceQueryService
+    from app.modules.intelligence.services.query_service import (
+        IntelligenceQueryService,
+        without_relations,
+    )
 
     result = IntelligenceQueryService.cross_layer_impact(
         element_id,
+        with_relations=True,
         include_derived=include_derived,
         include_stale=False,
         max_depth=max_depth,
@@ -242,7 +253,13 @@ def _derived_elements_for_element(element_id: int, *, include_derived: bool, max
     # should raise (surfacing as a 500 via the caller's except block), not be
     # papered over with an invented value.
     derivation_state = summary["derivation_state"]
-    derived_rows = [row for row in (result.get("rows") or []) if row["relation"]["kind"] == "derived"]
+    derived_rows = without_relations(
+        [
+            row
+            for row in (result.get("rows") or [])
+            if any(rel["kind"] == "derived" for rel in row.get("relations") or [row["relation"]])
+        ]
+    )
     return derived_rows, derivation_state
 
 

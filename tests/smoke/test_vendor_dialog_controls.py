@@ -21,12 +21,12 @@ def test_vendor_create_dialog_dismisses_without_write(browser, live_server, seed
         page.on('request', lambda request: writes.append((request.method, request.url))
                 if request.method in {'POST', 'PUT', 'PATCH', 'DELETE'}
                 and 'vendor' in request.url else None)
-        trigger = page.get_by_role('button', name='Add Vendor', exact=True)
+        trigger = page.get_by_role('button', name='Add vendor', exact=True)
         trigger.click()
         dialog = page.locator('#create-vendor')
         expect(dialog).to_be_visible()
-        expect(dialog.get_by_role('heading', name='New Vendor', exact=True)).to_be_visible()
-        name = dialog.get_by_label('Vendor Name *', exact=True)
+        expect(dialog.get_by_role('heading', name='New vendor', exact=True)).to_be_visible()
+        name = dialog.get_by_label('Vendor name *', exact=True)
         expect(name).to_be_visible()
         name.fill('Unsaved QA vendor')
         if dismissal == 'Escape':

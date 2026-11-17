@@ -43,6 +43,10 @@ _NAME_LIKE_ARG_KEYS = frozenset({"name", "title"})
 # server. A tool argument that names one is text the model was given by a user
 # or a document, so it is dropped here, at the one dispatch point, before any
 # handler can read it.
+# A genome node id, the citation unit of a slice: <domain>:<kind>:<store id>.
+_GENOME_NODE_ID = re.compile(r"[a-z_]{1,20}:[a-z_]{1,20}:[A-Za-z0-9_]{1,64}")
+GENOME_NOTICE = "Answer written by AI from your model"
+
 _SCOPE_ARG_KEYS = frozenset({"organization_id", "organisation_id", "org_id", "tenant_id"})
 
 
@@ -278,20 +282,32 @@ def record_paused_tool_call(user, tool_name: str, arguments, *, paused_by_name: 
         logger.warning("Could not record the paused tool call '%s'", tool_name, exc_info=True)
 
 
-def user_can_write(user_id) -> bool:
-    """Whether the user holds write access (``Permission.GENERAL``).
+# Tools that change one kind of record are held to that record's own permission, the one the
+# form for the same record asks (``can("edit", "application")``), not only to write permission.
+TOOL_RECORD_PERMISSION = {
+    "update_application_status": ("application", "edit"),
+    "bulk_update_application_status": ("application", "edit"),
+}
+
+
+def user_can_write(user_id, tool_name=None) -> bool:
+    """Whether the user may change the model: ``may_write``, the rule the API write guard asks.
 
     The one rule every AI write surface applies: the agent tool executor, the
     slash commands and the natural-language write branches of the chat service.
-    The user is loaded scoped to the current tenant, so a user from another
-    organisation never authorises.
+    A tool that changes one kind of record is also held to that record's own
+    permission. The user is loaded scoped to the current tenant, so a user from
+    another organisation never authorises.
     """
-    from app.models.user import Permission
+    from app.core.auth.permissions import may_write
 
     user = _load_acting_user(user_id)
     if not user:
         return False
-    return bool(user.can(Permission.GENERAL))
+    record = TOOL_RECORD_PERMISSION.get(tool_name)
+    if record is None:
+        return may_write(user)
+    return may_write(user) and may_write(user, object_type=record[0], action=record[1])
 
 
 def refuse_unless_can_write(user_id, action_name: str, arguments=None, *, via: str):
@@ -301,7 +317,7 @@ def refuse_unless_can_write(user_id, action_name: str, arguments=None, *, via: s
     audit log (``via`` says which surface was refused) and returns the same
     permissions-framed refusal the agent path gives, as a result dict.
     """
-    if user_can_write(user_id):
+    if user_can_write(user_id, action_name):
         return None
     user = _load_acting_user(user_id)
     logger.warning(
@@ -350,6 +366,8 @@ class ToolExecutor:
         # One stored answer per identical question per turn (an executor lives
         # for one turn): a repeated call returns the same address.
         self._answers_this_turn: dict = {}
+        # Genome slices read this turn, by their exact arguments (LG-1 budgets).
+        self._genome_this_turn: dict = {}
 
     @staticmethod
     def _coverage(rows, total, noun):
@@ -397,6 +415,32 @@ class ToolExecutor:
             ),
         }
 
+    def _application_owner_fields(self, apps) -> dict:
+        """{application id: {"owners": [...], "has_owner": bool}} from the ownership records.
+
+        The same records and the same "is it owned" rule the Applications pages
+        read; owner text on the application row is used only when no record
+        names anyone.
+        """
+        from app.models.application_owner import ApplicationOwner
+        from app.services.element_ownership_service import application_is_owned
+
+        org_id = self._get_organization_id()
+        recorded = ApplicationOwner.get_display_rows_for_applications([a.id for a in apps], org_id)
+        fields = {}
+        for a in apps:
+            owners = [
+                {"name": row["user_name"], "ownership_type": row["ownership_type"]}
+                for row in recorded.get(a.id, [])
+                if row.get("user_name") and row["user_name"] != "\u2014"
+            ]
+            if not owners:
+                text = (a.legacy_business_owner or a.legacy_application_owner or "").strip()
+                if text:
+                    owners = [{"name": text, "ownership_type": None}]
+            fields[a.id] = {"owners": owners, "has_owner": application_is_owned(a)}
+        return fields
+
     def _get_organization_id(self) -> int:
         """Return the organization_id for the current user (cached after first call)."""
         if self._org_id is not None:
@@ -424,17 +468,15 @@ class ToolExecutor:
     # Public dispatch                                                      #
     # ------------------------------------------------------------------ #
 
-    def _user_can_write(self) -> bool:
-        """Server-side write-permission check for the invoking user (V-01).
+    def _user_can_write(self, tool_name=None) -> bool:
+        """Server-side write-permission check for the invoking user.
 
-        This — not the prompt, not the LLM's own judgement — is the access
-        control. `Permission.GENERAL` is the same bitfield `user.can()` already
-        checks for every non-AI write route (app/models/user.py); a Viewer role
-        carries permissions=0 and fails it, exactly as it fails the equivalent
-        HTTP routes. Reusing it means the AI surface can never be *more*
-        permissive than the API it wraps.
+        This, not the prompt or the model's own judgement, is the access control. It asks
+        ``may_write``, the rule the API write guard asks, so the assistant can never be more
+        permissive than the screens it wraps; a tool that changes one kind of record is also
+        held to that record's own permission.
         """
-        return user_can_write(self.user_id)
+        return user_can_write(self.user_id, tool_name)
 
     def execute(self, tool_call: ToolCall, *, propagate_errors: bool = False) -> dict:
         """Dispatch one tool call. THE choke point for every agent write.
@@ -546,7 +588,7 @@ class ToolExecutor:
                         "writes_paused": True,
                     }
 
-            if not user or not self._user_can_write():
+            if not user or not self._user_can_write(tool_call.name):
                 logger.warning(
                     "ToolExecutor: refusing mutating tool '%s' for user_id=%s — no write permission",
                     tool_call.name, self.user_id,
@@ -560,13 +602,23 @@ class ToolExecutor:
             if tool_call.name == "submit_for_arb_review":
                 tool_call_digest = hashlib.sha256(str(tool_call.id).encode("utf-8")).hexdigest()
                 arguments["_trusted_command_key"] = f"ai-tool-{tool_call_digest}"
-            return handler(arguments)
+            result = handler(arguments)
+            if isinstance(result, dict) and result.get("success") is False and isinstance(result.get("error"), str):
+                from app.modules.ai_chat.services.customer_words import WRITE_FAILED, is_database_error
+
+                if is_database_error(result["error"]):
+                    logger.warning("Tool %s returned a database error: %s", tool_call.name, result["error"])
+                    db.session.rollback()
+                    result = dict(result, error=WRITE_FAILED)
+            return result
         except Exception as e:
             db.session.rollback()
             logger.exception("Tool %s failed", tool_call.name)
             if propagate_errors:
                 raise
-            return {"success": False, "error": str(e)}
+            from app.modules.ai_chat.services.customer_words import WRITE_FAILED, is_database_error
+
+            return {"success": False, "error": WRITE_FAILED if is_database_error(e) else str(e)}
 
     # ------------------------------------------------------------------ #
     # Helpers                                                              #
@@ -737,42 +789,37 @@ class ToolExecutor:
     # ------------------------------------------------------------------ #
 
     def _tool_link_application_to_capability(self, args: dict) -> dict:
-        app_r = self._resolver.resolve_application(args["application_name"])
-        cap_r = self._resolver.resolve_capability(args["capability_name"])
+        from app.services import capability_support as support
 
-        if not app_r["resolved"]:
-            return self._clarify("application", app_r)
-        if not cap_r["resolved"]:
-            return self._clarify("capability", cap_r)
-
-        from app.models.application_capability import ApplicationCapabilityMapping
-
-        # tenant-scoping-ok: FK id already org-scoped (application/capability resolved via a TenantMixin model or the current request's own app/solution).
-        existing = ApplicationCapabilityMapping.query.filter_by(
-            application_component_id=app_r["id"],
-            business_capability_id=cap_r["id"],
-        ).first()
-        if existing:
-            return {
-                "success": True,
-                "message": (
-                    f"'{app_r['name']}' is already mapped to capability '{cap_r['name']}'."
-                ),
-            }
-
-        mapping = ApplicationCapabilityMapping(
-            application_component_id=app_r["id"],
-            business_capability_id=cap_r["id"],
-            support_level=args.get("coverage_level", "partial"),
-        )
-        db.session.add(mapping)
-        db.session.commit()
+        org_id = self._get_organization_id()
+        level = args.get("support_level") or args.get("coverage_level")
+        try:
+            application, capability = support.resolve_support_ends(
+                org_id, args.get("application_name"), args.get("capability_name"))
+            result = support.record_capability_support(
+                org_id, application.id, capability.id,
+                kind=args.get("how") or "realization",
+                facts={"support_level": level, "notes": args.get("notes")},
+                actor_id=self.user_id,
+            )
+            db.session.commit()
+        except support.CapabilitySupportRefused as refusal:
+            db.session.rollback()
+            return {"success": False, "error": str(refusal)}
+        row = next((r for r in support.support_rows(org_id, application_ids=None)
+                    if r["row_id"] == result.row_id), None)
+        level_word = (row or {}).get("support_level") or "linked"
+        page = support.application_page(org_id, application)
+        verb = support.KIND_WORDS[result.kind]
+        lead = "Recorded" if result.created else "Already recorded"
         return {
             "success": True,
-            "result": {"application": app_r["name"], "capability": cap_r["name"]},
+            "result": {"application": result.application_name, "capability": result.capability_name,
+                       "kind": verb, "support_level": level_word, "page": page},
             "message": (
-                f"Mapped application '{app_r['name']}' to capability '{cap_r['name']}' "
-                f"({args.get('coverage_level', 'partial')} coverage)."
+                f"{lead}: {result.application_name} {verb} {result.capability_name} "
+                f"({level_word.capitalize()} support). See it on the application page: "
+                f"[{result.application_name}]({page})."
             ),
         }
 
@@ -869,6 +916,15 @@ class ToolExecutor:
     # ------------------------------------------------------------------ #
 
     def _tool_update_application_status(self, args: dict) -> dict:
+        from app.services.application_status import status_for_write
+
+        new_status, refusal = status_for_write(args.get("new_status"))
+        args = {**args, "new_status": new_status}
+        if new_status is None:
+            return {
+                "success": False,
+                "error": refusal or "Status must not be blank.",
+            }
         app_r = self._resolver.resolve_application(args["application_name"])
         if not app_r["resolved"]:
             return self._clarify("application", app_r)
@@ -1043,6 +1099,14 @@ class ToolExecutor:
         if status_filter:
             q = q.filter(ApplicationComponent.lifecycle_status == status_filter)
 
+        # Ownership filter: the same "is it owned" rule the Applications pages use.
+        ownership = args.get("ownership")
+        if ownership in ("owned", "unowned"):
+            from app.services.element_ownership_service import application_is_owned_expression
+
+            owned = application_is_owned_expression(ApplicationComponent)
+            q = q.filter(owned if ownership == "owned" else ~owned)
+
         # Capability filter: join through ApplicationCapabilityMapping
         cap_name = args.get("capability_name")
         if cap_name:
@@ -1062,6 +1126,7 @@ class ToolExecutor:
         # told what it is not seeing.
         total = q.count()
         apps = q.limit(limit).all()
+        owner_fields = self._application_owner_fields(apps)
         rows = [
             {
                 "id": a.id,
@@ -1072,7 +1137,7 @@ class ToolExecutor:
                 # technical-deployment concept and is labelled as such.
                 "lifecycle_status": a.lifecycle_status,
                 "deployment_status": a.deployment_status,
-                "owner_team": getattr(a, "owner_team", None),
+                **owner_fields[a.id],
             }
             for a in apps
         ]
@@ -1556,14 +1621,79 @@ class ToolExecutor:
         elem_r = self._resolver.resolve_archimate_element(args["element_name"])
         if not elem_r["resolved"]:
             return self._clarify("ArchiMate element", elem_r)
+
+        # Load the ArchiMateElement to get description and custom_properties
+        try:
+            from app.models.archimate_core import ArchiMateElement
+        except ImportError:
+            from app.models.models import ArchiMateElement
+
+        ae = ArchiMateElement.query.filter_by(id=elem_r["id"]).first()
+        if not ae:
+            return {"success": False, "error": "Element not found"}
+
+        # Get the provenance chain
         from app.modules.architecture.services.inference_engine_service import ArchiMateInferenceEngine
+        from app.services.model_map import origin_sentence
         engine = ArchiMateInferenceEngine(architecture_id=0)
-        result = engine.explain(elem_r["id"])
-        return {
-            "success": True,
-            "result": result,
-            "message": f"Provenance chain for '{elem_r['name']}' traced.",
+        provenance = engine.explain(ae.id)
+
+        # The description comes first and the properties beside it: a property can
+        # outlive what the description now says (a price card withdrawn, a date moved).
+        # The properties carry their source when the element records one.
+        properties = ae.custom_properties or {}
+        origin = origin_sentence(ae.source_kind, ae.source_label, ae.source_ref) if ae.source_kind else None
+        result = {
+            "element_id": ae.id,
+            "element_name": ae.name,
+            "element_type": ae.type,
+            "element_layer": ae.layer,
+            "description": ae.description or "",
+            "custom_properties": properties,
+            "properties_source": origin,
+            "provenance": {
+                "steps": provenance.steps,
+                "source_element_ids": provenance.source_elements,
+                "rules_applied": provenance.rules_applied,
+                "confidence": provenance.confidence,
+            },
         }
+
+        # If this element mirrors a motivation entity, include its typed fields
+        typed_record = self._get_typed_record(ae)
+        if typed_record:
+            result["typed_record"] = {"model": type(typed_record).__name__, **typed_record.to_dict()}
+
+        said = [f"Element '{ae.name}' ({ae.type})."]
+        said.append(f"Description: {ae.description.strip().rstrip('.')}." if ae.description else "No description is recorded.")
+        if properties:
+            suffix = f" ({origin})" if origin else ""
+            said.append("Properties: " + "; ".join(f"{k}: {v}{suffix}" for k, v in properties.items()) + ".")
+        else:
+            said.append("No properties are recorded.")
+        return {"success": True, "result": result, "message": " ".join(said)}
+
+    def _get_typed_record(self, ae):
+        """Find the motivation entity that mirrors this ArchiMateElement."""
+        from app.middleware.tenant_context import current_org_id
+        org_id = current_org_id()
+        if not org_id:
+            return None
+
+        # Check each motivation model that has archimate_element_id
+        from app.models.solution_architect_models import (
+            SolutionConstraint, SolutionDriver, SolutionGoal, SolutionRequirement,
+        )
+        from app.models.solution_lifecycle_models import SolutionRisk
+
+        for model_class in [SolutionDriver, SolutionGoal, SolutionConstraint, SolutionRequirement, SolutionRisk]:
+            record = model_class.query.filter_by(
+                archimate_element_id=ae.id,
+                organization_id=org_id
+            ).first()
+            if record:
+                return record
+        return None
 
     # ------------------------------------------------------------------ #
     # Tool: simulate_impact (read-only)                                  #
@@ -1664,6 +1794,94 @@ class ToolExecutor:
                 + (" The list is partial: report the total, not the rows shown." if len(shown) < total else "")
             )
         return {"success": True, "result": body, "message": message}
+
+    # ------------------------------------------------------------------ #
+    # Tool: get_genome_slice (read-only)                                 #
+    # ------------------------------------------------------------------ #
+
+    GENOME_NOT_FOUND = {"success": False, "error": "Not found.", "code": "NOT_FOUND"}
+
+    def _tool_get_genome_slice(self, args: dict) -> dict:
+        """One registered domain slice of the caller's organisation, serialised to
+        its budget (ADR-genome-01, LG-1). The organisation is the session's (chat)
+        or the token's user's (MCP), never an argument; arguments are a domain
+        name, ids and declared filters only. Read-only: nothing is queued or written."""
+        import json as _json
+
+        from app.modules.genome.slices import serialise as genome_serialise
+        from app.modules.genome.slices.registry import SLICES, get_slice, registered_domains
+
+        domain = args.get("domain")
+        if not isinstance(domain, str) or domain not in SLICES:
+            return {
+                "success": True,
+                "result": {"registered_domains": registered_domains()},
+                "message": "No such part of the model. Ask for one of: %s." % ", ".join(registered_domains()),
+            }
+        focus = args.get("focus_ids") or []
+        if not isinstance(focus, list) or len(focus) > genome_serialise.MAX_FOCUS:
+            return {"success": False, "error": "focus_ids must be a list of at most 20 ids.", "code": "INVALID_PARAMETER"}
+        for ident in focus:
+            if not (type(ident) is int or (isinstance(ident, str) and _GENOME_NODE_ID.fullmatch(ident))):
+                return {"success": False, "error": "focus_ids takes node or element ids only.", "code": "INVALID_PARAMETER"}
+        filters = args.get("filters") or {}
+        if not isinstance(filters, dict):
+            return {"success": False, "error": "filters must be an object.", "code": "INVALID_PARAMETER"}
+        depth = args.get("depth", 1)
+        budget = args.get("budget_tokens", genome_serialise.DEFAULT_BUDGET)
+        if type(depth) is not int or type(budget) is not int:
+            return {"success": False, "error": "depth and budget_tokens are whole numbers.", "code": "INVALID_PARAMETER"}
+
+        # An executor lives for one turn: a repeated identical call returns the
+        # first result, and the turn's slice budget and fetch count hold.
+        key = _json.dumps(args, sort_keys=True, default=str)
+        cache = self._genome_this_turn
+        if key in cache:
+            return cache[key]
+        spent = sum(r["result"].get("tokens", 0) for r in cache.values() if r.get("success"))
+        if len(cache) >= 4 or spent >= genome_serialise.TURN_BUDGET:
+            return {
+                "success": False,
+                "error": "This question has read as much of the model as one answer may; narrow it.",
+                "code": "SLICE_BUDGET_SPENT",
+            }
+        budget = min(budget, genome_serialise.TURN_BUDGET - spent)
+
+        org_id = self._get_organization_id()
+        envelope = get_slice(domain, org_id)
+        if focus:
+            known = {n["id"] for n in envelope["nodes"]} | {
+                str((n.get("provenance") or {}).get("archimate_element_id")) for n in envelope["nodes"]
+            }
+            if not any(str(f) in known for f in focus):
+                # Another organisation's id reads exactly like an id that does not exist.
+                return dict(self.GENOME_NOT_FOUND)
+        result = genome_serialise.serialise(
+            envelope, focus_ids=focus, depth=depth, filters=filters, budget_tokens=budget,
+        )
+        base = ""
+        try:
+            from app.services.origin import canonical_origin
+
+            base = canonical_origin()
+        except Exception:
+            base = ""
+        for node in result["nodes"]:
+            if base and node.get("link"):
+                node["url"] = base + node["link"]
+        result["notice"] = GENOME_NOTICE
+        result["tokens"] = genome_serialise.estimate_tokens(result)
+        out = {
+            "success": True,
+            "result": result,
+            "message": (
+                "%d records from the %s part of the model, as of %s. Cite each record you "
+                "state as [ref:<node id>]." % (len(result["nodes"]), domain, result["as_of"])
+                if result["nodes"] else (result.get("reason") or "Nothing recorded.")
+            ),
+        }
+        cache[key] = out
+        return out
 
     def _tool_answer(self, args: dict) -> dict:
         kind = args.get("question")
@@ -1900,6 +2118,87 @@ class ToolExecutor:
         }
 
     # ------------------------------------------------------------------ #
+    # Tool: get_application_capabilities (read-only)                      #
+    # ------------------------------------------------------------------ #
+
+    def _tool_get_application_capabilities(self, args: dict) -> dict:
+        """The capabilities one application of the signed-in organisation supports, through the
+        catalogue entry the keyword answer runs, so every phrasing gets the recorded answer."""
+        from app.modules.intelligence.services.query_catalogue import run_entry
+
+        name = args.get("application_name")
+        org_id = self._get_organization_id()
+        if not isinstance(name, str) or not name.strip():
+            return {"success": False, "error": "application_name is required"}
+        if org_id is None:
+            return {"success": False, "error": "No organisation is signed in."}
+        found = run_entry("capabilities_of_application", org_id, service=name.strip())
+        rows = [
+            {
+                "id": row["id"],
+                "name": row["name"],
+                "support_level": row.get("support_level"),
+                "coverage_percentage": row.get("coverage_percentage"),
+                "url": citation.get("target"),
+            }
+            for row, citation in zip(found["rows"], found["citations"])
+        ]
+        # The whole mapping is read, so the total is the number of rows.
+        coverage = self._coverage(rows, len(rows), "capabilities mapped to the application")
+        return {
+            "success": True,
+            "result": rows,
+            "application": found.get("service"),
+            "application_id": found.get("application_id"),
+            **coverage,
+            "message": found.get("reason") or "The capabilities mapped to %s, as its page shows them." % found.get("service"),
+        }
+
+    def _applications_supporting(self, capability_name: str):
+        """The applications recorded as supporting the capability a name means, read through the one
+        reader; ``None`` when no capability element carries the name."""
+        from app.models.application_portfolio import ApplicationComponent
+        from app.services import capability_support as support
+
+        org_id = self._get_organization_id()
+        elements = support._elements_named(org_id, capability_name, "capability")
+        if not elements:
+            return None
+        rows = []
+        for element in elements:
+            # A lookup only: asking who supports a capability never makes the capability's record.
+            record = support.existing_capability_record(org_id, element)
+            if record is not None:
+                rows.extend(support.applications_of_capability(org_id, record.id))
+        apps = {
+            a.id: a for a in ApplicationComponent.query.filter(
+                ApplicationComponent.organization_id == org_id,
+                ApplicationComponent.id.in_([r["application_id"] for r in rows] or [0]),
+            )
+        }
+        owner_fields = self._application_owner_fields(list(apps.values()))
+        out = []
+        for r in rows:
+            a = apps.get(r["application_id"])
+            if a is None:
+                continue
+            out.append({
+                "id": a.id, "name": a.name, "deployment_status": a.deployment_status,
+                "how": r["kind_word"], "coverage_level": r["support_level"], **owner_fields[a.id],
+            })
+        name = elements[0].name
+        coverage = self._coverage(out, len(out), f"application(s) mapped to '{name}'")
+        if not out:
+            return {
+                "success": True, "result": [], "count": 0, "capability_name": name,
+                "message": f"No applications are recorded as supporting '{name}'. This is a coverage gap.",
+            }
+        return {
+            "success": True, "result": out, "capability_name": name, **coverage,
+            "message": coverage["message"] + " Use link_application_to_solution to attach relevant ones to your solution.",
+        }
+
+    # ------------------------------------------------------------------ #
     # Tool: find_applications_by_capability (read-only)                   #
     # ------------------------------------------------------------------ #
 
@@ -1914,6 +2213,10 @@ class ToolExecutor:
         cap_name = args.get("capability_name", "")
         if not cap_name.strip():
             return {"success": False, "error": "capability_name is required"}
+
+        supported = self._applications_supporting(cap_name)
+        if supported is not None:
+            return supported
 
         cap_r = self._resolver.resolve_capability(cap_name)
         if not cap_r.get("resolved"):
@@ -1944,6 +2247,7 @@ class ToolExecutor:
 
         app_map = {a.id: a for a in apps}
         rows = []
+        owner_fields = self._application_owner_fields(apps)
         for m in mappings:
             a = app_map.get(m.application_component_id)
             if not a:
@@ -1953,7 +2257,7 @@ class ToolExecutor:
                 "name": a.name,
                 "deployment_status": a.deployment_status,
                 "coverage_level": getattr(m, "coverage_level", None),
-                "owner_team": getattr(a, "owner_team", None),
+                **owner_fields[a.id],
             })
 
         coverage = self._coverage(
@@ -2223,21 +2527,47 @@ class ToolExecutor:
     # Genome patch (ADR 0009 / 0010)                                      #
     # ------------------------------------------------------------------ #
 
+    def _tool_propose_vendors(self, args: dict) -> dict:
+        """Queue the named vendor products as proposals in the approvals inbox. Records nothing else."""
+        from app.services.vendor_detection import INBOX_PATH, propose_from_names
+
+        names = args.get("names") or []
+        if isinstance(names, str):
+            names = [part.strip() for part in names.replace(" and ", ",").split(",")]
+        result = propose_from_names(self._get_organization_id(), names, words=args.get("request") or "",
+                                    requested_by=self.user_id)
+        proposed = [p["product"] for p in result["proposed"]]
+        parts = []
+        if proposed:
+            parts.append("Proposed for confirmation in the approvals inbox: %s." % ", ".join(proposed))
+        if result["known"]:
+            parts.append("Already recorded or proposed: %s." % ", ".join(result["known"]))
+        if result["not_in_catalogue"]:
+            parts.append("Not in the vendor catalogue yet: %s." % ", ".join(result["not_in_catalogue"]))
+        return {
+            "success": True,
+            "proposed": result["proposed"],
+            "known": result["known"],
+            "not_in_catalogue": result["not_in_catalogue"],
+            "inbox_url": INBOX_PATH,
+            "message": " ".join(parts) or "No product names were given.",
+        }
+
     def _tool_propose_genome_patch(self, args: dict) -> dict:
-        """Validate an LLM-proposed genome patch and QUEUE it for approval.
+        """Validate an LLM-proposed change to the model and QUEUE it for approval.
 
         Non-mutating with respect to the enterprise model: it only creates a
-        pending approval (or rejects an invalid patch). The actual model write
+        pending approval (or rejects an invalid proposal). The actual model write
         happens later, in `_tool_apply_genome_patch`, once a human approves —
         exactly the existing approve-tier queue/confirm mechanism.
 
-        The LLM supplies the candidate patch as ``args["patch"]`` (or as the
+        The LLM supplies the candidate proposal as ``args["patch"]`` (or as the
         argument object itself). Whatever it emits is validated deterministically
-        before anything is queued, so a hallucinated patch cannot reach the model.
+        before anything is queued, so a hallucinated proposal cannot reach the model.
         """
         from app.modules.genome.patch.proposer import propose_genome_patch
 
-        request_text = args.get("request") or "propose a genome patch"
+        request_text = args.get("request") or "propose a change to your model"
 
         supplied = args.get("patch")
         if isinstance(supplied, dict):
@@ -3172,7 +3502,8 @@ class ToolExecutor:
             "contract_value": args.get("value") if args.get("value") is not None
             else args.get("contract_value"),
             "annual_cost": args.get("annual_cost"),
-            "currency": args.get("currency") or "USD",
+            # no currency given means the organisation's, as on the contract form
+            "currency": args.get("currency") or "",
             "start_date": args.get("start_date") or "",
             "end_date": args.get("end_date") or "",
             "renewal_date": args.get("renewal_date") or "",
@@ -3206,6 +3537,8 @@ class ToolExecutor:
                 "status": contract.status,
                 "start_date": str(contract.start_date) if contract.start_date else None,
                 "end_date": str(contract.end_date) if contract.end_date else None,
+                "annual_cost": contract.annual_cost,
+                "currency": contract.currency,
             },
             "message": "Created contract '%s' (id=%s)." % (contract.contract_name, contract.id),
         }

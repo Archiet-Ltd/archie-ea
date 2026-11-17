@@ -12,6 +12,7 @@ from flask import Blueprint, jsonify, request
 from flask_login import login_required
 from werkzeug.exceptions import HTTPException
 
+from app._bootstrap.write_access import commit_unless_read_only
 from app.decorators import audit_log
 from app.extensions import db
 from app.models.business_capabilities import BusinessCapability
@@ -23,6 +24,7 @@ from app.models.vendor.vendor_organization import (
 from app.modules.vendors.services.vendor_product_service import VendorProductService
 from app.utils.pagination import safe_int_arg
 from app.utils.route_guards import require_entity
+from app.services.cost_visibility import withhold_reply
 
 logger = logging.getLogger(__name__)
 
@@ -44,12 +46,14 @@ def get_vendors():
         vendors = service.get_all_vendors_with_stats(tier=tier, category=category, search=search)
 
         return jsonify(
-            {
-                "success": True,
-                "vendors": vendors,
-                "total": len(vendors),
-                "filters": {"tier": tier, "category": category, "search": search},
-            }
+            withhold_reply(
+                {
+                    "success": True,
+                    "vendors": vendors,
+                    "total": len(vendors),
+                    "filters": {"tier": tier, "category": category, "search": search},
+                }
+            )
         )
 
     except Exception as e:
@@ -71,7 +75,7 @@ def get_vendor_hierarchy(vendor_id):
         if not hierarchy:
             return jsonify({"success": False, "error": "Vendor not found"}), 404
 
-        return jsonify({"success": True, "hierarchy": hierarchy, "vendor_id": vendor_id})
+        return jsonify(withhold_reply({"success": True, "hierarchy": hierarchy, "vendor_id": vendor_id}))
 
     except HTTPException:
         raise
@@ -286,7 +290,7 @@ def get_vendor_statistics():
         service = VendorProductService()
         stats = service.get_catalog_statistics()
 
-        return jsonify({"success": True, "statistics": stats})
+        return jsonify(withhold_reply({"success": True, "statistics": stats}))
 
     except Exception as e:
         logger.error(f"Error getting vendor statistics: {e}")
@@ -450,14 +454,14 @@ def score_vendor(vendor_id):
             results.append({
                 "vendor_option_id": vo.id,
                 "vendor_name": vo.vendor_name or vendor.name,
-                "total_score": round(vo.total_score or 0, 1),
-                "cost_score": round(vo.cost_score or 0, 1),
-                "capability_coverage_score": round(vo.capability_coverage_score or 0, 1),
-                "risk_score": round(vo.risk_score or 0, 1),
-                "strategic_fit_score": round(vo.strategic_fit_score or 0, 1),
-                "implementation_score": round(vo.implementation_score or 0, 1),
+                "total_score": None if vo.total_score is None else round(vo.total_score, 1),
+                "cost_score": None if vo.cost_score is None else round(vo.cost_score, 1),
+                "capability_coverage_score": None if vo.capability_coverage_score is None else round(vo.capability_coverage_score, 1),
+                "risk_score": None if vo.risk_score is None else round(vo.risk_score, 1),
+                "strategic_fit_score": None if vo.strategic_fit_score is None else round(vo.strategic_fit_score, 1),
+                "implementation_score": None if vo.implementation_score is None else round(vo.implementation_score, 1),
             })
-        db.session.commit()
+        commit_unless_read_only()
         return jsonify({"success": True, "vendor": vendor.name, "scores": results, "total": len(results)})
     except HTTPException:
         # Let get_or_404 (e.g. unknown vendor) surface as its real status
@@ -488,20 +492,18 @@ def rank_vendors():
 
         svc = VendorScoringService()
         ranked = svc.rank_vendors(options)
-        db.session.commit()
-        return jsonify({
-            "success": True,
-            "ranking": [
-                {
-                    "rank": vo.ranking,
-                    "vendor_option_id": vo.id,
-                    "vendor_name": vo.vendor_name,
-                    "total_score": round(vo.total_score or 0, 1),
-                }
-                for vo in ranked
-            ],
-            "total": len(ranked),
-        })
+        # Built before the commit: for a reader who may not write, the ranks are shown, not stored.
+        ranking = [
+            {
+                "rank": vo.ranking,
+                "vendor_option_id": vo.id,
+                "vendor_name": vo.vendor_name,
+                "total_score": None if vo.total_score is None else round(vo.total_score, 1),
+            }
+            for vo in ranked
+        ]
+        commit_unless_read_only()
+        return jsonify({"success": True, "ranking": ranking, "total": len(ranking)})
     except Exception as e:
         logger.error(f"Error ranking vendors: {e}")
         return jsonify({"success": False, "error": str(e)}), 500

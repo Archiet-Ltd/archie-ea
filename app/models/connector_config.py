@@ -372,6 +372,27 @@ class ConnectorConfig(TenantMixin, db.Model):
             return self.webhook_config
         return _mask_sensitive(self.webhook_config, url_keys_fully_sensitive=True)
 
+    @classmethod
+    def live_connector_types(cls, organization_id):
+        """The connector types an organisation can actually use today.
+
+        A connector is live for an organisation when it has an active
+        ``ConnectorConfig`` row -- a real, configured connection, not merely
+        a permitted type. Returns the set of ``connector_type`` values whose
+        row is ``ConnectorStatus.ACTIVE`` for this organisation, so a screen
+        can name only what a customer has in front of them rather than a
+        hard-coded list. Returns an empty set when the organisation is
+        unknown or has nothing live.
+        """
+        if organization_id is None:
+            return set()
+        rows = db.session.execute(
+            db.select(cls.connector_type)
+            .where(cls.organization_id == organization_id)
+            .where(cls.status == ConnectorStatus.ACTIVE.value)
+        ).scalars()
+        return {connector_type for connector_type in rows if connector_type}
+
 
 class SyncLog(db.Model):
     """Synchronization log entries for :class:`ConnectorConfig`."""

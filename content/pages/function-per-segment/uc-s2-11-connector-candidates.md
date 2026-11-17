@@ -1,4 +1,5 @@
 ---
+wave: 4
 page_family: function-per-segment
 use_case_id: UC-S2-11
 segment_id: S2
@@ -24,8 +25,8 @@ stack. Typing them in again during setup is friction nobody needs.
 Reading your own public pages during onboarding to propose connector candidates automatically — each
 one shown with exactly the page and passage it came from, and nothing configured until you say so.
 
-Coming soon. Join the waiting list and we'll tell you the day it ships.
+Early access. Join the waiting list and we'll email you when you can use it.
 
 ## Related
 
-- [How do I stop typing every system into Entelim by hand?](/use-cases/import-from-jira-and-github)
+- [Connect GitHub and ask what breaks, without typing every system in](/use-cases/import-from-jira-and-github)

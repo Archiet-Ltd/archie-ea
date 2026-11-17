@@ -1,20 +1,20 @@
-{% extends 'layouts/public_base.html' %}{% from 'components/badge.html' import badge %}{% from 'components/public_faq.html' import faq_chevron %}{# smoke-coverage-ok: public landing page; visual layout verified by unit tests and Playwright screenshots under .task/ #}
-{% block full_title %}Entelim — The Company Brain for every enterprise{% endblock %}
+{% extends 'layouts/public_base.html' %}{% from 'components/badge.html' import badge %}{% from 'components/table.html' import table %}{% from 'components/button.html' import button %}{% from 'components/public_faq.html' import faq_chevron %}{# smoke-coverage-ok: public landing page; visual layout verified by unit tests and Playwright screenshots under .task/ #}
+{% block full_title %}Entelim — The company brain: a digital twin of your business{% endblock %}
 {% block meta_description %}
-<link rel="canonical" href="https://entelim.org/">
-<meta name="description" content="Entelim is the company brain: one living, explainable model of your enterprise that your people and your AI agents can both query and trust. Enterprise Intelligence Management, open source, self-host free under AGPL-3.0.">
-<meta property="og:title" content="Entelim — The Company Brain for every enterprise">
-<meta property="og:description" content="One living, explainable model of your enterprise, queryable by your people and your AI agents. Open source, self-host free, forever.">
+<link rel="canonical" href="{{ canonical_origin }}/">
+<meta name="description" content="Entelim is the company brain: a living digital twin of your business, with the enterprise intelligence answering what you ask it. Strategy, capabilities, applications, people, spend and risk in one model that keeps itself current, for founders, leadership teams and architects.">
+<meta property="og:title" content="Entelim — The company brain: a digital twin of your business">
+<meta property="og:description" content="Entelim is the company brain: a living digital twin of your business, with the enterprise intelligence answering what you ask it. Strategy, capabilities, applications, people, spend and risk in one model that keeps itself current, for founders, leadership teams and architects.">
 <meta property="og:type" content="website">
-<meta property="og:url" content="https://entelim.org/">
-<meta property="og:image" content="{{ url_for('static', filename='brand/entelim-share.png', _external=True) }}">
+<meta property="og:url" content="{{ canonical_origin }}/">
+<meta property="og:image" content="{{ canonical_origin }}{{ url_for('static', filename='brand/entelim-share.png') }}">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="Entelim — The Company Brain for every enterprise">
-<meta name="twitter:description" content="One living, explainable model of your enterprise, queryable by your people and your AI agents. Open source, self-host free, forever.">
-<meta name="twitter:image" content="{{ url_for('static', filename='brand/entelim-share.png', _external=True) }}">
-<script type="application/ld+json">{"@context": "https://schema.org", "@type": "Organization", "name": "Entelim", "url": "https://entelim.org/", "description": "Entelim is the company brain: Enterprise Intelligence Management, the open-source enterprise architecture and intelligence platform."}</script>
+<meta name="twitter:title" content="Entelim — The company brain: a digital twin of your business">
+<meta name="twitter:description" content="Entelim is the company brain: a living digital twin of your business, with the enterprise intelligence answering what you ask it. Strategy, capabilities, applications, people, spend and risk in one model that keeps itself current, for founders, leadership teams and architects.">
+<meta name="twitter:image" content="{{ canonical_origin }}{{ url_for('static', filename='brand/entelim-share.png') }}">
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "Organization", "name": "Entelim", "url": "{{ canonical_origin }}/", "description": "Entelim is the company brain: Enterprise Intelligence Management, the open-source enterprise architecture and intelligence platform."}</script>
 {% if config.GOOGLE_SITE_VERIFICATION %}
 <meta name="google-site-verification" content="{{ config.GOOGLE_SITE_VERIFICATION }}">
 {% endif %}
@@ -35,52 +35,44 @@
 <!-- Hero: category name first, product-in-search-terms second. One centred column, then the real
      product window (the applications portfolio) in a browser frame. The captures are 2x and shown 1:1
      (scripts/capture_proof_assets.py). -->
-<section class="home-hero" data-testid="home-hero">
-  <div class="mx-auto max-w-5xl px-4 text-center">
-    {% call badge(size='pill') %}
-      <span class="sm:hidden">Open source &middot; Self-host free</span>
-      <span class="hidden sm:inline">Open source under AGPL-3.0 &middot; Self-host free, forever</span>
-    {% endcall %}
-
+<section class="home-hero home-hero--fold" data-testid="home-hero">
+  <div class="home-hero__layout">
+  <div class="home-hero__copy mx-auto max-w-5xl px-4 text-center">
     <h1 class="home-display">
-      The company brain for every enterprise.
+      The company brain for your business.
     </h1>
 
     <p class="home-lead">
-      One living, explainable model of your enterprise: its strategy, systems, data, people, money, risk,
-      suppliers and AI, kept current and turned into cited answers &mdash; built so that when your AI agents
-      need to know how your company actually works, there is a governed source to ask, not a guess. Entelim is
-      an open-source enterprise architecture and intelligence platform built on ArchiMate 3.2. Import your
-      model and get a free, cited answer to what breaks if a system fails, in minutes.
+      A living digital twin of your business, with the company brain's enterprise intelligence answering what you ask it. Built for founders, leadership teams and architects. Start free.
     </p>
 
-    <div class="mt-9 flex flex-col gap-3 sm:flex-row sm:justify-center">
-      <a href="{{ url_for('account.register') }}" class="public-btn public-btn--lg public-btn--primary">Start free</a>
-      <a href="/pricing" class="public-btn public-btn--lg public-btn--outline">See pricing</a>
+    <div class="home-hero__actions mt-6 flex flex-col gap-3 sm:flex-row sm:justify-center">
+      {{ button(text='Start free', href=url_for('account.register'), size='lg', testid='home-hero-start') }}
+      {{ button(text='See pricing', href='/pricing', variant='outline', size='lg', testid='home-hero-pricing') }}
     </div>
   </div>
 
-  <div class="home-hero__stage mt-16">
+  <div class="home-hero__stage mt-6">
     <figure class="home-hero__figure" data-testid="home-hero-figure">
       <div class="home-frame">
         <div class="home-frame__bar" aria-hidden="true">
           <span class="home-frame__dot"></span><span class="home-frame__dot"></span><span class="home-frame__dot"></span>
-          <span class="home-frame__url">Applications</span>
+          <span class="home-frame__url">AI chat</span>
         </div>
-        {# The desktop capture is 1280 CSS px wide and is shown at that width; the phone-width capture
-           of the same screen is shown below 740px. #}
+        {# A real answer from the sample company in the AI chat, captured by scripts/capture_proof_assets.py --home-chat. #}
         <picture>
-          <source media="(max-width: 739px)" srcset="{{ url_for('static', filename='img/home/product-portfolio-mobile.webp') }}"
-                  width="358" height="640">
-          <img src="{{ url_for('static', filename='img/home/product-portfolio.webp') }}"
-               alt="The Entelim application portfolio for a demonstration company: every application with its owner, lifecycle status and the business capability it serves."
-               width="1280" height="800" decoding="async" fetchpriority="high" class="home-frame__img">
+          <source media="(max-width: 739px)" srcset="{{ url_for('static', filename='img/home/chat-answer-mobile.webp') }}"
+                  width="374" height="284">
+          <img src="{{ url_for('static', filename='img/home/chat-answer.webp') }}"
+               alt="The AI chat answering what breaks if the Payments service fails: how many connections are recorded, then the first one, Customer web app, with its owner, Sam, and the source it was imported from."
+               width="624" height="472" decoding="async" fetchpriority="high" class="home-frame__img" data-testid="home-hero-proof">
         </picture>
       </div>
       <figcaption class="public-card-body mt-3 text-center">
-        The application portfolio of the demonstration company, as Entelim shows it.
+        An example question, answered in the AI chat: what depends on one system, with the owner and the source behind each connection.
       </figcaption>
     </figure>
+  </div>
   </div>
 </section>
 
@@ -141,31 +133,40 @@
         Ask a question. Get an answer that shows its working.
       </h2>
       <p class="home-section-lead">
-        Pick any element in your model and ask: what breaks if it fails, which strategy it serves, which
-        programmes touch it, and which risks reach it. Every row shows its source and how it was derived, and you
-        can see the model as it stood on any past date.
+        Ask the AI chat what breaks if a system fails, what it costs and who owns it, which programmes serve a strategy,
+        which controls are missing and what to fund next. Every answer names the records behind it, and you can see the model as it
+        stood on any past date.
       </p>
     </div>
-    <div class="mt-12 grid gap-6 sm:grid-cols-2">
+    <div class="mt-12 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
       <div class="public-card" data-testid="home-proof-what-breaks">
         <h3 class="public-card-title">What breaks if this fails?</h3>
         <p class="public-card-body">Everything that depends on it, across every layer, cited back to the record it came from.</p>
+        <p class="public-card-body mt-3" data-testid="home-proof-what-breaks-who">Asked by founders, CTOs and technology architects.</p>
       </div>
-      <div class="public-card" data-testid="home-proof-strategy">
-        <h3 class="public-card-title">Which strategy does it serve?</h3>
-        <p class="public-card-body">The goals and value streams this element carries, traced back to the motivation model.</p>
+      <div class="public-card" data-testid="home-proof-cost">
+        <h3 class="public-card-title">What does this cost us, and who owns it?</h3>
+        <p class="public-card-body">The annual cost and the named owner, read from the same records as the systems they belong to.</p>
+        <p class="public-card-body mt-3" data-testid="home-proof-cost-who">Asked by finance.</p>
       </div>
       <div class="public-card" data-testid="home-proof-programmes">
-        <h3 class="public-card-title">Which programmes touch it?</h3>
-        <p class="public-card-body">Every gap, roadmap and work package that changes it, in the same model as the estate it changes.</p>
+        <h3 class="public-card-title">Which programmes serve this strategy?</h3>
+        <p class="public-card-body">Every gap, roadmap and work package that carries a goal, traced back to the strategy it serves.</p>
+        <p class="public-card-body mt-3" data-testid="home-proof-programmes-who">Asked by architects.</p>
       </div>
-      <div class="public-card" data-testid="home-proof-risk">
-        <h3 class="public-card-title">Which risks reach it?</h3>
-        <p class="public-card-body">Every recorded risk on the path to this element, not only the risk written directly on it.</p>
+      <div class="public-card" data-testid="home-proof-controls">
+        <h3 class="public-card-title">Which controls are not in place?</h3>
+        <p class="public-card-body">The frameworks and waivers on record, and the risks linked to each application, so where protection is thin shows.</p>
+        <p class="public-card-body mt-3" data-testid="home-proof-controls-who">Asked by risk and compliance.</p>
+      </div>
+      <div class="public-card" data-testid="home-proof-fund">
+        <h3 class="public-card-title">What should we fund next?</h3>
+        <p class="public-card-body">Gaps, costs and risks side by side, each tied to the strategy it serves, so the choice rests on records.</p>
+        <p class="public-card-body mt-3" data-testid="home-proof-fund-who">Asked by leadership.</p>
       </div>
     </div>
     <div class="mt-8">
-      <a href="{{ url_for('account.register') }}" class="public-btn public-btn--outline">Start free and ask your own model</a>
+      <a href="{{ url_for('account.register') }}" class="public-btn public-btn--outline">Start free and ask the AI chat</a>
     </div>
   </div>
 </section>
@@ -219,7 +220,8 @@
         <p class="public-card-body">What does it mean, what happens next, and what should we do?</p>
         <ul class="public-card-body mt-6 space-y-2">
           <li><a href="/features#enterprise-intelligence" class="public-link text-foreground">Enterprise Intelligence</a></li>
-          <li><a href="/features#simulation-and-scenario-planning" class="public-link text-foreground">Simulation and Scenario Planning</a></li>
+          {% set scenarios = registry_entry("Scenarios") %}
+          {% if scenarios %}<li><a href="{{ scenarios.href }}" class="public-link text-foreground">Scenarios{% if scenarios.coming_soon %} (coming soon){% endif %}</a></li>{% endif %}
           <li><a href="/features#agentic-automation" class="public-link text-foreground">Agentic Automation</a></li>
         </ul>
       </div>
@@ -235,7 +237,7 @@
     </div>
 
     <p class="public-card-body mt-10">
-      Every capability is in the product today or has a quarter on the published roadmap.
+      Capabilities that are not open to everyone yet are listed under <a href="/features#coming-soon" class="public-link">Coming soon</a> on the features page, each with a waiting list.
       <a href="/features" class="public-link">See all eighteen in full</a>.
     </p>
   </div>
@@ -258,12 +260,12 @@
       </p>
     </div>
     <ul class="home-emphasis-list mt-12 max-w-3xl">
-      <li><strong>Your administrator decides.</strong> Each assistant is approved for your organisation and access can be revoked at any time.</li>
+      <li><strong>You connect it yourself.</strong> Any member can connect their own AI assistant from their account, and an administrator can disconnect it at any time.</li>
       <li><strong>Read first, change only with approval.</strong> Assistants start with read access; a suggested change arrives in your approval queue, and nothing changes until a person approves it.</li>
       <li><strong>Every call on the record.</strong> Each request is logged with the assistant, the grant and the person it acted for.</li>
     </ul>
     <p class="home-note mt-8 max-w-3xl">
-      Read access for your AI assistants opens in Q1 2027. Today, Entelim's own assistant already works this way:
+      Connecting your own AI assistant is live on every plan. Entelim's own AI chat works the same way:
       every action passes one permission check and every change waits for approval.
     </p>
   </div>
@@ -273,30 +275,30 @@
 <section class="home-section">
   <div class="container px-4">
     <div class="max-w-3xl">
-      <p class="home-eyebrow">Roadmap</p>
+      <p class="home-eyebrow">Stages</p>
       <h2 class="home-h2">
         How the company brain grows.
       </h2>
     </div>
     <ol class="public-stepper mt-12">
       <li>
-        <p class="home-eyebrow">Today</p>
+        <p class="home-eyebrow">Stage 1</p>
         <p class="public-stepper__name">Modelled</p>
       </li>
       <li>
-        <p class="home-eyebrow">Q1 2027</p>
+        <p class="home-eyebrow">Stage 2</p>
         <p class="public-stepper__name">Synchronised</p>
       </li>
       <li>
-        <p class="home-eyebrow">Q2 2027</p>
+        <p class="home-eyebrow">Stage 3</p>
         <p class="public-stepper__name">Operational</p>
       </li>
       <li>
-        <p class="home-eyebrow">Q3 2027</p>
+        <p class="home-eyebrow">Stage 4</p>
         <p class="public-stepper__name">Predictive</p>
       </li>
       <li>
-        <p class="home-eyebrow">Q1 2028</p>
+        <p class="home-eyebrow">Stage 5</p>
         <p class="public-stepper__name">Self-maintaining</p>
       </li>
     </ol>
@@ -343,7 +345,7 @@
     </div>
 
     <div class="mt-6 overflow-x-auto rounded-2xl border border-border public-table-scroll" tabindex="0" role="region" aria-label="Pricing plans table, scrollable">
-      <table class="public-table">
+      {% call table(class='public-table') %}
         <thead>
           <tr>
             <th scope="col">Plan</th>
@@ -358,32 +360,32 @@
             <td>Community</td>
             <td><strong>Free</strong></td>
             <td>No trial clock.</td>
-            <td>For evaluation, one-person companies and self-hosters.</td>
-            <td>One organisation, three people. Every question, the Business Model Canvas, the twin map. File import. Community support.</td>
+            <td data-testid="home-plan-for-free">{{ plans.free.audience }}</td>
+            <td>One organisation, three people. Every question, the Business Model Canvas, the ArchiMate Composer. File import. Community support.</td>
           </tr>
           <tr>
             <td>Startup</td>
             <td><strong>$49</strong>/month</td>
             <td>$490/year.</td>
-            <td>For founders and small services firms, 5 to 50 people.</td>
-            <td>Ten people and email support, everything in Community included.</td>
+            <td data-testid="home-plan-for-startup">{{ plans.startup.audience }}</td>
+            <td data-testid="home-plan-includes-startup">{{ plans.startup.features|join('. ') }}.</td>
           </tr>
           <tr>
             <td>Team</td>
             <td><strong>$29</strong>/editor/month</td>
             <td>$290/editor/year. Askers free.</td>
-            <td>For scale-ups and services companies, 50 to 500 people.</td>
-            <td>Single sign-on, the review-board workflow, and your own model key.</td>
+            <td data-testid="home-plan-for-team">{{ plans.team.audience }}</td>
+            <td data-testid="home-plan-includes-team">{{ plans.team.features|join('. ') }}.</td>
           </tr>
           <tr>
             <td>Enterprise</td>
             <td><strong>From $24,000</strong>/year</td>
             <td>Annual contract.</td>
-            <td>For enterprise architecture teams.</td>
+            <td data-testid="home-plan-for-enterprise">{{ plans.enterprise.audience }}</td>
             <td>Unlimited editors, SAML, audit export, own key by default, supported self-hosting, named contact.</td>
           </tr>
         </tbody>
-      </table>
+      {% endcall %}
     </div>
 
     <div class="mt-6 grid gap-6 sm:grid-cols-2">
@@ -419,7 +421,7 @@
         <p class="public-card-body mb-6">
           A startup has a strategy, a handful of systems it cannot live without, suppliers it pays every month and
           risks nobody has written down. Entelim puts all of it in one place on a free plan for up to three people, or
-          on the Startup plan for a team of ten at $49 a month.
+          on the Startup plan for a team of {{ plans.startup.people_words }} at $49 a month.
         </p>
         <a href="/use-cases" class="public-btn public-btn--outline">See it for startups and growing businesses</a>
       </div>
@@ -429,7 +431,7 @@
           Licensed under AGPL-3.0.
         </h2>
         <p class="public-card-body mb-6">
-          Every question, the Business Model Canvas and the twin map run on software licensed under AGPL-3.0. Run it
+          Every question, the Business Model Canvas and the ArchiMate Composer run on software licensed under AGPL-3.0. Run it
           on your own servers at any size, free, for as long as you like. Pay us when you want us to run it for you,
           support it under contract, or connect it to your systems.
         </p>
@@ -484,11 +486,11 @@
         </details>
         <details>
           <summary>What works today?{{ faq_chevron() }}</summary>
-          <p>Import an existing architecture model and get a cited answer to what breaks if a system fails, in minutes. <a href="/features" class="public-link">See all eighteen capabilities</a> for what each one delivers today.</p>
+          <p>Connect GitHub or Jira when you sign up, or import an existing architecture model, then ask the AI chat what breaks if a system fails and get a cited answer. <a href="/features" class="public-link">See all eighteen capabilities</a> for what each one delivers today.</p>
         </details>
         <details>
           <summary>Can my AI assistant use it?{{ faq_chevron() }}</summary>
-          <p>Read access for your own AI assistants, through the open Model Context Protocol, opens in Q1 2027. Today, Entelim's own assistant already works through the same permission and approval model.</p>
+          <p>Yes. Connect your own AI assistant from your account, on every plan, through the open Model Context Protocol. It reads your model and cites the records; any change it suggests waits in your approval queue.</p>
         </details>
       </div>
     </div>
@@ -496,19 +498,12 @@
 </section>
 
 <!-- 11. Closing call to action -->
-<section class="home-closing">
-  <div class="container px-4">
-    <p class="home-cta-eyebrow">Start today</p>
-    <h2 class="home-h2 mx-auto max-w-3xl">Import your model. Get a cited answer in minutes.</h2>
-    <p class="home-section-lead">Free for up to three people, with no trial clock. Self-host it free under AGPL-3.0, at any size.</p>
-    <div class="mt-9 flex flex-col gap-3 sm:flex-row sm:justify-center">
-      <a href="{{ url_for('account.register') }}" class="public-btn public-btn--lg public-btn--primary">Start free</a>
-      <a href="/contact" class="public-btn public-btn--lg public-btn--outline">Get in touch</a>
-    </div>
-  </div>
-</section>
+{% with closing_primary = ('Start free', url_for('account.register'), none), closing_secondary = ('Get in touch', '/contact', none) %}
+{% include 'public/_partials/_section_closing.html' %}
+{% endwith %}
 
 <!-- Footer -->
 {% include 'components/public_footer.html' %}
 
 {% endblock %}
+{# design-block: public #}

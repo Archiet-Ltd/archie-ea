@@ -25,8 +25,38 @@ let ComposerRenderer = (function() {
     };
     let DEFAULT_LAYER = { fill: '#f8fafc', stroke: '#1a1a1a', text: '#1a1a1a', port: '#64748b', badge: '#e2e8f0', accent: '#94a3b8' };
 
+    /* Notation mode (opt-in, the composer turns it on): layer colours are read from the
+       --notation-* tokens in the token file, so light and dark both follow the theme and
+       no colour is written here. Off, every caller keeps the literals above. */
+    let NOTATION_ON = false;
+    let NOTATION_SPRITE = '/static/img/archimate-notation.svg';
+
+    function notationToken(name, alpha) {
+        let raw = '';
+        try { raw = getComputedStyle(document.documentElement).getPropertyValue(name).trim(); } catch (e) { raw = ''; }
+        if (!raw) return null;
+        return 'hsl(' + raw + (alpha != null ? ' / ' + alpha : '') + ')';
+    }
+
+    function notationLayer(layer) {
+        let key = layer || 'other';
+        if (!notationToken('--notation-' + key)) key = 'other';
+        return {
+            get fill() { return notationToken('--notation-' + key) || 'none'; },
+            get stroke() { return notationToken('--notation-' + key + '-stroke') || 'currentColor'; },
+            get text() { return notationToken('--foreground') || 'currentColor'; },
+            get port() { return notationToken('--notation-' + key + '-stroke') || 'currentColor'; },
+            get badge() { return notationToken('--notation-' + key + '-stroke', 0.3) || 'none'; },
+            get accent() { return notationToken('--notation-' + key + '-stroke') || 'currentColor'; },
+        };
+    }
+
+    function useNotation(on) { NOTATION_ON = on !== false; }
+
     function layerColor(layer) {
-        return LAYER_COLORS[(layer || '').toLowerCase()] || DEFAULT_LAYER;
+        let key = (layer || '').toLowerCase();
+        if (NOTATION_ON) return notationLayer(key);
+        return LAYER_COLORS[key] || DEFAULT_LAYER;
     }
 
     /* ── Element type palette ─────────────────────────────── */
@@ -302,7 +332,7 @@ let ComposerRenderer = (function() {
             accentBar:          { x: 0, y: 0, refWidth: '100%', height: 5, rx: 0, ry: 0, fill: '#94a3b8' },
             iconBox:            { x: 12, y: 12, width: 40, height: 40, rx: 8, ry: 8, fill: 'rgba(255,255,255,0.65)', stroke: 'rgba(0,0,0,0.04)', strokeWidth: 1 },
             typeIcon:           { transform: 'translate(22, 22) scale(1.2)', fill: 'none', stroke: '#1a1a1a', strokeWidth: 1.1, strokeLinecap: 'round', strokeLinejoin: 'round', d: '' },
-            nameLabel:          { x: 12, y: 60, textAnchor: 'start', textVerticalAnchor: 'top', fontSize: 12, fontWeight: 700, fontFamily: 'Public Sans, Inter, system-ui, sans-serif', fill: '#1a1a1a', text: 'Element', textWrap: { width: -24, maxLineCount: 2, ellipsis: true } },
+            nameLabel:          { x: 12, y: 60, textAnchor: 'start', textVerticalAnchor: 'top', fontSize: 12, fontWeight: 700, fontFamily: 'Public Sans, Inter, system-ui, sans-serif', fill: '#1a1a1a', text: 'Element', textWrap: { width: -24, maxLineCount: 1, ellipsis: true } },
             typeLabel:          { x: 12, y: 79, textAnchor: 'start', textVerticalAnchor: 'top', fontSize: 9,  fontWeight: 500, fontFamily: 'Public Sans, Inter, system-ui, sans-serif', fill: 'rgba(26,26,26,0.45)', text: '', textWrap: { width: -24, maxLineCount: 1, ellipsis: true } },
             maturityBadgeBg:    { refX: '100%', x: -50, y: 10, width: 36, height: 18, rx: 9, ry: 9, fill: 'rgba(0,0,0,0.75)', display: 'none' },
             maturityBadgeLabel: { refX: '100%', x: -32, y: 19, textAnchor: 'middle', textVerticalAnchor: 'middle', fontSize: 8, fontWeight: 800, fontFamily: 'Public Sans, Inter, system-ui, sans-serif', fill: '#ffffff', text: '', display: 'none' },
@@ -817,6 +847,23 @@ let ComposerRenderer = (function() {
         return zone;
     }
 
+    /* Notation mode: the type symbol sits in the top-right corner, as the standard draws
+       it, taken from the one sprite; the card's own left-hand icon box is hidden. */
+    function withNotationIcon(markup) {
+        return (markup || []).concat([{ tagName: 'use', selector: 'notationIcon' }]);
+    }
+
+    function applyNotationIcon(node, elType, c) {
+        if (!NOTATION_ON || !elType) return;
+        node.attr('notationIcon', {
+            href: NOTATION_SPRITE + '#am-' + elType,
+            refX: '100%', x: -28, y: 6, width: 20, height: 14,
+            color: c.stroke,
+        });
+        node.attr('typeIcon/display', 'none');
+        node.attr('iconBox/display', 'none');
+    }
+
     /* ── Create a styled ArchiMate node ────────────────────────
      *  Selects the correct JointJS shape class based on SHAPE_CATEGORY
      *  so each element type renders with its proper ArchiMate 3.2 geometry.
@@ -848,12 +895,12 @@ let ComposerRenderer = (function() {
            iconBox drops its background/border so the icon reads as part of the
            notation rather than a UI chrome affordance. */
         let shapeAttrs = {
-            body:      { fill: c.fill, stroke: 'rgba(17,24,39,0.55)' },
+            body:      { fill: c.fill, stroke: NOTATION_ON ? c.stroke : 'rgba(17,24,39,0.55)', strokeWidth: NOTATION_ON ? 1 : undefined },
             accentBar: { fill: c.fill, opacity: 0 },
             iconBox:   { fill: 'none', stroke: 'none' },
             typeIcon:  iconPath ? { d: iconPath, stroke: c.text, strokeWidth: 1.1 } : { d: '' },
             nameLabel: { text: name || '(unnamed)', fill: c.text },
-            typeLabel: { text: typeName },
+            typeLabel: NOTATION_ON ? { text: typeName, fill: c.text } : { text: typeName },
         };
 
         /* ImplementationNode: tint underlay with layer accent */
@@ -861,20 +908,26 @@ let ComposerRenderer = (function() {
             shapeAttrs.underlay = { fill: c.accent || c.fill, opacity: 0.22 };
         }
 
-        let node = new ShapeClass({
+        let nodeOptions = {
             position: { x: x, y: y },
             size: { width: 200, height: 130 },
             attrs: shapeAttrs,
-        });
+        };
+        if (NOTATION_ON) nodeOptions.markup = withNotationIcon(ShapeClass.prototype.markup);
+        let node = new ShapeClass(nodeOptions);
+        applyNotationIcon(node, elType, c);
 
         /* UX-CMP-001: Override port colors with layer accent.
          * Ports are pre-declared in CARD_PORTS.items; here we just restyle them. */
         const _ac = c.accent || '#1a1a1a';
-        node.getPorts().forEach(function(p, i) {
+        /* One write for all ports: a write per port per node fires a change
+         * event each time, which is most of the cost of opening a large model. */
+        node.prop('ports/items', node.getPorts().map(function(p, i) {
             let fill = (p.group === 'right' && i % 3 === 0) ? _ac : '#fff';
-            node.portProp(p.id, 'attrs/circle/fill', fill);
-            node.portProp(p.id, 'attrs/circle/stroke', _ac);
-        });
+            let attrs = Object.assign({}, p.attrs);
+            attrs.circle = Object.assign({}, attrs.circle, { fill: fill, stroke: _ac });
+            return Object.assign({}, p, { attrs: attrs });
+        }));
 
         node.set('elementId', elementId);
         node.set('elType', elType);
@@ -1049,7 +1102,7 @@ let ComposerRenderer = (function() {
         let iconPath = typeIconPath(elType);
         let typeName = (elType || '').replace(/([A-Z])/g, ' $1').trim();
 
-        let container = new joint.shapes.archimate.Container({
+        let container = new joint.shapes.archimate.Container(Object.assign({
             position: { x: x, y: y },
             size: { width: w || 320, height: h || 220 },
             attrs: {
@@ -1057,11 +1110,11 @@ let ComposerRenderer = (function() {
                 accentBar: { fill: c.accent || c.stroke },
                 iconBox:   { fill: 'rgba(255,255,255,0.65)' },
                 nameLabel: { text: name || '(unnamed)', fill: c.text },
-                typeLabel: { text: typeName },
+                typeLabel: NOTATION_ON ? { text: typeName, fill: c.text } : { text: typeName },
                 typeIcon:  iconPath ? { d: iconPath, stroke: c.text } : { d: '' },
                 resizeHandle: { stroke: c.accent || c.stroke },
             },
-        });
+        }, NOTATION_ON ? { markup: withNotationIcon(joint.shapes.archimate.Container.prototype.markup) } : {}));
 
         /* UX-CMP-001: Override port colors for containers.
          * Ports pre-declared in CARD_PORTS.items; restyle with layer accent. */
@@ -1072,6 +1125,7 @@ let ComposerRenderer = (function() {
             container.portProp(p.id, 'attrs/circle/stroke', _cs);
         });
 
+        applyNotationIcon(container, elType, c);
         container.set('elementId', elementId);
         container.set('elType', elType);
         container.set('elLayer', layer);
@@ -1244,6 +1298,41 @@ let ComposerRenderer = (function() {
             }
         }
 
+    /* Slide each connection label along its own line until no two labels on the
+     * screen overlap. Connections that share a stretch of route (a fan of lines
+     * leaving one element) all put their word at the middle of the line, so the
+     * words land in one row; this moves a word to the nearest clear point on its
+     * own line and leaves it at the middle when the middle is already clear.
+     * Measured on the rendered labels, so call it once the drawing is on screen. */
+    function separateLabels(paper, graph) {
+        let placed = [];
+        let tries = [0.5, 0.42, 0.58, 0.34, 0.66, 0.26, 0.74, 0.18, 0.82, 0.12, 0.88];
+        let hits = function(a, b) {
+            return a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top;
+        };
+        graph.getLinks().forEach(function(link) {
+            let view = paper.findViewByModel(link);
+            let count = link.labels().length;
+            if (!view || !count) return;
+            /* A label's move is a CSS transition by default, and a box measured mid-transition is where the
+               label was, not where it is now, so every try read the same stale place and nothing was ever
+               spread. Moves must be immediate while measuring. */
+            view.el.querySelectorAll('.labels > .label').forEach(function(node) { node.style.transition = 'none'; });
+            for (let i = 0; i < count; i++) {
+                let box = null;
+                for (let k = 0; k < tries.length; k++) {
+                    link.prop('labels/' + i + '/position/distance', tries[k]);
+                    let node = view.el.querySelectorAll('.labels > .label')[i];
+                    if (!node) break;
+                    let r = node.getBoundingClientRect();
+                    box = { left: r.left - 2, right: r.right + 2, top: r.top - 2, bottom: r.bottom + 2 };
+                    if (!placed.some(function(o) { return hits(box, o); })) break;
+                }
+                if (box) placed.push(box);
+            }
+        });
+    }
+
     /* ── Plain connection style (opt-in: create(el, {connectionStyle:'plain'})) ──
      *  Pure geometry for routing one connection around the nodes of a drawing.
      *  Rectangles are {id, x, y, w, h} in drawing pixels. Band zones are never
@@ -1252,7 +1341,7 @@ let ComposerRenderer = (function() {
      *  is wider than the 16px floor), a 36px band header (arcs sit below the band
      *  label), a worked-out partner offset 13px, routes kept 4px off nodes and 6px
      *  inside the drawing. */
-    let PLAIN_COL_GAP = 24, PLAIN_ROW_GAP = 16, PLAIN_HEADER = 36;
+    let PLAIN_COL_GAP = 24, PLAIN_BAND_ROW_GAP = 40, PLAIN_LANES = 6, PLAIN_HEADER = 36;
     let PLAIN_PAIR_OFFSET = 13, PLAIN_CLEARANCE = 4, PLAIN_EDGE = 6, PLAIN_MIN_CORRIDOR = 8, PLAIN_CORNER = 12, PLAIN_STEP = 12;
 
     function plainSegmentHitsRect(a, b, r, m) {
@@ -1312,6 +1401,71 @@ let ComposerRenderer = (function() {
         return lower.top - upper.bottom <= 24 ? (upper.bottom + lower.top) / 2 : lower.top - 8;
     }
 
+    /* The stretch of a channel a line may use. Between two bands the next band's label sits at the top of
+       its header, so the lines keep above it: the window runs from just under the row above to just over
+       the highest label in the gap. Where no label sits in the gap the window is the whole gap. */
+    function plainWindow(rows, channel, labels) {
+        let top = rows[channel].bottom + 2, bottom = rows[channel + 1].top - 4;
+        (labels || []).forEach(function(l) {
+            if (l.y >= rows[channel].bottom && l.y < rows[channel + 1].top) bottom = Math.min(bottom, l.y - 3);
+        });
+        if (bottom - top < 4) { top = rows[channel].bottom; bottom = rows[channel + 1].top - 4; }
+        return { mid: (top + bottom) / 2, room: Math.max(0, bottom - top) };
+    }
+
+    /* A line that passes a row on its way between two channels runs through a gap in that row, and through the
+       header above it. The gaps a label would be in the way of are moved clear of it, or left out. */
+    function plainGapsClearOfLabels(gaps, labels, row) {
+        let near = (labels || []).filter(function(l) { return l.y < row.top && row.top - l.y <= PLAIN_HEADER + 4; });
+        if (!near.length) return gaps;
+        let clear = [];
+        gaps.forEach(function(g) {
+            let x = g.x;
+            near.forEach(function(l) {
+                if (x === null || x < l.x - 4 || x > l.x + l.w + 4) return;
+                if (l.x + l.w + 6 <= g.hi - 2) x = l.x + l.w + 6;
+                else if (l.x - 6 >= g.lo + 2) x = l.x - 6;
+                else x = null;
+            });
+            if (x !== null) clear.push({ x: x, lo: g.lo, hi: g.hi });
+        });
+        return clear.length ? clear : gaps;
+    }
+
+    /* Each connection that runs along a channel between two rows takes its own lane beside the channel's
+       centre line, so lines that share a channel can be told apart. A lane is kept for the life of the
+       slot, so planning a connection again does not move it. */
+    function plainLane(slot, channel, win) {
+        if (!slot.lanes) return 0;
+        slot.laneOf = slot.laneOf || {};
+        if (slot.laneOf[channel] === undefined) {
+            slot.lanes[channel] = slot.lanes[channel] || 0;
+            slot.laneOf[channel] = slot.lanes[channel]++;
+        }
+        let spacing = Math.min(6, win.room / PLAIN_LANES);
+        return ((slot.laneOf[channel] % PLAIN_LANES) - (PLAIN_LANES - 1) / 2) * spacing;
+    }
+
+    /* Where a band's label is drawn, as a box, so no line is routed through it. The label is top-left in the
+       band's header; its width is estimated from its text. */
+    function plainLabelBox(zone) {
+        let b = zone.getBBox();
+        let text = String(zone.attr('label/text') || '');
+        return { x: b.x + 16, y: b.y + 8, w: Math.ceil(text.length * 9) + 8, h: 14 };
+    }
+
+    /* An anchor on the top edge of a node sits where a line comes down through the node's own header. If that
+       is where the band's label is, the anchor moves along the edge to clear it. */
+    function plainClearOfLabels(x, node, labels) {
+        let lo = node.x + 8, hi = node.x + node.w - 8;
+        let label = (labels || []).filter(function(l) { return l.y + l.h <= node.y && node.y - l.y <= PLAIN_HEADER + 4; })[0];
+        if (!label || x < label.x - 4 || x > label.x + label.w + 4) return x;
+        let right = label.x + label.w + 6, left = label.x - 6;
+        if (right <= hi) return right;
+        if (left >= lo) return left;
+        return x;
+    }
+
     /* The smooth connector curves through its vertices with a spline that treats them
        as evenly spaced, so a handful of far-apart corners makes it swing wide. The
        engine therefore hands it a route that is already rounded: the corners of the
@@ -1351,7 +1505,7 @@ let ComposerRenderer = (function() {
        the same two nodes (each later one sits PLAIN_PAIR_OFFSET further along),
        corridor is how many earlier ones already took a route round the nodes, so a
        later one takes the next-nearest gap. Returns anchors, vertices and the polyline. */
-    function planPlainRoute(S, T, rows, width, height, slot, arcMax) {
+    function planPlainRoute(S, T, rows, width, height, slot, arcMax, labels) {
         let tOff = slot.tOff || 0;
         let sc = { x: S.x + S.w / 2, y: S.y + S.h / 2 }, tc = { x: T.x + T.w / 2, y: T.y + T.h / 2 };
         let off = slot.index * PLAIN_PAIR_OFFSET;
@@ -1363,7 +1517,7 @@ let ComposerRenderer = (function() {
             return -1;
         };
         let iS = rowOf(S), iT = rowOf(T);
-        let A, B, line = null, vertices = [], srcSide, tgtSide, corridor = false;
+        let A, B, line = null, vertices = [], srcSide, tgtSide, corridor = false, sShift = 0, tShift = 0;
         if (S === T || iS === iT) {
             /* Same row: both ends on the top edge, an arc over the row between them. */
             let sx = sc.x + (S === T ? -12 : off), tx = tc.x + (S === T ? 12 : off + tOff);
@@ -1371,6 +1525,7 @@ let ComposerRenderer = (function() {
             srcSide = tgtSide = 'top';
             let span = Math.abs(tx - sx);
             let h = Math.min(arcMax, 5 + 2 * Math.round(span / 100)) + 4 * slot.index;
+            if (labels && labels.length) h = Math.min(h, 12);  /* an arc stays below the band's label */
             let top = Math.min(S.y, T.y);
             line = [A, clampV({ x: sx, y: top - h }), clampV({ x: tx, y: top - h }), B];
         } else {
@@ -1378,21 +1533,30 @@ let ComposerRenderer = (function() {
             srcSide = down ? 'bottom' : 'top'; tgtSide = down ? 'top' : 'bottom';
             A = { x: sc.x + off, y: down ? S.y + S.h : S.y };
             B = { x: tc.x + off + tOff, y: down ? T.y : T.y + T.h };
+            /* a line leaving or arriving through a node's top edge passes the band's label above it */
+            if (!down) { sShift = plainClearOfLabels(A.x, S, labels) - A.x; A.x += sShift; }
+            if (down) { tShift = plainClearOfLabels(B.x, T, labels) - B.x; B.x += tShift; }
             let others = [];
             rows.forEach(function(row) { row.rects.forEach(function(r) { if (r !== S && r !== T) others.push(r); }); });
             /* A straight line is kept only when it is steep enough not to graze the
                band edges it crosses and clear of every other node. */
             let steep = Math.abs(B.y - A.y) >= 0.45 * Math.abs(B.x - A.x);
-            let blocked = !steep || others.some(function(r) { return plainSegmentHitsRect(A, B, r, PLAIN_CLEARANCE + 2); });
+            let blocked = !steep || others.some(function(r) { return plainSegmentHitsRect(A, B, r, PLAIN_CLEARANCE + 2); })
+                || (labels || []).some(function(l) { return plainSegmentHitsRect(A, B, { x: l.x, y: l.y, w: l.w, h: l.h }, 2); });
             if (blocked) {
                 corridor = true;
                 let midX = (A.x + B.x) / 2;
                 let pts = [A];
-                let chan = function(j) { return plainChannel(rows, step > 0 ? iS + j : iS - j - 1); };
+                let chan = function(j) {
+                    let c = step > 0 ? iS + j : iS - j - 1;
+                    if (!slot.lanes) return plainChannel(rows, c);
+                    let win = plainWindow(rows, c, labels);
+                    return win.mid + plainLane(slot, c, win);
+                };
                 pts.push({ x: A.x, y: chan(0) });
                 let m = Math.abs(iT - iS) - 1;
                 for (let j = 1; j <= m; j++) {
-                    let gaps = plainRowGaps(rows[iS + step * j].rects, midX, width);
+                    let gaps = plainGapsClearOfLabels(plainRowGaps(rows[iS + step * j].rects, midX, width), labels, rows[iS + step * j]);
                     /* the next-nearest gap; when the row has no more, the same gap, shifted
                        along inside it so the two connections do not share a line */
                     let gx = midX;
@@ -1424,7 +1588,7 @@ let ComposerRenderer = (function() {
             }
         }
         if (line && line.length > 2) vertices = plainSmoothVertices(line, PLAIN_CORNER, PLAIN_STEP);
-        return { A: A, B: B, line: line || [A, B], srcSide: srcSide, tgtSide: tgtSide, off: off, tOff: tOff, vertices: vertices, corridor: corridor };
+        return { A: A, B: B, line: line || [A, B], srcSide: srcSide, tgtSide: tgtSide, off: off, tOff: tOff, sShift: sShift, tShift: tShift, vertices: vertices, corridor: corridor };
     }
 
     /* ── Public factory: create a renderer bound to a container element ── */
@@ -1546,6 +1710,23 @@ let ComposerRenderer = (function() {
             return graph.getElements().filter(function(c) { return c.get('elementId') != null && !c.get('isLayerZone'); });
         }
 
+        /* The paper and every cell take their colours from the page's tokens when drawn, so a change of theme
+           has to draw them again: otherwise a dark page keeps the light paper and light bands. */
+        function paintTheme() {
+            let ground = tokenColour('--background');
+            if (ground) paper.drawBackground({ color: ground });
+            graph.getCells().forEach(function(c) {
+                if (c.get('isLayerZone')) {
+                    if (plain) plainZoneChrome(c); else applyTokens(c, c.get('zoneLayer'), true);
+                } else if (c.isElement() && c.get('elementId') != null) {
+                    if (plain) plainNodeChrome(c); else applyTokens(c, c.get('elLayer'), false);
+                } else if (c.isLink() && plain) {
+                    paintPlainLink(c, false);
+                }
+            });
+            if (plain) paintSelection();
+        }
+
         function paintSelection() {
             nodeCells().forEach(function(c) {
                 let id = c.get('elementId');
@@ -1635,7 +1816,7 @@ let ComposerRenderer = (function() {
             zone.attr('body/rx', 6);
             zone.attr('body/ry', 6);
             zone.attr('label/fill', ink.text);
-            zone.attr('label/fontSize', 10);
+            zone.attr('label/fontSize', opts.zoneLabelSize || 10);
             zone.attr('label/fontWeight', 600);
             zone.attr('label/letterSpacing', '0.08em');
             zone.attr('label/style', { textTransform: 'uppercase' });
@@ -1735,6 +1916,7 @@ let ComposerRenderer = (function() {
                 let b = z.getBBox();
                 return { x: b.x, y: b.y, w: b.width, h: PLAIN_HEADER };
             });
+            let labels = banded ? graph.getElements().filter(function(c) { return c.get('isLayerZone'); }).map(plainLabelBox) : [];
             let byId = {};
             rects.forEach(function(r) { byId[r.id] = r; });
             let groups = {};
@@ -1748,6 +1930,7 @@ let ComposerRenderer = (function() {
                node are then spread (recorded first, each later one 13px further along) and
                planned again, so no two arrivals share a stretch of line. */
             let items = [];
+            let lanes = {};
             Object.keys(groups).forEach(function(g) {
                 let list = groups[g].slice().sort(function(a, b) {
                     let ra = a.get('provenance') === 'derived' ? 1 : 0, rb = b.get('provenance') === 'derived' ? 1 : 0;
@@ -1756,8 +1939,8 @@ let ComposerRenderer = (function() {
                 let corridors = 0;
                 list.forEach(function(link, index) {
                     let sId = link.source().id, tId = link.target().id;
-                    let slot = { index: index, corridor: corridors, tOff: 0 };
-                    let plan = planPlainRoute(byId[sId], byId[tId], rows, size.width, size.height, slot, banded ? 8 : 24);
+                    let slot = { index: index, corridor: corridors, tOff: 0, lanes: banded ? lanes : null };
+                    let plan = planPlainRoute(byId[sId], byId[tId], rows, size.width, size.height, slot, banded ? 8 : 24, labels);
                     if (plan.corridor) corridors++;
                     items.push({ link: link, sId: sId, tId: tId, slot: slot, plan: plan });
                 });
@@ -1774,15 +1957,15 @@ let ComposerRenderer = (function() {
                 let want = n * PLAIN_PAIR_OFFSET - it.plan.off;
                 if (want > 0) {
                     it.slot.tOff = want;
-                    it.plan = planPlainRoute(byId[it.sId], byId[it.tId], rows, size.width, size.height, it.slot, banded ? 8 : 24);
+                    it.plan = planPlainRoute(byId[it.sId], byId[it.tId], rows, size.width, size.height, it.slot, banded ? 8 : 24, labels);
                 }
             });
             items.forEach(function(it) {
                 let plan = it.plan, link = it.link;
                 /* Measure from the node's own body when it has one, so a resize handle or port
                    sticking out of the box does not hold the connection off the visible border. */
-                let src = { id: it.sId, anchor: { name: plan.srcSide, args: { dx: plan.off } }, connectionPoint: { name: 'boundary' } };
-                let tgt = { id: it.tId, anchor: { name: plan.tgtSide, args: { dx: plan.off + plan.tOff } }, connectionPoint: { name: 'boundary' } };
+                let src = { id: it.sId, anchor: { name: plan.srcSide, args: { dx: plan.off + plan.sShift } }, connectionPoint: { name: 'boundary' } };
+                let tgt = { id: it.tId, anchor: { name: plan.tgtSide, args: { dx: plan.off + plan.tOff + plan.tShift } }, connectionPoint: { name: 'boundary' } };
                 if (it.sId === it.tId) { src.anchor.args.dx = -12; tgt.anchor.args.dx = 12; }
                 if (graph.getCell(it.sId).attr('body')) src.selector = 'body';
                 if (graph.getCell(it.tId).attr('body')) tgt.selector = 'body';
@@ -1802,7 +1985,7 @@ let ComposerRenderer = (function() {
             if (plain || centreRows) {
                 layoutOpts = {};
                 if (centreRows) layoutOpts.rowAlign = 'centre';
-                if (plain) { layoutOpts.colGap = PLAIN_COL_GAP; layoutOpts.rowGap = PLAIN_ROW_GAP; layoutOpts.header = PLAIN_HEADER; }
+                if (plain) { layoutOpts.colGap = PLAIN_COL_GAP; layoutOpts.rowGap = PLAIN_BAND_ROW_GAP; layoutOpts.header = PLAIN_HEADER; }
             }
             let plan = computeBandLayout(elements, opts.bands, width, compact, layoutOpts);
             /* Reuse a zone that is already drawn; only touch what moved or resized. */
@@ -1930,6 +2113,16 @@ let ComposerRenderer = (function() {
             resizeFrame = requestAnimationFrame(function() { resizeFrame = 0; relayout(); });
         }
 
+        let themeObserver = null;
+        if (!opts.background && (useTokens || plain)) {
+            let ground = tokenColour('--background');
+            if (ground) paper.drawBackground({ color: ground });
+            if (typeof MutationObserver !== 'undefined') {
+                themeObserver = new MutationObserver(paintTheme);
+                themeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+            }
+        }
+
         if (banded && typeof ResizeObserver !== 'undefined') {
             resizeObserver = new ResizeObserver(scheduleRelayout);
             resizeObserver.observe(containerEl);
@@ -2042,6 +2235,7 @@ let ComposerRenderer = (function() {
 
             destroy: function() {
                 if (resizeObserver) { resizeObserver.disconnect(); resizeObserver = null; }
+                if (themeObserver) { themeObserver.disconnect(); themeObserver = null; }
                 if (resizeFrame) { cancelAnimationFrame(resizeFrame); resizeFrame = 0; }
                 graph.clear();
                 paper.remove();
@@ -2069,9 +2263,11 @@ let ComposerRenderer = (function() {
         createNode: createNode,
         createLink: createLink,
         decorateEdge: decorateEdge,
+        separateLabels: separateLabels,
         createContainerNode: createContainerNode,
         applyImportedElementPresentation: applyImportedElementPresentation,
         createSpecialNode: createSpecialNode,
+        useNotation: useNotation,
         defineArchiMateShape: defineArchiMateShape,
         createAnnotation: createAnnotation,
         createLayerZone: createLayerZone,

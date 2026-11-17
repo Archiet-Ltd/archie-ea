@@ -567,10 +567,31 @@ def architecture_journey_workspace(journey_id):
         JOURNEY_LINK_RELATIONS,
     )
 
+    # The linked solution opens in the guided journey for the person who owns
+    # it, and read-only on its own page for anyone else who may read it.
+    solution_link = None
+    if journey.solution_id:
+        from app.modules.solutions_strategic.v2.routes.solution_design_routes import (
+            _check_solution_access,
+        )
+
+        linked = Solution.query.filter_by(id=journey.solution_id).first()
+        if linked is not None and _check_solution_access(linked):
+            from app.middleware.tenant_decorators import is_platform_admin
+            from app.services.rbac_service import rbac_service
+
+            if linked.created_by_id == current_user.id or is_platform_admin(
+                current_user
+            ) or rbac_service.is_org_admin(current_user, linked.organization_id):
+                solution_link = url_for("architecture_journey.journey_page", solution_id=linked.id)
+            else:
+                solution_link = url_for("solution_design.view_solution", solution_id=linked.id)
+
     return render_template(
         "architecture_assistant/architecture_journey_workspace.html",
         journey=journey,
         home=home,
+        solution_link=solution_link,
         link_entity_types=JOURNEY_LINK_ENTITY_TYPES,
         link_relations=JOURNEY_LINK_RELATIONS,
         intent_options=JOURNEY_INTENT_OPTIONS,
@@ -1211,7 +1232,11 @@ def extract_brief(solution_id):
     The browser gets the brief text in < 1 s; proposals appear on the Blueprint
     page by the time the user reaches Step 4.
     """
+    from app.core.auth.permissions import is_read_only_member
     from flask import current_app
+
+    if is_read_only_member(current_user):
+        return api_error("Your role can read but not change this organisation's records.", 403)
 
     files = request.files.getlist("file")
     if not files or not any(f.filename for f in files):
@@ -3092,6 +3117,10 @@ def generate_architecture(solution_id):
     The LLM call can take 3-8 minutes. Poll GET /generate-architecture/status for progress.
     If a job is already running, returns its current status without starting a new one.
     """
+    from app.core.auth.permissions import is_read_only_member
+    if is_read_only_member(current_user):
+        return api_error("Your role can read but not change this organisation's records.", 403)
+
     try:
         from flask import current_app
         data = request.get_json() or {}

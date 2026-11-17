@@ -1,3 +1,4 @@
+{# design-block: form #}
 {% extends "layouts/admin_base.html" %}
 {% from 'macros/page_shell.html' import page_shell %}
 {% from 'architecture_assistant/partials/_journey_home_panels.html' import journey_count_panel %}
@@ -473,11 +474,16 @@
         <section data-testid="journey-outcome" class="rounded-xl border border-border bg-muted/30 p-5">
           <p class="text-xs font-medium uppercase tracking-wide text-muted-foreground">Outcome</p>
           <p class="mt-2 text-sm font-semibold text-foreground">{{ journey.outcome_type|replace('_', ' ')|title }}</p>
-          {% if journey.solution_id %}
-          <a href="{{ url_for('architecture_journey.journey_page', solution_id=journey.solution_id) }}"
+          {% if journey.solution_id and solution_link %}
+          <a href="{{ solution_link }}"
              class="mt-3 inline-flex items-center gap-2 text-sm font-medium text-primary hover:underline">
             Open linked solution <i data-lucide="arrow-right" class="h-4 w-4" aria-hidden="true"></i>
           </a>
+          {% elif journey.solution_id %}
+          <span class="mt-3 inline-flex items-center gap-2 text-sm font-medium text-muted-foreground" aria-disabled="true" role="link" data-testid="journey-solution-disabled">
+            Open linked solution
+          </span>
+          <p class="mt-1 text-xs leading-5 text-muted-foreground">You cannot open this solution. Ask an administrator in Team settings to give you access to solutions.</p>
           {% else %}
           <p class="mt-2 text-xs leading-5 text-muted-foreground">
             No solution has been assumed or created. This journey can conclude with its

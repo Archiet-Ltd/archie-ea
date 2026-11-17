@@ -18,6 +18,7 @@ from flask_login import current_user, login_required
 from flask_wtf.csrf import CSRFError, validate_csrf
 
 from app import db
+from app.core.auth.decorators import require_permission
 from app.decorators import audit_log
 from . import unified_applications_bp
 from ._helpers import _verify_app_in_org
@@ -25,76 +26,171 @@ from ._helpers import _verify_app_in_org
 logger = logging.getLogger(__name__)
 
 
-@unified_applications_bp.route("/<int:id>/overview-update", methods=["POST"])
-@login_required
-@audit_log("update_application_overview")
-def update_overview(id):
-    """Unified save for Overview: updates app metadata and vendor classifications atomically."""
-    app = _verify_app_in_org(id, g.current_org_id, raise_not_found=True)
+_USER_COUNT_MAX = 10_000_000
 
-    try:
-        # Validate and sanitize input fields
-        name = request.form.get("name", app.name)
-        if name and len(name) > 255:
-            name = name[:255]
+# Not a column: a business owner name that matches no user, recorded as a named
+# person without an account when the values are saved.
+NAMED_BUSINESS_OWNER = "named_business_owner"
 
-        description = request.form.get("description", app.description)
-        if description and len(description) > 5000:
-            description = description[:5000]
 
-        component_type = request.form.get("application_type", app.component_type)
-        valid_types = {
-            "web_application", "mobile_application", "desktop_application",
-            "api_service", "microservice", "batch_process", "data_pipeline",
-            "integration_platform", "database", "infrastructure", "other", None, ""
-        }
-        if component_type and component_type not in valid_types:
-            component_type = app.component_type
+def _validate_overview(app, form):
+    """Return (values to save, {form key: error in words}) for the posted fields."""
+    from app.services import element_ownership_service as owners
+    from app.services.application_overview_fields import OVERVIEW_TEXT_FIELDS, overview_limits
+    from app.services.application_status import same_status, status_for_write
 
-        business_criticality = request.form.get("criticality", app.business_criticality)
-        valid_criticalities = {
-            "mission_critical", "business_critical", "business_operational",
-            "administrative", "low", "medium", "high", "critical", None, ""
-        }
-        if business_criticality and business_criticality not in valid_criticalities:
-            business_criticality = app.business_criticality
-
-        technology_stack = request.form.get("technology_stack", app.technology_stack)
-        if technology_stack and len(technology_stack) > 500:
-            technology_stack = technology_stack[:500]
-
-        # Update application fields with validated values
-        app.name = name
-        app.description = description
-        app.component_type = component_type
-        app.business_criticality = business_criticality
-        app.technology_stack = technology_stack
-        app.updated_by = current_user.id
-
-        db.session.commit()
-
-        if request.headers.get("X-Requested-With") == "XMLHttpRequest":
-            return {"status": "success", "message": "Application updated successfully"}
-        else:
-            flash("Application updated successfully!", "success")
-            return redirect(
-                url_for(
-                    "unified_applications.application_detail",
-                    id=app.id,
-                    tab="architecture",
+    limits = overview_limits()
+    values, errors = {}, {}
+    for key, (column, label, _fallback) in OVERVIEW_TEXT_FIELDS.items():
+        if key not in form:
+            continue
+        text = form.get(key, "").strip()
+        longest = limits[key]
+        if len(text) > longest:
+            errors[key] = f"{label} must be {longest} characters or fewer."
+        elif key == "name" and not text:
+            errors[key] = "Name is required."
+        elif column == "business_owner":
+            problem = owners.application_owner_edit_problem(
+                app, "business_owner", text, app.organization_id,
+            )
+            # A name left as it is stays as it is: only a changed name has to say which person.
+            changed = text != (app.business_owner or "")
+            alike = owners.users_named_alike(text, app.organization_id) if text and changed else []
+            if problem:
+                errors[key] = f"{label} {problem}"
+            elif alike:
+                # Never recorded as a person with no account: the person is asked which one.
+                errors[key] = (
+                    f"{label} matches more than one person: {len(alike)} people in this organisation "
+                    f"are called \u201c{text}\u201d ("
+                    + ", ".join(u.email for u in alike)
+                    + "). Type the email of the one you mean."
                 )
+            elif changed:
+                # A blank with no owner on record clears the text kept on the
+                # application. A name is recorded as that user's owner record,
+                # or, when it matches no user, as a named person without an
+                # account: an owner is never left as text only.
+                if text and owners.resolve_user_by_name(text, app.organization_id) is None:
+                    values[NAMED_BUSINESS_OWNER] = text
+                else:
+                    values["business_owner" if text else "legacy_business_owner"] = text or None
+        else:
+            values[column] = text or None
+
+    if "deployment_status" in form:
+        status = form.get("deployment_status", "").strip()
+        stored = (app.deployment_status or "").strip()
+        if not same_status(status, stored):
+            stored_status, status_refusal = status_for_write(status)
+            if status_refusal:
+                errors["deployment_status"] = status_refusal
+            else:
+                values["deployment_status"] = stored_status
+
+    if "userCount" in form:
+        raw = form.get("userCount", "").strip()
+        if not raw:
+            values["user_count"] = None
+        elif raw.isascii() and raw.isdigit() and int(raw) <= _USER_COUNT_MAX:
+            values["user_count"] = int(raw)
+        else:
+            errors["userCount"] = (
+                f"User Count must be a whole number from 0 to {_USER_COUNT_MAX:,}."
             )
 
+    component_type = form.get("application_type")
+    if component_type is not None and component_type in _OVERVIEW_TYPES:
+        values["component_type"] = component_type or None
+    criticality = form.get("criticality")
+    if criticality is not None and criticality in _OVERVIEW_CRITICALITIES:
+        values["business_criticality"] = criticality or None
+    return values, errors
+
+
+_OVERVIEW_TYPES = {
+    "web_application", "mobile_application", "desktop_application",
+    "api_service", "microservice", "batch_process", "data_pipeline",
+    "integration_platform", "database", "infrastructure", "other", "",
+}
+_OVERVIEW_CRITICALITIES = {
+    "mission_critical", "business_critical", "business_operational",
+    "administrative", "low", "medium", "high", "critical", "",
+}
+
+
+def save_overview_values(app, values, user_id):
+    """Write validated Overview values to the application and commit.
+
+    The one writer of the Overview fields: the edit form's route and the AI
+    chat both call it with the values ``_validate_overview`` returned.
+    """
+    from app.services import element_ownership_service as owners
+
+    for column, value in values.items():  # request-field-writes-ok: columns come from the fixed field table in _validate_overview, never from the request
+        if column == NAMED_BUSINESS_OWNER:
+            owners.set_named_person_owner(
+                app, value, "business", organization_id=app.organization_id, assigned_by=user_id,
+            )
+        else:
+            setattr(app, column, value)
+    app.updated_by = user_id
+    db.session.commit()
+
+
+def save_overview(app, form, user_id):
+    """Validate *form* for *app* and save it. Returns ``{form key: error}``, empty when saved."""
+    values, errors = _validate_overview(app, form)
+    if errors:
+        return errors
+    save_overview_values(app, values, user_id)
+    return {}
+
+
+@unified_applications_bp.route("/<int:id>/overview-update", methods=["POST"])
+@login_required
+@require_permission("edit", "application")
+@audit_log("update_application_overview")
+def update_overview(id):
+    """The one save for the Overview edit form.
+
+    Every field the form posts is saved. A value that cannot be saved comes
+    back on the same page, beside its field, with what the person typed kept
+    and nothing saved.
+    """
+    app = _verify_app_in_org(id, g.current_org_id, raise_not_found=True)
+    ajax = request.headers.get("X-Requested-With") == "XMLHttpRequest"
+
+    values, errors = _validate_overview(app, request.form)
+    if errors:
+        if ajax:
+            return {"status": "error", "message": "Some values could not be saved.",
+                    "errors": errors}, 422
+        from app.application_mgmt.routes import render_application_detail
+
+        return render_application_detail(
+            id, form_values=request.form.to_dict(), form_errors=errors, status=422,
+        )
+
+    try:
+        save_overview_values(app, values, current_user.id)
     except Exception:
         db.session.rollback()
-        if request.headers.get("X-Requested-With") == "XMLHttpRequest":
-            return {
-                "status": "error",
-                "message": "An error occurred processing the request",
-            }, 400
-        else:
-            flash("Error updating application. Please try again.", "error")
-            return redirect(url_for("unified_applications.application_detail", id=id))
+        logger.exception("Overview save failed for application %s", id)
+        if ajax:
+            return {"status": "error", "message": "The application could not be saved."}, 500
+        flash("The application could not be saved. Nothing was changed; try again.", "error")
+        return redirect(
+            url_for("unified_applications.application_detail", id=id, edit="1", tab="overview")
+        )
+
+    if ajax:
+        return {"status": "success", "message": "Application updated successfully"}
+    flash("Application updated.", "success")
+    return redirect(
+        url_for("unified_applications.application_detail", id=app.id, tab="overview")
+    )
 
 
 @unified_applications_bp.route("/<int:id>/health-quality-update", methods=["POST"])
@@ -434,7 +530,7 @@ def update_strategy_layer(id):
                         cap_obj.name = cap_name
                         cap_obj.level = cap_level or 1
                         cap_obj.maturity_level = cap_maturity or "initial"
-                        cap_obj.coverage_percentage = cap_coverage or 0
+                        cap_obj.coverage_percentage = None if cap_coverage in (None, "") else cap_coverage
 
                         if old_name != cap_name:
                             changed_fields.append(f"capability_{cap_id}")

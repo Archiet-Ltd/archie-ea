@@ -52,7 +52,7 @@ class ExportManager {
     async exportToPNG(elementId, filename = 'export', options = {}) {
         const {
             scale = 2,
-            backgroundColor = '#ffffff',
+            backgroundColor = getComputedStyle(document.body).backgroundColor,
             quality = 1.0,
             showToast = true
         } = options;
@@ -124,7 +124,7 @@ class ExportManager {
     async exportToJPG(elementId, filename = 'export', options = {}) {
         const {
             scale = 2,
-            backgroundColor = '#ffffff',
+            backgroundColor = getComputedStyle(document.body).backgroundColor,
             quality = 0.95,
             showToast = true
         } = options;

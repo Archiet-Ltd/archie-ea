@@ -289,3 +289,13 @@ def set_wsjf_components(
     set_wsjf_component(element, "job_size", job_size, source=source)
     db.session.flush()
     return read_profile(element)
+
+
+def get_kind_property(element, key: str):
+    """Read the plain value of a kind-specific property."""
+    return _read_property_value(element, key)
+
+
+def set_kind_property(element, key: str, value: any, source: str = "user") -> Dict:
+    """Write a kind-specific property."""
+    return _write_property(element, key, value, source=source)

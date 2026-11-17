@@ -19,9 +19,11 @@ Directory layout maps to URL families:
 
 from __future__ import annotations
 
+import dataclasses
 import functools
 import json
 import re
+import threading
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -31,11 +33,11 @@ import markdown
 import yaml
 from markupsafe import Markup
 
-from app.services.billing_plans import CONTACT_SALES_URL, PLANS
+from app.services.billing_plans import CONTACT_SALES_URL, listed_plans
+from app.services.origin import canonical_origin
 
 CONTENT_ROOT = Path(__file__).resolve().parent.parent.parent / "content" / "pages"
 STATIC_ROOT = Path(__file__).resolve().parent.parent / "static"
-SITE_URL = "https://entelim.org"
 
 # ── SEO/GEO audit verdicts (2026-10-06) -- single source of truth ───────────
 # Which pages fold into a parent page (MERGE, 301 from the old URL) and which
@@ -79,7 +81,13 @@ FEATURE_INTEREST_CONSENT_TEXT = (
     "Used to tell you when this becomes available, and for nothing else."
 )
 IMG_MODULES_DIR = STATIC_ROOT / "img" / "modules"
+# The share files of each module recording (three shapes, a cover image and the manifest a distribution tool reads),
+# cut from the recordings by scripts/capture/share_assets.py.
+SHARE_DIR = STATIC_ROOT / "video" / "share"
+SHARE_MANIFEST = "manifest.json"
+SHARE_URL_PREFIX = "/see"
 IMG_USE_CASES_DIR = STATIC_ROOT / "img" / "use-cases"
+IMG_ROLES_DIR = STATIC_ROOT / "img" / "roles"
 VIDEO_USE_CASES_DIR = STATIC_ROOT / "video" / "use-cases"
 
 # ── seeded demo personas (Lantern Quay Systems -- app/commands/seed_demo_company.py) ──
@@ -87,9 +95,55 @@ VIDEO_USE_CASES_DIR = STATIC_ROOT / "video" / "use-cases"
 # registries below; kept here (not duplicated in the capture script) so the
 # fictional persona list has one source.
 DEMO_PERSONA = "demo@lantern-quay.example.com"
-ITOPS_ADMIN_PERSONA = "sage.itops@lantern-quay.example.com"
-APP_MANAGER_PERSONA = "casey.inventory@lantern-quay.example.com"
-PROCUREMENT_PERSONA = "taylor.procurement@lantern-quay.example.com"
+ITOPS_ADMIN_PERSONA = "sage.okafor@lantern-quay.example.com"
+APP_MANAGER_PERSONA = "casey.marsh@lantern-quay.example.com"
+PROCUREMENT_PERSONA = "taylor.brennan@lantern-quay.example.com"
+
+# Role pages: each role's workspace in Ask, open on the impact question for the
+# Calibration Ledger application with its first answer row shown
+# (scripts/capture_proof_assets.py --roles). Same 5-tuple shape as MODULE_CAPTURES.
+def _role_capture(slug: str, role: str) -> tuple[str, str, str, str, str]:
+    article = "an" if role[0] in "AEIOUaeiou" or role.startswith("IT ") else "a"
+    return (
+        slug, "/ai-chat/", DEMO_PERSONA,
+        f"The AI chat as {article} {role} sees it: the impact question put to Calibration Ledger, with the first row of the answer showing what depends on it.",
+        f"Screenshot of the AI chat signed in as {article} {role}, with the impact question asked of Calibration Ledger and the first result row displayed.",
+    )
+
+
+# The screen each role page's hero shows, named in the browser frame (Ask unless listed).
+ROLE_FRAME_LABELS = {
+    "business-architects": "Capability maturity",
+    "security-architects": "Risk register",
+    "data-architects": "Data lineage",
+    "chief-architects": "Capability health",
+    "scale-up-cto-and-vp-engineering": "Import applications",
+}
+
+ROLE_CAPTURES: list[tuple[str, str, str, str, str]] = [
+    _role_capture("enterprise-architects", "enterprise architect"),
+    _role_capture("cto-and-cio", "CTO or CIO"),
+    _role_capture("it-portfolio-managers", "IT portfolio manager"),
+    _role_capture("solution-architects", "solution architect"),
+    # Roles whose primary screen is not Ask: the path is the screen the page's own
+    # text names first, and capture_role photographs the top of it.
+    ("business-architects", "/capability-maturity/heatmap", DEMO_PERSONA,
+     "The capability maturity heat map as a business architect sees it: current against target maturity for each capability, the gap and the date it was assessed.",
+     "Screenshot of the capability maturity heat map signed in as a business architect, listing capabilities with current and target maturity, the gap and the assessment date."),
+    ("chief-architects", "/strategic/capability-health", DEMO_PERSONA,
+     "The capability health dashboard as a chief architect sees it: average portfolio health, critical capabilities, at-risk hotspots and the domain health index.",
+     "Screenshot of the capability health dashboard signed in as a chief architect, with portfolio health, critical capabilities, at-risk hotspots and a domain health index with a status chart."),
+    ("scale-up-cto-and-vp-engineering", "/applications/import", DEMO_PERSONA,
+     "The application import as a scale-up CTO sees it: a spreadsheet chosen, its first rows previewed and each column matched to an application field.",
+     "Screenshot of the Import Applications dialog with the Upload File tab open, a template download link, merge or duplicate handling and a preview of the first rows of an application spreadsheet."),
+    ("security-architects", "/risks/", DEMO_PERSONA,
+     "The risk register as a security architect sees it: the top risks ranked by how many elements each reaches, with the elements it touches.",
+     "Screenshot of the risk register signed in as a security architect, with the top risks ranked by the number of elements each reaches."),
+    ("data-architects", "/architecture/data-lineage", DEMO_PERSONA,
+     "Data lineage as a data architect sees it: data objects, recorded lineage edges and the form for recording a flow between two modelled data objects.",
+     "Screenshot of the data lineage screen signed in as a data architect, with counts of data objects and recorded lineage edges above the form for recording a lineage flow."),
+]
+
 
 # ── module & use-case screenshot/recording registry ─────────────────────────
 # Single source of truth for which live pages get a captured screen: the path
@@ -105,23 +159,23 @@ MODULE_CAPTURES: list[tuple[str, str, str, str, str]] = [
      "The AI assistant answering a question from the organisation's own architecture model.",
      "Screenshot of the AI Chat module answering a question about Lantern Quay Systems' architecture."),
     ("applications", "/applications/", DEMO_PERSONA,
-     "The application portfolio: lifecycle tiles, owner and vendor coverage, and each application's type, lifecycle stage and the capability it supports.",
-     "Screenshot of the Applications module showing Lantern Quay Systems' portfolio tiles, data-quality coverage and application list with type, lifecycle stage and mapped capability."),
+     "The application portfolio: every system with its type, lifecycle stage, owner, record completeness and the capability it supports.",
+     "The Applications list showing the systems with their type, lifecycle stage, owner, how complete each record is and the capability each supports."),
     ("arb", "/arb/", DEMO_PERSONA,
-     "The Architecture Review Board hub: review volume, pending decisions, approval rate and cycle time.",
-     "Screenshot of the Architecture Review Board hub showing total and pending reviews, approval rate, cycle time and the review status chart."),
+     "The Architecture Review Board: the review figures and the queue of reviews waiting for a decision.",
+     "The Architecture Review Board showing its review figures and the reviews waiting for a decision, each with its subject, status and an Open review button."),
     ("architecture-model", "/architecture/", DEMO_PERSONA,
-     "The ArchiMate element browser, spanning the business, application, technology and motivation layers.",
-     "Screenshot of the Architecture Model module's ArchiMate element browser."),
+     "The ArchiMate layered view: strategy, business, application and technology elements in bands, joined by their relationships.",
+     "A layered ArchiMate view of the model's elements drawn in strategy, business, application and technology bands, with the relationships between them drawn as arrows."),
     ("business-case", "/business-case/", DEMO_PERSONA,
-     "Business cases with their status, three-year TCO and return on investment.",
-     "Screenshot of the Business Case module's list of business cases."),
+     "One business case open: its options, the recommendation and the three-year cost and return worked out from its figures.",
+     "The business case to move the event backbone to a managed message broker, with the options considered, the recommendation, and the capital cost, annual running cost, three-year cost, annual benefit, return and payback worked out from them."),
     ("business-model-canvas", "/business-model/", DEMO_PERSONA,
-     "The business model canvas library, with each canvas's operating-model archetype.",
-     "Screenshot of the Business Model Canvas module's canvas library."),
+     "The nine-block business model canvas, filled in for the demonstration company.",
+     "A business model canvas with every block filled in for the demonstration company: key partners, activities and resources, value propositions, customer relationships, channels and segments, cost structure and revenue streams."),
     ("compliance-frameworks", "/dashboard/compliance", DEMO_PERSONA,
-     "The compliance frameworks dashboard, tracking framework coverage across the estate.",
-     "Screenshot of the Compliance Frameworks module's dashboard."),
+     "Regulatory compliance: the framework, its controls and the controls mapped to applications that are not yet in place.",
+     "The compliance dashboard showing the active frameworks, controls and application control mappings by status, above the controls not yet in place with the application and capability each belongs to."),
     ("duplicate-detection", "/duplicate-detection/simple", DEMO_PERSONA,
      "The duplicate detection dashboard, flagging applications that may overlap in function.",
      "Screenshot of the Duplicate Detection module's dashboard."),
@@ -129,24 +183,220 @@ MODULE_CAPTURES: list[tuple[str, str, str, str, str]] = [
      "An application owner's personal dashboard of the applications they're responsible for.",
      "Screenshot of the My Applications module's owner dashboard."),
     ("portfolio", "/portfolio/", DEMO_PERSONA,
-     "The portfolio dashboard, summarising active initiatives and programmes.",
-     "Screenshot of the Portfolio module's dashboard."),
+     "The portfolio: {initiatives} with budget, spend, health and benefits.",
+     "The portfolio dashboard showing the initiatives, their approved budget and spend, a health count of red, amber and green, and a table with each initiative's phase, budget, spend, variance, completion, benefits and sponsor."),
     ("procurement", "/procurement/renewals", PROCUREMENT_PERSONA,
-     "The contract renewals dashboard, showing upcoming vendor renewal dates.",
-     "Screenshot of the Procurement module's contract renewals dashboard."),
+     "Contract renewals: the contracts due soonest with their vendor, annual cost and days to renewal.",
+     "The renewals screen showing how many contracts renew in each window, and the contracts due soonest with their vendor, annual cost and days to renewal."),
     ("projects", "/enterprise/implementation/work-packages", DEMO_PERSONA,
      "The work packages list, tracking delivery programmes in progress.",
      "Screenshot of the Projects module's work packages list."),
     ("risk-register", "/risks/", DEMO_PERSONA,
-     "The risk register, with likelihood, impact and a mitigation plan recorded for each risk.",
-     "Screenshot of the Risk Register module."),
+     "The risk register: the ranked risks beside a probability-by-impact matrix.",
+     "The risk register showing the top risks ranked by the elements each reaches, with their status and what they touch, beside a five-by-five matrix counting the register's risks by probability and impact."),
+    ("build-your-model-from-your-tools", "/account/welcome", DEMO_PERSONA,
+     "The welcome screen, where you connect GitHub or Jira or import a model.",
+     "Screenshot of the welcome screen offering to connect GitHub or Jira, or import an existing model."),
+    ("capability-maturity", "/capability-maturity/heatmap", DEMO_PERSONA,
+     "Capability maturity: how many capabilities have a recorded assessment, and the average current and target level.",
+     "Screenshot of the capability maturity page showing the assessed count and the average current and target maturity for the demonstration company."),
+    ("digital-twin", "/intelligence/twin-map", DEMO_PERSONA,
+     "The twin map: an application and everything it connects to, banded by architecture layer.",
+     "Screenshot of the twin map showing an application and the capabilities, processes, technology and data it connects to, grouped by architecture layer."),
+    ("industry-apqc", "/industry-apqc/", DEMO_PERSONA,
+     "The industry process classification, with its process groups and coverage.",
+     "Screenshot of the industry process classification dashboard for the demonstration company."),
+    ("rationalization", "/applications/rationalization", DEMO_PERSONA,
+     "The rationalization dashboard, showing which applications to keep, merge or retire.",
+     "Screenshot of the rationalization dashboard with the demonstration company's applications."),
+    ("roadmaps", "/capability-roadmap", DEMO_PERSONA,
+     "The capability roadmap's headline figures: recorded gaps, plateaus, work packages, capabilities and domains.",
+     "Screenshot of the capability roadmap's headline figures for the demonstration company: recorded gaps, plateaus, work packages, capabilities and domains."),
     ("solutions", "/solutions/", DEMO_PERSONA,
      "The solutions list, tracking each solution's design progress and next action.",
      "Screenshot of the Solutions module's solution list."),
     ("vendors", "/applications/vendors", DEMO_PERSONA,
-     "The vendor catalogue, with each vendor's type, products and contract status.",
-     "Screenshot of the Vendors module's vendor catalogue."),
+     "The vendor register: each vendor with its active contracts and the systems it supplies.",
+     "The vendor register: a line counting vendors, systems and renewals, above the vendors with the number of active contracts and the systems each supplies."),
 ]
+
+# What the phone version of a module image shows, where it is not the same screen as the desktop version: a picture
+# can have one description per version, and the page gives each its own. A slug not listed here uses its alt text above.
+MODULE_PHONE_ALTS: dict[str, str] = {
+    "applications": "The Applications list as cards, each with its status, owner, vendor, capability and a ring showing how complete its record is.",
+    "architecture-model": "The layered ArchiMate view on a narrow screen: the elements stacked one above another in strategy, business, application and technology bands, with the relationships between them drawn as lines.",
+    "arb": "The Architecture Review Board's four figures, a line saying how many pending reviews are not yet in a review cycle, and the reviews waiting for a decision, one card each.",
+    "business-case": "A business case with its options considered, the recommendation, and the capital cost, annual running cost, three-year cost, annual benefit, return and payback.",
+    "business-model-canvas": "One block of the business model canvas, the value propositions, listing what the demonstration company offers.",
+    "compliance-frameworks": "The compliance figures: the active frameworks, controls and application control mappings counted by status.",
+    "portfolio": "The portfolio figures: the initiatives, the approved budget, the spend to date and a health count of red, amber and green.",
+    "procurement": "The renewals screen showing how many contracts renew in each window, and the contracts coming up soonest.",
+    "risk-register": "The risk register on a phone: a five-by-five matrix counting the register's risks by probability and impact, above the top risks ranked by the elements each reaches.",
+    "vendors": "The vendor register: a line counting vendors, systems and renewals, above the vendors and the systems each supplies.",
+}
+
+# ── whole-journey recordings of the module pages ────────────────────────────
+# One recording per /modules/<slug> page, captured by scripts/capture_screenshots.py --modules from the
+# demonstration organisation (storyboards in scripts/capture/module_clips.py) and re-recorded after each
+# release. Each entry: slug -> title (the page's action title, a conclusion), promise (the closing card's
+# line), summary (the two to four sentences under the video) and alt (what is on screen).
+# A module with no entry is named in MODULE_RECORDING_DEFECTS with the screen and what is wrong with it; the
+# two are mutually exclusive and together cover every module page.
+MODULE_RECORDINGS: dict[str, dict[str, str]] = {
+    "applications": {
+        "title": "Find who owns any application in seconds",
+        "promise": "One true list of every application you run, with its owner and its stage.",
+        "summary": ("Opens the application portfolio, where every application shows its owner, lifecycle stage and "
+                    "the capability it supports. Typing a name narrows the list to that application, with its owner "
+                    "on the row."),
+        "alt": ("Recording of the Applications module: the portfolio list, then narrowed by search to one "
+                "application with its owner."),
+    },
+    "business-model-canvas": {
+        "title": "Open a canvas already filled from your own model",
+        "promise": "Strategy canvases that fill themselves from what you already model.",
+        "summary": ("Opens the canvas library and one canvas whose boxes are already filled with partners, activities, "
+                    "resources, value propositions and customers taken from the organisation's own model. Every entry "
+                    "is an element of that model and opens from the canvas."),
+        "alt": ("Recording of the Business Model Canvas module: the canvas library and a canvas filled with "
+                "elements of the model."),
+    },
+    "compliance-frameworks": {
+        "title": "See which controls apply to which applications, and where they stand",
+        "promise": "Show an auditor which controls cover which systems, in one place.",
+        "summary": ("Opens the regulatory compliance dashboard, which counts the adopted frameworks, their controls and "
+                    "the applications they are mapped to. Choosing a control from the findings opens it with the "
+                    "applications that carry it and whether each is planned, implemented or verified."),
+        "alt": ("Recording of the Compliance Frameworks module: the compliance dashboard and one control opened with "
+                "its applications and their status."),
+    },
+    "industry-apqc": {
+        "title": "Start from your industry's own process framework",
+        "promise": "A recognised process framework for your industry, ready to map to your model.",
+        "summary": ("Opens the industry process frameworks, one for each industry, and then the banking framework with "
+                    "its categories and process counts. Opening a category lists the processes inside it."),
+        "alt": ("Recording of the Industry Process Frameworks module: the framework list, the banking framework's "
+                "categories and one category opened."),
+    },
+    "risk-register": {
+        "title": "See which risk would hit the most of your estate",
+        "promise": "Know which risk reaches the most of what you run.",
+        "summary": ("Opens the risk register, which ranks every risk by the number of model elements it reaches and "
+                    "names them. Following one named application opens its impact graph, showing what depends on it "
+                    "and what it depends on."),
+        "alt": ("Recording of the Risk Register module: the ranked risks with the elements each reaches, and the "
+                "impact graph of one application they name."),
+    },
+    "digital-twin": {
+        "title": "See everything that depends on a system, across every layer",
+        "promise": "See what depends on any system, drawn from your own records.",
+        "summary": ("Opens the digital twin on Calibration Ledger, the most connected system in the model, with its "
+                    "elements and relationships spread over the business, application and technology layers. The "
+                    "connections open as a list that names each one, from one element to the next."),
+        "alt": ("Recording of the digital twin: the map around Calibration Ledger and the list of its "
+                "connections."),
+    },
+}
+
+MODULE_RECORDING_DEFECTS: dict[str, str] = {
+    "ai-chat": "The chat screen of the demonstration organisation says \"No AI model. Ask an administrator.\" "
+               "under the question box, so no answer with its sources can be shown without that line in frame.",
+    "answer-sources": "Shown on the same chat screen as AI Chat, which states \"No AI model. Ask an administrator.\" "
+                      "in the demonstration organisation.",
+    "arb": "Every seeded review opens as a legacy row marked \"Not part of the typed governance graph\", and the one "
+           "checked says the demonstration person submitted it so cannot record its decision; a decision cannot be "
+           "shown end to end.",
+    "architecture-model": "The model browser's summary reads \"repository total unavailable\" and \"Relationship "
+                          "data unavailable on this page\".",
+    "batch-import": "The import jobs list shows 0% progress on completed jobs, a dash for the type and \u00a30.00 cost. The page itself redirects to /modules/architecture-model today.",
+    "build-your-model-from-your-tools": "The screen is a new account's first-run wizard; the demonstration "
+                                        "organisation is already populated, so the journey needs an empty "
+                                        "organisation, which a recording may not use.",
+    "business-case": "The list says \"No business case has its three-year cost worked out yet\", so the cost and "
+                     "return the module sells are not shown.",
+    "capability-maturity": 'The heatmap\'s summary card reads "Not assessed 0" and its key shows a bare dash, and the screen is a table to scroll rather than a job to do, so no recording that clicks from a first question to an answer can be made without those lines in frame.',
+    "duplicate-detection": "The page redirects to /modules/rationalization today, so a visitor never sees a recording placed on it.",
+    "gap-analysis": 'The page redirects to /modules/roadmaps today, so a visitor never sees a recording placed on it; the gap register also shows "0 Resolved" and "Not reviewed yet" in frame.',
+    "projects": 'The page redirects to /use-cases/programme-tracking today, so a visitor never sees a recording placed on it; the work package list also shows "0 Overdue", and an opened package shows a 50% progress bar beside an evidence line reading "Progress: 0%".',
+    "roadmaps": 'The roadmap shows "0" on its AI Generated card, two breadcrumb trails at once, and plateaus reading "0 gaps, 0 work packages", so its whole journey cannot be shown without those in frame.',
+    "diagrams": "The Supplier integration landscape diagram, listed with six elements, opens with one element "
+                "drawn and \"0 relationships\".",
+    "integrations": "The demonstration person is refused with \"You don't have access to this page\"; the screen "
+                    "needs a platform administrator, and recordings are made only as the demonstration person. The page itself redirects to /connectors today.",
+    "investment-analysis": "The matrix prints the word \"undefined\" in a capability's name, shows \"No initiative "
+                           "linked\" and clips its last columns. The page itself redirects to /modules/business-case today.",
+    "my-applications": "The owner dashboard of the demonstration person shows zero applications assigned; the "
+                       "seeded owner who has applications is not a person recordings may use. The page itself redirects to /use-cases/what-i-own today.",
+    "org-chart": "The org chart says \"No Business Actors yet\" and the RACI matrix shows \"No one is "
+                 "accountable\" on several capabilities.",
+    "portfolio": "The list reports four initiatives serving no objective, and an initiative opens with \"No "
+                 "canonical transformation programmes exist yet to link to\".",
+    "procurement": "The demonstration person is refused with \"You don't have access to this page\"; the screen "
+                   "needs the procurement role, and recordings are made only as the demonstration person.",
+    "rationalization": "All twenty applications are marked \"Needs Data Enrichment\" in the workbench and its "
+                       "business unit column is a dash, so no decision can be shown.",
+    "scenario-modelling": "There is no screen: the module is not built yet.",
+    "software-and-tool-discovery": "There is no screen: the module is not built yet.",
+    "sysml-to-archimate": "There is no screen: the module is not built yet.",
+    "solutions": "A solution opens with \"No problem statement yet\", no cost and 8% readiness; all four listed "
+                 "solutions still need setting up. The page itself redirects to /modules/arb today.",
+    "value-streams": "The stages of the value stream carry \"No description yet\", \"No entry criteria yet\" and "
+                     "\"No cycle time recorded\". The page itself redirects to /use-cases/value-streams-at-risk today.",
+    "vendors": "The annual cost column reads \"Not shown for your role\" for the demonstration person.",
+}
+
+MODULE_RECORDINGS_MANIFEST = "recordings.json"
+
+
+def module_recording_slugs() -> list[str]:
+    """Every module page that has a content file, in name order."""
+    return sorted(path.stem for path in (CONTENT_ROOT / "modules").glob("*.md") if not is_translation_file(path))
+
+
+# ── "See how" clips on the first empty screens ──────────────────────────────
+# Each entry is the next step done in the demonstration organisation, captured by
+# scripts/capture_screenshots.py --help-clips and re-recorded after each release.
+# The clip and its poster are served from the image tree; help_clip() answers None
+# until the file exists, so an empty screen never offers a clip that is not there.
+# Each entry: key -> (path the clip is recorded on, dialog title, line under the video)
+IMG_HELP_DIR = IMG_MODULES_DIR.parent / "help"
+HELP_CLIPS: dict[str, tuple[str, str, str]] = {
+    "applications-first": (
+        "/applications/", "Add your first application",
+        "Opening the application list, choosing Add an application, and the Connect GitHub route that fills it for you."),
+    "connectors-github": (
+        "/admin/connectors", "Connect GitHub",
+        "Opening Connectors and following Connect GitHub to the page that reads your repositories."),
+    "model-from-github": (
+        "/archimate/composer", "See the model built from GitHub",
+        "The model opened on the canvas, with the applications and links read from GitHub."),
+    "chat-citation": (
+        "/ai-chat", "Ask what breaks if this fails",
+        "Asking what breaks if a system fails, then opening a citation to see the record behind the answer."),
+    "compliance-controls": (
+        "/dashboard/compliance", "Choose a framework and see its controls",
+        "Choosing a framework in the list to open its controls."),
+    "canvases-open": (
+        "/business-model/", "Open a loaded canvas",
+        "Opening a canvas whose boxes are already filled from the model."),
+}
+
+
+def help_clip(key: str) -> dict | None:
+    """The clip registered under ``key`` with its urls, or None when the file has not been recorded."""
+    entry = HELP_CLIPS.get(key)
+    if entry is None or not (IMG_HELP_DIR / f"{key}.webm").is_file():
+        return None
+    _, title, line = entry
+    poster = IMG_HELP_DIR / f"{key}.poster.webp"
+    return {
+        "key": key,
+        "title": title,
+        "line": line,
+        "src": f"/static/img/help/{key}.webm",
+        "poster": f"/static/img/help/{key}.poster.webp" if poster.is_file() else None,
+    }
+
 
 # ── capture-pending: named explicitly, by design (lead review 2026-10-06) ──
 # Every slug below is genuinely capture_status: live in its own content file
@@ -166,18 +416,16 @@ MODULE_CAPTURES: list[tuple[str, str, str, str, str]] = [
 # slug back to the matching *_CAPTURES list above -- the two are meant to
 # be mutually exclusive, never both.
 MODULE_CAPTURE_PENDING: dict[str, str] = {
+    "answer-sources": (
+        "shown inside the AI chat answer, which the home page already photographs; "
+        "a module-specific capture is owed"
+    ),
     "integrations": (
         "connector health dashboard throws \"An internal error occurred\" on any "
         "data: app/routes/connector_routes.py api_list_connectors() calls .value "
         "on connector_type/status/sync_mode as though they were Enum columns, but "
         "app/models/connector_config.py declares all three as plain strings -- "
         "pre-existing bug, unrelated file, out of scope to fix here"
-    ),
-    "capability-maturity": (
-        "heat map showed \"No capabilities yet\" for an organisation that has 24 "
-        "capabilities elsewhere (investment-analysis) -- this screen reads a "
-        "different capability store than the one seeded; a reuse-register-shaped "
-        "bug, separate brief owed"
     ),
     "batch-import": (
         "completed jobs rendered at 0% progress and 0 elements generated -- "
@@ -192,21 +440,10 @@ MODULE_CAPTURE_PENDING: dict[str, str] = {
         "captured screen was a list of diagram names, not a rendered diagram -- "
         "needs a diagram actually open in the Composer"
     ),
-    "industry-apqc": "0 processes shown on every seeded framework",
     "investment-analysis": "domain Unknown and 0 apps coverage on every capability row",
     "gap-analysis": "type None on every row",
-    "rationalization": (
-        "captured screen was the \"Get started\" onboarding panel, not the "
-        "rationalization view itself -- needs scores past onboarding"
-    ),
-    "roadmaps": "0 gaps detected; plateaus with no description and 0 gaps",
     "value-streams": "0 stages and 0 capabilities on every value stream",
-    "digital-twin": (
-        "no seeded demonstration organisation or browser available when the "
-        "page was written to capture Ask with an impact answer and the "
-        "provenance drawer open, the twin map, or model history with a "
-        "seeded change -- needs a real capture run, not a placeholder"
-    ),
+    "scenario-modelling": "the page is live now that the scenarios screen is released; its screen has not been captured yet",
 }
 
 # The one live use-case page: same screen as the capability-maturity module
@@ -276,7 +513,30 @@ FAMILY_URL_PREFIX = {
     "connector": "/connectors",
 }
 
-_md = markdown.Markdown(extensions=["extra"])
+# Languages the public site is published in besides English. A translation is a Markdown file beside the English one,
+# named <slug>.<code>.md, with front matter ``lang`` and ``translation_of`` (the English page's slug). It is served
+# at the language's prefix followed by the English address, and the English address never changes.
+DEFAULT_LANGUAGE = "en"
+TRANSLATION_PREFIXES: dict[str, str] = {"pt-BR": "/pt-br", "es": "/es", "fr": "/fr"}
+LANGUAGE_NAMES: dict[str, str] = {"en": "English", "pt-BR": "Português", "es": "Español", "fr": "Français"}
+LANGUAGE_BY_PREFIX: dict[str, str] = {prefix.lstrip("/"): code for code, prefix in TRANSLATION_PREFIXES.items()}
+
+
+def is_translation_file(path: Path) -> bool:
+    """Whether a content file is a translation (<slug>.<code>.md) rather than an English page."""
+    return "." in path.stem
+
+
+_md_local = threading.local()
+
+
+def _markdown() -> markdown.Markdown:
+    """This thread's Markdown converter. One converter keeps parse state between calls, so two pages rendered at
+    once by two request threads (a page and a closed address answered in place) must not share one."""
+    md = getattr(_md_local, "md", None)
+    if md is None:
+        md = _md_local.md = markdown.Markdown(extensions=["extra"])
+    return md
 
 # Tags and attributes produced by standard Markdown (plus extra extension).
 # Any HTML tag or attribute not in these lists is stripped by bleach.
@@ -300,6 +560,8 @@ _ALLOWED_ATTRS = {
     # id is not an XSS vector; allowed so a page's own headings can carry a
     # deep-link anchor (e.g. /features#strategy-management) for other pages
     # to link into, without needing the markdown "toc" extension.
+    # a paragraph may carry an id too: "needs-<screen>" holds it back until that screen's wave is released
+    "p": ["id"],
     "h1": ["id"], "h2": ["id"], "h3": ["id"], "h4": ["id"], "h5": ["id"], "h6": ["id"],
 }
 
@@ -341,16 +603,48 @@ class PublicPage:
         return self.front_matter.get("cta")
 
     @property
+    def lang(self) -> str:
+        """The language the page is written in: ``en`` unless its front matter names a published translation language."""
+        declared = self.front_matter.get("lang")
+        return declared if declared in TRANSLATION_PREFIXES else DEFAULT_LANGUAGE
+
+    @property
+    def alternates(self) -> list[tuple[str, str]]:
+        """Every published translation of this page as (hreflang, absolute address), with the English page and
+        x-default. Empty when the page has no published translation, so a page nobody has translated shows none."""
+        english_url = _english_url_of(self)
+        translations = _published_translations_by_english_url().get(english_url, {})
+        if not translations:
+            return []
+        origin = canonical_origin()
+        found = [(DEFAULT_LANGUAGE, f"{origin}{english_url}")]
+        found += [(code, f"{origin}{translations[code].url}") for code in TRANSLATION_PREFIXES if code in translations]
+        found.append(("x-default", f"{origin}{english_url}"))
+        return found
+
+    @property
+    def language_links(self) -> list[tuple[str, str, str]]:
+        """Each language this page is published in as (code, the language's own name, site address), English
+        first. Empty when the page has no published translation, so the reader sees no language list."""
+        if not self.alternates:
+            return []
+        english_url = _english_url_of(self)
+        translations = _published_translations_by_english_url().get(english_url, {})
+        found = [(DEFAULT_LANGUAGE, LANGUAGE_NAMES[DEFAULT_LANGUAGE], english_url)]
+        found += [(code, LANGUAGE_NAMES[code], translations[code].url) for code in TRANSLATION_PREFIXES if code in translations]
+        return found
+
+    @property
     def page_family(self) -> str:
         return self.front_matter.get("page_family", self.family)
 
     @property
     def self_canonical_url(self) -> str:
-        """Every public page is canonical to its own entelim.org address --
+        """Every public page is canonical to its own entelim.tech address --
         no exceptions, including comparison pages that also have an
         ``external_url`` on archiet.ai (section 2 of the SEO/GEO audit:
         the two are different products' content now, not the same page)."""
-        return f"{SITE_URL}{self.url}"
+        return f"{canonical_origin()}{self.url}"
 
     @property
     def is_held(self) -> bool:
@@ -383,7 +677,42 @@ class PublicPage:
         checks both ``is_held`` and ``MERGED_PAGES`` separately.
         """
         state = self.front_matter.get("state")
-        return self.url in HELD_PAGE_URLS or (state is not None and state != "on_main")
+        return (
+            self.url in HELD_PAGE_URLS
+            or (state is not None and state != "on_main")
+            or (self.wave_closed and not self.is_early_access_page)
+        )
+
+    @property
+    def heading(self) -> str:
+        """The heading the page opens with: a module page's own headline when it has a landing, else its title.
+        Every list that names the page (the early-access hub, the enquiry page) reads this one value."""
+        if self.family == "module" and self.front_matter.get("questions"):
+            return str(self.front_matter.get("headline") or self.title)
+        return self.title
+
+    @property
+    def is_early_access_page(self) -> bool:
+        """True for a page that is itself the early-access page: it says on the page that the capability is not
+        yet available and offers a waiting list. Such a page is a demand test and search is how demand arrives,
+        so the wave switch does not hold it; its own ``state`` still decides whether it is ready."""
+        return self.front_matter.get("wave") == "EA" and self.cta == "waiting_list"
+
+    @property
+    def wave_closed(self) -> bool:
+        """True while the wave switch (RELEASE_WAVE) is on and this page's screen opens in a later wave.
+
+        Every content page names its wave in front matter (``wave: 1`` to ``wave: 5``, or ``wave: EA``
+        for early access); a page that names none is closed. A closed page is out of the sitemap and every menu
+        and shows the early-access page at its own address instead of describing a screen that is not open.
+        """
+        from app.release_waves import OPEN, configured_wave, page_wave_code, state_for
+
+        wave = configured_wave()
+        if wave is None:
+            return False
+        # a page with no wave is closed, never open by default (tests/test_release_waves.py fails for it)
+        return state_for([page_wave_code(self.front_matter.get("wave")), "", "page", None, None], wave) != OPEN
 
     @property
     def description(self) -> str | None:
@@ -396,6 +725,26 @@ class PublicPage:
         if isinstance(explicit, str) and explicit.strip():
             return explicit.strip()
         return _first_paragraph_summary(self.body_html)
+
+    def enquiry_source(self, raw: str | None) -> str:
+        """The slug of the waiting-list module page a visitor came from to this enquiry page, or "" when
+        ``raw`` names no such page. Only an offer page (``cta: inquiry``) takes a source."""
+        if self.cta != "inquiry" or not raw:
+            return ""
+        origin = load_page("module", slug=raw)
+        return origin.slug if origin is not None and origin.cta == "waiting_list" else ""
+
+    def enquiry_topic(self, source: str) -> str:
+        """The heading of the page an enquiry is about, or "" when ``source`` names no known waiting-list page.
+        ``source`` is the value ``enquiry_source`` returned, never raw input."""
+        origin = load_page("module", slug=source) if source else None
+        return origin.heading if origin is not None else ""
+
+    def enquiry_offer(self, source: str = "") -> str:
+        """The ``offer`` stored for an enquiry on this page: its own offer, followed by the page the visitor
+        came from when there is one, so the row names both."""
+        offer = str(self.front_matter.get("offer") or "")
+        return f"{offer}:{source}"[:50] if source else offer
 
     @property
     def feature_interest_offer(self) -> str:
@@ -517,10 +866,156 @@ def use_case_redirect_target(old_filename_slug: str) -> str | None:
 # pixels are twice their CSS size, so the <img> width/height attributes halve them and the
 # image displays 1:1. Every other module image is a 1x capture and keeps its file size.
 TWO_X_MODULE_IMAGES = frozenset({"applications", "arb"})
+# The four role-page captures are 2x as well (capture_role in the same script).
+TWO_X_ROLE_IMAGES = frozenset({
+    "enterprise-architects", "cto-and-cio", "it-portfolio-managers", "solution-architects",
+    "business-architects", "security-architects", "data-architects",
+    "chief-architects", "scale-up-cto-and-vp-engineering",
+})
+
+
+# More real screens for each role page, from the captures already committed for the
+# product's own pages (app/static/img/modules). Each role page shows its own hero screen
+# plus these, so a visitor sees the role's job on more than one screen. Entry:
+# (image file under static/img, density, frame label, caption, alt text).
+ROLE_MORE_SCREENS: dict[str, list[tuple[str, int, str, str, str]]] = {
+    "enterprise-architects": [
+        ("modules/arb.webp", 2, "Architecture Review Board",
+         "The review board dashboard: reviews, how many are pending, the approval rate and the average cycle time.",
+         "Screenshot of the Architecture Review Board with total reviews, pending reviews, approval rate and cycle time above a chart of review status."),
+        ("modules/architecture-model.webp", 1, "Architecture model",
+         "The architecture model: every ArchiMate element in a layer, counted and filterable.",
+         "Screenshot of the architecture model for one ArchiMate layer, with element counts, filters and a table of elements and their relationships."),
+    ],
+    "solution-architects": [
+        ("modules/solutions.webp", 1, "Solutions",
+         "The solutions list: each design with its phase, readiness and next action.",
+         "Screenshot of the All Solutions screen with counts of solutions by readiness and a list of solutions with phase, maturity and next action."),
+        ("modules/arb.webp", 2, "Architecture Review Board",
+         "The review board dashboard a design goes to for a decision.",
+         "Screenshot of the Architecture Review Board with total reviews, pending reviews, approval rate and cycle time above a chart of review status."),
+    ],
+    "cto-and-cio": [
+        ("modules/portfolio.webp", 1, "Portfolio",
+         "The portfolio: initiatives with approved budget, spend to date, health and sponsor.",
+         "Screenshot of the portfolio screen with initiative, budget and spend totals above a table of initiatives with phase, budget, spend, variance and sponsor."),
+        ("modules/business-case.webp", 1, "Business cases",
+         "Business cases: options, costs and expected return for each investment.",
+         "Screenshot of the Business Cases list with each case's status, total cost of ownership, return on investment and last update."),
+    ],
+    "it-portfolio-managers": [
+        ("modules/duplicate-detection.webp", 1, "Duplicate detection",
+         "Duplicate detection: groups of applications that do the same job, with the estimated saving.",
+         "Screenshot of the Duplicate Detection screen with duplicate groups, estimated annual saving and priority counts above a filterable list of groups."),
+        ("modules/applications.webp", 2, "Applications",
+         "The application portfolio: lifecycle, owner and capability for every application.",
+         "Screenshot of the Applications screen with active portfolio counts, a data quality notice and a table of applications with type, lifecycle status and capability."),
+    ],
+    "chief-architects": [
+        ("modules/arb.webp", 2, "Architecture Review Board",
+         "The review board dashboard: total reviews, pending reviews, approval rate and cycle time.",
+         "Screenshot of the Architecture Review Board with total reviews, pending reviews, approval rate and cycle time above a chart of review status."),
+    ],
+    "scale-up-cto-and-vp-engineering": [
+        ("modules/applications.webp", 2, "Applications",
+         "The portfolio the import fills, with how many applications have a named owner and a vendor.",
+         "Screenshot of the Applications screen with active portfolio counts, a data quality notice about owners and a table of applications with lifecycle status."),
+    ],
+    "business-architects": [
+        ("modules/projects.webp", 1, "Work packages",
+         "Work packages: the changes that close a gap, with status, priority and progress.",
+         "Screenshot of the Work Packages screen with a table of packages showing status, priority, a progress bar and due date."),
+    ],
+    "security-architects": [
+        ("modules/compliance-frameworks.webp", 1, "Regulatory compliance",
+         "Regulatory compliance: the frameworks in scope and the controls mapped to each.",
+         "Screenshot of the Regulatory Compliance screen with active frameworks and controls counts above a table of frameworks with jurisdiction and enforcement."),
+    ],
+    "data-architects": [
+        ("modules/architecture-model.webp", 1, "Architecture model",
+         "The architecture model: elements by layer, including the data objects lineage is recorded between.",
+         "Screenshot of the architecture model for one ArchiMate layer, with element counts, filters and a table of elements and their relationships."),
+    ],
+}
+
+
+def get_role_more_screens(page: "PublicPage") -> list[dict[str, Any]]:
+    """The extra real screens a role page shows below its hero (ROLE_MORE_SCREENS).
+
+    Only files that exist on disk are returned, so a missing capture can never ship a
+    broken <img>."""
+    if page.page_family != "role" or page.front_matter.get("capture_status") != "live":
+        return []
+    from PIL import Image
+
+    out = []
+    for rel, density, label, caption, alt in ROLE_MORE_SCREENS.get(page.slug, []):
+        path = STATIC_ROOT / "img" / rel
+        if not path.is_file():
+            continue
+        if rel.startswith("modules/"):
+            density = _standard_density(Path(rel).stem) or density
+        with Image.open(path) as im:
+            width, height = im.size[0] // density, im.size[1] // density
+        out.append({"url": f"/static/img/{rel}", "width": width, "height": height,
+                    "frame_label": f"{label} \u00b7 Demonstration company", "caption": caption, "alt": alt})
+    return out
+
+
+# The module images made to the capture standard (scripts/capture/clip_kit.py, capture_standard_image). Each
+# is recorded with its density in captures.json beside the images; a module not yet recaptured keeps the
+# density it was captured at.
+STANDARD_MODULE_IMAGES = frozenset({
+    "applications", "arb", "architecture-model", "business-case", "business-model-canvas",
+    "compliance-frameworks", "portfolio", "procurement", "risk-register", "vendors",
+})
+MODULE_CAPTURES_MANIFEST = "captures.json"
+
+
+def _standard_density(slug: str) -> int | None:
+    manifest = IMG_MODULES_DIR / MODULE_CAPTURES_MANIFEST
+    if not manifest.is_file():
+        return None
+    entry = json.loads(manifest.read_text(encoding="utf-8")).get(slug)
+    return entry["density"] if entry else None
+
+
+def module_image_alt(slug: str, variant: str = "desktop") -> str | None:
+    """The description written when the picture was captured, from the figures its screen showed, or None when
+    the manifest holds none for it (the registry's figure-free description is then used)."""
+    manifest = IMG_MODULES_DIR / MODULE_CAPTURES_MANIFEST
+    if not manifest.is_file():
+        return None
+    entry = json.loads(manifest.read_text(encoding="utf-8")).get(slug) or {}
+    return (entry.get(variant) or {}).get("alt")
+
+
+def module_caption(slug: str, caption: str) -> str:
+    """A caption whose figures come from the manifest: ``{initiatives}`` becomes "7 initiatives" from the
+    count captured with the picture, and a count the manifest does not hold reads as the plural noun alone,
+    so no number is written by hand."""
+    if "{" not in caption:
+        return caption
+    manifest = IMG_MODULES_DIR / MODULE_CAPTURES_MANIFEST
+    facts = {}
+    if manifest.is_file():
+        facts = ((json.loads(manifest.read_text(encoding="utf-8")).get(slug) or {}).get("desktop") or {}).get("facts") or {}
+    nouns = {"initiatives": "initiative"}
+    words = {}
+    for key, noun in nouns.items():
+        count = facts.get(key)
+        words[key] = ("%d %s%s" % (count, noun, "" if count == 1 else "s")) if isinstance(count, int) else "its " + key
+    return caption.format(**words)
 
 
 def _screenshot_density(slug: str, page_family: str) -> int:
-    return 2 if page_family == "module" and slug in TWO_X_MODULE_IMAGES else 1
+    if page_family == "module" and _standard_density(slug):
+        return _standard_density(slug)
+    if page_family == "module" and slug in TWO_X_MODULE_IMAGES:
+        return 2
+    if page_family == "role" and slug in TWO_X_ROLE_IMAGES:
+        return 2
+    return 1
 
 
 def get_page_screenshot(page: "PublicPage") -> dict[str, Any] | None:
@@ -543,6 +1038,10 @@ def get_page_screenshot(page: "PublicPage") -> dict[str, Any] | None:
         registry = USE_CASE_SCREENSHOT_CAPTURES
         static_dir = IMG_USE_CASES_DIR
         url_prefix = "/static/img/use-cases"
+    elif page.page_family == "role":
+        registry = ROLE_CAPTURES
+        static_dir = IMG_ROLES_DIR
+        url_prefix = "/static/img/roles"
     else:
         return None
 
@@ -550,6 +1049,9 @@ def get_page_screenshot(page: "PublicPage") -> dict[str, Any] | None:
     if entry is None:
         return None
     _, _, _, caption, alt = entry
+    if page.page_family == "module":
+        alt = module_image_alt(page.slug) or alt
+        caption = module_caption(page.slug, caption)
 
     image_path = static_dir / f"{page.slug}.webp"
     if not image_path.is_file():
@@ -569,6 +1071,8 @@ def get_page_screenshot(page: "PublicPage") -> dict[str, Any] | None:
         with Image.open(mobile_path) as im:
             mobile = {
                 "url": f"{url_prefix}/{page.slug}-mobile.webp",
+                "alt": (module_image_alt(page.slug, "phone") or MODULE_PHONE_ALTS.get(page.slug, alt))
+                if page.page_family == "module" else alt,
                 "width": im.size[0] // density,
                 "height": im.size[1] // density,
             }
@@ -578,8 +1082,80 @@ def get_page_screenshot(page: "PublicPage") -> dict[str, Any] | None:
         "width": width,
         "height": height,
         "mobile": mobile,
+        "density": density,
         "alt": alt,
         "caption": caption,
+        "frame_label": f"{ROLE_FRAME_LABELS.get(page.slug, 'Ask')} \u00b7 Demonstration company"
+        if page.page_family == "role" else None,
+    }
+
+
+def get_module_recording(page: "PublicPage") -> dict[str, Any] | None:
+    """The whole-journey recording of a module page, when its video, poster and manifest line all exist."""
+    if page.page_family != "module":
+        return None
+    entry = MODULE_RECORDINGS.get(page.slug)
+    if entry is None:
+        return None
+    video_path = IMG_MODULES_DIR / f"{page.slug}.webm"
+    poster_path = IMG_MODULES_DIR / f"{page.slug}.poster.webp"
+    manifest_path = IMG_MODULES_DIR / MODULE_RECORDINGS_MANIFEST
+    if not (video_path.is_file() and poster_path.is_file() and manifest_path.is_file()):
+        return None
+    meta = json.loads(manifest_path.read_text(encoding="utf-8")).get(page.slug)
+    if meta is None:
+        return None
+    share = get_share(page.slug)
+    return {
+        "video_url": f"/static/img/modules/{page.slug}.webm",
+        # The H.264 file cut for the same recording, for the browsers that do not play WebM (iPhone).
+        "mp4_url": share["files"]["wide"]["path"] if share else None,
+        "share_path": f"{SHARE_URL_PREFIX}/{page.slug}" if share else None,
+        "poster_url": f"/static/img/modules/{page.slug}.poster.webp",
+        "width": meta["width"],
+        "height": meta["height"],
+        "duration_seconds": meta["duration_seconds"],
+        "captured_date": meta["captured_date"],
+        "caption": entry["summary"],
+        "alt": entry["alt"],
+        "name": f"{entry['title']} \u2014 recorded walkthrough",
+    }
+
+
+def load_share_manifest() -> list[dict[str, Any]]:
+    """Every entry of the share manifest, or an empty list while the file has not been generated."""
+    path = SHARE_DIR / SHARE_MANIFEST
+    if not path.is_file():
+        return []
+    return json.loads(path.read_text(encoding="utf-8")).get("recordings", [])
+
+
+def get_share(slug: str) -> dict[str, Any] | None:
+    """The share-manifest entry of one module recording, or None when that module has none."""
+    return next((entry for entry in load_share_manifest() if entry["slug"] == slug), None)
+
+
+def share_page_paths() -> list[str]:
+    """The path of every share page, for the sitemap. A held or merged module has none listed, as its own page
+    is left out of load_feed_pages()."""
+    listed = {page.url for page in load_feed_pages()}
+    return [f"{SHARE_URL_PREFIX}/{entry['slug']}" for entry in load_share_manifest()
+            if f"/modules/{entry['slug']}" in listed]
+
+
+def share_social(share: dict[str, Any]) -> dict[str, Any]:
+    """The link-preview fields of a recording (``partials/_seo_meta.html`` draws them): the cover image, the wide
+    file and the type, with every address absolute so a platform can fetch it without the page around it."""
+    base = canonical_origin()
+    return {
+        "title": share["title"],
+        "description": share["message"],
+        "url": f"{base}{SHARE_URL_PREFIX}/{share['slug']}",
+        "image": base + share["cover"],
+        "image_alt": share["alt"],
+        "video": base + share["files"]["wide"]["path"],
+        "video_width": share["files"]["wide"]["width"],
+        "video_height": share["files"]["wide"]["height"],
     }
 
 
@@ -600,6 +1176,8 @@ def get_page_recording(page: "PublicPage") -> dict[str, Any] | None:
     if entry is None:
         return None
     _, _, _, caption, alt = entry
+    if page.page_family == "module":
+        alt = module_image_alt(page.slug) or alt
 
     video_path = VIDEO_USE_CASES_DIR / f"{page.slug}.webm"
     poster_path = VIDEO_USE_CASES_DIR / f"{page.slug}-poster.webp"
@@ -622,12 +1200,67 @@ def get_page_recording(page: "PublicPage") -> dict[str, Any] | None:
     }
 
 
+_LEGAL_BLOCK = re.compile(
+    r"\[\[if legal-pages\]\](.*?)(?:\[\[else\]\](.*?))?\[\[/if\]\]", re.DOTALL
+)
+_PAYMENT_BLOCK = re.compile(
+    r"\[\[if payment-open\]\](.*?)(?:\[\[else\]\](.*?))?\[\[/if\]\]", re.DOTALL
+)
+
+
+def _payment_open() -> bool:
+    """The one billing switch, so a page promises buying only while buying works."""
+    from app.services.billing_plans import payment_is_open
+
+    return payment_is_open()
+
+
+def _apply_legal_blocks(body_md: str) -> str:
+    """Keep the first branch of ``[[if legal-pages]]a[[else]]b[[/if]]`` when
+    the held legal pages are live, otherwise the ``else`` branch (or nothing),
+    so a page never names a legal page that answers 404."""
+    from app.services.legal_pages import legal_pages_enabled
+
+    live = legal_pages_enabled()
+    body_md = _LEGAL_BLOCK.sub(
+        lambda m: (m.group(1) if live else (m.group(2) or "")), body_md
+    )
+    # ``[[if payment-open]]a[[else]]b[[/if]]`` reads the one billing switch the same way.
+    paying = _payment_open()
+    return _PAYMENT_BLOCK.sub(
+        lambda m: (m.group(1) if paying else (m.group(2) or "")), body_md
+    )
+
+
+def _released_variant(front_matter: dict[str, Any], file_path: Path) -> Path | None:
+    """The page's own "available" text, when the screen it is waiting for is in a released wave.
+
+    A not-yet-built page may name ``released_variant: {screen: /route, file: relative/path.md}``. Once the
+    release wave that opens that route is released (or the wave switch is off) the variant file is
+    read in its place, so the page and every menu that reads it never describe a working screen as
+    not built. It is the same map entry the menu check reads, without needing an application context.
+    """
+    from app.release_waves import OPEN, configured_wave, entry_for, state_for
+
+    spec = front_matter.get("released_variant")
+    if not isinstance(spec, dict):
+        return None
+    wave = configured_wave()
+    if wave is not None and state_for(entry_for(str(spec["screen"])), wave) != OPEN:
+        return None
+    return file_path.parent / str(spec["file"])
+
+
 def _load_page(file_path: Path, family: str, slug: str, url: str) -> PublicPage:
     raw = file_path.read_text(encoding="utf-8")
     front_matter, body_md = _parse_front_matter(raw)
+    variant = _released_variant(front_matter, file_path)
+    if variant is not None:
+        front_matter, body_md = _parse_front_matter(variant.read_text(encoding="utf-8"))
+    body_md = _apply_legal_blocks(body_md)
     if family == "function-per-segment":
         slug, url = _use_case_slug_and_url(front_matter, slug)
-    body_html = _sanitize_html(_md.reset().convert(body_md))
+    body_html = _sanitize_html(_markdown().reset().convert(body_md))
     title = _extract_title(body_html, front_matter)
     external_url = _build_external_url(front_matter)
     return PublicPage(
@@ -661,6 +1294,8 @@ def load_all_pages() -> list[PublicPage]:
         if not family_dir.is_dir():
             continue
         for md_file in sorted(family_dir.glob("*.md")):
+            if is_translation_file(md_file):
+                continue
             slug = _slug_from_filename(md_file.name)
             if family == "dogfood":
                 url = FAMILY_URL_PREFIX[family]
@@ -679,7 +1314,17 @@ def _content_fingerprint() -> tuple[tuple[str, int], ...]:
     markdown + bleach over every content file on each call."""
     if not CONTENT_ROOT.is_dir():
         return ()
-    return tuple(sorted(
+    from app.services.legal_pages import legal_pages_enabled
+
+    # The flag is part of the key: a page's body can differ with it.
+    from app.release_waves import configured_wave
+
+    # the release wave is part of the key too: a page may read differently once its screen is released
+    return (
+        ("legal-pages", int(legal_pages_enabled())),
+        ("payment-open", int(_payment_open())),
+        ("release-wave", str(configured_wave())),
+    ) + tuple(sorted(
         (str(p), p.stat().st_mtime_ns) for p in CONTENT_ROOT.rglob("*.md")
     ))
 
@@ -720,7 +1365,7 @@ def load_feed_pages() -> list[PublicPage]:
     than one surface at a time.
     """
     return [
-        page for page in load_all_pages()
+        page for page in _pages_by_url().values()
         if not page.is_held and page.url not in MERGED_PAGES
     ]
 
@@ -737,7 +1382,77 @@ def feed_page_paths() -> list[str]:
     the way they did when each built its own (see
     tests/test_public_content_pages.py::test_indexnow_submission_matches_sitemap_urls).
     """
-    return ["/", "/vs", "/use-cases"] + [page.url for page in load_feed_pages()]
+    from app.release_waves.routes import early_access_paths
+
+    paths = ["/", "/vs", "/use-cases"] + early_access_paths() + [page.url for page in load_feed_pages()] + share_page_paths()
+    return list(dict.fromkeys(paths))
+
+
+def load_translations() -> list[PublicPage]:
+    """Every translated page under content/pages/, at its language's address. A translation whose English page does
+    not exist is left out: it would name a page nobody can reach."""
+    english = {(page.family, page.slug): page for page in _pages_by_url().values()}
+    translations: list[PublicPage] = []
+    for family, dir_name in FAMILY_DIR_MAP.items():
+        family_dir = CONTENT_ROOT / dir_name
+        if not family_dir.is_dir():
+            continue
+        for md_file in sorted(family_dir.glob("*.md")):
+            if not is_translation_file(md_file):
+                continue
+            page = _load_page(md_file, family, _slug_from_filename(md_file.name), "")
+            source = english.get((family, str(page.front_matter.get("translation_of") or "")))
+            if page.lang == DEFAULT_LANGUAGE or source is None:
+                continue
+            translations.append(dataclasses.replace(page, slug=source.slug, url=TRANSLATION_PREFIXES[page.lang] + source.url))
+    return translations
+
+
+@functools.lru_cache(maxsize=1)
+def _translations_for_fingerprint(fingerprint: tuple[tuple[str, int], ...]) -> dict[str, PublicPage]:
+    return {page.url: page for page in load_translations()}
+
+
+def _translations_by_url() -> dict[str, PublicPage]:
+    """Address-to-page map of every translation, cached like ``_pages_by_url`` and rebuilt when a content file changes."""
+    return _translations_for_fingerprint(_content_fingerprint())
+
+
+def _english_url_of(page: PublicPage) -> str:
+    return page.url[len(TRANSLATION_PREFIXES[page.lang]):] if page.lang != DEFAULT_LANGUAGE else page.url
+
+
+def published_translations() -> list[PublicPage]:
+    """The translations that belong in a sitemap: those not held back, whose English page is itself published."""
+    feed = {page.url for page in load_feed_pages()}
+    return [
+        page for page in _translations_by_url().values()
+        if not page.is_held and _english_url_of(page) in feed
+    ]
+
+
+def _published_translations_by_english_url() -> dict[str, dict[str, PublicPage]]:
+    grouped: dict[str, dict[str, PublicPage]] = {}
+    for page in published_translations():
+        grouped.setdefault(_english_url_of(page), {})[page.lang] = page
+    return grouped
+
+
+def translation_page(path: str) -> PublicPage | None:
+    """The translated page served at this address, or None."""
+    return _translations_by_url().get(path)
+
+
+def language_page_paths(code: str) -> list[str]:
+    """The addresses in one language's sitemap: the feed for English, the published translations otherwise."""
+    if code == DEFAULT_LANGUAGE:
+        return feed_page_paths()
+    return [page.url for page in published_translations() if page.lang == code]
+
+
+def sitemap_languages() -> list[str]:
+    """Every language that has pages to list, English first."""
+    return [DEFAULT_LANGUAGE] + [code for code in TRANSLATION_PREFIXES if language_page_paths(code)]
 
 
 def load_page(family: str, slug: str | None = None) -> PublicPage | None:
@@ -770,6 +1485,8 @@ def load_page(family: str, slug: str | None = None) -> PublicPage | None:
         # the internal uc-sN-NN-* filename -- find the file whose public
         # slug (see _use_case_slug_and_url) matches the one requested.
         for md_file in sorted(family_dir.glob("*.md")):
+            if is_translation_file(md_file):
+                continue
             filename_slug = _slug_from_filename(md_file.name)
             front_matter, _ = _parse_front_matter(md_file.read_text(encoding="utf-8"))
             public_slug, public_url = _use_case_slug_and_url(front_matter, filename_slug)
@@ -803,14 +1520,20 @@ def build_jsonld(page: PublicPage) -> str:
     test_template_escaping.py to flag.
     """
     family = page.page_family
-    site_url = SITE_URL
+    site_url = canonical_origin()
 
     if family == "comparison":
         ld = _jsonld_faq(page, site_url)
     elif family == "vision":
         ld = _jsonld_software_app(page, site_url)
-    elif family == "module":
+    elif family == "module" and page.cta != "waiting_list":
+        # A module still on the waiting list is a plain page: no
+        # SoftwareApplication or offer is emitted for a capability that
+        # cannot be used yet.
         ld = _jsonld_software_app(page, site_url)
+        recording = get_module_recording(page)
+        if recording is not None:
+            ld["video"] = _jsonld_video_object(recording, site_url)
     elif family == "function-per-segment":
         ld = _jsonld_webpage(page, site_url)
     elif family == "dogfood":
@@ -888,8 +1611,8 @@ def _breadcrumb_list_items(page: PublicPage, site_url: str) -> list[dict[str, An
 # lands in a final "More" group.
 
 ROLE_GROUPS: tuple[tuple[str, str], ...] = (
-    ("architecture", "Architecture"),
     ("technology-leadership", "Technology leadership"),
+    ("architecture", "Architecture"),
     ("portfolio-procurement-finance", "Portfolio, procurement and finance"),
     ("security-risk-compliance", "Security, risk and compliance"),
     ("owners", "Owners"),
@@ -994,6 +1717,32 @@ def hub_extra_entries(
     return resolved
 
 
+def role_hub_cards(registry_groups: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """The cards on /roles: the registry's family groups, then an "Other roles"
+    group holding every live role page no family card points at, so a new role
+    page is on the hub with no other edit."""
+    feed = load_feed_pages()
+    live = {p.url for p in feed}
+    # A registry role is carded only while its page opens: a held page gets no card.
+    groups = [
+        {**g, "cards": [c for c in g["cards"] if c["href"] in live]}
+        for g in registry_groups
+    ]
+    groups = [g for g in groups if g["cards"]]
+    carded = {card["href"] for group in registry_groups for card in group["cards"]}
+    others = sorted(
+        (p for p in feed if p.family == "role" and p.url not in carded),
+        key=_title_key,
+    )
+    if others:
+        groups.append({
+            "id": "other-roles",
+            "label": "Other roles",
+            "cards": [{"title": p.title, "blurb": p.description or f"Read the guide for {p.title}", "href": p.url} for p in others],
+        })
+    return groups
+
+
 def role_siblings(page: PublicPage) -> list[dict[str, Any]]:
     """The "Other roles" strip for a role page: every other role-family feed
     page (sorted by title) as one group, then the non-page role entries as
@@ -1018,7 +1767,7 @@ def build_hub_jsonld(
     """Structured data for a hub: CollectionPage with an ItemList of every
     linked page, a BreadcrumbList (Home > hub) and an FAQPage only when the
     hub's own intro has a real FAQ section. One @graph, one script block."""
-    site_url = SITE_URL
+    site_url = canonical_origin()
     collection: dict[str, Any] = {
         "@type": "CollectionPage",
         "url": f"{site_url}{path}",
@@ -1094,6 +1843,11 @@ def _self_hosted_offer() -> dict[str, Any]:
     }
 
 
+def _plan_audience(plan) -> dict[str, Any]:
+    """Who the plan is for, from the same field the pricing page shows."""
+    return {"@type": "Audience", "audienceType": plan.audience}
+
+
 def _flat_plan_offer(plan, interval: str, amount: int) -> dict[str, Any]:
     """An Offer for a flat (non per-unit) hosted plan price at one interval."""
     suffix = "month" if interval == "month" else "year"
@@ -1104,6 +1858,7 @@ def _flat_plan_offer(plan, interval: str, amount: int) -> dict[str, Any]:
         "price": str(amount),
         "priceCurrency": plan.display_currency,
         "description": f"{plan.summary} {price_text}, hosted by Entelim.",
+        "audience": _plan_audience(plan),
     }
 
 
@@ -1125,6 +1880,7 @@ def _per_unit_plan_offer(plan, interval: str, amount: int) -> dict[str, Any]:
         "description": (
             f"{plan.summary} ${amount}/{unit}/{suffix}, hosted by Entelim."
         ),
+        "audience": _plan_audience(plan),
         "priceSpecification": {
             "@type": "UnitPriceSpecification",
             "price": str(amount),
@@ -1158,6 +1914,7 @@ def _enterprise_offer(plan, site_url: str) -> dict[str, Any]:
         "description": (
             f"{plan.summary} Sold by contract, from ${floor:,}/year -- contact sales."
         ),
+        "audience": _plan_audience(plan),
     }
 
 
@@ -1168,7 +1925,7 @@ def _hosted_plan_offers(site_url: str) -> list[dict[str, Any]]:
     pricing page or the home page again.
     """
     offers: list[dict[str, Any]] = []
-    for plan in PLANS:
+    for plan in listed_plans():
         if plan.display_price_floor_annual is not None:
             offers.append(_enterprise_offer(plan, site_url))
             continue
@@ -1306,14 +2063,14 @@ def _jsonld_faq(page: PublicPage, site_url: str) -> dict[str, Any]:
     }
 
 
-# ── Landing layout (module, use-case and comparison pages) ──────────────────
-# These three families render as a landing page (hero, alternating section
+# ── Landing layout (module, use-case, comparison and role pages) ──────────────────
+# These four families render as a landing page (hero, alternating section
 # bands, link lists as cards, a closing action band) instead of one prose
 # column; every other family keeps the document layout. Keyed on
 # ``page.family`` (the content directory), never ``page.page_family``, so
 # front matter cannot switch a legal or site page into it.
 
-LANDING_FAMILIES: frozenset[str] = frozenset({"module", "function-per-segment", "comparison"})
+LANDING_FAMILIES: frozenset[str] = frozenset({"module", "function-per-segment", "comparison", "role"})
 
 # The one segment-label table: the /use-cases index groups by it and a
 # use-case page's hero names its segment from it.
@@ -1385,6 +2142,48 @@ class Landing:
     segment_label: str | None
     primary_action: tuple[str, str]
     secondary_action: tuple[str, str] = ("See pricing", "/pricing")
+    # A module page's structured sections (front matter), or None for any other page.
+    module: "ModuleLanding | None" = None
+
+
+@dataclass
+class ModuleLanding:
+    """What a /modules/<slug> page shows in the home page's own section order.
+
+    Every field is author-written plain text from the page's front matter
+    (headline, summary, who_for, questions, steps, faq); nothing is derived.
+    """
+
+    headline: str
+    summary: str
+    who_for: list[str]
+    questions: list[dict[str, str]]
+    steps: list[dict[str, str]]
+    faq: list[dict[str, str]]
+    steps_heading: str = "From your data to an answer, in steps."
+
+
+def _module_landing(page: PublicPage) -> ModuleLanding | None:
+    fm = page.front_matter
+    if page.family != "module" or not fm.get("questions"):
+        return None
+
+    def pairs(key: str, first: str, second: str) -> list[dict[str, str]]:
+        return [
+            {first: str(item[first]), second: str(item[second])}
+            for item in fm.get(key) or []
+            if isinstance(item, dict) and item.get(first) and item.get(second)
+        ]
+
+    return ModuleLanding(
+        headline=page.heading,
+        summary=str(fm.get("summary") or page.description or ""),
+        who_for=[str(x) for x in fm.get("who_for") or []],
+        questions=pairs("questions", "q", "who"),
+        steps=pairs("steps", "name", "text"),
+        faq=pairs("faq", "q", "a"),
+        steps_heading=str(fm.get("steps_heading") or ModuleLanding.steps_heading),
+    )
 
 
 @dataclass
@@ -1568,6 +2367,17 @@ def _link_list_cards(body: str, pages_by_url: dict[str, PublicPage]) -> list[Lan
     return cards
 
 
+def _start_action() -> tuple[str, str]:
+    """The one call to action of every module and share page: a signed-in person is offered their dashboard, a
+    visitor is offered sign-up."""
+    from flask import has_request_context, url_for
+    from flask_login import current_user
+
+    if has_request_context() and current_user.is_authenticated:
+        return ("Open Entelim", url_for("dashboard.overview"))
+    return ("Start free", url_for("account.register"))
+
+
 def build_landing(page: PublicPage) -> Landing | None:
     """The landing-page view of ``page`` for public/_partials/_landing.html,
     or ``None`` when ``page.family`` keeps the document layout.
@@ -1581,8 +2391,6 @@ def build_landing(page: PublicPage) -> Landing | None:
     """
     if page.family not in LANDING_FAMILIES:
         return None
-
-    from flask import url_for
 
     body = str(page.body_html)
     nodes = _top_level_nodes(body)
@@ -1650,8 +2458,12 @@ def build_landing(page: PublicPage) -> Landing | None:
 
     if page.cta == "waiting_list":
         primary_action = ("Tell us you need this", "#feature-interest")
+        # A page for something not built yet never points at pricing: its
+        # second action is a conversation, not a plan.
+        secondary_action = ("Talk to us", f"/contact?from={page.slug}")
     else:
-        primary_action = ("Start free", url_for("account.register"))
+        primary_action = _start_action()
+        secondary_action = ("See pricing", "/pricing")
 
     return Landing(
         title=page.title,
@@ -1662,4 +2474,6 @@ def build_landing(page: PublicPage) -> Landing | None:
         breadcrumb=parent,
         segment_label=segment_label,
         primary_action=primary_action,
+        secondary_action=secondary_action,
+        module=_module_landing(page),
     )

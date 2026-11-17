@@ -238,6 +238,6 @@ class TestRiskInputComesFromTheRiskRows:
                 return real(app_ids)
 
             monkeypatch.setattr(RationalizationScoringService, "_load_risk_scores", staticmethod(spy))
-            RationalizationScoringService.calculate_portfolio_scores(force_recalculate=True)
+            RationalizationScoringService.calculate_portfolio_scores(org.id, force_recalculate=True)
 
         assert len(calls) == 1

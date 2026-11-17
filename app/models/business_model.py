@@ -68,6 +68,16 @@ class BusinessModelCanvas(TenantMixin, db.Model):
     cost_structure = db.Column(db.Text, nullable=True)
     revenue_streams = db.Column(db.Text, nullable=True)
 
+    # The canvas is a view over the model: its Architecture View (a saved
+    # diagram) lists the elements it shows, and the vision it serves is a
+    # Goal element. Both nullable so reconcile-schema can add them.
+    saved_diagram_id = db.Column(db.Integer, nullable=True)
+    vision_element_id = db.Column(db.Integer, nullable=True)
+
+    # Which framework this canvas draws (a CANVAS_TEMPLATES key). NULL is the
+    # Business Model Canvas, which is what every canvas was before this column.
+    canvas_type = db.Column(db.String(64), nullable=True)
+
     # Timestamps
     created_at = db.Column(db.DateTime, default=utcnow, nullable=True)
     updated_at = db.Column(db.DateTime, default=utcnow, onupdate=utcnow, nullable=True)

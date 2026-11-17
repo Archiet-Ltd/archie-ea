@@ -209,11 +209,14 @@ class AdminUserService:
         the attacker's captured cookie is still riding on, or the reset is
         cosmetic.
         """
-        user.password = new_password
         if confirm_user:
-            user.confirmed = True
-        db.session.add(user)
-        db.session.commit()
+            from app.modules.account.services.account_service import AccountService
+
+            AccountService.confirm_user(user, password=new_password)
+        else:
+            user.password = new_password
+            db.session.add(user)
+            db.session.commit()
 
         from app.services import session_registry
 
@@ -234,6 +237,9 @@ class AdminUserService:
         Returns:
             Tuple of (success, message).
         """
+        from app.services.administrator_guard import ensure_keeps_administrator
+
+        ensure_keeps_administrator(user.organization_id, [user.id], leaving=True)
         user_name = user.full_name()
         db.session.delete(user)
         db.session.commit()

@@ -8,6 +8,12 @@ document.addEventListener('alpine:init', function() {
             elements: [],
             pagination: { page: 1, pages: 0, per_page: 25, total: null, has_next: false, has_prev: false },
             loading: false,
+            // The first list request has not finished, or the layer on screen is not the layer last loaded:
+            // the figures that come from the list are being fetched, not missing.
+            elementsLoaded: false,
+            loadedLayer: null,
+            // The layer counts sweep has not answered yet: a layer count not known by then is being fetched.
+            countsLoaded: false,
             loadError: null,   // referenced by x-show/x-text in the template; must exist to avoid Alpine ReferenceError
             searchQuery: '',
             typeFilter: '',
@@ -29,6 +35,12 @@ document.addEventListener('alpine:init', function() {
                 return Object.values(this.layerCounts).reduce(function(a, b) { return a + (b || 0); }, 0);
             },
             layerCounts: {},
+            // True from the page's first moment until the counts answer: a tab or card with no figure yet
+            // says it is counting, and only a count that failed says it is unavailable.
+            countsLoading: true,
+            // Per layer, how many of its records the model map does not draw (a gap entered in the gap
+            // register has no model element). Read from the same counts answer as layerCounts.
+            notOnModelMap: {},
             layerConfig: APP_CONFIG.layerConfig || {},
             popstateHandler: null,
             // ARCH-064: fieldConfigs used to be inlined into every dashboard
@@ -39,6 +51,7 @@ document.addEventListener('alpine:init', function() {
             // fetch completes, exactly as it already does for a type with no
             // configured fields.
             fieldConfigs: {},
+            fieldConfigsReady: null,
 
             // Card filter and grouping
             cardFilter: '',
@@ -52,6 +65,9 @@ document.addEventListener('alpine:init', function() {
             selectAll: false,
 
             editingElement: null,
+            // Set when this page was opened on one record's Edit page: the form opens on that
+            // record, and saving or cancelling returns to the record's own page.
+            editPageDeepLink: APP_CONFIG.editingElement || null,
             formData: { element_type: '', name: '', description: '' },
             formError: '',
             saving: false,
@@ -158,7 +174,13 @@ document.addEventListener('alpine:init', function() {
                 // them, still) returns [] and the modal stays name+description only.
                 let et = this.formData.element_type;
                 let cfg = et ? this.fieldConfigs[et] : null;
-                return (cfg && Array.isArray(cfg.fields)) ? cfg.fields : [];
+                let fields = (cfg && Array.isArray(cfg.fields)) ? cfg.fields : [];
+                // A record held only as an architecture element shows the fields it can save and no others.
+                let saveable = this.editingElement && this.editingElement.saveable_fields;
+                if (Array.isArray(saveable)) {
+                    fields = fields.filter(function(f) { return saveable.indexOf(f.name) !== -1; });
+                }
+                return fields;
             },
 
             get elementGroups() {
@@ -235,6 +257,7 @@ document.addEventListener('alpine:init', function() {
             },
 
             get relationshipHint() {
+                if (this.elementsPending) return 'Loading';
                 let metrics = this.relationshipMetrics;
                 if (!metrics.known) return 'Relationship data unavailable on this page';
                 return metrics.connected + ' of ' + metrics.known + ' measured on this page';
@@ -249,6 +272,7 @@ document.addEventListener('alpine:init', function() {
             },
 
             get documentationHint() {
+                if (this.elementsPending) return 'Loading';
                 if (!this.pageCount) return 'No page denominator available';
                 let documented = this.elements.filter(function(el) {
                     return !!(el.description && el.description.trim());
@@ -300,8 +324,65 @@ document.addEventListener('alpine:init', function() {
                     : null;
             },
 
+            get elementsPending() {
+                return !this.elementsLoaded || (this.loading && this.loadedLayer !== this.activeTab);
+            },
+
             get layerTotalKnown() {
                 return typeof this.layerTotal === 'number';
+            },
+
+            // The layer's own count: the number on its tab, its header and its Elements card. The list's
+            // total (layerTotal) is narrower whenever a search or filter is applied, so it is never shown as
+            // the layer's count.
+            get layerCount() {
+                let count = this.layerCounts[this.activeTab];
+                return typeof count === 'number' ? count : null;
+            },
+
+            get layerCountKnown() {
+                return typeof this.layerCount === 'number';
+            },
+
+            get layerNotOnModelMap() {
+                let count = this.notOnModelMap[this.activeTab];
+                return typeof count === 'number' ? count : 0;
+            },
+
+            // The layer's count is not known yet and the answers that carry it are still being fetched.
+            get layerCountPending() {
+                return !this.layerCountKnown && (!this.countsLoaded || this.elementsPending);
+            },
+
+            get layerCountLabel() {
+                if (this.layerCountPending) return 'loading layer total';
+                if (!this.layerCountKnown) return 'layer total unavailable';
+                let n = this.layerCount;
+                let text = n + (n === 1 ? ' element' : ' elements') + ' in this layer';
+                if (this.layerNotOnModelMap > 0) {
+                    text += ', ' + this.layerNotOnModelMap + ' of them not on the model map';
+                }
+                return text;
+            },
+
+            get layerCountHint() {
+                if (!this.layerCountKnown) return this.countsLoading ? 'Counting this layer' : 'Layer total unavailable';
+                if (this.layerNotOnModelMap > 0) {
+                    return this.layerNotOnModelMap + ' entered in a register and not on the model map';
+                }
+                return 'Every element in this layer';
+            },
+
+            get listNarrowed() {
+                return !!(this.searchQuery || this.typeFilter || this.sourceFilter || this.kindFilter
+                    || this.viewpointTypeFilter.length);
+            },
+
+            get listTotalLabel() {
+                if (this.elementsPending) return 'Loading';
+                if (!this.layerTotalKnown) return '\u2014 total';
+                if (this.listNarrowed && this.layerCountKnown) return this.layerTotal + ' of ' + this.layerCount + ' match';
+                return this.layerTotal + ' total';
             },
 
             // D-03: sourceCounts/healthStats are computed from `this.elements`,
@@ -351,9 +432,20 @@ document.addEventListener('alpine:init', function() {
                 this.loadElements();
             },
 
+            // The type a page such as the Products list opens on is the page itself, not a filter a person set.
+            pageType() {
+                return (window.__APP_CONFIG__ && window.__APP_CONFIG__.initialElementType) || '';
+            },
+
+            pageTypePlural() {
+                let name = this.formatTypeName(this.pageType());
+                if (!name) return '';
+                return /(s|x|ch|sh)$/i.test(name) ? name + 'es' : name.replace(/([^aeiou])y$/i, '$1ie') + 's';
+            },
+
             hasActiveFilters() {
                 return !!(
-                    this.searchQuery || this.typeFilter || this.sourceFilter ||
+                    this.searchQuery || (this.typeFilter && this.typeFilter !== this.pageType()) || this.sourceFilter ||
                     this.viewpointKey !== 'basic' || this.filterScope ||
                     this.filterBuildingBlock || this.filterPlateau ||
                     this.filterHasRels || this.cardFilter
@@ -366,9 +458,40 @@ document.addEventListener('alpine:init', function() {
 
             init() {
                 var self = this;
+                if (APP_CONFIG.embeddedForm) {
+                    // A page that makes one kind of element in place (the Gaps page) uses only the dialog:
+                    // it loads the field settings and leaves the repository list alone.
+                    if (APP_CONFIG.fieldConfigsUrl) {
+                        this.fieldConfigsReady = Platform.fetch.get(APP_CONFIG.fieldConfigsUrl, null, { silent: true })
+                            .then(function(data) { self.fieldConfigs = data || {}; })
+                            .catch(function() { /* swallow-ok: optional field settings; the dialog falls back to name and description */ });
+                    }
+                    return;
+                }
+                if (this.editPageDeepLink) {
+                    // On the record's own Edit page Escape means Cancel: back to the record.
+                    document.addEventListener('keydown', function(event) {
+                        if (event.key === 'Escape') { self.cancelForm(); }
+                    });
+                    // The dialog's own close control leaves the same way Cancel does.
+                    if (window.Platform && window.Platform.modal && window.Platform.modal.on) {
+                        window.Platform.modal.on('archimate-form-modal', 'close', function() {
+                            window.location.assign(self.editPageDeepLink.detail_url);
+                        });
+                    }
+                }
                 if (APP_CONFIG.fieldConfigsUrl) {
                     Platform.fetch.get(APP_CONFIG.fieldConfigsUrl, null, { silent: true })
-                        .then(function(data) { self.fieldConfigs = data || {}; })
+                        .then(function(data) {
+                            self.fieldConfigs = data || {};
+                            if (self.editPageDeepLink) { self.openEditModal(self.editPageDeepLink); }
+                            if (APP_CONFIG.createElementType) {
+                                // The New <type> page opens the Create form with that type chosen.
+                                self.openCreateModal();
+                                self.formData.element_type = APP_CONFIG.createElementType;
+                                self.resetTypedFields();
+                            }
+                        })
                         .catch(function(err) {
                             // Non-fatal: typed fields just fall back to the plain
                             // name+description form until a retry/reload succeeds.
@@ -414,6 +537,9 @@ document.addEventListener('alpine:init', function() {
             restoreUrlState() {
                 let params = new URLSearchParams(window.location.search);
                 let wantedLayer = params.get('layer') || APP_CONFIG.initialLayer || 'motivation';
+                if (this.layerConfig[wantedLayer] && this.layerConfig[wantedLayer].folded_into) {
+                    wantedLayer = this.layerConfig[wantedLayer].folded_into;
+                }
                 this.activeTab = this.layerConfig[wantedLayer] ? wantedLayer : 'motivation';
 
                 let wantedType = params.get('element_type') || APP_CONFIG.initialElementType || '';
@@ -506,28 +632,31 @@ document.addEventListener('alpine:init', function() {
                     this.elements = data.elements || [];
                     this.pagination = data.pagination || { page: 1, pages: 0, per_page: this.perPage, total: null, has_next: false, has_prev: false };
                     this.currentPage = this.pagination.page || this.currentPage;
-                    this.layerCounts[this.activeTab] = data.pagination && typeof data.pagination.total === 'number'
-                        ? data.pagination.total
-                        : null;
+                    // The tab's count is the layer's count from the counting service and nothing the list
+                    // returns changes it: opening a tab must not move its number.
+                    this.loadedLayer = this.activeTab;
                 } catch (err) {
                     // The template already renders an error state + Retry button on
                     // `loadError` (dashboard.html); nothing ever set it until now.
                     this.loadError = err.message || 'Could not load elements for this layer';
                     this.elements = [];
                     this.pagination = { page: this.currentPage, pages: 0, per_page: this.perPage, total: null, has_next: false, has_prev: false };
-                    this.layerCounts[this.activeTab] = null;   // unknown, not zero
                     // Platform.fetch already showed a toast unless silent:true; we passed silent:true,
                     // so we need to show our own toast here to maintain existing behavior.
                     if (window.Platform && Platform.toast) Platform.toast.error(this.loadError);
                 } finally {
                     this.loading = false;
+                    this.elementsLoaded = true;
                     this.$nextTick(function() { if (typeof lucide !== 'undefined') lucide.createIcons(); });
                 }
             },
 
             async loadAllLayerCounts() {
                 let self = this;
-                let layerKeys = Object.keys(this.layerConfig);
+                // A layer folded into another (Physical, held in Technology) has no count of its own.
+                let layerKeys = Object.keys(this.layerConfig).filter(function(key) {
+                    return !(self.layerConfig[key] && self.layerConfig[key].folded_into);
+                });
                 let uncounted = [];
                 // One batched request instead of one per layer. The per-layer
                 // sweep issued 7-14 requests per page load, and the app rate-limits
@@ -576,6 +705,7 @@ document.addEventListener('alpine:init', function() {
                     );
                     let payload = data.data || data;
                     batched = payload.counts || {};
+                    self.notOnModelMap = payload.not_on_model_map || {};
                 } catch (batchError) {
                     // Batched endpoint unavailable: every layer falls through below.
                     batched = {};
@@ -600,6 +730,9 @@ document.addEventListener('alpine:init', function() {
                         uncounted.push(layerKey);
                     }
                 }
+
+                self.countsLoading = false;
+                self.countsLoaded = true;
 
                 // One toast for the whole sweep — six per-layer toasts would be worse
                 // than the failure they report.
@@ -650,18 +783,32 @@ document.addEventListener('alpine:init', function() {
 
             toggleSelectAll() {
                 if (this.selectAll) {
-                    this.selectedIds = this.elements.map(function(el) { return el.id + ':' + el.element_type; });
+                    var self = this;
+                    this.selectedIds = this.elements.map(function(el) { return self.selectionKey(el); });
                 } else {
                     this.selectedIds = [];
                 }
             },
 
+            // A record kept in its own table is addressed by that record's id; one held only as an
+            // architecture element, by the element's id.
+            recordId(el) {
+                return el.record_id || el.id;
+            },
+            // A selection carries the id it will be acted on by and which kind of id that is.
+            selectionKey(el) {
+                return this.recordId(el) + ':' + el.element_type + ':' + (el.record_id ? 'r' : 'e');
+            },
+            // The two number spaces overlap, so an address built from an element's id says so.
+            idScope(el) {
+                return el.record_id ? '' : '?ae=1';
+            },
             detailUrl(el) {
-                return '/architecture/' + this.activeTab + '/' + el.element_type + '/' + el.id;
+                return '/architecture/' + this.activeTab + '/' + el.element_type + '/' + this.recordId(el) + this.idScope(el);
             },
             editPageUrl(el) {
                 if (!el) return '#';
-                return '/architecture/' + this.activeTab + '/' + el.element_type + '/' + el.id + '/edit';
+                return '/architecture/' + this.activeTab + '/' + el.element_type + '/' + this.recordId(el) + '/edit' + this.idScope(el);
             },
 
             formatTypeName(type) {
@@ -734,9 +881,24 @@ document.addEventListener('alpine:init', function() {
                 let out = {};
                 for (let i = 0; i < fields.length; i++) {
                     let name = fields[i].name;
-                    out[name] = (source && source[name] !== undefined) ? source[name] : '';
+                    // A new record opens a field that cannot be empty on the type's default.
+                    let blank = (!source && fields[i].allow_empty === false) ? (fields[i].default || '') : '';
+                    out[name] = (source && source[name] !== undefined) ? source[name] : blank;
                 }
                 return out;
+            },
+            capabilityChoices: [],
+            capabilityQuery: '',
+            async loadCapabilityChoices() {
+                let url = '/architecture/api/capability-choices?q=' + encodeURIComponent(this.capabilityQuery || '');
+                let selected = this.formData.capability_id;
+                if (selected) { url += '&selected=' + encodeURIComponent(selected); }
+                let data = await Platform.fetch.get(url, null, { silent: true });
+                this.capabilityChoices = Array.isArray(data) ? data : [];
+            },
+            // Choosing a capability answers an error that said one was missing.
+            clearCapabilityError() {
+                if (/capability/i.test(this.formError || '')) { this.formError = ''; }
             },
             resetTypedFields() {
                 // Called when the Element Type select changes: drop any typed
@@ -745,6 +907,18 @@ document.addEventListener('alpine:init', function() {
                 let base = { element_type: this.formData.element_type, name: this.formData.name, description: this.formData.description };
                 Object.assign(base, this.typedFieldDefaults(this.formData.element_type));
                 this.formData = base;
+            },
+            // The word the dialog names what it makes with: "Element", or the kind a page makes in place.
+            dialogNoun() {
+                return APP_CONFIG.createNoun || 'Element';
+            },
+            // The page's own button: open the dialog on the kind the page makes.
+            // It waits for the field settings, so each field opens on its own default, not on its first option.
+            async openCreateForType() {
+                if (this.fieldConfigsReady) { await this.fieldConfigsReady; }
+                this.openCreateModal();
+                this.formData.element_type = APP_CONFIG.createElementType || '';
+                this.resetTypedFields();
             },
             openCreateModal() {
                 this.editingElement = null;
@@ -767,6 +941,16 @@ document.addEventListener('alpine:init', function() {
                     window.Platform.modal.open('archimate-form-modal');
                 }
             },
+            cancelForm() {
+                if (this.editPageDeepLink) {
+                    window.location.assign(this.editPageDeepLink.detail_url);
+                    return;
+                }
+                if (window.Platform && window.Platform.modal) {
+                    // Typed text is not thrown away without asking (the dialog system asks in the page).
+                    window.Platform.modal.requestClose('archimate-form-modal');
+                }
+            },
             async submitForm() {
                 this.formError = '';
                 if (!this.formData.name.trim()) {
@@ -781,7 +965,7 @@ document.addEventListener('alpine:init', function() {
                 try {
                     let url;
                     if (this.editingElement) {
-                        url = '/architecture/' + this.activeTab + '/' + this.editingElement.element_type + '/' + this.editingElement.id + '/edit';
+                        url = '/architecture/' + this.activeTab + '/' + this.editingElement.element_type + '/' + this.recordId(this.editingElement) + '/edit' + this.idScope(this.editingElement);
                     } else {
                         url = '/architecture/' + this.activeTab + '/' + this.formData.element_type + '/new';
                     }
@@ -793,6 +977,12 @@ document.addEventListener('alpine:init', function() {
                     // server's _set_model_fields can persist them alongside
                     // name/description; a type with no config contributes none.
                     Object.assign(payload, this.typedFieldDefaults(this.formData.element_type, this.formData));
+                    let saveable = this.editingElement && this.editingElement.saveable_fields;
+                    if (Array.isArray(saveable)) {
+                        Object.keys(payload).forEach(function(key) {
+                            if (key !== 'name' && key !== 'description' && saveable.indexOf(key) === -1) { delete payload[key]; }
+                        });
+                    }
                     let data = await Platform.fetch.post(url, payload, { silent: true });
                     if (data.success) {
                         if (window.Platform && window.Platform.modal) {
@@ -806,16 +996,33 @@ document.addEventListener('alpine:init', function() {
                                 this.editingElement ? 'Element updated.' : 'Element created.'
                             );
                         }
+                        if (this.editPageDeepLink) {
+                            window.location.assign(this.editPageDeepLink.detail_url);
+                            return;
+                        }
+                        if (APP_CONFIG.embeddedForm) {
+                            // Made in place: the page reads its list again and stays where it is.
+                            window.location.reload();
+                            return;
+                        }
                         this.loadElements();
                         this.loadAllLayerCounts();
                     } else {
-                        this.formError = data.error || 'Operation failed';
+                        this.showFormError(data.error || 'Operation failed');
                     }
                 } catch (err) {
-                    this.formError = 'Error: ' + err.message;
+                    this.showFormError('Error: ' + err.message);
                 } finally {
                     this.saving = false;
                 }
+            },
+            // A refusal shows above a long form; the person is by the Create button, so it is brought into view.
+            showFormError(message) {
+                this.formError = message;
+                this.$nextTick(function() {
+                    var notice = document.getElementById('archimate-form-error');
+                    if (notice && notice.scrollIntoView) { notice.scrollIntoView({ block: 'nearest' }); }
+                });
             },
 
             openAiGenerateModal() {
@@ -891,8 +1098,8 @@ document.addEventListener('alpine:init', function() {
                 try {
                     let el = this.deletingElement;
                     let data = await Platform.fetch.post(
-                        '/architecture/' + this.activeTab + '/' + el.element_type + '/' + el.id + '/delete',
-                        null,
+                        '/architecture/' + this.activeTab + '/' + el.element_type + '/' + this.recordId(el) + '/delete' + this.idScope(el),
+                        {},
                         { silent: true }
                     );
                     if (data.success) {
@@ -918,8 +1125,9 @@ document.addEventListener('alpine:init', function() {
                     let parts = key.split(':');
                     let id = parts[0];
                     let type = parts[1];
-                    if (!grouped[type]) grouped[type] = [];
-                    grouped[type].push(parseInt(id));
+                    let kind = parts[2] === 'e' ? 'element_ids' : 'ids';
+                    if (!grouped[type]) grouped[type] = { ids: [], element_ids: [] };
+                    grouped[type][kind].push(parseInt(id));
                 }
                 let self = this;
                 let modalId = window.modalManager.createModal({
@@ -933,8 +1141,7 @@ document.addEventListener('alpine:init', function() {
                                 let entries = Object.entries(grouped);
                                 for (let j = 0; j < entries.length; j++) {
                                     let type = entries[j][0];
-                                    let ids = entries[j][1];
-                                    await Platform.fetch.post('/architecture/' + self.activeTab + '/' + type + '/bulk-delete', { ids: ids }, { silent: true });
+                                    await Platform.fetch.post('/architecture/' + self.activeTab + '/' + type + '/bulk-delete', entries[j][1], { silent: true });
                                 }
                                 self.selectedIds = [];
                                 self.selectAll = false;
@@ -1022,15 +1229,27 @@ document.addEventListener('alpine:init', function() {
 
             bulkExportSelected() {
                 let grouped = {};
+                let heldAsElements = 0;
                 for (let i = 0; i < this.selectedIds.length; i++) {
                     let key = this.selectedIds[i];
                     let parts = key.split(':');
                     let id = parts[0];
                     let type = parts[1];
+                    if (parts[2] === 'e') { heldAsElements++; continue; }
                     if (!grouped[type]) grouped[type] = [];
                     grouped[type].push(id);
                 }
                 let entries = Object.entries(grouped);
+                // An export is by record id; an item held only as an architecture element has none.
+                if (heldAsElements) {
+                    let words = heldAsElements === 1
+                        ? '1 selected item is held only as an architecture element and has no record to export.'
+                        : heldAsElements + ' selected items are held only as architecture elements and have no record to export.';
+                    if (window.Platform && window.Platform.toast) {
+                        if (entries.length) { window.Platform.toast.info(words + ' The rest were exported.'); }
+                        else { window.Platform.toast.error('Nothing exported. ' + words); }
+                    }
+                }
                 for (let j = 0; j < entries.length; j++) {
                     let type = entries[j][0];
                     let ids = entries[j][1];

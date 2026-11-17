@@ -1,0 +1,30 @@
+{# Vendored from flask-basecoat, branch feat/canvases-capability-map, commit 24590ba,
+   flask_basecoat/templates/basecoat/canvas/business-model-canvas.html. Adapted only to Entelim macro names (components/canvas/_ui.html maps the library
+   names onto components/*.html); the edit Sheet and its client-side script are left out because Entelim saves on the server. #}
+{# Business Model Canvas, C4. After Osterwalder and Pigneur, Business Model Generation (2010): nine blocks on a ten-column
+   grid. Key Partners, Value Propositions and Customer Segments run the full height of the upper area; Key Activities
+   over Key Resources and Customer Relationships over Channels share a column; Cost Structure and Revenue Streams are
+   equal halves of the bottom strip. Block order in the markup is the canonical reading order (accessibility-v1 2.4).
+   Usage: {{ canvas.business_model_canvas(data) }}, data = {'title', 'subtitle', 'boxes': {'key-partners': [notes], ...}}.
+   Box keys: key-partners key-activities key-resources value-propositions customer-relationships channels
+   customer-segments cost-structure revenue-streams. #}
+{% import 'components/canvas/_frame.html' as f with context %}
+{% set SPEC = {
+  'form': 'C4', 'name': 'Business model canvas', 'grid': 'grid-cols-10 grid-rows-[auto_auto_auto]',
+  'hint': 'Scroll sideways on a narrow screen to see all nine blocks.',
+  'credit': 'Business Model Canvas by Strategyzer AG (strategyzer.com), Alexander Osterwalder and Yves Pigneur.',
+  'boxes': [
+    {'key': 'key-partners', 'empty': 'No partners yet. Add the organisations and suppliers you rely on.', 'title': 'Key Partners', 'icon': 'handshake', 'question': 'Who helps you?', 'area': 'col-span-2 row-span-2 row-start-1'},
+    {'key': 'key-activities', 'empty': 'No activities yet. Add the processes and functions that deliver the offer.', 'title': 'Key Activities', 'icon': 'clipboard-check', 'question': 'What must you do every day?', 'area': 'col-span-2 col-start-3 row-start-1'},
+    {'key': 'key-resources', 'empty': 'No resources yet. Add what you need to deliver it.', 'title': 'Key Resources', 'icon': 'factory', 'question': 'What do you need to deliver it?', 'area': 'col-span-2 col-start-3 row-start-2'},
+    {'key': 'value-propositions', 'empty': 'No value yet. Add the services and the value they give.', 'title': 'Value Propositions', 'icon': 'gift', 'question': 'What problem do you solve for them?', 'area': 'col-span-2 col-start-5 row-span-2 row-start-1'},
+    {'key': 'customer-relationships', 'empty': 'No relationship services yet. Add how you look after customers.', 'title': 'Customer Relationships', 'icon': 'heart', 'question': 'What do they expect from you?', 'area': 'col-span-2 col-start-7 row-start-1'},
+    {'key': 'channels', 'empty': 'No channels yet. Add how customers find and receive the offer.', 'title': 'Channels', 'icon': 'truck', 'question': 'How do they find and receive it?', 'area': 'col-span-2 col-start-7 row-start-2'},
+    {'key': 'customer-segments', 'empty': 'No segments yet. Add who you create value for.', 'title': 'Customer Segments', 'icon': 'users', 'question': 'Who are you creating value for?', 'area': 'col-span-2 col-start-9 row-span-2 row-start-1'},
+    {'key': 'cost-structure', 'readonly': true, 'empty': 'No application costs recorded yet. Record them on each application.', 'title': 'Cost Structure', 'icon': 'tag', 'question': 'What does it cost to run?', 'area': 'col-span-5 col-start-1 row-start-3'},
+    {'key': 'revenue-streams', 'empty': 'No prices yet. Add a price to a value proposition.', 'title': 'Revenue Streams', 'icon': 'banknote', 'question': 'What will they pay for, and how?', 'area': 'col-span-5 col-start-6 row-start-3'},
+  ]} %}
+
+{% macro business_model_canvas(data, id='business-model-canvas') -%}
+{{ f.grid_canvas(SPEC, data, id) }}
+{%- endmacro %}

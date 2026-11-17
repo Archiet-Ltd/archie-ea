@@ -1,0 +1,33 @@
+{
+ "results": [
+  {
+   "id": "https://openalex.org/W1",
+   "doi": "https://doi.org/10.1000/xyz",
+   "display_name": "Cold-chain logistics at Northwind Freight",
+   "publication_date": "2025-11-02",
+   "cited_by_count": 14,
+   "abstract_inverted_index": {
+    "Cold": [
+     0
+    ],
+    "chain": [
+     1
+    ],
+    "routing": [
+     2
+    ],
+    "improves": [
+     3
+    ],
+    "delivery": [
+     4
+    ]
+   },
+   "primary_location": {
+    "source": {
+     "display_name": "Journal of Logistics"
+    }
+   }
+  }
+ ]
+}

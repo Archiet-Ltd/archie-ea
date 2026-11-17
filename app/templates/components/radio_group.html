@@ -24,7 +24,9 @@
     label='',
     error=none,
     inline=false,
-    class=''
+    class='',
+    attrs={},
+    id_prefix=''
 ) %}
 <fieldset {% if disabled %}disabled{% endif %}
           {% if error %}aria-invalid="true"{% endif %}
@@ -37,7 +39,7 @@
     {% endif %}
     <div class="{% if inline %}flex flex-wrap gap-x-6 gap-y-2{% else %}grid gap-2{% endif %}">
         {% for opt in options %}
-        {% set oid = (name ~ '-' ~ loop.index) %}
+        {% set oid = ((id_prefix ~ '-' if id_prefix else '') ~ name ~ '-' ~ loop.index) %}
         <div class="flex items-start gap-2.5">
             <input
                 type="radio"
@@ -47,6 +49,7 @@
                 {% if value is not none and (value | string) == (opt.value | string) %}checked{% endif %}
                 {% if opt.get('disabled') %}disabled{% endif %}
                 {% if required and loop.first %}required aria-required="true"{% endif %}
+                {{ attrs|xmlattr }}
                 class="mt-0.5 h-4 w-4 shrink-0 border-input accent-primary text-primary
                        focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2
                        disabled:cursor-not-allowed disabled:opacity-50" />

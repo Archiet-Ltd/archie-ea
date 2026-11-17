@@ -12,13 +12,14 @@ from app.modules.ai_chat.services.agent_registry_service import (
     InvalidDelegatedLimit,
 )
 from app.utils.role_access import can_access_section
+from app.utils.plain_errors import render_plain_error
 
 agent_registry_bp = Blueprint("agent_registry", __name__, url_prefix="/admin/agent-registry")
 
 
 def _guard():
     if not can_access_section(current_user, "administration"):
-        return render_template("errors/403.html"), 403
+        return render_plain_error(403)
     return None
 
 
@@ -62,7 +63,7 @@ def detail(registration_id):
         return guard
     reg = svc.get_registration(g.current_org_id, registration_id)
     if reg is None:
-        return render_template("errors/404.html"), 404
+        return render_plain_error(404)
     return render_template("ai_chat/agent_registry/detail.html", reg=reg)
 
 
@@ -74,7 +75,7 @@ def set_owner(registration_id):
         return guard
     reg = svc.get_registration(g.current_org_id, registration_id)
     if reg is None:
-        return render_template("errors/404.html"), 404
+        return render_plain_error(404)
     owner_user_id = request.form.get("owner_user_id", type=int)
     if owner_user_id:
         try:
@@ -93,7 +94,7 @@ def set_limits(registration_id):
         return guard
     reg = svc.get_registration(g.current_org_id, registration_id)
     if reg is None:
-        return render_template("errors/404.html"), 404
+        return render_plain_error(404)
     max_writes = request.form.get("max_writes_per_day", type=int)
     if max_writes is not None:
         try:
@@ -112,7 +113,7 @@ def propose_charter(registration_id):
         return guard
     reg = svc.get_registration(g.current_org_id, registration_id)
     if reg is None:
-        return render_template("errors/404.html"), 404
+        return render_plain_error(404)
     persona = (request.form.get("persona") or "").strip()
     if not persona:
         flash("Persona is required.", "error")
@@ -144,7 +145,7 @@ def activate(registration_id):
         return guard
     reg = svc.get_registration(g.current_org_id, registration_id)
     if reg is None:
-        return render_template("errors/404.html"), 404
+        return render_plain_error(404)
     ok, missing = svc.activate(reg)
     if ok:
         flash("Agent activated.", "success")

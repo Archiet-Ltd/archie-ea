@@ -4,6 +4,7 @@ import json
 from threading import Lock, Thread
 
 MODEL = 'ci-protocol-stub-v1'
+CATALOGUE_LOOKUP = "Map the user's question onto exactly one of these catalogue entries"
 TOKEN = 'ci-protocol-only-not-a-real-key'
 CHAT = {
     'marker': 'ARCHIE_CI_CHAT_PROTOCOL_V1',
@@ -52,12 +53,37 @@ CASE_SEED = {
     'stream': False,
 }
 
+# Provider refusals in the shape each provider sends them. A prompt carrying the
+# marker gets the refusal on whichever transport the app uses.
+REFUSALS = {
+    'credit_openrouter': {
+        'marker': 'ARCHIE_CI_REFUSE_CREDIT_402_V1',
+        'status': 402,
+        'body': {'error': {'message': 'Insufficient credits. Add more using https://openrouter.ai/settings/credits',
+                           'code': 402}},
+    },
+    'credit_openai': {
+        'marker': 'ARCHIE_CI_REFUSE_CREDIT_429_V1',
+        'status': 429,
+        'body': {'error': {'message': 'You exceeded your current quota, please check your plan and billing details.',
+                           'type': 'insufficient_quota', 'code': 'insufficient_quota'}},
+    },
+    'rate_per_minute': {
+        'marker': 'ARCHIE_CI_REFUSE_RATE_V1',
+        'status': 429,
+        'body': {'error': {'message': "Quota exceeded for quota metric 'Generate Content API requests per minute'",
+                           'code': 429}},
+    },
+}
+
 
 class AIProtocolStub:
     """Loopback HTTP transport, strict scenarios and a metadata-only request ledger."""
 
     def __init__(self):
         self._records = []
+        self._sent_text = []
+        self._lookups = []
         self._lock = Lock()
         owner = self
 
@@ -119,6 +145,31 @@ class AIProtocolStub:
                     return
                 last = messages[-1]
                 content = last.get('content')
+                is_lookup = (last.get('role') == 'user' and isinstance(content, str)
+                             and content.startswith(CATALOGUE_LOOKUP) and body.get('stream', False) is False)
+                text = ' '.join(str(m.get('content')) for m in messages if isinstance(m, dict))
+                with owner._lock:
+                    (owner._lookups if is_lookup else owner._sent_text).append(text)
+                refused = [(name, r) for name, r in REFUSALS.items()
+                           if isinstance(content, str) and r['marker'] in content]
+                if last.get('role') == 'user' and len(refused) == 1:
+                    name, refusal = refused[0]
+                    self._record(refusal['status'], scenario=name, model=MODEL,
+                                 stream=bool(body.get('stream', False)))
+                    self._json(refusal['status'], refusal['body'])
+                    return
+                if is_lookup:
+                    # The chat first asks which catalogue entry a question fits; the fixture says none
+                    # fits, so the question goes on to the reply being tested. It is not a chat request.
+                    self._record(200, scenario='catalogue_lookup', model=MODEL)
+                    self._json(200, {'id': 'chatcmpl-ci-lookup', 'created': 0, 'model': MODEL,
+                                     'object': 'chat.completion', 'choices': [{
+                                         'index': 0, 'finish_reason': 'stop', 'message': {
+                                             'role': 'assistant',
+                                             'content': '{"entry_id": null, "params": {}}'}}],
+                                     'usage': {'prompt_tokens': 12, 'completion_tokens': 8,
+                                               'total_tokens': 20}})
+                    return
                 matches = [(name, scenario) for name, scenario in [
                     ('chat', CHAT), ('guide', GUIDE),
                     ('programme_prefill', PROGRAMME_PREFILL), ('case_seed', CASE_SEED),
@@ -166,21 +217,38 @@ class AIProtocolStub:
         self.base_url = f'http://127.0.0.1:{self.port}/v1'
 
     @property
+    def sent_text(self):
+        """The message text of each request, in arrival order (never the credentials)."""
+        with self._lock:
+            return list(self._sent_text)
+
+    @property
+    def lookups(self):
+        """The text of each catalogue lookup the chat made before answering (not chat requests)."""
+        with self._lock:
+            return list(self._lookups)
+
+    @property
     def records(self):
         with self._lock:
             return [dict(record) for record in self._records]
 
-    def child_environment(self, original):
-        """Return isolated settings; never alter pytest's already-scrubbed env."""
+    def child_environment(self, original, organisation_key_only=False):
+        """Return isolated settings; never alter pytest's already-scrubbed env.
+
+        With ``organisation_key_only`` the platform holds no OpenAI key at all, so the token the
+        organisation's own settings row carries is that organisation's money, called the way a
+        customer's key is; without it the token is also the platform's environment key.
+        """
         env = dict(original)
-        providers = ('ANTHROPIC', 'AZURE', 'CLAUDE', 'DEEPSEEK', 'GEMINI',
-                     'GOOGLE', 'HUGGINGFACE', 'OPENAI', 'OPENROUTER')
+        providers = ('ANTHROPIC', 'AZURE', 'CLAUDE', 'GEMINI',
+                     'GOOGLE', 'HUGGINGFACE', 'NVIDIA', 'OPENAI', 'OPENROUTER')
         for provider in providers:
             for suffix in ['', '_SECONDARY'] + ['_' + str(number) for number in range(1, 10)]:
                 env[provider + '_API_KEY' + suffix] = ''
         env['LLM_API_KEY'] = ''
         env['AZURE_OPENAI_API_KEY'] = ''
-        env.update(OPENAI_API_KEY=TOKEN, OPENAI_BASE_URL=self.base_url,
+        env.update(OPENAI_API_KEY='' if organisation_key_only else TOKEN, OPENAI_BASE_URL=self.base_url,
                    AI_PAGE_GUIDE_ENABLED='true', REQUIRE_AI_APPROVAL='true',
                    PYTHON_DOTENV_DISABLED='1')
         bypass = ','.join(filter(None, [env.get('NO_PROXY'), env.get('no_proxy'),

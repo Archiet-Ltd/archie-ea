@@ -23,7 +23,8 @@ MAP_ENDPOINT = '/applications/api/comprehensive-auto-map'
 
 def manual_html():
     env = Environment(loader=FileSystemLoader(ROOT / 'app/templates'), autoescape=True)
-    env.globals.update(csrf_token=lambda: 'synthetic-token',
+    from app.services.application_status import status_options
+    env.globals.update(csrf_token=lambda: 'synthetic-token', status_options=status_options,
                        url_for=lambda endpoint, **kw: '/static/' + kw['filename'])
     html = '<!doctype html><html><head><meta charset="utf-8"><meta name="csrf-token" content="synthetic-token">'
     for asset in ['css/shadcn_tokens.css', 'css/tailwind-output.css', 'css/app.css']:
@@ -163,7 +164,7 @@ def add_row(dialog, name='Synthetic import', kind='ERP'):
     row.get_by_placeholder('APP ID', exact=True).fill('SYNTHETIC-01')
     row.get_by_placeholder('Application Name *', exact=True).fill(name)
     row.get_by_placeholder('Type', exact=True).fill(kind)
-    row.locator('select').select_option('planned')
+    row.locator('select').select_option('design')
     return row
 
 
@@ -199,7 +200,7 @@ def test_normal_create_and_merge_payload(manual_page):
         acknowledge_import(page, close=index == 1)
         assert state['posts'][-1] == {'csrf': 'synthetic-token', 'body': {
             'applications': [{'app_id': 'SYNTHETIC-01', 'name': 'Synthetic import',
-                              'component_type': kind, 'deployment_status': 'planned'}],
+                              'component_type': kind, 'deployment_status': 'design'}],
             'duplicate_mode': 'update'}}
         assert len(state['posts']) == index + 1
 

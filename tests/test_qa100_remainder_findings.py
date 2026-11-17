@@ -140,20 +140,19 @@ def test_applications_empty_state_primary_action_is_generic():
 
 
 def test_sidebar_close_nav_button_has_a_real_target_size():
+    # Navigation v3: the close button is the shared button macro at icon-sm (h-8 w-8).
     src = open("app/templates/components/admin_sidebar.html", encoding="utf-8").read()
-    m = re.search(r'aria-label="Close navigation"', src)
+    m = re.search(r"button\([^)]*aria_label='Close navigation'[^)]*\)", src)
     assert m
-    # the enclosing <button ...> tag must carry an explicit h-*/w-* >= 24px class
-    tag_start = src.rfind("<button", 0, m.start())
-    tag = src[tag_start : m.end() + 5]
-    assert "h-9" in tag or "h-8" in tag or "h-10" in tag or "h-11" in tag
+    assert "size='icon-sm'" in m.group(0)
+    sizes = open("app/templates/components/button.html", encoding="utf-8").read()
+    assert "'icon-sm': 'h-8 w-8'" in sizes
 
 
 def test_sidebar_logout_link_has_a_real_target_size():
+    # Navigation v3: signing out is the last item of the footer user menu; each menu item
+    # is a full-width row with py-2 around 20px text, above the 24px minimum.
     src = open("app/templates/components/admin_sidebar.html", encoding="utf-8").read()
-    m = re.search(r'aria-label="Log out"', src)
-    assert m
-    tag_start = src.rfind("<a", 0, m.start())
-    tag = src[tag_start : m.end() + 5]
-    assert re.search(r"\bh-(8|9|10|11)\b", tag), "logout target still lacks an explicit size class"
-    assert re.search(r"\bw-(8|9|10|11)\b", tag), "logout target still lacks an explicit size class"
+    assert "'text': 'Sign out'" in src and "url_for('account.logout')" in src
+    menu = open("app/templates/components/dropdown_menu.html", encoding="utf-8").read()
+    assert 'class="w-full text-left px-4 py-2 text-sm flex items-center gap-2' in menu

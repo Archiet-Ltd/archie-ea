@@ -27,7 +27,12 @@ are recorded as facts. A person is written to the one owner record
 address that belongs to exactly one user of the organisation; a team or a
 GitHub handle is never turned into a person. A primary owner a person recorded
 is never overwritten: the connector queues an ``owner_proposal`` in the approval
-queue instead. Unowned repositories stay unowned.
+queue instead. When no code owner names a person, the commits of the last 90 days are counted
+by author e-mail: an author whose e-mail belongs to exactly one user of the
+organisation is a candidate, and a candidate with more than half of the members'
+commits becomes the primary owner, with the count and the commit range kept as the
+source. Otherwise the candidates (up to three) are kept as suggestions for a person
+to choose from. Unowned repositories stay unowned.
 
 Unmatched repositories become proposals in the approval queue (one per
 repository, never repeated once decided), each with a classification decided by
@@ -74,7 +79,8 @@ import base64
 import json
 import logging
 import re
-from datetime import datetime
+import time
+from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional, Tuple
 
 from app import db
@@ -98,7 +104,8 @@ PROPOSAL_SOURCE = "github_connector"
 OP_CLASSIFY = "repository_classification"
 OP_OWNER = "owner_proposal"
 OP_RELATE = "repository_relationship"
-GITHUB_PROPOSAL_OPERATIONS = frozenset({OP_CLASSIFY, OP_OWNER, OP_RELATE})
+OP_TECHNOLOGY = "repository_technology"
+GITHUB_PROPOSAL_OPERATIONS = frozenset({OP_CLASSIFY, OP_OWNER, OP_RELATE, OP_TECHNOLOGY})
 CLASSIFICATIONS = ("application", "component", "library", "infrastructure", "documentation", "ignore")
 MAX_SUBFOLDERS = 12  # folders read under apps/ and services/ in one monorepo
 PROPOSAL_DUE_DAYS = 30
@@ -107,14 +114,17 @@ PAGE_SIZE = 100
 MAX_PAGES = 50  # 5,000 items per listing
 RATE_LIMIT_PER_MINUTE = 80  # 5,000 requests an hour is the authenticated allowance
 MAX_CODEOWNERS_BYTES = 200_000
+COMMIT_WINDOW_DAYS = 90  # the recent commits that name a likely owner
+MAX_SUGGESTED_OWNERS = 3
 
 _ORG_RE = re.compile(r"^[A-Za-z0-9](?:[A-Za-z0-9-]{0,38})$")
 _REPO_RE = re.compile(r"^[A-Za-z0-9._-]+/[A-Za-z0-9._-]+$")
 _SLUG_RE = re.compile(r"^[A-Za-z0-9._-]+$")
 
 
-def is_valid_organization(name) -> bool:
-    """True for a GitHub organisation name that is safe to put in a request path."""
+def is_valid_github_name(name) -> bool:
+    """True for a GitHub organisation or user name that is safe to put in a request path.
+    GitHub uses the same login rules for both."""
     return isinstance(name, str) and bool(_ORG_RE.match(name.strip()))
 
 
@@ -249,6 +259,371 @@ def default_code_owners(text: str) -> List[str]:
     return []
 
 
+def _made_since(commit: Any, start: datetime) -> bool:
+    """Whether a commit record was authored inside the window (a record with no readable date counts)."""
+    detail = commit.get("commit") if isinstance(commit, dict) else None
+    stamp = str(((detail or {}).get("author") or {}).get("date") or "")
+    try:
+        return datetime.strptime(stamp, "%Y-%m-%dT%H:%M:%SZ") >= start
+    except ValueError:
+        return True
+
+
+def _is_bot(item: Any) -> bool:
+    """Whether a GitHub commit record was made by an automation account, not a person."""
+    account = (item.get("author") if isinstance(item, dict) else None) or {}
+    return (str(account.get("login") or "").strip().lower().endswith("[bot]")
+            or str(account.get("type") or "").strip().lower() == "bot")
+
+
+def summarise_commits(org_id, repository: str, commits: List[dict]) -> Dict[str, Any]:
+    """Who of this organisation made the recent commits of a repository.
+
+    ``commits`` is a page of GitHub commit records. An author counts only when the e-mail
+    on the commit belongs to exactly one user of the organisation; a handle, a team or an
+    address nobody here has is never turned into a person. Returns the repository, the
+    commit range read, the number of commits made by members and the candidates, most
+    commits first, as ``{"user_id", "commits"}``.
+    """
+    from app.models.user import User
+
+    by_email: Dict[str, int] = {}
+    by_login: Dict[str, Dict[str, int]] = {}
+    login_shown: Dict[str, str] = {}
+    login_total: Dict[str, int] = {}
+    stamps: List[Tuple[str, str]] = []
+    bot_commits = 0
+    for item in commits or []:
+        detail = item.get("commit") if isinstance(item, dict) else None
+        author = (detail or {}).get("author") or {}
+        if _is_bot(item):
+            bot_commits += 1
+            continue
+        email = str(author.get("email") or "").strip().lower()
+        login = str(((item.get("author") if isinstance(item, dict) else None) or {}).get("login") or "").strip().lower()
+        if login:
+            shown = str(((item.get("author") if isinstance(item, dict) else None) or {}).get("login") or "").strip()
+            login_shown.setdefault(login, shown)
+            login_total[login] = login_total.get(login, 0) + 1
+            tally = by_login.setdefault(login, {"": 0})
+            tally[""] += 1
+            if email:
+                tally[email] = tally.get(email, 0) + 1
+        if str(item.get("sha") or "") and author.get("date"):
+            stamps.append((str(author["date"]), str(item["sha"])[:7]))
+        if email:
+            by_email[email] = by_email.get(email, 0) + 1
+    members: Dict[str, List[int]] = {}
+    if by_email:
+        for user in db.session.execute(
+            db.select(User).where(db.func.lower(User.email).in_(list(by_email))).where(User.organization_id == org_id)
+        ).scalars():
+            members.setdefault(user.email.lower(), []).append(user.id)
+    counts: Dict[int, int] = {}
+    for email, ids in members.items():
+        if len(ids) == 1:
+            counts[ids[0]] = counts.get(ids[0], 0) + by_email[email]
+    candidates = sorted(
+        ({"user_id": uid, "commits": n} for uid, n in counts.items()),
+        key=lambda c: (-c["commits"], c["user_id"]),
+    )
+    stamps.sort()
+    # What each GitHub account's own commits say about who it is: only members of this organisation are kept.
+    logins: Dict[str, Dict[str, Any]] = {}
+    for login, tally in by_login.items():
+        matched: Dict[str, int] = {}
+        for email, n in tally.items():
+            if email and len(members.get(email, [])) == 1:
+                key = str(members[email][0])
+                matched[key] = matched.get(key, 0) + n
+        if matched:
+            logins[login] = {"commits": tally[""], "members": matched}
+    # The one GitHub account behind more than half of all the commits read, member or not.
+    total = len(commits or []) - bot_commits
+    leader_login = None
+    if login_total:
+        top = max(login_total, key=lambda k: (login_total[k], k))
+        if login_total[top] * 2 > total:
+            leader_login = {"login": login_shown[top], "commits": login_total[top]}
+    return {
+        "repository": repository,
+        "days": COMMIT_WINDOW_DAYS,
+        "oldest": stamps[0][1] if stamps else None,
+        "newest": stamps[-1][1] if stamps else None,
+        "member_commits": sum(counts.values()),
+        "candidates": candidates[:MAX_SUGGESTED_OWNERS],
+        "logins": logins,
+        "total_commits": total,
+        "leader_login": leader_login,
+    }
+
+
+def code_owner_handles(element) -> List[str]:
+    """The GitHub accounts (not teams, not e-mail addresses) named as code owner of an application."""
+    entry = (getattr(element, "acm_properties", None) or {}).get("github_code_owners")
+    owners = entry.get("value") if isinstance(entry, dict) else None
+    return [o for o in (owners or []) if isinstance(o, str) and o.startswith("@") and "/" not in o and len(o) > 1]
+
+
+def code_owner_count(element) -> int:
+    """How many owners (teams, people, addresses) CODEOWNERS names for an application."""
+    entry = (getattr(element, "acm_properties", None) or {}).get("github_code_owners")
+    owners = entry.get("value") if isinstance(entry, dict) else None
+    return len([o for o in (owners or []) if isinstance(o, str) and o])
+
+
+def handle_owner(org_id, summary: Dict[str, Any], handles: List[str]) -> Tuple[Optional[Dict[str, Any]], Optional[str]]:
+    """The member a code-owner account is, shown only by its own commits.
+
+    An account becomes a person when the commits it made in the window carry the e-mail of
+    exactly one member of this organisation. Returns ``(match, reason)``: the match is
+    ``{"user_id", "handle", "commits", "of"}`` when one person is named by the evidence, else the
+    plain reason no owner was set. Two accounts pointing at different people name nobody."""
+    from app.models.user import User
+
+    days = (summary or {}).get("days") or COMMIT_WINDOW_DAYS
+    logins = (summary or {}).get("logins") or {}
+    found: Dict[int, Dict[str, Any]] = {}
+    for handle in handles:
+        entry = logins.get(handle[1:].lower())
+        members = (entry or {}).get("members") or {}
+        if len(members) == 1:
+            user_id, n = next(iter(members.items()))
+            belongs = db.session.execute(
+                db.select(User.id).where(User.id == int(user_id)).where(User.organization_id == org_id)).scalar()
+            if belongs is not None:
+                found.setdefault(int(user_id), {"user_id": int(user_id), "handle": handle, "commits": n, "of": entry["commits"]})
+    if len(found) == 1:
+        return next(iter(found.values())), None
+    if not handles:
+        return None, None
+    named = ", ".join(handles)
+    if found:
+        return None, (f"No owner was set: GitHub names {named} as code owner, and their commits in the last "
+                      f"{days} days point at more than one member of this organisation.")
+    those = "that account's commits" if len(handles) == 1 else "those accounts' commits"
+    return None, (f"No owner was set: GitHub names {named} as code owner, and none of {those} in the last "
+                  f"{days} days use the e-mail of a member of this organisation.")
+
+
+def handle_provenance(summary: Dict[str, Any], match: Dict[str, Any], user) -> str:
+    """The words that say why a code-owner account was taken to be this member."""
+    email = (getattr(user, "email", None) or "").strip()
+    return (
+        f"From commit history: GitHub names {match['handle']} as code owner; {match['commits']} of that account's "
+        f"{match['of']} commits in the last {summary.get('days') or COMMIT_WINDOW_DAYS} days use the e-mail {email} "
+        f"of a member of this organisation ({summary['repository']})"
+    )
+
+
+def commit_leader(summary: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+    """The one candidate with more than half of the members' commits, else None."""
+    candidates = (summary or {}).get("candidates") or []
+    total = (summary or {}).get("member_commits") or 0
+    if candidates and total and candidates[0]["commits"] * 2 > total:
+        return candidates[0]
+    return None
+
+
+def commit_provenance(summary: Dict[str, Any], candidate: Dict[str, Any]) -> str:
+    """The words that say why a person was named owner from the commits."""
+    span = ""
+    if summary.get("oldest") and summary.get("newest"):
+        span = f", commits {summary['oldest']} to {summary['newest']}"
+    return (
+        f"From commit history: {candidate['commits']} of {summary['member_commits']} commits "
+        f"in the last {summary.get('days') or COMMIT_WINDOW_DAYS} days ({summary['repository']}{span})"
+    )
+
+
+def commit_limit_reason(repository: str) -> str:
+    """The words that say why no owner could be suggested from a very busy repository."""
+    short = repository.rsplit("/", 1)[-1] or "this repository"
+    return (
+        f"No owner was suggested: {short} has too many commits in the last {COMMIT_WINDOW_DAYS} days "
+        "to name one person from them."
+    )
+
+
+def code_owner_provenance(element) -> str:
+    """The words that say a person was named by the repository's CODEOWNERS file."""
+    try:
+        ref = json.loads(element.source_ref or "")
+    except (TypeError, ValueError):
+        ref = None
+    commit = str((ref or {}).get("commit") or "")[:7] if isinstance(ref, dict) else ""
+    repository = application_repository(element) or "the repository"
+    return f"Named by GitHub: code owner in {repository} CODEOWNERS" + (f" at {commit}" if commit else "")
+
+
+def login_leader_provenance(summary: Dict[str, Any], leader: Dict[str, Any]) -> str:
+    """The words that say a person was named by leading the recent commits of a repository."""
+    return (f"Named by GitHub: leads the recent commits of {summary['repository']} "
+            f"({leader['commits']} of {summary['total_commits']})")
+
+
+def _login_leader(summary: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    leader = (summary or {}).get("leader_login")
+    total = (summary or {}).get("total_commits") or 0
+    if isinstance(leader, dict) and leader.get("login") and total and leader.get("commits", 0) * 2 > total:
+        return leader
+    return None
+
+
+def apply_commit_history(org_id, element, component, summary: Dict[str, Any], assigned_by=None) -> bool:
+    """Keep what the commits show on the element and record the owner GitHub names as the primary
+    owner through the one owner writer: first the one code owner CODEOWNERS names, then the one
+    author who leads the recent commits. A person who is a member of this organisation (by the
+    e-mail of their commits) is recorded as that user; anyone else is a named person ``@login``.
+    An application that already has a primary owner, however it got one, is left as it is.
+    Returns True when an owner was written."""
+    from app.models.application_owner import ApplicationOwner
+    from app.services.element_ownership_service import set_application_owner, set_named_person_owner
+
+    facts: Dict[str, Any] = {"github_commit_owners": summary}
+    leader = commit_leader(summary)
+    login_leader = _login_leader(summary)
+    owned = bool(component is not None and ApplicationOwner.query.filter_by(
+        application_id=component.id, organization_id=org_id, ownership_type="primary").first())
+    written = False
+    handles = code_owner_handles(element)
+    single = code_owner_count(element) == 1
+    match, handle_reason = (None, None) if owned or component is None else handle_owner(org_id, summary, handles)
+    if match is not None and not single:
+        match = None
+
+    def _member(user_id, text):
+        record = set_application_owner(
+            component, user_id, "primary", organization_id=org_id, assigned_by=assigned_by)
+        record.source_table = PROPOSAL_SOURCE
+        facts["github_owner_source"] = {"user_id": user_id, "text": text}
+
+    def _named(login, text):
+        record = set_named_person_owner(
+            component, "@" + login.lstrip("@"), "primary", organization_id=org_id,
+            assigned_by=assigned_by, replace=False)
+        record.source_table = PROPOSAL_SOURCE
+        facts["github_owner_source"] = {"user_id": None, "person_name": record.person_name, "text": text}
+
+    if match is not None:
+        from app.models.user import User
+
+        _member(match["user_id"], handle_provenance(summary, match, db.session.get(User, match["user_id"])))
+        written = True
+    elif single and len(handles) == 1 and component is not None and not owned:
+        _named(handles[0], code_owner_provenance(element))
+        written = True
+    elif leader is not None and component is not None and not owned:
+        _member(leader["user_id"], commit_provenance(summary, leader))
+        written = True
+    elif login_leader is not None and component is not None and not owned:
+        _named(login_leader["login"], login_leader_provenance(summary, login_leader))
+        written = True
+    elif summary.get("unavailable") and not owned:
+        facts["github_owner_source"] = {"user_id": None, "text": summary["unavailable"]}
+    elif handle_reason and not owned:
+        facts["github_owner_source"] = {"user_id": None, "text": handle_reason}
+    _write_facts(element, facts)
+    db.session.flush()
+    return written
+
+
+def commit_unreadable_reason(repository: str, cause: Optional[str] = None) -> str:
+    """The words that say why no owner could be suggested because the commits could not be read."""
+    short = repository.rsplit("/", 1)[-1] or "this repository"
+    status = re.search(r"HTTP (\d+)", cause or "")
+    if cause is None:
+        why = "GitHub is not connected for this organisation"
+    elif status and status.group(1) in ("401", "403", "404"):
+        why = "the GitHub connection has no access to it"
+    elif status and status.group(1) == "429":
+        why = "GitHub's request limit was reached"
+    else:
+        why = "GitHub did not answer"
+    return f"No owner was suggested: the commits of {short} could not be read because {why}."
+
+
+def _unreadable_summary(repository: str, cause: Optional[str] = None) -> Dict[str, Any]:
+    return {
+        "repository": repository,
+        "days": COMMIT_WINDOW_DAYS,
+        "oldest": None,
+        "newest": None,
+        "member_commits": 0,
+        "candidates": [],
+        "unavailable": commit_unreadable_reason(repository, cause),
+    }
+
+
+def application_repository(element) -> Optional[str]:
+    """The repository an imported application was read from, else None."""
+    try:
+        ref = json.loads(element.source_ref or "")
+    except (TypeError, ValueError):
+        return None
+    repository = ref.get("repository") if isinstance(ref, dict) else None
+    return repository if isinstance(repository, str) and _REPO_RE.match(repository) else None
+
+
+def owners_from_commits(org_id) -> List[Dict[str, Any]]:
+    """Work out the owner of every connector-imported application of one organisation that has no
+    primary owner, from its recent commits, or record the one sentence that says why not. The
+    same step the connector's read runs (``apply_commit_history``), so a run changes nothing that
+    a read would not, and an application that has an owner is only reported. One entry per
+    application: ``{"application", "repository", "outcome", "text"}`` where outcome is
+    ``owner set``, ``reason recorded``, ``already owned`` or ``unchanged``."""
+    from app.models.application_owner import ApplicationOwner
+    from app.models.application_portfolio import ApplicationComponent
+    from app.models.archimate_core import ArchiMateElement
+    from app.services.connector_framework import _load_org_connector, build_connector
+
+    rows = db.session.execute(
+        db.select(ApplicationComponent, ArchiMateElement)
+        .join(ArchiMateElement, ArchiMateElement.id == ApplicationComponent.archimate_element_id)
+        .where(ApplicationComponent.organization_id == org_id)
+        .where(ArchiMateElement.organization_id == org_id)
+        .order_by(ApplicationComponent.id)
+    ).all()
+    cfg = _load_org_connector(org_id, connector_type="github")
+    evidence = None
+    cause: Optional[str] = None
+    if cfg is not None:
+        try:
+            connector = build_connector(cfg, org_id)
+            evidence = _RepositoryEvidence(connector, connector._client(), org_id, connector._organization(), {})
+        except Exception as exc:  # no token, a token this server cannot open: the commits cannot be read
+            cause = str(exc) or "no access"
+            cause = cause if "HTTP" in cause else "no access (HTTP 403)"
+    lines: List[Dict[str, Any]] = []
+    for component, element in rows:
+        repository = application_repository(element)
+        if repository is None:
+            continue
+        line = {"application": component.name, "repository": repository}
+        owned = ApplicationOwner.query.filter_by(
+            application_id=component.id, organization_id=org_id, ownership_type="primary").first()
+        if owned is not None:
+            lines.append({**line, "outcome": "already owned", "text": "Owner already recorded"})
+            continue
+        before = ((element.acm_properties or {}).get("github_commit_owners") or {}).get("value")
+        if evidence is not None:
+            try:
+                summary = evidence._commit_history(repository)
+            except GitHubConnectorError as exc:
+                summary = _unreadable_summary(repository, str(exc))
+        else:
+            summary = _unreadable_summary(repository, cause if cfg is not None else None)
+        if apply_commit_history(org_id, element, component, summary):
+            source = (element.acm_properties or {}).get("github_owner_source", {}).get("value") or {}
+            lines.append({**line, "outcome": "owner set", "text": source.get("text", "")})
+            continue
+        after = ((element.acm_properties or {}).get("github_commit_owners") or {}).get("value")
+        text = summary.get("unavailable") or "No single author leads the recent commits"
+        outcome = "unchanged" if before == after and before is not None else "reason recorded"
+        lines.append({**line, "outcome": outcome, "text": text})
+    return lines
+
+
 def execute_github_proposal(approval, data_service=None) -> Dict[str, Any]:
     """Apply one approved proposal of this connector (called by the approval service)."""
     try:
@@ -261,6 +636,8 @@ def execute_github_proposal(approval, data_service=None) -> Dict[str, Any]:
         return _execute_classification(approval, payload, data_service)
     if approval.operation_type == OP_RELATE:
         return _execute_relationship(approval, payload)
+    if approval.operation_type == OP_TECHNOLOGY:
+        return _execute_technology(approval, payload)
     return {"success": False, "error": f"Unsupported GitHub proposal: {approval.operation_type}"}
 
 
@@ -333,15 +710,26 @@ def origin_ref(repository, commit, file=None, path=None, detail=None) -> str:
     return json.dumps(body, sort_keys=True)
 
 
-def stamp_origin(row, *, repository, commit, file=None, path=None, detail=None) -> None:
-    """Record on an element or relationship where it came from: the repository, the
-    commit it was read at and the file that shows it (the provenance origin columns)."""
-    row.source_kind = "connector"
-    row.source_ref = origin_ref(repository, commit, file, path, detail)
+def origin_fields(repository, commit, file=None, path=None, detail=None) -> Dict[str, Any]:
+    """The origin columns of an element or relationship read from a repository: the repository, the
+    commit it was read at and the file that shows it."""
     short = f" @ {commit[:7]}" if commit else ""
     where = f"{file}" if file else ""
-    row.source_label = f"GitHub {repository}{short}" + (f" ({where})" if where else "")
-    row.source_recorded_at = datetime.utcnow()
+    return {
+        "source_kind": "connector",
+        "source_ref": origin_ref(repository, commit, file, path, detail),
+        "source_label": f"GitHub {repository}{short}" + (f" ({where})" if where else ""),
+        "source_recorded_at": datetime.utcnow(),
+    }
+
+
+def stamp_origin(row, *, repository, commit, file=None, path=None, detail=None) -> None:
+    """Record on an element or relationship where it came from (the provenance origin columns)."""
+    origin = origin_fields(repository, commit, file, path, detail)
+    row.source_kind = origin["source_kind"]
+    row.source_ref = origin["source_ref"]
+    row.source_label = origin["source_label"]
+    row.source_recorded_at = origin["source_recorded_at"]
 
 
 def _element_for_repository(org_id, repository, path=None):
@@ -390,6 +778,9 @@ def proposal_blocker(approval) -> Optional[str]:
                 f"The application it belongs to ({payload.get('parent_name') or payload.get('parent')}) "
                 "is not in the model yet. Approve that application first."
             )
+    if approval.operation_type == OP_TECHNOLOGY:
+        if _element_for_repository(org_id, payload.get("target")) is None:
+            return f"{payload.get('target')} is not in the model yet, so this link cannot be added. Approve it first."
     if approval.operation_type == OP_RELATE:
         for end in ("source", "target"):
             if _element_for_repository(org_id, payload.get(end)) is None:
@@ -409,7 +800,41 @@ def _facts_from_payload(payload) -> Dict[str, Any]:
         facts["github_owning_team"] = payload["owning_team"]
     if payload.get("group"):
         facts["github_group"] = payload["group"]
+    if payload.get("commit_owners"):
+        facts["github_commit_owners"] = payload["commit_owners"]
     return facts
+
+
+def _join_to_product(org_id, payload, element, *, repository, commit, file) -> None:
+    """Join an element an approved proposal landed to the Product the read was started from, citing the
+    same repository, commit and file. Nothing is written when the proposal names no Product, the Product
+    is not in this organisation, or the two are already joined."""
+    from app.models import ArchiMateRelationship
+    from app.models.archimate_core import ArchiMateElement
+    from app.modules.architecture.services.archimate_relationship_service import ArchiMateRelationshipService
+
+    product_id = payload.get("product_id")
+    if not product_id or element is None:
+        return
+    product = ArchiMateElement.query.filter_by(id=product_id, type="Product", organization_id=org_id).first()
+    if product is None or product.id == element.id:
+        return
+    joined = ArchiMateRelationship.query.filter(
+        ArchiMateRelationship.organization_id == org_id,
+        db.or_(
+            db.and_(ArchiMateRelationship.source_id == product.id, ArchiMateRelationship.target_id == element.id),
+            db.and_(ArchiMateRelationship.source_id == element.id, ArchiMateRelationship.target_id == product.id),
+        ),
+    ).first()
+    if joined is not None:
+        return
+    link = ArchiMateRelationshipService.create_relationship(
+        product, element, "association", architecture_id=None, organization_id=org_id, rollback=False
+    )
+    if link is None:
+        return
+    stamp_origin(link, repository=repository, commit=commit, file=file, detail=f"Read for {product.name}")
+    db.session.flush()
 
 
 def _execute_classification(approval, payload, data_service) -> Dict[str, Any]:
@@ -418,18 +843,96 @@ def _execute_classification(approval, payload, data_service) -> Dict[str, Any]:
         return {"success": True, "acknowledged": True, "classification": classification}
     org_id = approval.organization_id
     path = payload.get("path")
-    if _element_for_repository(org_id, payload.get("repository"), path) is not None:
+    existing = _element_for_repository(org_id, payload.get("repository"), path)
+    if existing is not None:
+        _join_to_product(org_id, payload, existing, repository=payload.get("repository"),
+                         commit=payload.get("commit"), file=payload.get("evidence_file"))
         return {"success": True, "acknowledged": True, "classification": classification, "already_in_model": True}
     if classification == "component":
         return _create_component(approval, payload)
     if data_service is None:
         return {"success": False, "error": "No application writer is available"}
-    result = data_service.create_application(
-        {"name": payload.get("name"), "description": payload.get("description") or ""}
-    )
+    from app.services.archimate_backbone import new_elements_originate_from
+
+    with new_elements_originate_from(
+        origin_fields(payload.get("repository"), payload.get("commit"), payload.get("evidence_file"), payload.get("path"))
+    ):
+        result = data_service.create_application(
+            {"name": payload.get("name"), "description": payload.get("description") or ""}
+        )
     if result.get("success"):
         _finish_application(org_id, result.get("application_id"), payload, approval.approved_by_id)
+        created = _element_for_repository(org_id, payload.get("repository"), path)
+        _join_to_product(org_id, payload, created, repository=payload.get("repository"),
+                         commit=payload.get("commit"), file=payload.get("evidence_file"))
     return result
+
+
+# The type of an imported row the connector did not classify as a deployable service or application
+# (a library, documentation, a fork, an archive or a template). A repository it classified as an
+# application is an application from the moment it is imported, owner or not.
+REPOSITORY_TYPE = "repository"
+
+
+def is_unpromoted_import(component, element=None) -> bool:
+    """True for a repository the connector brought in that it did not classify as an application,
+    and that no person has promoted by naming its owner."""
+    from app.models.archimate_core import ArchiMateElement
+    from app.services.element_ownership_service import application_is_owned
+
+    if (component.component_type or "") != REPOSITORY_TYPE:
+        return False
+    if element is None and component.archimate_element_id:
+        element = db.session.get(ArchiMateElement, component.archimate_element_id)
+    if element is None or element.source_kind != "connector":
+        return False
+    return not application_is_owned(component)
+
+
+def unpromoted_import_expression(model=None):
+    """SQL boolean: the application row is an unpromoted import, by the rule of ``is_unpromoted_import``."""
+    from app.models.application_portfolio import ApplicationComponent
+    from app.models.archimate_core import ArchiMateElement
+    from app.services.element_ownership_service import application_is_owned_expression
+
+    model = model or ApplicationComponent
+    from_connector = (
+        db.select(ArchiMateElement.id)
+        .where(ArchiMateElement.id == model.archimate_element_id, ArchiMateElement.source_kind == "connector")
+        .exists()
+    )
+    return db.and_(
+        model.component_type == REPOSITORY_TYPE, from_connector, ~application_is_owned_expression(model)
+    )
+
+
+def unpromoted_import_ids(org_id, application_ids) -> set:
+    """Which of these applications are unpromoted imports, found in one query for the whole page."""
+    from app.models.application_portfolio import ApplicationComponent as A
+
+    if not application_ids:
+        return set()
+    rows = db.session.execute(
+        db.select(A.id).where(
+            A.organization_id == org_id, A.id.in_(list(application_ids)), unpromoted_import_expression(A)
+        )
+    ).scalars()
+    return set(rows)
+
+
+def unpromoted_import_element_ids(org_id, element_ids) -> set:
+    """The model elements, among these, that belong to an unpromoted import."""
+    from app.models.application_portfolio import ApplicationComponent as A
+
+    if not element_ids:
+        return set()
+    rows = db.session.execute(
+        db.select(A.archimate_element_id).where(
+            A.organization_id == org_id, A.archimate_element_id.in_(list(element_ids)),
+            unpromoted_import_expression(A),
+        )
+    ).scalars()
+    return set(rows)
 
 
 def _finish_application(org_id, application_id, payload, assigned_by) -> None:
@@ -446,8 +949,6 @@ def _finish_application(org_id, application_id, payload, assigned_by) -> None:
     if element is None or element.organization_id != org_id:
         return
     element.type = "Application"  # a top-level system; its parts are components
-    if not row.component_type:
-        row.component_type = "application"  # what the review showed it to be: a repository classified as an application
     stamp_origin(
         element,
         repository=payload.get("repository"),
@@ -461,6 +962,12 @@ def _finish_application(org_id, application_id, payload, assigned_by) -> None:
     db.session.flush()
     _write_facts(element, _facts_from_payload(payload))
     _assign_owner_from_payload(org_id, row, payload.get("owners") or [], assigned_by)
+    if payload.get("commit_owners") and not _person_in_org(org_id, payload.get("owners") or []):
+        apply_commit_history(org_id, element, row, payload["commit_owners"], assigned_by)
+    if not row.component_type:
+        # The connector classified it as a deployable service or application, so it is one from now,
+        # derived from GitHub; a missing owner is a gap the ownership screens show, not a reason to hide it.
+        row.component_type = "application"
 
 
 def _assign_owner_from_payload(org_id, row, owners, assigned_by) -> None:
@@ -501,13 +1008,9 @@ def _create_component(approval, payload) -> Dict[str, Any]:
         name=payload.get("name") or "",
         description=payload.get("description") or None,
         organization_id=org_id,
-    )
-    stamp_origin(
-        element,
-        repository=payload.get("repository"),
-        commit=payload.get("commit"),
-        file=payload.get("evidence_file"),
-        path=payload.get("path"),
+        origin=origin_fields(
+            payload.get("repository"), payload.get("commit"), payload.get("evidence_file"), payload.get("path")
+        ),
     )
     CrosswalkService.write_link(SOURCE_SYSTEM, _identity(payload.get("repository"), payload.get("path")), element.id, org_id=org_id)
     _write_facts(element, _facts_from_payload(payload))
@@ -522,6 +1025,8 @@ def _create_component(approval, payload) -> Dict[str, Any]:
     stamp_origin(link, repository=payload.get("repository"), commit=payload.get("commit"), file=payload.get("evidence_file"), detail=detail)
     db.session.add(link)
     db.session.flush()
+    _join_to_product(org_id, payload, element, repository=payload.get("repository"),
+                     commit=payload.get("commit"), file=payload.get("evidence_file"))
     return {"success": True, "element_id": element.id, "composition_id": link.id}
 
 
@@ -535,6 +1040,8 @@ def _execute_relationship(approval, payload) -> Dict[str, Any]:
         return {"success": False, "error": blocker}
     source = _element_for_repository(org_id, payload.get("source"))
     target = _element_for_repository(org_id, payload.get("target"))
+    if source is None or target is None:
+        return {"success": False, "error": "Source or target element not found in this organisation"}
     kind = payload.get("relationship_type")
     if kind not in ("Serving", "Association", "Flow"):
         return {"success": False, "error": "Unsupported relationship type"}
@@ -558,6 +1065,77 @@ def _execute_relationship(approval, payload) -> Dict[str, Any]:
     return {"success": True, "relationship_id": link.id}
 
 
+def _technology_element(org_id, name, element_type, origin=None):
+    """The element of this organisation that is the technology called *name*: an existing one of
+    that name in the technology layer, else a new one."""
+    from sqlalchemy import func
+
+    from app.models.archimate_core import ArchiMateElement
+    from app.services.archimate_backbone import create_backbone_element
+
+    existing = (
+        ArchiMateElement.query.filter(
+            ArchiMateElement.organization_id == org_id,
+            func.lower(ArchiMateElement.name) == name.lower(),
+            func.lower(ArchiMateElement.layer) == "technology",
+        )
+        .order_by(ArchiMateElement.id)
+        .first()
+    )
+    if existing is not None and not getattr(existing, "deleted_at", None):
+        return existing, False
+    element = create_backbone_element(
+        element_type=element_type, layer="Technology", name=name, organization_id=org_id, origin=origin
+    )
+    return element, True
+
+
+def _execute_technology(approval, payload) -> Dict[str, Any]:
+    """An approved technology: the element is found or created in this organisation and serves the
+    application whose compose file runs it, the file, line and image kept on the link."""
+    from app.models import ArchiMateRelationship
+
+    org_id = approval.organization_id
+    blocker = proposal_blocker(approval)
+    if blocker:
+        return {"success": False, "error": blocker}
+    application = _element_for_repository(org_id, payload.get("target"))
+    if application is None:
+        return {"success": False, "error": "Application element not found in this organisation"}
+    name = payload.get("technology")
+    if not name or not payload.get("file") or not payload.get("line") or not payload.get("image"):
+        return {"success": False, "error": "A technology link needs its technology, file, line and image."}
+    detail = payload.get("detail") or payload.get("summary") or ""
+    technology, created = _technology_element(
+        org_id, name, payload.get("element_type") or "SystemSoftware",
+        origin=origin_fields(payload.get("from"), payload.get("commit"), payload.get("file"), detail=detail),
+    )
+    existing = ArchiMateRelationship.query.filter_by(
+        organization_id=org_id, source_id=technology.id, target_id=application.id, type="Serving"
+    ).first()
+    if existing is not None:
+        _join_to_product(org_id, payload, technology, repository=payload.get("from"),
+                         commit=payload.get("commit"), file=payload.get("file"))
+        return {"success": True, "acknowledged": True, "relationship_id": existing.id, "element_id": technology.id, "already_in_model": True}
+    link = ArchiMateRelationship(
+        type="Serving",
+        source_id=technology.id,
+        target_id=application.id,
+        organization_id=org_id,
+        description=detail[:2000] or None,
+        custom_properties={
+            "github": {"kind": "technology", "from": payload.get("from"), "file": payload.get("file"),
+                       "line": payload.get("line"), "image": payload.get("image")}
+        },
+    )
+    stamp_origin(link, repository=payload.get("from"), commit=payload.get("commit"), file=payload.get("file"), detail=detail)
+    db.session.add(link)
+    db.session.flush()
+    _join_to_product(org_id, payload, technology, repository=payload.get("from"),
+                     commit=payload.get("commit"), file=payload.get("file"))
+    return {"success": True, "relationship_id": link.id, "element_id": technology.id}
+
+
 # --------------------------------------------------------------------- #
 # The connector                                                          #
 # --------------------------------------------------------------------- #
@@ -565,6 +1143,9 @@ def _execute_relationship(approval, payload) -> Dict[str, Any]:
 
 class GitHubConnector(BaseConnector):
     """Reads one GitHub organisation's repositories as evidence for the model."""
+
+    # Set for a read a person narrowed from a Product's page: ``{"repositories": [...], "product_id": n}``.
+    scope: Optional[Dict[str, Any]] = None
 
     @property
     def connector_type(self) -> ConnectorType:
@@ -594,19 +1175,49 @@ class GitHubConnector(BaseConnector):
     def _organization(self) -> str:
         organization = (self.config.config or {}).get("organization")
         if not isinstance(organization, str) or not _ORG_RE.match(organization.strip()):
-            raise GitHubConnectorError("The GitHub organisation name in the connector settings is not valid")
+            raise GitHubConnectorError("The GitHub organisation or account name in the connector settings is not valid")
         return organization.strip()
+
+    def _account_type(self, client: GitHubAPIClient, persist: bool = True) -> str:
+        """Detect whether the configured name is a User or Organization.
+        Returns 'User' or 'Organization'. Caches the result in config unless ``persist`` is False
+        (a read-only check must not change the stored settings)."""
+        config = self.config.config or {}
+        cached = config.get("account_type")
+        if cached in ("User", "Organization"):
+            return cached
+        organization = self._organization()
+        data = self._get(client, f"users/{organization}")
+        account_type = data.get("type")
+        if account_type not in ("User", "Organization"):
+            raise GitHubConnectorError(f"GitHub returned an unexpected account type: {account_type}")
+        if not persist:
+            return account_type
+        # Persist the detected type so we don't re-detect on every sync
+        # Create a clean config without the token (token is in the vault)
+        clean_config = {k: v for k, v in config.items() if k != "api_token"}
+        clean_config["account_type"] = account_type
+        from app.services.connector_framework import _load_org_connector, apply_connector_change
+        from app.services.connector_framework import CONNECTOR_ACTION_UPDATE
+        existing = _load_org_connector(getattr(self.config, "organization_id", None), connector_type="github")
+        if existing:
+            apply_connector_change(
+                org_id=getattr(self.config, "organization_id", None),
+                action=CONNECTOR_ACTION_UPDATE,
+                payload={"connector_type": "github", "connector_id": existing.id, "name": "GitHub", "config": clean_config, "status": "active"},
+                delegated=True,
+            )
+        return account_type
 
     def _client(self) -> GitHubAPIClient:
         settings = self.config.config or {}
         token = settings.get("api_token")
         if not token:
-            raise GitHubConnectorError("No GitHub token is stored for this organisation")
+            raise GitHubConnectorError("No GitHub token is stored for this organisation or account")
         base_url = self._checked_base_url() if settings.get("base_url") else None
         return GitHubAPIClient(api_token=token, base_url=base_url, rate_limit_per_minute=RATE_LIMIT_PER_MINUTE)
 
-    @staticmethod
-    def _failure(response) -> GitHubConnectorError:
+    def _failure(self, response) -> GitHubConnectorError:
         status = getattr(response, "status_code", None)
         if status is None:
             return GitHubConnectorError((response.error or "The GitHub request failed")[:300])
@@ -615,10 +1226,12 @@ class GitHubConnector(BaseConnector):
         if status in (403, 429):
             return GitHubConnectorError(
                 f"GitHub refused the request (HTTP {status}): the token may lack read access "
-                "to the organisation, or the API rate limit was reached"
+                "to the organisation or account, or the API rate limit was reached"
             )
         if status == 404:
-            return GitHubConnectorError("GitHub could not find it, or the token cannot see it (HTTP 404)")
+            account = (self.config.config or {}).get("organization")
+            subject = f"the account {account}" if isinstance(account, str) and _ORG_RE.match(account.strip()) else "the account"
+            return GitHubConnectorError(f"GitHub could not find {subject}, or the token cannot see it (HTTP 404)")
         return GitHubConnectorError(f"The GitHub request failed (HTTP {status})")
 
     def _get(self, client: GitHubAPIClient, path: str, params: Optional[dict] = None):
@@ -653,19 +1266,33 @@ class GitHubConnector(BaseConnector):
 
     # ----- the BaseConnector interface -----------------------------------
 
-    async def test_connection(self) -> bool:
+    def check_connection(self) -> tuple:
+        """Whether the token reaches GitHub, and the reason in plain words.
+
+        Returns ``(True, "Connected to GitHub as <account>")`` or ``(False, <reason and next step>)``.
+        """
         try:
-            self._get(self._client(), f"orgs/{self._organization()}")
-            return True
-        except Exception as exc:  # the reason is ours and safe; the page shows only pass or fail
+            client = self._client()
+            organization = self._organization()
+            account_type = self._account_type(client, persist=False)
+            if account_type == "Organization":
+                data = self._get(client, f"orgs/{organization}")
+            else:
+                data = self._get(client, f"users/{organization}")
+            account = data.get("login") if isinstance(data, dict) else None
+            return True, f"Connected to GitHub as {account or organization}"
+        except GitHubConnectorError as exc:  # the reason is ours and safe to show; anything else is the caller's to log
             logger.warning("GitHub connection test failed: %s", exc)
-            return False
+            return False, f"{exc}. Check the token and the account name in the connector settings."
+
+    async def test_connection(self) -> bool:
+        return self.check_connection()[0]
 
     async def incremental_sync(self, event_data: Dict[str, Any]) -> Dict[str, Any]:
         return {"status": "ignored", "records_processed": 0, "reason": "GitHub events are not read"}
 
     async def batch_sync(self, since: Optional[datetime] = None) -> Dict[str, Any]:
-        """Read every repository of the organisation and write what it is evidence for.
+        """Read every repository of the organisation or account and write what it is evidence for.
 
         ``since`` is not used: GitHub has no updated-since filter for an
         organisation's repositories, and noticing a deleted repository needs the
@@ -676,34 +1303,58 @@ class GitHubConnector(BaseConnector):
             raise ConnectorWriteRefused("A connector sync cannot write to the model without an organisation.")
         organization = self._organization()
         client = self._client()
+        account_type = self._account_type(client)
 
-        repos = self._get_paged(client, f"orgs/{organization}/repos")
+        if account_type == "Organization":
+            repos_path = f"orgs/{organization}/repos"
+        else:
+            # For a personal account, read public repos via /users/{name}/repos
+            # and private repos via /user/repos with affiliation parameter
+            repos_path = f"users/{organization}/repos"
+        repos = self._get_paged(client, repos_path)
+        scope = self.scope or {}
+        if scope.get("repositories"):
+            chosen = {str(n).lower() for n in scope["repositories"]}
+            repos = [r for r in repos if str(r.get("full_name") or "").lower() in chosen]
         notes: List[str] = []
-        try:
-            admins = self._admin_teams(client, organization)
-        except GitHubConnectorError as exc:
-            admins = {}
-            notes.append(f"Team ownership was not read: {exc}")
+        admins: Dict[str, List[str]] = {}
+        if account_type == "Organization":
+            try:
+                admins = self._admin_teams(client, organization)
+            except GitHubConnectorError as exc:
+                admins = {}
+                notes.append(f"Team ownership was not read: {exc}")
+        else:
+            notes.append("Team ownership is not available for a personal account")
 
         # Oldest push first, so when several repositories are evidence for one
         # component the most recently active one supplies its facts, every run.
         repos.sort(key=lambda r: (r.get("pushed_at") or "", r.get("full_name") or ""))
-        evidence = _RepositoryEvidence(self, client, org_id, organization, admins, repos)
+        evidence = _RepositoryEvidence(self, client, org_id, organization, admins, repos, scope.get("product_id"))
         result = self.persist_records(
             repos,
             source_system=SOURCE_SYSTEM,
             to_element=lambda raw: self._repo_to_record(raw, organization),
             evidence=evidence,
         )
-        # The links the code states between the organisation's repositories, as proposals.
+        # The links the code states between the repositories, as proposals.
         try:
             with db.session.begin_nested():
                 result["relationships_proposed"] = evidence.propose_relationships()
         except GitHubConnectorError as exc:
             result["relationships_proposed"] = 0
             notes.append(f"Links between repositories were not read: {exc}")
+        # The databases, caches and brokers their compose files run, as proposals.
+        try:
+            with db.session.begin_nested():
+                result["technologies_proposed"] = evidence.propose_technologies()
+        except GitHubConnectorError as exc:
+            result["technologies_proposed"] = 0
+            notes.append(f"Technologies the compose files run were not read: {exc}")
         listed = {r.get("full_name", "").lower() for r in repos}
-        result["records_flagged_missing"] = self._flag_missing(org_id, organization, listed)
+        # A read of the chosen repositories is not a complete listing: it can say nothing about the others.
+        result["records_flagged_missing"] = 0 if scope.get("repositories") else self._flag_missing(org_id, organization, listed)
+        result["already_in_model"] = sorted(evidence.matched_repos)
         if notes:
             if result["status"] == "completed":
                 result["status"] = "partial"
@@ -777,8 +1428,10 @@ class _RepositoryEvidence:
         organization: str,
         admins: Dict[str, List[str]],
         repos: Optional[List[Dict[str, Any]]] = None,
+        product_id: Optional[int] = None,
     ):
         self.connector = connector
+        self.product_id = product_id
         self.client = client
         self.org_id = org_id
         self.organization = organization
@@ -791,6 +1444,7 @@ class _RepositoryEvidence:
         self._dirs: Dict[Tuple[str, str], List[dict]] = {}
         self._texts: Dict[Tuple[str, str], Optional[str]] = {}
         self._derived: Dict[str, Dict[str, Any]] = {}
+        self._histories: Dict[str, Dict[str, Any]] = {}
 
     # ----- reading more of a repository (all cached, all read-only) -------
 
@@ -997,7 +1651,60 @@ class _RepositoryEvidence:
             facts["github_repository_missing"] = False
 
         changed = _write_facts(element, facts)
-        return self._apply_owner(element, full_name, owners) or changed
+        owned = self._apply_owner(element, full_name, owners)
+        if self._person_for(owners) is None:
+            owned = self._owner_from_commits(element, full_name) or owned
+        return owned or changed
+
+    def _commit_history(self, full_name: str) -> Dict[str, Any]:
+        """The commits of the last 90 days, counted by member (read once per repository)."""
+        if full_name not in self._histories:
+            start = datetime.utcnow() - timedelta(days=COMMIT_WINDOW_DAYS)
+            since = start.strftime("%Y-%m-%dT%H:%M:%SZ")
+            commits: List[dict] = []
+            for page in range(1, MAX_PAGES + 1):
+                response = self.client.get(
+                    f"repos/{full_name}/commits",
+                    params={"since": since, "per_page": PAGE_SIZE, "page": page},
+                    use_cache=False,
+                )
+                if not response.success:
+                    if getattr(response, "status_code", None) in (404, 409):
+                        break  # no such history (an empty repository answers 409)
+                    raise self.connector._failure(response)
+                data = response.data if isinstance(response.data, list) else []
+                inside = [c for c in data if _made_since(c, start)]
+                commits.extend(inside)
+                if len(data) < PAGE_SIZE or len(inside) < len(data):
+                    break
+            else:
+                # Too many to count: give up on the owner alone, so the application and its facts are still written.
+                self._histories[full_name] = {
+                    "repository": full_name,
+                    "days": COMMIT_WINDOW_DAYS,
+                    "oldest": None,
+                    "newest": None,
+                    "member_commits": 0,
+                    "candidates": [],
+                    "unavailable": commit_limit_reason(full_name),
+                }
+                return self._histories[full_name]
+            self._histories[full_name] = summarise_commits(self.org_id, full_name, commits)
+        return self._histories[full_name]
+
+    def _owner_from_commits(self, element, full_name: str) -> bool:
+        from app.models.application_portfolio import ApplicationComponent
+
+        component = ApplicationComponent.query.filter_by(
+            archimate_element_id=element.id, organization_id=self.org_id
+        ).first()
+        if component is None:
+            return False
+        try:
+            summary = self._commit_history(full_name)
+        except GitHubConnectorError as exc:  # the application and its facts are still written, with the reason
+            summary = _unreadable_summary(full_name, str(exc))
+        return apply_commit_history(self.org_id, element, component, summary)
 
     def _person_for(self, owners: List[str]):
         """The one user of the organisation named by an e-mail code owner, else None."""
@@ -1091,6 +1798,7 @@ class _RepositoryEvidence:
                 continue
             if earlier_payload.get("repository_id") == repository_id:
                 proposed_paths.add(earlier_payload.get("path"))
+                self._claim_for_product(earlier_proposal, earlier_payload)
 
         info = self._derive(full_name)
         classification, reason = info["classification"], info["reason"]
@@ -1115,6 +1823,7 @@ class _RepositoryEvidence:
 
         commit = self._commit(full_name)
         owners = self._code_owners(full_name, root)
+        history = self._commit_history(full_name) if self._person_for(owners) is None else None
         team = self._owning_team(full_name)
         parent_full = info["parent"]
         parent_name = _title(self.repos[parent_full].get("name") or "") if parent_full in self.repos else None
@@ -1138,7 +1847,9 @@ class _RepositoryEvidence:
                 "parent": parent_full if kind == "component" else None,
                 "parent_name": parent_name if kind == "component" else None,
                 "owners": owners,
+                "commit_owners": history,
                 "owning_team": team,
+                "product_id": self.product_id,
             }
             if kind == "application":
                 outcome = "Approving adds it as an application."
@@ -1157,6 +1868,15 @@ class _RepositoryEvidence:
                 expiry_minutes=PROPOSAL_DUE_DAYS * 24 * 60,
             )
         return "proposed"
+
+    def _claim_for_product(self, approval, payload) -> None:
+        """A proposal still waiting that no Product claimed is claimed by the Product this read is for.
+        A decided proposal, or one another Product already holds, is left as it is."""
+        from app.models.ai_chat_crud_approval import ApprovalStatus
+
+        if not self.product_id or payload.get("product_id") or approval.status != ApprovalStatus.PENDING:
+            return
+        approval.operation_payload = json.dumps(dict(payload, product_id=self.product_id))
 
     # ----- links between repositories ------------------------------------
 
@@ -1204,15 +1924,12 @@ class _RepositoryEvidence:
         from app.models.ai_chat_crud_approval import AIChatCRUDApproval
         from app.modules.ai_chat.services.ai_chat_approval_service import create_approval_record
 
-        known = {
-            (p.get("from"), p.get("to"), p.get("kind"))
-            for p in (
-                json.loads(a.operation_payload or "{}")
-                for a in AIChatCRUDApproval.query.filter_by(
-                    organization_id=self.org_id, source_table=PROPOSAL_SOURCE, operation_type=OP_RELATE
-                ).all()
-            )
-        }
+        known = {}
+        for earlier in AIChatCRUDApproval.query.filter_by(
+            organization_id=self.org_id, source_table=PROPOSAL_SOURCE, operation_type=OP_RELATE
+        ).all():
+            p = json.loads(earlier.operation_payload or "{}")
+            known[(p.get("from"), p.get("to"), p.get("kind"))] = (earlier, p)
         created = 0
         for full_name in self.repos:
             try:
@@ -1225,11 +1942,15 @@ class _RepositoryEvidence:
             for edge in edges:
                 key = (edge["from"], edge["to"], edge["kind"])
                 try:
-                    if key in known or not self._modelled(edge["to"]):
+                    if key in known:
+                        if known[key] is not None:
+                            self._claim_for_product(*known[key])
+                        continue
+                    if not self._modelled(edge["to"]):
                         continue
                 except GitHubConnectorError:
                     continue
-                known.add(key)
+                known[key] = None
                 # "A depends on B" is B serving A; a deploy link is read from the deployer to what it deploys.
                 supplier, consumer = (edge["to"], edge["from"]) if edge["kind"] == "dependency" else (edge["from"], edge["to"])
                 names = {r: _title(self.repos[r].get("name") or "") for r in (supplier, consumer) if r in self.repos}
@@ -1245,6 +1966,7 @@ class _RepositoryEvidence:
                     target_name=names.get(consumer),
                     commit=self._commit(edge["from"]),
                     summary=summary,
+                    product_id=self.product_id,
                 )
                 create_approval_record(
                     organization_id=self.org_id,
@@ -1256,6 +1978,63 @@ class _RepositoryEvidence:
                     expiry_minutes=PROPOSAL_DUE_DAYS * 24 * 60,
                 )
                 created += 1
+        return created
+
+
+    def propose_technologies(self) -> int:
+        """Queue one proposal per database, cache, queue or broker the docker-compose file of a
+        modelled repository runs, citing the file, line and image. A technology already proposed
+        for a repository, pending or decided, is never proposed again."""
+        from app.models.ai_chat_crud_approval import AIChatCRUDApproval
+        from app.modules.ai_chat.services.ai_chat_approval_service import create_approval_record
+
+        known = {}
+        for earlier in AIChatCRUDApproval.query.filter_by(
+            organization_id=self.org_id, source_table=PROPOSAL_SOURCE, operation_type=OP_TECHNOLOGY
+        ).all():
+            p = json.loads(earlier.operation_payload or "{}")
+            known[(p.get("from"), p.get("technology"))] = (earlier, p)
+        created = 0
+        for full_name in self.repos:
+            try:
+                if not self._modelled(full_name):
+                    continue
+                root = self._root(full_name)
+                lower = {n.lower(): n for n in root}
+                for compose in github_model.COMPOSE_FILES:
+                    if compose.lower() not in lower:
+                        continue
+                    file = lower[compose.lower()]
+                    text = self._text(full_name, file)
+                    for name, element_type, image, line in github_model.compose_technologies(text or ""):
+                        if (full_name, name) in known:
+                            if known[(full_name, name)] is not None:
+                                self._claim_for_product(*known[(full_name, name)])
+                            continue
+                        known[(full_name, name)] = None
+                        application = _title(self.repos[full_name].get("name") or "")
+                        detail = f"{file} line {line} runs {image}"
+                        summary = f"{application} runs on {name} ({detail})."
+                        create_approval_record(
+                            organization_id=self.org_id,
+                            operation_type=OP_TECHNOLOGY,
+                            entity_type="repository_technology",
+                            summary=summary + " Approving adds the technology and the link to the model.",
+                            operation_payload=dict(
+                                {"from": full_name, "target": full_name, "technology": name,
+                                 "element_type": element_type, "image": image, "file": file, "line": line,
+                                 "detail": detail, "summary": summary, "kind": "technology",
+                                 "relationship_type": "Serving", "source_name": name, "target_name": application},
+                                commit=self._commit(full_name),
+                                product_id=self.product_id,
+                            ),
+                            source_table=PROPOSAL_SOURCE,
+                            expiry_minutes=PROPOSAL_DUE_DAYS * 24 * 60,
+                        )
+                        created += 1
+                    break  # the first compose file a repository has is the one read
+            except GitHubConnectorError as exc:
+                logger.warning("GitHub repository %s could not be read for technologies (%s)", full_name, exc)
         return created
 
 
@@ -1294,6 +2073,7 @@ def pending_review(org_id) -> Dict[str, Any]:
     model. ``total`` is what approve-all would approve (owner changes are separate)."""
     classified = [_item(a) for a in _pending(org_id, OP_CLASSIFY)]
     links = [_item(a) for a in _pending(org_id, OP_RELATE)]
+    technologies = [_item(a) for a in _pending(org_id, OP_TECHNOLOGY)]
     owners = [_item(a) for a in _pending(org_id, OP_OWNER)]
     groups: Dict[str, List[Dict[str, Any]]] = {}
     for item in classified:
@@ -1304,9 +2084,10 @@ def pending_review(org_id) -> Dict[str, Any]:
         "applications": [{"group": name, "items": items} for name, items in ordered],
         "parts": [i for i in classified if i.get("classification") == "component"],
         "links": links,
+        "technologies": technologies,
         "others": [i for i in classified if i.get("classification") in _OTHER_CLASSES],
         "owner_changes": owners,
-        "total": len(classified) + len(links),
+        "total": len(classified) + len(links) + len(technologies),
         "applications_total": sum(len(items) for items in groups.values()),
     }
 
@@ -1319,10 +2100,10 @@ def approve_all_proposals(org_id, approver_id) -> Dict[str, Any]:
     A proposal that cannot land yet stays pending and is reported with the reason."""
     from app.modules.ai_chat.services.ai_chat_approval_service import AIChatApprovalService
 
-    items = _pending(org_id, OP_CLASSIFY) + _pending(org_id, OP_RELATE)
+    items = _pending(org_id, OP_CLASSIFY) + _pending(org_id, OP_RELATE) + _pending(org_id, OP_TECHNOLOGY)
 
     def rank(approval):
-        if approval.operation_type == OP_RELATE:
+        if approval.operation_type in (OP_RELATE, OP_TECHNOLOGY):
             return 3
         kind = json.loads(approval.operation_payload or "{}").get("classification")
         return _APPROVE_ORDER.get(kind, 2)
@@ -1382,25 +2163,197 @@ def skip_proposal(org_id, approval_id, user_id) -> Dict[str, Any]:
 # --------------------------------------------------------------------- #
 
 FIRST_SYNC_TASK = "github_first_sync"
+BUSY_WAIT_SECONDS = 300  # how long a read of chosen repositories waits for a read already under way
+BUSY_WAIT_STEP = 3
 
 
-def run_first_sync(org_id, connector_id) -> Dict[str, Any]:
+def run_first_sync(org_id, connector_id, scope=None) -> Dict[str, Any]:
     """Run the connector's read for one organisation (the job the connect page starts and the
-    re-sync button restarts). Returns counts only: no repository content and no credential."""
+    re-sync button restarts). Returns counts only: no repository content and no credential.
+    ``scope`` narrows the read to the repositories a person chose for a Product."""
     from app.jobs.tenant_safe_job import tenant_scope
+    from app.modules.codegen.services.credential_encryption import CredentialUnreadable
     from app.services.connector_framework import run_connector_sync
 
-    with tenant_scope(org_id):
-        result = run_connector_sync(org_id=org_id, connector_id=connector_id, delegated=True)
-        db.session.commit()
+    try:
+        with tenant_scope(org_id):
+            result = run_connector_sync(org_id=org_id, connector_id=connector_id, delegated=True, scope=scope)
+            # A read of chosen repositories that meets the read of the whole account (started when GitHub
+            # was connected) waits for it rather than failing: the person asked for this one.
+            waited = 0
+            while scope and result.get("busy") and waited < BUSY_WAIT_SECONDS:
+                time.sleep(BUSY_WAIT_STEP)
+                waited += BUSY_WAIT_STEP
+                result = run_connector_sync(org_id=org_id, connector_id=connector_id, delegated=True, scope=scope)
+            db.session.commit()
+    except CredentialUnreadable as exc:  # the sentence says what failed and who can fix it
+        db.session.rollback()
+        return {"success": False, "repositories": 0, "proposals": pending_total(org_id), "error": str(exc)}
     return {
         "success": bool(result.get("success")),
         "repositories": result.get("records_processed", 0),
         "proposals": pending_total(org_id),
         "relationships_proposed": result.get("relationships_proposed", 0),
+        "already_in_model": result.get("already_in_model", []),
         "failed": result.get("records_failed", 0),
         "error": (result.get("error") or result.get("error_message") or None) if not result.get("success") else None,
     }
+
+
+class ConnectRefused(ValueError):
+    """The connection was not saved; the message says why, in words a person can act on."""
+
+
+def _store_token(org_id, token) -> None:
+    """Seal the new token in the vault. Saved details this server cannot open are replaced by the new
+    ones rather than opened; only when the new ones cannot be sealed either is the person told, in the
+    one plain sentence the read path uses."""
+    from app.modules.codegen.services.credential_encryption import (
+        CredentialUnreadable,
+        replace_unopenable_org_key,
+    )
+    from app.modules.codegen.services.credential_vault import OrgCredentialVault
+
+    vault = OrgCredentialVault()
+    try:
+        try:
+            vault.store(org_id=org_id, connector_type="github", credential_type="api_token", value=token)
+        except CredentialUnreadable:
+            replace_unopenable_org_key(org_id)
+            vault.store(org_id=org_id, connector_type="github", credential_type="api_token", value=token)
+    except CredentialUnreadable as exc:
+        db.session.rollback()
+        raise ConnectRefused(str(exc)) from None
+
+
+def connect_and_start(org_id, organization, token, *, task=None, extra=None) -> int:
+    """Store the read-only token in the organisation's vault, save the connection and queue the
+    first read. Returns the connector id. The one place a GitHub connection is made, for the
+    connectors page and for sign-up. ``task`` and ``extra`` let sign-up queue the read together
+    with approving what it finds; the token goes to the vault and nowhere else."""
+    from app.modules.codegen.services.credential_vault import OrgCredentialVault
+    from app.services.connector_framework import (
+        CONNECTOR_ACTION_CREATE,
+        CONNECTOR_ACTION_UPDATE,
+        _load_org_connector,
+        apply_connector_change,
+    )
+    from app.services.job_queue_service import get_job_queue_service
+
+    organization = (organization or "").strip()
+    token = (token or "").strip()
+    existing = _load_org_connector(org_id, connector_type="github")
+    vault = OrgCredentialVault()
+    has_token = vault.get_masked(org_id, "github", "api_token") is not None
+    # A GitHub App installation (app/connectors/github_app.py) is also a connection
+    # with nothing to paste: the state and the installation are confirmed with
+    # GitHub before this is ever called, so its presence here is enough.
+    has_installation = vault.get_masked(org_id, "github", "installation_id") is not None
+    if not is_valid_github_name(organization):
+        raise ConnectRefused("Enter your GitHub organisation or account name exactly as it appears in github.com/<name>.")
+    if not token and not has_token and not has_installation:
+        raise ConnectRefused("Paste a read-only GitHub token to connect.")
+    if token and (len(token) > 255 or any(ch.isspace() for ch in token)):
+        raise ConnectRefused("That does not look like a GitHub token.")
+
+    config = dict((existing.config or {}) if existing else {})
+    config["organization"] = organization
+    payload = {
+        "connector_type": "github",
+        "connector_id": existing.id if existing else None,
+        "name": "GitHub",
+        "config": config,
+        "status": "active",
+        "credential_provided": bool(token),
+    }
+    cfg = apply_connector_change(
+        org_id=org_id,
+        action=CONNECTOR_ACTION_UPDATE if existing else CONNECTOR_ACTION_CREATE,
+        payload=payload,
+        delegated=True,
+    )
+    if token:
+        _store_token(org_id, token)
+    db.session.commit()
+    get_job_queue_service().create_job(
+        "GitHub: read repositories",
+        task or FIRST_SYNC_TASK,
+        {"connector_id": cfg.id, **(extra or {})},
+        organization_id=org_id,
+    )
+    return cfg.id
+
+
+def pending_for_product(org_id, product_id) -> int:
+    """How many proposals still waiting for a decision were read for this Product."""
+    return sum(
+        1 for a in _pending(org_id, OP_CLASSIFY)
+        if json.loads(a.operation_payload or "{}").get("product_id") == product_id
+    )
+
+
+PRODUCT_SCAN_MAX = 25  # repositories read in one scan from a Product's page
+
+
+def list_repositories(org_id) -> List[Dict[str, Any]]:
+    """The repositories the organisation's GitHub connection can read, for a person to choose from.
+
+    One listing through the connector's own client (token from the vault, read-only). Each entry says
+    whether the repository is already in the model. Raises ``GitHubConnectorError`` with a plain reason."""
+    from app.services.connector_framework import _load_org_connector, build_connector
+
+    cfg = _load_org_connector(org_id, connector_type="github")
+    if cfg is None:
+        raise GitHubConnectorError("GitHub is not connected yet.")
+    connector = build_connector(cfg, org_id)
+    organization = connector._organization()
+    client = connector._client()
+    kind = connector._account_type(client)
+    path = f"orgs/{organization}/repos" if kind == "Organization" else f"users/{organization}/repos"
+    repos = connector._get_paged(client, path)
+    listed = []
+    for raw in sorted(repos, key=lambda r: str(r.get("full_name") or "").lower()):
+        full_name = raw.get("full_name")
+        if not isinstance(full_name, str) or not _REPO_RE.match(full_name):
+            continue
+        listed.append({
+            "full_name": full_name,
+            "description": (raw.get("description") or "").strip(),
+            "language": raw.get("language") or "",
+            "archived": bool(raw.get("archived")),
+            "element": _element_for_repository(org_id, full_name),
+        })
+    return listed
+
+
+def start_product_scan(org_id, product_id, repositories) -> "Dict[str, Any]":
+    """Queue the read of the chosen repositories for one Product. Returns the job id and the names kept.
+
+    Names that are not ``owner/repository`` of the connected account are dropped here; the read keeps only
+    those GitHub also lists, so a made-up name reads nothing."""
+    from app.services.connector_framework import _load_org_connector
+    from app.services.job_queue_service import get_job_queue_service
+
+    cfg = _load_org_connector(org_id, connector_type="github")
+    if cfg is None:
+        raise ConnectRefused("Connect GitHub first.")
+    organization = str((cfg.config or {}).get("organization") or "").lower()
+    kept = []
+    for name in repositories or []:
+        name = str(name or "").strip()
+        if _REPO_RE.match(name) and name.split("/")[0].lower() == organization and name not in kept:
+            kept.append(name)
+    if not kept:
+        raise ConnectRefused("Choose at least one repository.")
+    if len(kept) > PRODUCT_SCAN_MAX:
+        raise ConnectRefused(f"Choose at most {PRODUCT_SCAN_MAX} repositories at a time.")
+    job = get_job_queue_service().create_job(
+        "GitHub: read repositories for a product",
+        FIRST_SYNC_TASK,
+        {"connector_id": cfg.id, "product_id": product_id, "repositories": kept},
+        organization_id=org_id,
+    )
+    return {"job_id": job.id, "repositories": kept}
 
 
 def pending_total(org_id) -> int:
@@ -1410,12 +2363,13 @@ def pending_total(org_id) -> int:
         AIChatCRUDApproval.organization_id == org_id,
         AIChatCRUDApproval.source_table == PROPOSAL_SOURCE,
         AIChatCRUDApproval.status == ApprovalStatus.PENDING,
-        AIChatCRUDApproval.operation_type.in_([OP_CLASSIFY, OP_RELATE]),
+        AIChatCRUDApproval.operation_type.in_([OP_CLASSIFY, OP_RELATE, OP_TECHNOLOGY]),
     ).count()
 
 
 def model_counts(org_id) -> Dict[str, int]:
-    """What the connector has put in the organisation's model so far."""
+    """What the connector has put in the organisation's model so far: every element and every
+    relationship it wrote, so the sum is the number of rows added."""
     from app.models import ArchiMateElement, ArchiMateRelationship
 
     by_type = dict(
@@ -1429,6 +2383,8 @@ def model_counts(org_id) -> Dict[str, int]:
         "applications": by_type.get("Application", 0),
         # a component is an application-kind element that is not itself an Application
         "components": sum(n for kind, n in by_type.items() if is_application_kind(kind) and kind != "Application"),
+        # everything else the connector put in the model: the technology its compose files run on
+        "technologies": sum(n for kind, n in by_type.items() if not is_application_kind(kind)),
         "relationships": ArchiMateRelationship.query.filter_by(organization_id=org_id, source_kind="connector").count(),
     }
 

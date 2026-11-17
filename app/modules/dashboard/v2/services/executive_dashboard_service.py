@@ -40,6 +40,41 @@ HEALTH_COMPONENT_NAMES = (
 )
 
 
+# What each component contributes to the composite when all four are measured.
+# The one place the weights are written; the score and the sentence that shows
+# the arithmetic both read it.
+HEALTH_COMPONENT_WEIGHTS = {
+    "phase_maturity": 0.4,
+    "risk_posture": 0.3,
+    "capability_coverage": 0.2,
+    "governance": 0.1,
+}
+
+
+def health_score_arithmetic(components):
+    """The weights actually applied and the sum they give, from the four component values.
+
+    ``components`` maps each key of ``HEALTH_COMPONENT_WEIGHTS`` to its value or
+    ``None``. Unmeasured parts carry no weight and the rest are scaled up so the
+    weights add to 100 percent, exactly as ``_get_health_score`` does. Returns
+    ``{"weights": {key: percent or None}, "sum": "40% x 66.7 + ... = 52.2"}``;
+    ``sum`` is ``None`` when nothing was measured.
+    """
+    measured = {k: w for k, w in HEALTH_COMPONENT_WEIGHTS.items() if components.get(k) is not None}
+    total = sum(measured.values())
+    if not total:
+        return {"weights": {k: None for k in HEALTH_COMPONENT_WEIGHTS}, "sum": None}
+    percent = {k: round(w / total * 100, 1) for k, w in measured.items()}
+    terms = " + ".join(
+        "%g%% × %.1f" % (percent[k], components[k]) for k in HEALTH_COMPONENT_WEIGHTS if k in measured
+    )
+    score = round(sum(components[k] * w for k, w in measured.items()) / total, 1)
+    return {
+        "weights": {k: percent.get(k) for k in HEALTH_COMPONENT_WEIGHTS},
+        "sum": "%s = %s" % (terms, format_health_score(score)),
+    }
+
+
 def _join_names(names):
     if len(names) > 1:
         return ", ".join(names[:-1]) + " and " + names[-1]
@@ -381,12 +416,7 @@ class ExecutiveDashboardService:
         # in as zero would drag the headline score down for a reason the reader
         # cannot see; treating the whole composite as unavailable when one part is
         # missing would hide the three that are known.
-        weights = {
-            "phase_maturity": 0.4,
-            "risk_posture": 0.3,
-            "capability_coverage": 0.2,
-            "governance": 0.1,
-        }
+        weights = HEALTH_COMPONENT_WEIGHTS
         available = {k: w for k, w in weights.items() if scores.get(k) is not None}
         total_weight = sum(available.values())
         # Renormalising over only the measured components is right when most

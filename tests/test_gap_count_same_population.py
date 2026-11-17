@@ -111,10 +111,10 @@ def test_gap_analysis_recorded_gaps_metric_is_register_count(
     html = resp.data.decode("utf-8")
 
     match = re.search(
-        r"Recorded Gaps</p>\s*<div data-slot=\"card-title\"[^>]*>\s*([0-9]+)\s*</div>",
+        r"data-testid=\"gap-stat-recorded-value\">\s*([0-9]+)\s*<",
         html,
     )
-    assert match is not None, "Recorded Gaps metric not found in rendered page"
+    assert match is not None, "Recorded gaps metric not found in rendered page"
     recorded = int(match.group(1))
 
     assert recorded == 501, (
@@ -135,7 +135,7 @@ def test_roadmap_gaps_api_total_matches_filtered_list(
     """GET /capability-map/api/roadmap/gaps with a gap_type filter returns a
     total_gaps that equals the sum of the per-type counts and the length of
     the returned list — never a register-wide count."""
-    from app.models.business_capabilities import ApplicationCapabilityCoverage
+    from app.services.capability_support import record_capability_support
 
     org_a = make_org("rm-gaps-a")
     org_b = make_org("rm-gaps-b")
@@ -156,12 +156,8 @@ def test_roadmap_gaps_api_total_matches_filtered_list(
         obsolescence_risk="low",
         technology_age_years=1,
     )
-    db_session.add(
-        ApplicationCapabilityCoverage(
-            application_component_id=app_q.id,
-            capability_id=cap_aq.id,
-        )
-    )
+    db_session.flush()
+    record_capability_support(org_a.id, app_q.archimate_element_id, cap_aq.archimate_element_id)
 
     # Org B: one uncovered capability that must not appear for A.
     cap_b1 = _make_business_capability(db_session, org_b, "RM B Coverage 1")

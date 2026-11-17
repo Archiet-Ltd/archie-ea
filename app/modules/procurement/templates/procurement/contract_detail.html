@@ -1,3 +1,4 @@
+{# design-block: record-detail #}
 {% extends 'layouts/admin_base.html' %}
 {% from 'components/page_header.html' import page_header %}
 {% block title %}Contract: {{ contract.contract_name }}{% endblock %}
@@ -12,9 +13,9 @@
             {'label': 'Vendor Contracts', 'href': url_for('procurement.contracts_list')},
             {'label': contract.contract_name}
         ],
-        actions=[
-            {'text': 'Edit contract', 'icon': 'pencil', 'href': url_for('procurement.contract_edit', contract_id=contract.id), 'variant': 'outline'}
-        ]
+        actions=(
+            [{'text': 'Edit contract', 'icon': 'pencil', 'href': url_for('procurement.contract_edit', contract_id=contract.id), 'variant': 'outline'}] if may_open_procurement() else []
+        )
     ) }}
 
     <div class="flex items-center gap-2 -mt-4">
@@ -24,16 +25,19 @@
             {% else %}bg-muted text-muted-foreground{% endif %}">
             {{ (contract.status or 'unknown') | replace('_', ' ') | title }}
         </span>
-        {% if urgency and urgency != 'ok' and urgency != 'unknown' %}
+        {% if renewal.kind in ('ended', 'overdue') %}
+        <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-destructive/10 text-destructive-emphasis">{{ renewal.text }}</span>
+        {% elif renewal.kind == 'ahead' and urgency in ('critical', 'warning', 'upcoming') %}
         <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium
-            {% if urgency == 'critical' or urgency == 'expired' %}bg-destructive/10 text-destructive-emphasis
+            {% if urgency == 'critical' %}bg-destructive/10 text-destructive-emphasis
             {% elif urgency == 'warning' %}bg-warning/10 text-warning-emphasis
             {% else %}bg-info/10 text-info-emphasis{% endif %}">
-            {% if urgency == 'expired' %}Expired
-            {% elif days_until_renewal %}{{ days_until_renewal }} days until renewal{% endif %}
+            {% if days_until_renewal == 0 %}Renews today
+            {% else %}{{ days_until_renewal }} {{ 'day' if days_until_renewal == 1 else 'days' }} until renewal{% endif %}
         </span>
         {% endif %}
     </div>
+    {% if system_retired %}<p class="text-sm text-muted-foreground" data-testid="contract-system-retired">{{ retired_note }}</p>{% endif %}
 
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <!-- Main Content -->
@@ -85,15 +89,15 @@
                 <dl class="grid grid-cols-2 gap-4">
                     <div>
                         <dt class="text-sm text-muted-foreground">Total Contract Value</dt>
-                        <dd class="text-xl font-bold">{{ contract.contract_value|format_currency if contract.contract_value else '—' }}</dd>
+                        <dd class="text-xl font-bold">{{ contract.contract_value|format_currency(currency=contract.currency) if contract.contract_value else '—' }}</dd>
                     </div>
                     <div>
                         <dt class="text-sm text-muted-foreground">Annual Cost</dt>
-                        <dd class="text-xl font-bold text-primary">{{ contract.annual_cost|format_currency if contract.annual_cost else '—' }}</dd>
+                        <dd class="text-xl font-bold text-primary">{{ contract.annual_cost|format_currency(currency=contract.currency) if contract.annual_cost else '—' }}</dd>
                     </div>
                     <div>
                         <dt class="text-sm text-muted-foreground">Currency</dt>
-                        <dd class="font-medium">{{ contract.currency or 'USD' }}</dd>
+                        <dd class="font-medium">{{ contract.currency or organisation_currency }}</dd>
                     </div>
                     <div>
                         <dt class="text-sm text-muted-foreground">Payment Terms</dt>
@@ -177,7 +181,10 @@
                     </div>
                     <div class="flex justify-between">
                         <dt class="text-sm text-muted-foreground">Renewal Date</dt>
-                        <dd class="font-medium">{{ contract.renewal_date.strftime('%d %b %Y') if contract.renewal_date else '—' }}</dd>
+                        <dd class="font-medium">{{ renews_on.strftime('%d %b %Y') if renews_on else '—' }}
+                            {%- if renewal.kind == 'overdue' %} <span class="block text-xs font-normal text-muted-foreground" data-testid="renewal-passed">This date has passed. Add the next renewal date.</span>
+                            {%- elif renewal.kind == 'ended' %} <span class="block text-xs font-normal text-muted-foreground" data-testid="renewal-ended">The contract ended on this date. Mark it ended or add a new end date.</span>
+                            {%- elif renewal.kind == 'inactive' %} <span class="block text-xs font-normal text-muted-foreground" data-testid="renewal-inactive">No renewal: the contract is {{ (contract.status or 'not active')|replace('_', ' ') }}.</span>{% endif %}</dd>
                     </div>
                     <div class="flex justify-between">
                         <dt class="text-sm text-muted-foreground">Notice Period</dt>

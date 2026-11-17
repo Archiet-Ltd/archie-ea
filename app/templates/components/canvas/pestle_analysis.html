@@ -1,0 +1,17 @@
+{# Vendored from flask-basecoat, branch feat/canvases-capability-map, commit 2b02744, flask_basecoat/templates/basecoat/canvas/ pestle-analysis.html. Adapted only to Entelim macro names. #}
+{# PESTLE analysis, C2. Six external factor boxes in the published order (Political, Economic, Social, Technological, Legal, Environmental), three columns by two rows. #}
+{% import 'components/canvas/_frame.html' as f with context %}
+{% set SPEC = {
+  'form': 'C2', 'name': 'PESTLE analysis', 'grid': 'grid-cols-3',
+  'hint': 'Scroll sideways on a narrow screen to see all six factors.',
+  'boxes': [
+    {'key': 'political', 'title': 'Political', 'icon': 'landmark', 'question': 'Government policy, trade and stability.', 'empty': 'No political drivers yet. Add the policy and trade forces that act on you.', 'area': ''},
+    {'key': 'economic', 'title': 'Economic', 'icon': 'banknote', 'question': 'Growth, costs and spending.', 'empty': 'No economic drivers yet. Add the cost and demand forces that act on you.', 'area': ''},
+    {'key': 'social', 'title': 'Social', 'icon': 'users', 'question': 'Habits, expectations and the workforce.', 'empty': 'No social drivers yet. Add the habits and expectations that act on you.', 'area': ''},
+    {'key': 'technological', 'title': 'Technological', 'icon': 'zap', 'question': 'Tools that change how delivery works.', 'empty': 'No technology drivers yet. Add the tools and trends that change delivery.', 'area': ''},
+    {'key': 'legal', 'title': 'Legal', 'icon': 'shield-check', 'question': 'Laws and regulation we must meet.', 'empty': 'No legal drivers yet. Add the laws and regulation you must meet.', 'area': ''},
+    {'key': 'environmental', 'title': 'Environmental', 'icon': 'globe', 'question': 'Climate, emissions and the physical world.', 'empty': 'No environmental drivers yet. Add the climate and resource forces that act on you.', 'area': ''},
+  ]} %}
+{% macro pestle_analysis(data, id='pestle-analysis') -%}
+{{ f.grid_canvas(SPEC, data, id) }}
+{%- endmacro %}

@@ -114,11 +114,47 @@ class JiraALMConnector(BaseConnector):
                 all_issues.extend(issues)
 
             # Write the issues into the organisation's model
-            return await self._process_jira_issues(all_issues)
+            result = await self._process_jira_issues(all_issues)
+            if since is None:
+                # An incremental run sees only the issues changed since, so its
+                # median would replace a full-sample one with a partial one.
+                self._record_stage_times(all_issues, result)
+            return result
 
         except Exception as e:
             logger.error(f"Batch sync failed: {e}")
             raise
+
+    def _record_stage_times(self, issues: List[Dict[str, Any]], result: Dict[str, Any]) -> None:
+        """Measure the organisation's mapped value stream stages from these issues.
+
+        The same measurement the "Measure from Jira" action makes. A failure here
+        is logged and never fails the sync that already wrote its issues.
+        """
+        from app import db
+        from app.modules.capabilities.services import stage_time_service
+
+        org_id = getattr(self.config, "organization_id", None)
+        if not org_id:
+            return
+        try:
+            with db.session.begin_nested():
+                outcomes = stage_time_service.measure_from_issues(
+                    org_id, issues, self.config.config.get("base_url")
+                )
+            result["stage_times"] = outcomes
+        except Exception:
+            logger.error("Stage times were not measured for organisation %s", org_id, exc_info=True)
+
+    async def fetch_issues_with_changelog(self) -> List[Dict[str, Any]]:
+        """Every issue of the configured projects, each with its status history."""
+        project_keys = self.config.config.get("project_keys", [])
+        if not project_keys:
+            raise ValueError("No project keys configured")
+        issues: List[Dict[str, Any]] = []
+        for project_key in project_keys:
+            issues.extend(await self._fetch_project_issues(project_key))
+        return issues
 
     async def _fetch_project_issues(
         self, project_key: str, since: Optional[datetime] = None
@@ -135,6 +171,9 @@ class JiraALMConnector(BaseConnector):
         params = {
             "jql": jql,
             "maxResults": 100,
+            # The changelog carries each issue's status history, which is what
+            # the time a value stream stage takes is measured from.
+            "expand": "changelog",
             "fields": "id,key,summary,description,status,priority,issuetype,assignee,reporter,created,updated,duedate,customfield_10000,customfield_10001",
         }
 
@@ -155,6 +194,8 @@ class JiraALMConnector(BaseConnector):
                     if not issues:
                         break
 
+                    for issue in issues:
+                        await self._complete_changelog(session, headers, issue)
                     all_issues.extend(issues)
                     start_at += len(issues)
 
@@ -164,6 +205,45 @@ class JiraALMConnector(BaseConnector):
                         break
 
         return all_issues
+
+    async def _complete_changelog(self, session, headers: Dict[str, str], issue: Dict[str, Any]) -> None:
+        """Replace a search result's partial history with the issue's whole one.
+
+        A search embeds only the most recent history entries (at most 100) of an
+        issue, while the issue's own changelog pages oldest first. When the
+        embedded page is not the whole history it is discarded and the changelog
+        is read from the start, so the earliest status times are not lost. The
+        entries are de-duplicated by id and put in time order.
+        """
+        changelog = issue.get("changelog") or {}
+        embedded = changelog.get("histories") or []
+        total = changelog.get("total")
+        key = issue.get("key")
+        if not key or not isinstance(total, int) or total <= len(embedded):
+            return
+        url = urljoin(self.config.config["base_url"], "/rest/api/3/issue/%s/changelog" % key)
+        histories: List[Dict[str, Any]] = []
+        seen = set()
+        start_at = 0
+        while start_at < total:
+            async with session.get(
+                url, headers=headers, params={"startAt": start_at, "maxResults": 100}
+            ) as response:
+                if response.status != 200:
+                    raise Exception(f"Jira API request failed: {response.status}")
+                page = (await response.json()).get("values") or []
+            if not page:
+                break
+            for history in page:
+                history_id = history.get("id")
+                if history_id is not None:
+                    if history_id in seen:
+                        continue
+                    seen.add(history_id)
+                histories.append(history)
+            start_at += len(page)
+        histories.sort(key=lambda h: h.get("created") or "")
+        changelog["histories"] = histories
 
     def _issue_to_element(self, issue: Dict[str, Any]) -> Dict[str, Any]:
         """One Jira issue as a work package: the issue id is its identity, the summary its name."""

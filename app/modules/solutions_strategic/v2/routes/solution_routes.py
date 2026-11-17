@@ -1,7 +1,7 @@
 """TPM-013: Risk heat map route — /solutions/<id>/risks/heatmap."""
 import logging
 
-from flask import Blueprint, render_template
+from flask import Blueprint, redirect, render_template, url_for
 from flask_login import login_required
 
 from app.models.solution_models import Solution
@@ -22,6 +22,9 @@ _LEVEL_MAP = {
     "very high": 5,
     "critical": 5,
 }
+
+
+_RISK_LEVEL_NAMES = {1: "Very low", 2: "Low", 3: "Medium", 4: "High", 5: "Very high"}
 
 
 def _level_to_int(val, default=3):
@@ -54,24 +57,6 @@ def export_narrative(solution_id):
 @solutions_bp.route("/<int:solution_id>/risks/heatmap")
 @login_required
 def risk_heatmap(solution_id):
-    """Render the 5×5 risk heat-map page for a solution."""
-    solution = Solution.query.get_or_404(solution_id)
-    risks = SolutionRisk.query.filter_by(solution_id=solution_id).all()
-    risks_data = [
-        {
-            "id": r.id,
-            "title": r.risk_description[:60] if r.risk_description else f"Risk {r.id}",
-            "description": r.risk_description or "",
-            "probability": _level_to_int(r.probability),
-            "impact": _level_to_int(r.impact),
-            "mitigation": r.mitigation or "",
-            "status": r.status or "open",
-            "owner": r.owner or "",
-        }
-        for r in risks
-    ]
-    return render_template(
-        "solutions/risk_heatmap.html",
-        solution=solution,
-        risks_data=risks_data,
-    )
+    """The solution's risk heat map lives on the Risks tab of its record now
+    (the solutions rethink, slice 5b)."""
+    return redirect(url_for("solution_design.view_solution", solution_id=solution_id, tab="risks"))

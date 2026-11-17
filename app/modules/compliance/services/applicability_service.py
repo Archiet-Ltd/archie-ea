@@ -14,10 +14,28 @@ from app import db
 from app.models.application_compliance import ApplicationComplianceControl
 from app.models.compliance_models import ComplianceControl, RegulatoryFramework
 from app.models.regulatory_change import RegulatoryChange, RegulatoryChangeImpact
+from app.models.application_portfolio import ApplicationComponent
 from app.models.regulatory_framework import FrameworkAdoption
 from app.models.technology_layer import Node
+from app.services.compliance.earlier_catalogue_seeds import article_order
 
 logger = logging.getLogger(__name__)
+
+
+class NotFoundInOrganisation(LookupError):
+    """The record does not exist for the organisation asking; another organisation's record answers the same."""
+
+
+class FrameworkNotAdopted(ValueError):
+    """The requirement belongs to a framework the organisation has not adopted."""
+
+
+IMPLEMENTATION_STATUSES = ("planned", "in_progress", "implemented", "verified", "not_applicable", "waived")
+
+
+def _require_organisation(organization_id):
+    if organization_id is None:
+        raise ValueError("An organisation is required.")
 
 
 def _now_utc_naive():
@@ -94,9 +112,10 @@ class ApplicabilityService:
 
     @classmethod
     def adopt_framework(
-        cls, organization_id: int, framework_id: int, adopted_by_id: int
+        cls, organization_id: int, framework_id: int, adopted_by_id: int, source: Optional[str] = None
     ) -> FrameworkAdoption:
-        """Adopt a framework for an organisation, copying its controls.
+        """Adopt a framework for an organisation, copying its controls. ``source`` says where the
+        adoption came from and is saved with it.
 
         Returns the new FrameworkAdoption row.
         """
@@ -117,6 +136,7 @@ class ApplicabilityService:
             adopted_by_id=adopted_by_id,
             adopted_at=_now_utc_naive(),
             status="active",
+            source=source,
         )
         db.session.add(adoption)
         db.session.flush()
@@ -132,6 +152,117 @@ class ApplicabilityService:
 
         db.session.commit()
         return adoption
+
+    @classmethod
+    def top_up_adoption(cls, organization_id: int, framework_id: int) -> int:
+        """Give an adopted framework the controls its catalogue gained since it was adopted; returns how many.
+
+        Rows of the catalogue that still read as an earlier release loaded them are first brought to the
+        current catalogue (title, heading, reference, description); a row anyone has edited is left alone.
+        """
+        # This runs from the job queue as well as from requests, where no tenant filter is applied, so the
+        # organisation is named in every query here.
+        adoption = FrameworkAdoption.query.filter_by(organization_id=organization_id, framework_id=framework_id).first()
+        if adoption is None:
+            return 0
+        from app.services.compliance.regulatory_framework_service import RegulatoryFrameworkService
+
+        RegulatoryFrameworkService.correct_unedited_controls(framework_id)
+        held = {
+            row.control_id
+            for row in ApplicationComplianceControl.query.filter_by(organization_id=organization_id, adoption_id=adoption.id)
+        }
+        added = 0
+        for control in ComplianceControl.query.filter_by(framework_id=framework_id):
+            if control.id not in held:
+                db.session.add(ApplicationComplianceControl(
+                    organization_id=organization_id, adoption_id=adoption.id, control_id=control.id,
+                    implementation_status="planned",
+                ))
+                added += 1
+        db.session.commit()
+        return added
+
+    @classmethod
+    def requirements_to_link(cls, organization_id: int) -> List[Dict[str, Any]]:
+        """The requirements the organisation holds through its adopted frameworks, framework by framework."""
+        rows = (
+            db.session.query(ComplianceControl, RegulatoryFramework)
+            .join(ApplicationComplianceControl, ApplicationComplianceControl.control_id == ComplianceControl.id)
+            .join(RegulatoryFramework, RegulatoryFramework.id == ComplianceControl.framework_id)
+            .filter(
+                ApplicationComplianceControl.organization_id == organization_id,
+                ApplicationComplianceControl.application_id.is_(None),
+                ApplicationComplianceControl.adoption_id.isnot(None),
+            )
+            .all()
+        )
+        rows.sort(key=lambda row: (row[1].code, article_order(row[0].control_code, row[0].id)))
+        return [
+            {"id": c.id, "code": c.control_code, "title": c.title, "framework": f.code, "framework_name": f.name}
+            for c, f in rows
+        ]
+
+    @classmethod
+    def link_requirement(
+        cls, organization_id: int, application_id: int, control_id: int,
+        implementation_status: str = "planned", notes: Optional[str] = None, evidence_url: Optional[str] = None,
+    ) -> ApplicationComplianceControl:
+        """Link one requirement of an adopted framework to an application of the same organisation. This is
+        the only place an application-to-requirement link is written.
+
+        Linking it again returns the link already there. Raises ValueError when no organisation is given or
+        the organisation has not adopted the requirement's framework, and NotFoundInOrganisation when the
+        application is not the organisation's own; nothing is written in either case.
+        """
+        _require_organisation(organization_id)
+        owned = db.session.query(ApplicationComponent.id).filter(
+            ApplicationComponent.id == application_id, ApplicationComponent.organization_id == organization_id
+        ).first()
+        if owned is None:
+            raise NotFoundInOrganisation("Application not found")
+        held = ApplicationComplianceControl.query.filter(
+            ApplicationComplianceControl.organization_id == organization_id,
+            ApplicationComplianceControl.control_id == control_id,
+            ApplicationComplianceControl.adoption_id.isnot(None),
+        ).first()
+        if held is None:
+            raise FrameworkNotAdopted("That requirement is not in a framework your organisation has adopted.")
+        existing = ApplicationComplianceControl.query.filter_by(
+            organization_id=organization_id, application_id=application_id, control_id=control_id
+        ).first()
+        if existing is not None:
+            return existing
+        link = ApplicationComplianceControl(
+            organization_id=organization_id, application_id=application_id, control_id=control_id,
+            adoption_id=held.adoption_id, implementation_status=implementation_status,
+            notes=notes, evidence_url=evidence_url,
+        )
+        db.session.add(link)
+        db.session.commit()
+        return link
+
+    @classmethod
+    def requirements_of_application(cls, organization_id: int, application_id: int) -> List[Dict[str, Any]]:
+        """The requirements linked to one application, with the framework each belongs to."""
+        rows = (
+            db.session.query(ApplicationComplianceControl, ComplianceControl, RegulatoryFramework)
+            .join(ComplianceControl, ComplianceControl.id == ApplicationComplianceControl.control_id)
+            .join(RegulatoryFramework, RegulatoryFramework.id == ComplianceControl.framework_id)
+            .filter(
+                ApplicationComplianceControl.organization_id == organization_id,
+                ApplicationComplianceControl.application_id == application_id,
+            )
+            .all()
+        )
+        rows.sort(key=lambda row: (row[2].code, article_order(row[1].control_code, row[1].id)))
+        return [
+            {
+                "code": c.control_code, "title": c.title, "category": c.category, "framework": f.code,
+                "framework_id": f.id, "control_id": c.id, "reference": c.official_reference, "status": link.implementation_status,
+            }
+            for link, c, f in rows
+        ]
 
     @classmethod
     def propose_harmonization(

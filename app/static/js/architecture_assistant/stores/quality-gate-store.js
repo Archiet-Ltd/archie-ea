@@ -166,7 +166,7 @@ document.addEventListener('alpine:init', () => {
         },
 
         get scorePercentage() {
-            return this.assessment?.overall_score || 0;
+            return this.assessment?.overall_score ?? 0; // zero-fallback-ok: the score ring is only drawn once an assessment has returned
         },
 
         get failingItems() {

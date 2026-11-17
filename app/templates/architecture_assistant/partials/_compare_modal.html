@@ -18,11 +18,11 @@
       <div>
         <p class="text-sm text-muted-foreground mb-4">
           Weighted scoring: Strategic Fit
-          <span x-text="Math.round((comparisonData.weights.strategic_fit || 0) * 100) + '%'"></span>,
+          <span x-text="Platform.figure.percent(comparisonData.weights.strategic_fit, 100)"></span>,
           Risk
-          <span x-text="Math.round((comparisonData.weights.risk_score || 0) * 100) + '%'"></span>,
+          <span x-text="Platform.figure.percent(comparisonData.weights.risk_score, 100)"></span>,
           Coverage
-          <span x-text="Math.round((comparisonData.weights.coverage || 0) * 100) + '%'"></span>
+          <span x-text="Platform.figure.percent(comparisonData.weights.coverage, 100)"></span>
         </p>
 
         <div class="overflow-x-auto">
@@ -40,8 +40,8 @@
                 <td class="p-2 text-muted-foreground">Strategic Fit</td>
                 <template x-for="opt in comparisonData.options" :key="'sf-'+opt.name">
                   <td class="text-center p-2">
-                    <span x-text="Math.round((opt.scores?.strategic_fit || 0) * 100) + '%'"
-                      :class="(opt.scores?.strategic_fit || 0) >= 0.7 ? 'text-success-emphasis' : 'text-warning-emphasis'"></span>
+                    <span x-text="Platform.figure.percent(opt.scores?.strategic_fit, 100)"
+                      :class="Platform.figure.num(opt.scores?.strategic_fit) >= 0.7 ? 'text-success-emphasis' : 'text-warning-emphasis'"></span>
                   </td>
                 </template>
               </tr>
@@ -49,8 +49,8 @@
                 <td class="p-2 text-muted-foreground">Risk (inverted)</td>
                 <template x-for="opt in comparisonData.options" :key="'ri-'+opt.name">
                   <td class="text-center p-2">
-                    <span x-text="Math.round((opt.scores?.risk_inverted || 0) * 100) + '%'"
-                      :class="(opt.scores?.risk_inverted || 0) >= 0.7 ? 'text-success-emphasis' : 'text-warning-emphasis'"></span>
+                    <span x-text="Platform.figure.percent(opt.scores?.risk_inverted, 100)"
+                      :class="Platform.figure.num(opt.scores?.risk_inverted) >= 0.7 ? 'text-success-emphasis' : 'text-warning-emphasis'"></span>
                   </td>
                 </template>
               </tr>
@@ -58,8 +58,8 @@
                 <td class="p-2 text-muted-foreground">Coverage</td>
                 <template x-for="opt in comparisonData.options" :key="'cv-'+opt.name">
                   <td class="text-center p-2">
-                    <span x-text="Math.round((opt.scores?.coverage || 0) * 100) + '%'"
-                      :class="(opt.scores?.coverage || 0) >= 0.7 ? 'text-success-emphasis' : 'text-warning-emphasis'"></span>
+                    <span x-text="Platform.figure.percent(opt.scores?.coverage, 100)"
+                      :class="Platform.figure.num(opt.scores?.coverage) >= 0.7 ? 'text-success-emphasis' : 'text-warning-emphasis'"></span>
                   </td>
                 </template>
               </tr>

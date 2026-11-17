@@ -1,5 +1,14 @@
+{# design-block: dashboard #}
 {% extends "layouts/admin_base.html" %}
+{% from 'components/disabled_action.html' import disabled_action %}
 {% from 'components/page_header.html' import page_header %}
+{% from 'components/badge.html' import badge %}
+{% from 'components/see_how.html' import see_how %}
+{% import 'basecoat/index.html' as ui %}
+{% from 'components/list_table.html' import list_table %}
+{% from 'components/fact_list.html' import fact_list %}
+{% from 'basecoat/table.html' import table_cell %}
+{% from 'components/provenance.html' import result_footer %}
 
 {% block title %}Regulatory Compliance{% endblock %}
 
@@ -9,7 +18,7 @@
        tracks software license entitlement compliance, not regulatory
        frameworks -- cross-linked so neither page reads as the other. #}
     {% set _actions = [] %}
-    {% if 'procurement.compliance_dashboard' in flask.current_app.view_functions %}
+    {% if 'procurement.compliance_dashboard' in flask.current_app.view_functions and may_open_procurement() %}
     {% set _ = _actions.append({'text': 'License Compliance', 'icon': 'file-check', 'href': url_for('procurement.compliance_dashboard'), 'variant': 'outline'}) %}
     {% endif %}
     {{ page_header(
@@ -21,6 +30,13 @@
         ],
         actions=_actions
     ) }}
+    {% if 'procurement.compliance_dashboard' in flask.current_app.view_functions and not may_open_procurement() %}
+    {% if may_open_role_page(current_user) and 'user_role.edit_user_role' in flask.current_app.view_functions %}
+    {{ disabled_action('License Compliance', 'Only the ' ~ procurement_role_names() ~ ' roles can open License Compliance. Choose Procurement on', 'license-compliance-reason', icon='file-check', link_text='your role page', link_after='.', link_href=url_for('user_role.edit_user_role', user_id=current_user.id)) }}
+    {% else %}
+    {{ disabled_action('License Compliance', 'Only the ' ~ procurement_role_names() ~ ' roles can open License Compliance. Ask an administrator in Team settings.', 'license-compliance-reason', icon='file-check') }}
+    {% endif %}
+    {% endif %}
 
     {# Summary tiles — every value is a real query result; 0 when there is nothing to show. #}
     <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -53,6 +69,51 @@
         </div>
     </div>
 
+    {% if control_panel %}
+    <div class="bg-card text-card-foreground rounded-lg border border-border p-5 space-y-4" data-testid="control-panel">
+        <h2 class="text-base font-semibold text-foreground">Control {{ control_panel.code }}</h2>
+        {% call(p) fact_list(items=[{'label': 'Title', 'key': 'title'}, {'label': 'Framework', 'key': 'framework'}, {'label': 'What it asks', 'key': 'description'}], testid='control-facts') %}
+          {% if p.key == 'title' %}{{ control_panel.title }}{% elif p.key == 'framework' %}{{ control_panel.framework or 'Framework not recorded' }}{% else %}{{ control_panel.description or 'No description is recorded for this control.' }}{% endif %}
+        {% endcall %}
+        {% call(m) list_table(rows=control_panel.applications, columns=[('Application', ''), ('Status', '')], caption='Applications this control is mapped to', testid='control-applications', row_testid='control-application-row',
+                              empty_message='No application is mapped to this control yet.') %}
+          {% call table_cell(class='font-medium') %}{{ m.name }}{% endcall %}
+          {% call table_cell() %}{{ m.status }}{% endcall %}
+        {% endcall %}
+    </div>
+    {% endif %}
+
+    <div class="bg-card text-card-foreground rounded-lg border border-border p-5 space-y-3">
+        <h2 class="text-base font-semibold text-foreground">Findings</h2>
+        <p class="text-sm text-muted-foreground" data-testid="not-in-place-count">{{ not_in_place_text }}. A control is not in place until it is implemented or verified.</p>
+        {% call(f) list_table(rows=finding_rows, columns=[('Control', ''), {'label': 'Status', 'class': 'hidden md:table-cell'}, {'label': 'Application', 'class': 'hidden md:table-cell'}, {'label': 'Capability', 'class': 'hidden md:table-cell'}], caption='Controls not in place', testid='compliance-findings-table', row_testid='compliance-finding-row', row_id_prefix='control-',
+                              empty_message='No control is missing. Map controls to applications to see where the estate falls short.') %}
+          {% call table_cell(class='font-medium max-w-md whitespace-normal') %}<a href="{{ url_for('application_mgmt.compliance_frameworks_dashboard', control=f.control_id) }}" class="text-primary hover:underline">{{ f.control_code }}: {{ f.control_title }}</a>
+            {# On a phone the status, application and capability sit under the control instead of in columns too narrow to read. #}
+            <dl class="mt-2 grid gap-1 text-sm font-normal md:hidden" data-testid="finding-compact">
+              <div><dt class="inline text-muted-foreground">Status: </dt><dd class="inline capitalize">{{ f.status }}</dd></div>
+              <div><dt class="inline text-muted-foreground">Application: </dt><dd class="inline">{% if f.application_href %}<a href="{{ f.application_href }}" class="text-primary hover:underline" data-testid="finding-application-compact">{{ f.application }}</a>{% else %}{{ f.application }}{% endif %}</dd></div>
+              <div><dt class="inline text-muted-foreground">Capability: </dt><dd class="inline">{% for c in f.capabilities %}{% if c.href %}<a href="{{ c.href }}" class="text-primary hover:underline">{{ c.name }}</a>{% else %}{{ c.name }}{% endif %}{{ ', ' if not loop.last }}{% else %}No capability mapped{% endfor %}</dd></div>
+            </dl>
+            {{ result_footer(f.footer) }}{% endcall %}
+          {% call table_cell(class='capitalize hidden md:table-cell') %}{{ f.status }}{% endcall %}
+          {% call table_cell(class='hidden md:table-cell') %}{% if f.application_href %}<a href="{{ f.application_href }}" class="text-primary hover:underline" data-testid="finding-application">{{ f.application }}</a>{% else %}{{ f.application }}{% endif %}{% endcall %}
+          {% call table_cell(class='hidden md:table-cell') %}{% for c in f.capabilities %}{% if c.href %}<a href="{{ c.href }}" class="text-primary hover:underline" data-testid="finding-capability">{{ c.name }}</a>{% else %}{{ c.name }}{% endif %}{{ ', ' if not loop.last }}{% else %}No capability mapped{% endfor %}{% endcall %}
+        {% endcall %}
+    </div>
+
+    <div class="bg-card text-card-foreground rounded-lg border border-border p-5 space-y-3">
+        <h2 class="text-base font-semibold text-foreground">Capability compliance</h2>
+        <p class="text-sm text-muted-foreground">The same figure Compliance Tracking and Capability Health show. A capability with no mapped control is not assessed. A control on an application that supports several capabilities is counted under each of them.</p>
+        {% call(c) list_table(rows=capability_rows, columns=[('Capability', ''), ('Compliance', ''), ('Status', ''), ('Controls not in place', '')], caption='Compliance of each capability', testid='dashboard-capability-table', row_testid='dashboard-capability-row',
+                              empty_message='No capabilities yet. Add capabilities to see their compliance.') %}
+          {% call table_cell(class='font-medium') %}{{ c.name }}{% endcall %}
+          {% call table_cell(class='tabular-nums', attrs={'data-testid': 'compliance-figure'}) %}{{ c.figure }}{% endcall %}
+          {% call table_cell() %}{{ c.status }}{% endcall %}
+          {% call table_cell(class='tabular-nums') %}{{ c.missing if c.assessed else 'Not assessed' }}{% endcall %}
+        {% endcall %}
+    </div>
+
     {% if load_error %}
     <div class="rounded-md border border-destructive/40 bg-destructive/10 px-5 py-2 text-sm text-destructive-emphasis" role="alert">
         Could not load compliance data. Please try again.
@@ -62,10 +123,24 @@
     {# Frameworks table — each row expands in place to list its controls,
        reusing the existing GET /api/compliance/frameworks/<id>/controls
        endpoint (previously reachable only via curl). No new backend. #}
-    <div class="bg-card text-card-foreground rounded-lg border border-border overflow-hidden" x-data="frameworksTable()">
+    <div class="bg-card text-card-foreground rounded-lg border border-border overflow-hidden" x-data="frameworksTable({{ open_framework_id if open_framework_id else 'null' }})" x-init="start()">
         <div class="px-5 py-4 border-b border-border">
             <h2 class="text-base font-semibold text-foreground">Frameworks</h2>
         </div>
+        {% if not adopted_count %}
+        {% call ui.empty(class='py-12', attrs={'data-testid': 'compliance-empty'}) %}
+            {% call ui.empty_header() %}
+                {% call ui.empty_icon(variant='icon') %}{{ lucide('shield-check') }}{% endcall %}
+                {{ ui.empty_title(text='No regulatory frameworks adopted yet') }}
+                {% if frameworks %}
+                {{ ui.empty_description(text='Your organisation has not adopted a framework. The list below is every framework the platform carries: choose one to see its controls.') }}
+                {% else %}
+                {{ ui.empty_description(text='Regulatory frameworks define the compliance standards, controls and obligations your organisation must meet, such as GDPR, SOC 2 or ISO 27001. Frameworks are added by an administrator.') }}
+                {% endif %}
+            {% endcall %}
+            {% call ui.empty_content() %}{{ see_how('compliance-controls') }}{% endcall %}
+        {% endcall %}
+        {% endif %}
         {% if frameworks %}
         <div class="overflow-x-auto">
             <table class="dense-table w-full text-sm">
@@ -94,13 +169,18 @@
                                :class="openId === {{ f.id }} ? 'rotate-90' : ''" aria-hidden="true"></i>
                             {{ f.code }}
                         </td>
-                        <td class="px-5 py-3 text-foreground">{{ f.name }}</td>
+                        <td class="px-5 py-3 text-foreground">
+                            {{ f.name }}
+                            {% if f.adopted %}<span class="ml-2" data-testid="framework-adopted" data-source="{{ f.source or '' }}">{% call badge('neutral') %}Adopted{% if f.source %} &middot; starter, chosen at sign-up{% endif %}{% endcall %}</span>{% endif %}
+                        </td>
                         <td class="px-5 py-3 text-muted-foreground">{{ f.category or '—' }}</td>
                         <td class="px-5 py-3 text-muted-foreground">{{ f.jurisdiction or '—' }}</td>
                         <td class="px-5 py-3 text-muted-foreground">{{ f.enforcement_level or '—' }}</td>
                         <td class="px-5 py-3 text-muted-foreground">{{ f.penalty_risk or '—' }}</td>
                         <td class="px-5 py-3 text-right text-foreground">
-                            {{ f.control_count if f.control_count else '—' }}
+                            {% if not f.whole_loaded %}{{ f.control_count if f.control_count else '—' }}{% endif %}
+                            {% if f.partly_loaded %}<div class="text-xs text-muted-foreground" data-testid="controls-loaded">{{ f.partly_loaded }}. The rest of the standard is not loaded yet.</div>{% elif f.whole_loaded %}<div class="text-xs text-muted-foreground" data-testid="controls-loaded">{{ f.whole_loaded }}.</div>{% endif %}
+                            {% if f.scope_note %}<div class="text-xs text-muted-foreground" data-testid="scope-note">{{ f.scope_note }}</div>{% endif %}
                         </td>
                     </tr>
                     <tr x-show="openId === {{ f.id }}" x-cloak>
@@ -118,16 +198,18 @@
                                             <th class="py-1 pr-4 font-medium">Control</th>
                                             <th class="py-1 pr-4 font-medium">Title</th>
                                             <th class="py-1 pr-4 font-medium">Category</th>
+                                            <th class="py-1 pr-4 font-medium">Reference</th>
                                             <th class="py-1 font-medium">Priority</th>
                                         </tr>
                                     </thead>
                                     <tbody>
                                         <template x-for="c in (controlsByFramework[{{ f.id }}] || [])" :key="c.id">
-                                            <tr class="border-t border-border/60">
+                                            <tr class="border-t border-border/60" :id="'requirement-' + c.id">
                                                 <td class="py-1.5 pr-4 font-medium text-foreground" x-text="c.control_code || '—'"></td>
                                                 <td class="py-1.5 pr-4 text-foreground" x-text="c.title || '—'"></td>
                                                 <td class="py-1.5 pr-4 text-muted-foreground" x-text="c.category || '—'"></td>
-                                                <td class="py-1.5 text-muted-foreground" x-text="c.priority || '—'"></td>
+                                                <td class="py-1.5 pr-4 text-muted-foreground" x-text="c.official_reference || 'Not recorded'"></td>
+                                                <td class="py-1.5 text-muted-foreground" x-text="c.priority || 'Not set'"></td>
                                             </tr>
                                         </template>
                                     </tbody>
@@ -139,17 +221,44 @@
                 </tbody>
             </table>
         </div>
-        {% else %}
-        <div class="px-5 py-12 text-center text-sm text-muted-foreground">
-            <p class="mb-2">Regulatory frameworks define the compliance standards, controls and obligations your organisation must meet — such as GDPR, SOC 2 or ISO 27001.</p>
-            <p>Frameworks are added by an administrator.</p>
-        </div>
         {% endif %}
     </div>
 </div>
 <script>
-    function frameworksTable() {
+    // Handle anchor fragment on page load: if a requirement anchor (e.g.
+    // #requirement-123) is present, scroll to that requirement's row once the
+    // framework's controls have been loaded and rendered by Alpine.
+    document.addEventListener('DOMContentLoaded', function () {
+        var hash = window.location.hash || '';
+        if (!hash.startsWith('#requirement-')) return;
+        var requirementId = hash.substring('#requirement-'.length);
+        var attempts = 0;
+        var tryScroll = function () {
+            var el = document.getElementById('requirement-' + requirementId);
+            if (el) {
+                el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                el.classList.add('ring-2', 'ring-primary', 'bg-muted/50');
+                setTimeout(function () {
+                    el.classList.remove('ring-2', 'ring-primary', 'bg-muted/50');
+                }, 10000);
+                return;
+            }
+            attempts++;
+            if (attempts < 300) {
+                setTimeout(tryScroll, 100);
+            }
+        };
+        tryScroll();
+    });
+
+    function frameworksTable(initialId) {
         return {
+            start() {
+                if (initialId) {
+                    this.openId = null;
+                    this.toggle(initialId);
+                }
+            },
             openId: null,
             loadingId: null,
             controlsByFramework: {},
@@ -163,7 +272,7 @@
                     return;
                 }
                 this.loadingId = frameworkId;
-                Platform.fetch.get('/api/compliance/frameworks/' + frameworkId + '/controls')
+                Platform.fetch.get('{{ url_for("application_mgmt.get_compliance_frameworks") }}/' + frameworkId + '/controls')
                     .then((data) => {
                         this.controlsByFramework[frameworkId] = Array.isArray(data) ? data : [];
                     })

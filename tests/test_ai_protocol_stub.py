@@ -9,7 +9,7 @@ import httpx
 from openai import AuthenticationError, BadRequestError, OpenAI
 import pytest
 
-from tests.smoke.ai_protocol_stub import AIProtocolStub, CHAT, GUIDE, MODEL, TOKEN
+from tests.smoke.ai_protocol_stub import AIProtocolStub, CATALOGUE_LOOKUP, CHAT, GUIDE, MODEL, TOKEN
 
 
 def test_sdk_nonstreaming_guide_response_and_usage_cross_loopback():
@@ -126,3 +126,50 @@ def test_concurrent_requests_have_independent_ledger_and_socket_closes():
     with socket.socket() as connection:
         connection.settimeout(1)
         assert connection.connect_ex(('127.0.0.1', port)) != 0
+
+
+def _openai_environment(monkeypatch, platform_key, order):
+    monkeypatch.setenv('OPENAI_API_KEY', platform_key)
+    for number in range(1, 10):
+        monkeypatch.delenv('OPENAI_API_KEY_%d' % number, raising=False)
+    monkeypatch.delenv('OPENAI_API_KEY_SECONDARY', raising=False)
+    monkeypatch.delenv('AI_PROVIDER_ORDER', raising=False)
+    monkeypatch.setenv('LLM_PROVIDER_ORDER', order)
+    monkeypatch.setenv('LLM_SPEND_CEILING_USD_OPENAI', '50')
+
+
+def test_server_environment_leaves_the_stub_token_as_the_organisations_own_key(app, monkeypatch):
+    """The token is a customer's key, not the platform's, so the platform-paid stop does not apply to it."""
+    from app.modules.ai_chat.services.agent_runner import AgentRunner
+    from app.modules.ai_chat.services.llm_service_impl import LLMService
+
+    with AIProtocolStub() as stub:
+        child = stub.child_environment({}, organisation_key_only=True)
+    assert child['OPENAI_API_KEY'] == ''
+    assert child['OPENAI_BASE_URL'] == stub.base_url
+
+    # Outside the provider order: the organisation's own key is still its own money and answers.
+    _openai_environment(monkeypatch, child['OPENAI_API_KEY'], 'anthropic')
+    with app.app_context():
+        assert LLMService.platform_pays('openai', TOKEN) is False
+        assert AgentRunner._platform_funded('openai', TOKEN) is False
+
+    # The same token as the platform's own key is platform-paid, and the stop still refuses it.
+    _openai_environment(monkeypatch, TOKEN, 'anthropic')
+    with app.app_context():
+        assert AgentRunner._platform_funded('openai', TOKEN) is True
+        allowed, reason = LLMService.platform_call_allowed('openai')
+    assert allowed is False
+    assert 'not in the provider order' in reason
+
+
+def test_catalogue_lookup_is_its_own_scenario_and_never_a_chat_request():
+    with AIProtocolStub() as stub:
+        with OpenAI(api_key=TOKEN, base_url=stub.base_url, max_retries=0,
+                    http_client=httpx.Client(trust_env=False)) as client:
+            client.chat.completions.create(model=MODEL, messages=[
+                {'role': 'user', 'content': CATALOGUE_LOOKUP + ' for jane.doe@acme-corp.example'}])
+            client.chat.completions.create(model=MODEL, messages=[{'role': 'user', 'content': GUIDE['prompt']}])
+        assert [record['scenario'] for record in stub.records] == ['catalogue_lookup', 'guide']
+        assert len(stub.lookups) == 1 and 'jane.doe@acme-corp.example' in stub.lookups[0]
+        assert len(stub.sent_text) == 1 and GUIDE['marker'] in stub.sent_text[0]

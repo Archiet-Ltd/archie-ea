@@ -13,7 +13,9 @@ from flask import (
     request,
     url_for,
 )
-from flask_login import login_required
+from flask_login import current_user, login_required
+
+from app.core.auth.permissions import can
 
 from app.models.implementation_migration import Gap, GAP_KIND_PLATEAU_TRANSITION
 from app.modules.interface_register.routes.register_routes import (
@@ -26,6 +28,7 @@ from app.modules.interface_register.services import (
     interface_gap_service,
     work_package_service,
 )
+from app.utils.plain_errors import render_plain_error
 
 
 @interface_register_bp.route("/comparison", methods=["GET"])
@@ -43,7 +46,7 @@ def comparison():
     try:
         initiative = service.resolve_initiative(initiative_id, g.current_org_id)
     except service.InterfaceRegisterError:
-        return render_template("errors/404.html"), 404
+        return render_plain_error(404)
 
     # Get plateau pair (if exists)
     plateau_pair = plateau_pair_service.get_plateau_pair(initiative_id)
@@ -90,7 +93,7 @@ def provision_comparison():
     try:
         service.resolve_initiative(initiative_id, g.current_org_id)
     except service.InterfaceRegisterError:
-        return render_template("errors/404.html"), 404
+        return render_plain_error(404)
 
     try:
         plateau_pair_service.provision_plateau_pair(initiative_id)
@@ -116,7 +119,7 @@ def raise_gap(element_id):
     try:
         initiative = service.resolve_initiative(initiative_id, g.current_org_id)
     except service.InterfaceRegisterError:
-        return render_template("errors/404.html"), 404
+        return render_plain_error(404)
 
     try:
         interface_gap_service.raise_interface_gap(
@@ -166,12 +169,14 @@ def attach_work_package(gap_id):
     guard = _guard()
     if guard:
         return guard
+    if not can(current_user, "create", "work_package"):
+        return render_plain_error(403)
 
     initiative_id = request.form.get("initiative_id", type=int)
     try:
         service.resolve_initiative(initiative_id, g.current_org_id)
     except service.InterfaceRegisterError:
-        return render_template("errors/404.html"), 404
+        return render_plain_error(404)
 
     try:
         work_package_service.attach_work_package_to_gap(

@@ -1,0 +1,17 @@
+{# Vendored from flask-basecoat, branch feat/canvases-capability-map, commit 24590ba,
+   flask_basecoat/templates/basecoat/canvas/index.html, the fourteen canvases Entelim draws (the twelve added from commit 2b02744).
+   Usage: {% import 'components/canvas/index.html' as canvas with context %} then {{ canvas.business_model_canvas(data) }} #}
+{% import 'components/canvas/business_model_canvas.html' as _business_model_canvas with context %}{% set business_model_canvas = _business_model_canvas.business_model_canvas %}
+{% import 'components/canvas/value_proposition_canvas.html' as _value_proposition_canvas with context %}{% set value_proposition_canvas = _value_proposition_canvas.value_proposition_canvas %}
+{% import 'components/canvas/lean_canvas.html' as _lean_canvas with context %}{% set lean_canvas = _lean_canvas.lean_canvas %}
+{% import 'components/canvas/empathy_map.html' as _empathy_map with context %}{% set empathy_map = _empathy_map.empathy_map %}
+{% import 'components/canvas/swot_analysis.html' as _swot_analysis with context %}{% set swot_analysis = _swot_analysis.swot_analysis %}
+{% import 'components/canvas/pestle_analysis.html' as _pestle_analysis with context %}{% set pestle_analysis = _pestle_analysis.pestle_analysis %}
+{% import 'components/canvas/porters_five_forces.html' as _porters_five_forces with context %}{% set porters_five_forces = _porters_five_forces.porters_five_forces %}
+{% import 'components/canvas/ansoff_matrix.html' as _ansoff_matrix with context %}{% set ansoff_matrix = _ansoff_matrix.ansoff_matrix %}
+{% import 'components/canvas/mckinsey_7s.html' as _mckinsey_7s with context %}{% set mckinsey_7s = _mckinsey_7s.mckinsey_7s %}
+{% import 'components/canvas/blue_ocean.html' as _blue_ocean with context %}{% set blue_ocean = _blue_ocean.blue_ocean %}
+{% import 'components/canvas/wardley_mapping.html' as _wardley_mapping with context %}{% set wardley_mapping = _wardley_mapping.wardley_mapping %}
+{% import 'components/canvas/balanced_scorecard.html' as _balanced_scorecard with context %}{% set balanced_scorecard = _balanced_scorecard.balanced_scorecard %}
+{% import 'components/canvas/okr.html' as _okr with context %}{% set okr = _okr.okr %}
+{% import 'components/canvas/product_vision_board.html' as _product_vision_board with context %}{% set product_vision_board = _product_vision_board.product_vision_board %}

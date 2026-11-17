@@ -14,12 +14,21 @@ from ..models.metrics import ApplicationMetricsSnapshot  # noqa: F401
 import json
 import logging
 import re
+
+from sqlalchemy.exc import ProgrammingError
+from werkzeug.exceptions import NotFound
 from datetime import datetime  # dead-code-ok
 from app.models.archimate_element_types import is_application_kind
+from app.services.cost_visibility import SHARE_FIGURE_KEYS
 
 # Define the logger
 logger = logging.getLogger(__name__)
 
+from app.services.capability_support import (
+    SUPPORT_LEVELS,
+    CapabilitySupportRefused,
+    record_support_for_records,
+)
 from flask import (
     current_app,
     flash,
@@ -328,11 +337,12 @@ def _validate_and_clean_import_row(row, clean_func):
     cleaned["version"] = _truncate_to_length(
         _get_column_value(row, "version", clean_func), "version"
     )
-    cleaned["deployment_status"] = (
-        _truncate_to_length(
-            _get_column_value(row, "deployment_status", clean_func), "deployment_status"
-        )
-        or "planned"
+    # One list of statuses: a known word is stored in the list's form, a blank
+    # stores nothing, anything else is refused for this row.
+    from app.services.application_status import status_for_write
+
+    cleaned["deployment_status"], cleaned["status_error"] = status_for_write(
+        _get_column_value(row, "deployment_status", clean_func)
     )
     cleaned["business_domain"] = _truncate_to_length(
         _get_column_value(row, "business_domain", clean_func), "business_domain"
@@ -812,15 +822,20 @@ def _link_application_to_capabilities(app, capabilities_str):
             # Check if mapping already exists using prefetched set
             if capability.id not in existing_mapping_keys:
                 # Create new mapping
-                mapping = UnifiedApplicationCapabilityMapping(
-                    application_component_id=app.id,
-                    unified_capability_id=capability.id,
-                    support_level="partial",  # Default support level
-                    coverage_percentage=50,  # Default 50% coverage
-                    relationship_type="enables",
-                    notes=f"Auto-linked from import: {cap_name}",
-                )
-                db.session.add(mapping)
+                try:
+                    record_support_for_records(
+                        app.organization_id,
+                        app.id,
+                        capability.id,
+                        facts={
+                            "support_level": "partial",  # Default support level
+                            "coverage_percentage": 50,  # Default 50% coverage
+                            "notes": f"Auto-linked from import: {cap_name}",
+                        },
+                    )
+                except CapabilitySupportRefused:
+                    not_found.append(cap_name)
+                    continue
                 existing_mapping_keys.add(
                     capability.id
                 )  # Update set to prevent duplicates
@@ -1106,7 +1121,7 @@ def validate_archimate_element_creation(
 from sqlalchemy.exc import SQLAlchemyError
 
 # Import statements (moved to proper location)
-from ..models.business_capabilities import BusinessCapability, BusinessFunction
+from ..models.business_capabilities import BusinessFunction
 from ..models.business_layer import (
     BusinessActor,
     BusinessObject,
@@ -1761,10 +1776,16 @@ def _delete_archimate_element(element_id, rel_type="realization"):
             ("values",                               "archimate_element_id"),
         ]
         for table, col in _nullable_refs:
-            db.session.execute(
-                text(f"UPDATE {table} SET {col} = NULL WHERE {col} = :id"),  # noqa: S608
-                {"id": eid},
-            )
+            # A table this installation never created holds nothing that points at the element.
+            try:
+                with db.session.begin_nested():
+                    db.session.execute(
+                        text(f"UPDATE {table} SET {col} = NULL WHERE {col} = :id"),  # noqa: S608
+                        {"id": eid},
+                    )
+            except ProgrammingError as exc:
+                if "does not exist" not in str(exc):
+                    raise
 
         # ------------------------------------------------------------------
         # 6. Finally delete the element itself (CASCADE constraints in DB will
@@ -1778,6 +1799,9 @@ def _delete_archimate_element(element_id, rel_type="realization"):
 
         return jsonify({"success": True})
 
+    except NotFound:
+        db.session.rollback()
+        return jsonify({"success": False, "error": "That element was not found."}), 404
     except Exception as e:
         db.session.rollback()
         current_app.logger.error(f"Error deleting ArchiMate element: {str(e)}")
@@ -1895,120 +1919,84 @@ def _sync_vendor_products(archimate_element_id, target_ids):
         )
 
 
-def render_application_detail(id):
+def render_application_detail(id, form_values=None, form_errors=None, status=200):
     """Render the Application Detail page.
 
     Called by unified_applications_bp (canonical /applications/<id>).
     Restored after BE-054 god-file decomposition dropped this shared handler.
+
+    A refused Overview save comes back through here in edit mode with the typed
+    values and one error per field, so nothing the person typed is lost.
     """
     from app.models.application_portfolio import ApplicationComponent
 
     app_obj = ApplicationComponent.query.get_or_404(id)
 
     # --- Capabilities ---
-    # Query ApplicationCapabilityMapping (populated by Abacus sync — 410 rows)
-    # NOT UnifiedApplicationCapabilityMapping (empty table, different schema)
+    # What this application supports is one relationship per capability, read through the one
+    # reader (the same one the coverage matrix and the chat read).
     capabilities = []
     capability_mappings = []
     try:
-        from app.models.application_capability import ApplicationCapabilityMapping
-        # tenant-scoping-ok: filtered by application_component_id == id below,
-        # and app_obj (id) is an org-scoped ApplicationComponent load.
-        cap_pairs = (
-            db.session.query(ApplicationCapabilityMapping, BusinessCapability)
-            .join(
-                BusinessCapability,
-                ApplicationCapabilityMapping.business_capability_id == BusinessCapability.id,
-            )
-            .filter(ApplicationCapabilityMapping.application_component_id == id)
-            .all()
-        )
-        capabilities = [cap for _, cap in cap_pairs]
-        capability_mappings = cap_pairs  # Keep (mapping, cap) pairs for table
+        from app.services.application_capabilities import application_capability_links
 
-        # DEF-003 follow-up (3 Sep 2026): the "Map Capability" modal's create
-        # handler (application_capability_mapping_create,
-        # detail_layer_routes.py) writes UnifiedApplicationCapabilityMapping —
-        # the canonical store per ADR-0008 — but this display only ever read
-        # the legacy ApplicationCapabilityMapping table above. A capability
-        # mapped through the modal therefore persisted correctly (confirmed
-        # in the DB) yet never appeared here: silent, not a crash. Rather than
-        # migrate the legacy rows into the unified table (a locked, checksum-
-        # verified data operation matching project_capabilities.py's rigor
-        # that this fix does not attempt), the display unions both sources,
-        # de-duplicated by the underlying BusinessCapability identity so an
-        # already-legacy-linked capability cannot render twice.
-        from app.models.unified_application_capability_mapping import (
-            UnifiedApplicationCapabilityMapping,
-        )
-        from app.models.unified_capability import UnifiedCapability
-
-        legacy_capability_ids = {cap.id for cap in capabilities}
-        unified_pairs = (
-            db.session.query(UnifiedApplicationCapabilityMapping, UnifiedCapability)
-            .join(
-                UnifiedCapability,
-                UnifiedApplicationCapabilityMapping.unified_capability_id == UnifiedCapability.id,
-            )
-            .filter(
-                UnifiedApplicationCapabilityMapping.application_component_id == id,
-                UnifiedCapability.source_table == "business_capability",
-            )
-            .all()
-        )
-        for u_mapping, u_cap in unified_pairs:
-            try:
-                source_bc_id = int(u_cap.source_id)
-            except (TypeError, ValueError):
-                continue
-            if source_bc_id in legacy_capability_ids:
-                continue
-            legacy_capability_ids.add(source_bc_id)
-            capability_mappings.append((u_mapping, u_cap))
-            capabilities.append(u_cap)
+        capability_mappings = application_capability_links(app_obj.id, app_obj.organization_id)
+        capabilities = [cap for _, cap in capability_mappings]
     except Exception:
         logger.exception("Could not load capability mappings for application %s", app_obj.id)
         db.session.rollback()
 
     # --- Capability form config (for "Map Capability" modal) ---
-    existing_cap_ids = {c.id for c in capabilities}
+    # The pick list is the capabilities the coverage page lists, one per capability record.
+    existing_element_ids = {c.archimate_element_id for c in capabilities if c.archimate_element_id}
     capability_options = []
     try:
-        all_caps = BusinessCapability.query.order_by(BusinessCapability.name.asc()).all()
+        from app.models.unified_capability import UnifiedCapability
+
+        all_caps = (
+            UnifiedCapability.query.filter(
+                UnifiedCapability.organization_id == app_obj.organization_id,
+                UnifiedCapability.retired_into_id.is_(None),
+            )
+            .order_by(UnifiedCapability.name.asc())
+            .all()
+        )
         for cap in all_caps:
             capability_options.append({
                 "id": cap.id,
                 "label": f"{cap.name} \u00b7 {cap.category or 'Uncategorized'}",
-                "disabled": cap.id in existing_cap_ids,
+                "disabled": cap.archimate_element_id in existing_element_ids,
             })
     except Exception:
         db.session.rollback()
     capability_form_config = {
         "capability_options": capability_options,
-        "support_levels": [
-            ("primary", "Primary"), ("secondary", "Secondary"),
-            ("partial", "Partial"), ("legacy", "Legacy"),
-            ("planned", "Planned"), ("linked", "Linked"),
-        ],
+        "support_levels": [(level, level.capitalize()) for level in SUPPORT_LEVELS],
+        "support_kinds": [("realization", "Realizes"), ("serving", "Serves")],
         "maturity_levels": [(str(i), f"Level {i}") for i in range(1, 6)],
     }
+    # The dialog's choices as (value, label, disabled) triples.
+    capability_form_config["capability_choices"] = [(o["id"], o["label"], o["disabled"]) for o in capability_options]
+    capability_form_config["kind_choices"] = [(v, label, False) for v, label in capability_form_config["support_kinds"]]
+    capability_form_config["level_choices"] = [(v, label, False) for v, label in capability_form_config["support_levels"]]
+    capability_form_config["maturity_choices"] = [(v, label, False) for v, label in capability_form_config["maturity_levels"]]
 
-    # --- Requirements ---
-    requirements = []
+    # --- Requirements of the frameworks the organisation adopted, linked to this application.
+    # One call feeds both the figure at the top and the card that lists them.
+    linked_requirements = []
+    requirement_options = []
     try:
-        from app.models.requirements import Requirement
-        from app.models.relationship_tables import ApplicationRequirementMapping
+        from app.modules.compliance.services.applicability_service import ApplicabilityService
 
-        requirements = (
-            db.session.query(Requirement)
-            .join(
-                ApplicationRequirementMapping,
-                Requirement.id == ApplicationRequirementMapping.requirement_id,
-            )
-            .filter(ApplicationRequirementMapping.application_component_id == id)
-            .all()
-        )
+        org_for_requirements = getattr(g, "current_org_id", None)
+        linked_requirements = ApplicabilityService.requirements_of_application(org_for_requirements, app_obj.id)
+        linked_codes = {(row["framework"], row["code"]) for row in linked_requirements}
+        requirement_options = [
+            row for row in ApplicabilityService.requirements_to_link(org_for_requirements)
+            if (row["framework"], row["code"]) not in linked_codes
+        ]
     except Exception:
+        logger.exception("Could not load linked requirements for application %s", app_obj.id)
         db.session.rollback()
 
     # --- Interfaces ---
@@ -2060,29 +2048,17 @@ def render_application_detail(id):
             db.session.rollback()
 
     # --- ArchiMate relationships for this app ---
+    # One reader of what the model links to the application: the Architecture tab, the
+    # Technology and Vendors tabs and the completeness banner all read it.
     archimate_relationships = {'incoming': [], 'outgoing': []}
     if app_obj.archimate_element_id:
         try:
-            from app.models.archimate_core import ArchiMateElement, ArchiMateRelationship
-            ae_id = app_obj.archimate_element_id
+            from app.services.application_model_links import linked_elements
 
-            outgoing = db.session.query(ArchiMateRelationship, ArchiMateElement).join(
-                ArchiMateElement, ArchiMateRelationship.target_id == ArchiMateElement.id
-            ).filter(ArchiMateRelationship.source_id == ae_id).all()
-
-            incoming = db.session.query(ArchiMateRelationship, ArchiMateElement).join(
-                ArchiMateElement, ArchiMateRelationship.source_id == ArchiMateElement.id
-            ).filter(ArchiMateRelationship.target_id == ae_id).all()
-
-            for rel, elem in outgoing:
-                archimate_relationships['outgoing'].append({
-                    'id': elem.id, 'name': elem.name, 'type': elem.type,
-                    'layer': (elem.layer or '').title(), 'rel_type': rel.type,
-                })
-            for rel, elem in incoming:
-                archimate_relationships['incoming'].append({
-                    'id': elem.id, 'name': elem.name, 'type': elem.type,
-                    'layer': (elem.layer or '').title(), 'rel_type': rel.type,
+            for item in linked_elements(app_obj):
+                archimate_relationships[item['direction']].append({
+                    'id': item['id'], 'name': item['name'], 'type': item['type'],
+                    'layer': item['layer'], 'rel_type': item['rel_type'],
                 })
         except Exception:
             db.session.rollback()
@@ -2094,6 +2070,27 @@ def render_application_detail(id):
         "product_count": 0,
         "has_archimate": bool(app_obj.archimate_element_id),
     }
+    # The vendor the one register holds for this application, and the suppliers the
+    # model links to it that are not yet recorded as its vendor.
+    vendor_organisations = []
+    supplier_links = []
+    primary_vendor_label = "None recorded"
+    try:
+        from app.services import vendor_register
+        from app.services.application_model_links import linked_suppliers
+
+        vendor_id = vendor_register.vendor_of(app_obj)
+        vendor = db.session.get(VendorOrganization, vendor_id) if vendor_id else None
+        if vendor is not None:
+            vendor_organisations = [{"id": vendor.id, "name": vendor.name}]
+            primary_vendor_label = vendor.name
+        vendor_summary["vendor_count"] = len(vendor_organisations)
+        vendor_summary["product_count"] = 1 if app_obj.primary_vendor_product is not None else 0
+        supplier_links = linked_suppliers(app_obj, vendor.name if vendor is not None else None)
+    except Exception:
+        logger.exception("Could not load vendors for application %s", app_obj.id)
+        db.session.rollback()
+    vendors_tab_count = len(vendor_organisations) + len(supplier_links)
     # Populate vendor product dropdown from VendorProduct table
     all_products = []
     try:
@@ -2113,6 +2110,18 @@ def render_application_detail(id):
         "criticalities": VENDOR_CRITICALITY_CHOICES,
         "hosting_models": VENDOR_HOSTING_CHOICES,
     }
+
+    # The interfaces counted are the ones the connections panel lists (connected elements of the
+    # interface type) plus recorded interface rows not already among them.
+    connected_interfaces = {
+        item["id"]
+        for side in archimate_relationships.values()
+        for item in side
+        if (item.get("type") or "").endswith("Interface")
+    }
+    interface_count = len(connected_interfaces) + len(
+        [i for i in interfaces if getattr(i, "archimate_element_id", None) not in connected_interfaces]
+    )
 
     # --- Metric cards ---
     metric_cards = [
@@ -2134,28 +2143,42 @@ def render_application_detail(id):
                 else "—"
             ),
             "delta": (
-                f"Criticality: {app_obj.business_criticality}"
-                if app_obj.business_criticality
-                else "Criticality not recorded"
+                (
+                    f"Criticality: {app_obj.business_criticality}"
+                    if app_obj.business_criticality
+                    else "Criticality not recorded"
+                )
+                if app_obj.deployment_status
+                else "Not recorded; set it in Edit"
             ),
             "icon_svg": "",
         },
         {
             "label": "Interfaces Linked",
-            "value": str(len(interfaces)),
-            "delta": "Exposed integrations connected to this component",
+            "value": str(interface_count),
+            "delta": (
+                "Among its connections"
+                if interface_count
+                else (
+                    "None linked yet; link one in the Composer"
+                    if archimate_info
+                    else "None linked"
+                )
+            ),
             "icon_svg": "",
         },
         {
             "label": "Mapped Capabilities",
             "value": str(len(capabilities)),
             "delta": "Enterprise capabilities linked to this application",
+            "href": "?tab=capabilities#mapped-capabilities",
             "icon_svg": "",
         },
         {
-            "label": "Linked Requirements",
-            "value": str(len(requirements)),
-            "delta": "Requirements implemented by this component",
+            "label": "Framework requirements",
+            "value": str(len(linked_requirements)),
+            "delta": "Linked to this application, listed below",
+            "href": "?tab=overview#application-requirements",
             "icon_svg": "",
         },
     ]
@@ -2175,6 +2198,8 @@ def render_application_detail(id):
     if capability_mappings:
         cap_table["columns"] = ["Capability", "Category", "Support", "Coverage", "Maturity", "Strategic", "Compliance"]
         cap_rows = []
+        from app.utils.recorded_figures import coverage_text
+
         for mapping, cap in capability_mappings:
             # DEF-003 follow-up: `mapping` is either an ApplicationCapabilityMapping
             # (legacy) or a UnifiedApplicationCapabilityMapping (canonical, from the
@@ -2195,10 +2220,16 @@ def render_application_detail(id):
                 is_strategic = getattr(mapping, "is_strategic", False)
             cap_rows.append({
                 "name": cap.name,
+                "id": mapping.id,
+                "kind_word": getattr(mapping, "kind_word", None),
+                "delete_url": (
+                    url_for("application_mgmt.application_capability_mapping_delete", id=app_obj.id, mapping_id=mapping.id)
+                    if getattr(mapping, "kind", None) else None
+                ),
                 "detail_url": None,
                 "category": cap.category or "",
                 "support_level": support.replace("_", " ").title() if support else "",
-                "coverage": f"{coverage_pct}%" if coverage_pct is not None else "",
+                "coverage": coverage_text(coverage_pct),
                 "maturity": f"L{maturity}" if maturity is not None else "",
                 "strategic": "Yes" if is_strategic else "No",
                 "compliance": compliance.replace("_", " ").title() if compliance else "\u2014",
@@ -2296,9 +2327,93 @@ def render_application_detail(id):
         logger.exception("Could not load unified work packages for application %s", app_obj.id)
         db.session.rollback()
 
+    # --- Owner: the one owner record's display rows for this application, so
+    # the Ownership card can offer the same "Assign owner" next step the
+    # element page does and show the assigned owner by name after.
+    owner_rows = []
+    owner_assign_url = url_for("unified_applications.add_owner", app_id=app_obj.id)
+    try:
+        from app.models.application_owner import ApplicationOwner
+
+        owner_rows = [
+            dict(row, remove_url=url_for(
+                "unified_applications.remove_owner", app_id=app_obj.id, owner_id=row["id"],
+            ))
+            for row in ApplicationOwner.get_display_rows_for_application(
+                app_obj.id, getattr(g, "current_org_id", None)
+            )
+        ]
+    except Exception:
+        logger.exception("Could not load owner rows for application %s", app_obj.id)
+        db.session.rollback()
+
+    from app.services import technology_cost
+    from flask_login import current_user
+
+    from app.core.auth.permissions import can as _can
+    from app.services.application_overview_fields import overview_limits
+    from app.services.application_status import status_options
+
+    technology_cost_shares = technology_cost.shares_for_application(
+        app_obj.organization_id, app_obj.id)
+
+    # What an application read from a connector still needs; a repository nobody has promoted is not one.
+    from app.connectors.github import unpromoted_import_ids
+    from app.connectors.github_gaps import application_gaps
+
+    imported_gaps = application_gaps(
+        app_obj.organization_id, [app_obj],
+        skip_ids=unpromoted_import_ids(app_obj.organization_id, [app_obj.id]),
+    ).get(app_obj.id)
+
+    owner_source, owner_reason = None, None
+    if imported_gaps:
+        owner_gap = next((x for x in imported_gaps["gaps"] if x["key"] == "owner"), None)
+        owner_reason = owner_gap.get("note") if owner_gap else None
+    if owner_rows:
+        from app.connectors.github_gaps import owner_source_note
+
+        owner_source = owner_source_note(app_obj, owner_rows)
+
+    # The one cost rule decides here; the page only prints what it is given.
+    from app.services.cost_visibility import COSTS_WITHHELD, costs_visible, withhold_costs
+
+    costs_withheld = not costs_visible(current_user)
+    if costs_withheld:
+        cost_breakdown = withhold_costs(cost_breakdown, keys=tuple(cost_breakdown))
+        technology_cost_shares = withhold_costs(
+            technology_cost_shares, keys=SHARE_FIGURE_KEYS)
+
+    technology_linked_count = 0
+    completeness_notes = {}
+    from app.services.application_fact_sheet import completeness_steps, detail_tab
+
+    completeness_step_rows = completeness_steps(app_obj, app_obj.completeness_gaps, tab=detail_tab(request.args.get("tab")))
+    try:
+        from app.services.application_fact_sheet import linked_notes
+        from app.services.application_model_links import linked_technology
+
+        technology_linked_count = len(linked_technology(app_obj))
+        completeness_notes = linked_notes(app_obj, app_obj.completeness_gaps)
+    except Exception:
+        logger.exception("Could not read the model links for application %s", app_obj.id)
+        db.session.rollback()
+
     return render_template(
         "applications/dashboard.html",
         app=app_obj,
+        imported_gaps=imported_gaps,
+        form_values=form_values or {},
+        form_errors=form_errors or {},
+        status_options=status_options,
+        field_limits=overview_limits(),
+        technology_cost_shares=technology_cost_shares,
+        linked_requirements=linked_requirements,
+        requirement_options=requirement_options,
+        owner_rows=owner_rows,
+        owner_source=owner_source,
+        owner_reason=owner_reason,
+        owner_assign_url=owner_assign_url,
         # Not yet computed for this view. Pass None (never 0.0) so the template
         # renders an em dash instead of asserting a measured score of zero —
         # a literal 0.0 here rendered every application as red/non-compliant.
@@ -2306,7 +2421,9 @@ def render_application_detail(id):
         compliance_score=None,
         compliance_results=None,
         capabilities_with_compliance=[],
-        edit_mode=request.args.get("edit") == "1",
+        # Only a person the permission matrix lets edit an application gets the form.
+        edit_mode=(request.args.get("edit") == "1" or bool(form_errors))
+        and _can(current_user, "edit", "application"),
         edit_mode_motivation=request.args.get("edit_motivation") == "1",
         edit_mode_strategy=request.args.get("edit_strategy") == "1",
         edit_mode_business=request.args.get("edit_business") == "1",
@@ -2317,10 +2434,16 @@ def render_application_detail(id):
         edit_mode_health_quality=request.args.get("edit_health_quality") == "1",
         changed_field_ids=[],
         capabilities=capabilities,
-        requirements=requirements,
         interfaces=interfaces,
         vendor_footprint=vendor_footprint,
         vendor_summary=vendor_summary,
+        vendor_organisations=vendor_organisations,
+        supplier_links=supplier_links,
+        primary_vendor_label=primary_vendor_label,
+        vendors_tab_count=vendors_tab_count,
+        technology_linked_count=technology_linked_count,
+        completeness_notes=completeness_notes,
+        completeness_steps=completeness_step_rows,
         vendor_form_config=vendor_form_config,
         metric_cards=metric_cards,
         dashboard_config=dashboard_config,
@@ -2392,6 +2515,8 @@ def render_application_detail(id):
         dependencies_downstream=[],
         dependency_graph_data={},
         cost_breakdown=cost_breakdown,
+        costs_withheld=costs_withheld,
+        costs_withheld_sentence=COSTS_WITHHELD,
         health_metrics=health_metrics,
         quality_metrics=quality_metrics,
         integration_mappings=[],
@@ -2406,4 +2531,4 @@ def render_application_detail(id):
         linked_solutions=linked_solutions,
         archimate_info=archimate_info,
         archimate_relationships=archimate_relationships,
-    )
+    ), status

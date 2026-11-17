@@ -18,7 +18,7 @@ from tests.test_account_mail_flows import (  # noqa: F401  (fixtures and helpers
     mail_on,
     outbox,
 )
-from tests.test_billing_plans_and_checkout import no_billing  # noqa: F401
+from tests.test_billing_plans_and_checkout import billing, no_billing  # noqa: F401
 from tests.test_team_invite_acceptance import PASSWORD, _make_org, _make_user
 
 @pytest.fixture
@@ -62,7 +62,7 @@ def _follow_to_billing(client, resp):
     return resp
 
 
-def test_pricing_buttons_lead_to_registration_with_plan_and_interval(app, client):
+def test_pricing_buttons_lead_to_registration_with_plan_and_interval(app, client, billing):
     """The registration URL below travels inside the click-tracking redirect's
     "next" parameter (app/main/views.py::track_plan_click), so a click both
     logs the plan and still keeps it through sign-up."""
@@ -72,10 +72,10 @@ def test_pricing_buttons_lead_to_registration_with_plan_and_interval(app, client
     assert "/t/plan-click?plan=team&amp;next=/account/register?plan%3Dteam%26interval%3Dyear" in html
     assert "/t/plan-click?plan=team&amp;next=/account/register?plan%3Dteam%26interval%3Dmonth" in html
     assert re.search(
-        r'<a href="/t/plan-click\?plan=enterprise&amp;next=/contact"[^>]*data-testid="buy-enterprise"', html)
+        r'<a (?:rel="nofollow" )?href="/t/plan-click\?plan=enterprise&amp;next=/contact"[^>]*data-testid="buy-enterprise"', html)
     # Start free carries no plan.
     assert re.search(
-        r'<a href="/t/plan-click\?plan=community&amp;next=/account/register"[^>]*>Start free</a>', html)
+        r'<a (?:rel="nofollow" )?href="/t/plan-click\?plan=community&amp;next=/account/register"[^>]*>Start free</a>', html)
 
 
 @pytest.mark.parametrize("plan,interval", CHOICES)
@@ -97,7 +97,11 @@ def test_new_visitor_keeps_the_plan_through_registration(
     landed = client.get(f"/admin/billing/?plan={plan}&interval={interval}")
     html = landed.get_data(as_text=True)
     assert landed.status_code == 200
-    assert "Online payment is not set up on this installation" in html
+    notice = re.search(r'data-testid="checkout-unavailable"[^>]*>(.*?)<a ', html, re.S)
+    assert notice, "no payment notice"
+    assert " ".join(notice.group(1).split()) == (
+        f"Payment opens soon, so {plan.capitalize()} cannot be bought here yet."
+    )
     assert 'data-testid="checkout-unavailable"' in html
     assert "/contact" in html
 

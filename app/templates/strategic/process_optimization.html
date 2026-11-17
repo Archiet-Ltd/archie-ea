@@ -1,19 +1,9 @@
+{# design-block: dashboard #}
 {% extends 'layouts/admin_base.html' %}
 {% from 'components/page_header.html' import page_header %}
 {% from 'components/metrics_card.html' import metrics_card %}
 
-{% block title %}Process Optimization{% endblock %}
-
-{% block breadcrumb %}
-{% from 'components/breadcrumb_nav.html' import breadcrumb_nav %}
-{{ breadcrumb_nav(items=[
-    {'text': 'Home', 'href': url_for('main.index'), 'icon': 'home'},
-    {'text': 'Strategy Layer', 'href': url_for('archimate_crud.dashboard') + '#strategy'},
-    {'text': 'Process Optimization', 'current': true}
-]) }}
-{% endblock %}
-
-{% block content %}
+{% block title %}Process Optimization{% endblock %}{% block content %}
 {# Builds the href for a row's record, or an empty string when the blueprint that
    owns the destination failed to register -- blueprints register non-fatally here,
    so an unguarded url_for would raise BuildError and 500 every page rendering the
@@ -39,7 +29,7 @@
     <div data-slot="card" class="rounded-lg border border-border bg-card">
         <div class="p-6">
             <h3 class="font-semibold mb-4">Process Analysis</h3>
-            <div class="overflow-x-auto">
+            <div class="overflow-x-auto" tabindex="0" role="region" aria-label="Process analysis">
                 <table class="dense-table w-full">
                     <thead>
                         <tr class="border-b">

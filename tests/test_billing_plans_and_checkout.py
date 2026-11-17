@@ -5,6 +5,7 @@ is replaced with a recorded response, and the provider's API base is pointed at
 a closed local port so an unreplaced call fails instead of going out.
 """
 
+import re
 import hashlib
 import hmac
 import json
@@ -430,14 +431,14 @@ def test_without_keys_the_billing_page_says_payment_is_not_set_up(app, db_sessio
                            follow_redirects=True)
     html = page.get_data(as_text=True)
     assert page.status_code == 200
-    assert "Online payment is not set up on this installation" in html
+    assert "Online payment is not open yet" in html
     # An organisation administrator is a customer, not the platform operator:
     # the banner tells them payment is not available, but not which settings
     # are missing.
     assert "STRIPE_SECRET_KEY" not in html
     assert "Settings the operator has not provided" not in html
     assert "Continue to payment" not in html
-    assert "Online payment is not set up on this installation. No payment was taken." in resp.get_data(as_text=True)
+    assert "Online payment is not open yet. Contact us to buy a plan. No payment was taken." in resp.get_data(as_text=True)
 
 
 def test_without_keys_a_platform_admin_sees_which_settings_are_missing(app, db_session, client, login_as, no_billing):
@@ -447,7 +448,7 @@ def test_without_keys_a_platform_admin_sees_which_settings_are_missing(app, db_s
         page = client.get("/admin/billing/")
     html = page.get_data(as_text=True)
     assert page.status_code == 200
-    assert "Online payment is not set up on this installation" in html
+    assert "Online payment is not open yet" in html
     assert "STRIPE_SECRET_KEY" in html  # the operator can see which setting is missing
 
 
@@ -458,7 +459,7 @@ def test_with_keys_the_billing_page_shows_no_configuration_warning(app, db_sessi
         page = client.get("/admin/billing/")
     html = page.get_data(as_text=True)
     assert page.status_code == 200
-    assert "Online payment is not set up on this installation" not in html
+    assert "Online payment is not open yet" not in html
     assert 'data-testid="billing-not-configured"' not in html
 
 
@@ -488,6 +489,31 @@ def test_buy_starts_checkout_for_the_chosen_plan(app, db_session, client, login_
     assert calls["success_url"].endswith("/admin/billing/checkout/complete?session_id={CHECKOUT_SESSION_ID}")
     db_session.expire_all()
     assert Subscription.query.filter_by(organization_id=org.id).one().stripe_customer_id == "cus_buy"
+
+
+def test_the_page_with_the_buy_form_lets_the_browser_follow_it_to_the_hosted_checkout(
+        app, db_session, client, login_as, billing, monkeypatch):
+    """The buy form posts here and is answered with a redirect to the provider's own checkout
+    address; a browser refuses that second hop unless the page that held the form allows it."""
+    org, admin = _admin_org(db_session, "formaction")
+    monkeypatch.delenv("STRIPE_API_BASE", raising=False)
+    with app.app_context():
+        login_as(client, admin)
+        page = client.get("/admin/billing/?plan=startup&interval=year")
+    policy = page.headers["Content-Security-Policy"]
+    form_action = [d for d in policy.split("; ") if d.startswith("form-action")][0]
+    assert page.status_code == 200
+    assert form_action.split() == ["form-action", "'self'", "https://checkout.stripe.com"], form_action
+
+
+def test_every_other_page_keeps_forms_to_this_site(app, db_session, client, login_as, billing, monkeypatch):
+    org, admin = _admin_org(db_session, "formaction-other")
+    monkeypatch.delenv("STRIPE_API_BASE", raising=False)
+    with app.app_context():
+        login_as(client, admin)
+        page = client.get("/account/manage")
+    policy = page.headers["Content-Security-Policy"]
+    assert [d for d in policy.split("; ") if d.startswith("form-action")] == ["form-action 'self'"]
 
 
 def test_enterprise_is_contact_sales_not_checkout(app, db_session, client, login_as, billing, monkeypatch):
@@ -654,7 +680,10 @@ def test_billing_page_uses_the_switched_organisation(app, db_session, client, lo
     assert page.status_code == 200
     assert f"Active: {switched_org.name}" in switched_html
     assert switched_org.name in html
-    assert home_org.name not in html
+    # The organisation switcher in the sidebar lists every organisation the person
+    # belongs to; the billing page itself speaks only for the active one.
+    billing_page = html[html.index('<main'):html.index('</main>')]
+    assert home_org.name not in billing_page
     assert 'data-testid="billing-current-plan">Team<' in html
 
 
@@ -691,8 +720,8 @@ def test_currency_context_and_filter_follow_the_switched_organisation(app, db_se
 
     home_org = make_org("currency-home")
     switched_org = make_org("currency-second")
-    home_org.settings = {"currency_code": "USD"}
-    switched_org.settings = {"currency_code": "EUR"}
+    home_org.reporting_currency = "USD"
+    switched_org.reporting_currency = "EUR"
     user = _user(db_session, home_org, admin=True)
     OrgRole.set_role(switched_org.id, user.id, "architect", granted_by_id=user.id)
     db_session.commit()
@@ -709,7 +738,7 @@ def test_currency_context_and_filter_follow_the_switched_organisation(app, db_se
             "{{ active_organization_name }}|{{ currency_config.code }}|{{ 12.5|format_currency(show_code=True) }}"
         )
 
-    assert rendered == f"{switched_org.name}|EUR|EUR 12.50€"
+    assert rendered == f"{switched_org.name}|EUR|EUR €12.50"
 
 
 def test_admin_at_the_limit_is_shown_the_upgrade_instead_of_adding(app, db_session, client, login_as, no_billing):
@@ -752,7 +781,7 @@ def test_admin_under_the_limit_adds_into_their_own_organisation(app, db_session,
     assert created.organization_id == org.id
 
 
-def test_pricing_page_has_a_buy_button_per_plan(app, client):
+def test_pricing_page_has_a_buy_button_per_plan(app, client, billing):
     with app.app_context():
         resp = client.get("/pricing")
     html = resp.get_data(as_text=True)
@@ -767,6 +796,15 @@ def test_pricing_page_has_a_buy_button_per_plan(app, client):
     assert 'data-testid="buy-enterprise"' in html
 
 
+def test_pricing_page_offers_no_buy_while_payment_is_closed(app, client, no_billing):
+    html = client.get("/pricing").get_data(as_text=True)
+    assert 'data-testid="plan-card-startup"' in html
+    for key in ("startup", "team"):
+        assert re.search(r'data-testid="buy-%s"[^>]*>Start free</a>' % key, html)
+        assert 'data-testid="talk-%s"' % key in html
+    assert not re.search(r"\bBuy\b", re.sub(r"<[^>]+>", " ", html.split("<main", 1)[1].split("</main>", 1)[0]))
+
+
 def test_pricing_contact_sales_button_points_at_the_contact_page(app, client):
     """'Contact sales' leads to /contact (via the click-tracking redirect,
     app/main/views.py::track_plan_click), which now carries the sales enquiry
@@ -776,7 +814,7 @@ def test_pricing_contact_sales_button_points_at_the_contact_page(app, client):
     resp = client.get("/pricing")
     html = resp.get_data(as_text=True)
     assert re.search(
-        r'<a href="/t/plan-click\?plan=enterprise&amp;next=/contact"[^>]*data-testid="buy-enterprise"', html)
+        r'<a (?:rel="nofollow" )?href="/t/plan-click\?plan=enterprise&amp;next=/contact"[^>]*data-testid="buy-enterprise"', html)
 
 
 def test_signing_in_returns_the_visitor_to_the_plan_they_chose(app, db_session, client, login_as, no_billing):

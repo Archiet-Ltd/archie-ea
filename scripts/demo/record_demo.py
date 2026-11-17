@@ -6,48 +6,27 @@ injects an on-screen caption bar (persona + action), chapter title cards and a
 synthetic cursor (Playwright's video can't capture the OS cursor).
 
     DEMO_BASE=http://localhost:5000 \
-    DEMO_USER=demo@example.com DEMO_PASS='...' \
+    DEMO_USER=demo@example.com DEMO_USER_PASSWORD='...' \
     python scripts/demo/record_demo.py        # writes demo.webm next to this file
 
 For a polished marketing cut, screen-record a headed run with a real cursor
 (OBS/Loom) using this as the storyboard, then convert webm -> mp4/gif.
 """
 import os
+import pathlib
+import sys
 
 from playwright.sync_api import sync_playwright
+
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[2]))
+from scripts.capture.clip_kit import overlay_script  # noqa: E402
 
 BASE = os.environ.get("DEMO_BASE", "http://localhost:5000").rstrip("/")
 OUTDIR = os.environ.get("DEMO_OUT", os.path.dirname(os.path.abspath(__file__)))
 USER = os.environ.get("DEMO_USER", "demo@example.com")
-PASS = os.environ.get("DEMO_PASS", "DemoPass123!")
-
-OVERLAY = r"""
-() => {
-  const ensure = () => {
-    if (!document.getElementById('__cur')) {
-      const c = document.createElement('div'); c.id='__cur';
-      c.style.cssText='position:fixed;left:720px;top:450px;z-index:2147483646;width:24px;height:24px;margin:-12px 0 0 -12px;border-radius:50%;background:rgba(37,99,235,.22);border:2.5px solid #2563eb;box-shadow:0 0 12px rgba(37,99,235,.75);pointer-events:none;transition:transform .12s ease';
-      (document.body||document.documentElement).appendChild(c);
-    }
-    if (!document.getElementById('__cap')) {
-      const b=document.createElement('div'); b.id='__cap';
-      b.style.cssText='position:fixed;left:0;right:0;bottom:0;z-index:2147483646;padding:13px 26px;background:linear-gradient(0deg,rgba(15,23,42,.94),rgba(15,23,42,.74));color:#fff;font-family:system-ui,Segoe UI,sans-serif;display:flex;align-items:center;gap:14px;box-shadow:0 -2px 24px rgba(0,0,0,.35)';
-      b.innerHTML='<span id="__who" style="background:#2563eb;padding:5px 13px;border-radius:999px;font:600 14px system-ui;white-space:nowrap"></span><span id="__txt" style="font:500 17px system-ui;opacity:.96"></span>';
-      (document.body||document.documentElement).appendChild(b);
-    }
-  };
-  if (document.readyState==='loading') document.addEventListener('DOMContentLoaded', ensure); else ensure();
-  window.__cur_set=(x,y)=>{const c=document.getElementById('__cur'); if(c){c.style.left=x+'px';c.style.top=y+'px';}};
-  window.__cur_pulse=()=>{const c=document.getElementById('__cur'); if(c){c.style.transform='scale(.5)'; setTimeout(()=>c.style.transform='scale(1)',160);}};
-  window.__caption=(w,t)=>{ensure(); const W=document.getElementById('__who'),T=document.getElementById('__txt'); if(W)W.textContent=w; if(T)T.textContent=t;};
-  window.__title=(t,s)=>{const o=document.createElement('div'); o.id='__tc';
-    o.style.cssText='position:fixed;inset:0;z-index:2147483647;background:radial-gradient(circle at 50% 38%,#1e293b,#0b1220);color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;font-family:system-ui,Segoe UI,sans-serif;opacity:0;transition:opacity .45s';
-    o.innerHTML='<div style="font:800 46px/1.15 system-ui;letter-spacing:-1px;text-align:center">'+t+'</div><div style="font:400 22px system-ui;opacity:.82;max-width:780px;text-align:center;line-height:1.4">'+s+'</div>';
-    document.body.appendChild(o); requestAnimationFrame(()=>o.style.opacity='1');};
-  window.__title_off=()=>{const o=document.getElementById('__tc'); if(o){o.style.opacity='0'; setTimeout(()=>o.remove(),450);}};
-}
-"""
-
+PASS = os.environ.get("DEMO_USER_PASSWORD")
+if not PASS:
+    raise SystemExit("DEMO_USER_PASSWORD is not set: put the demonstration person's password in the environment and run again.")
 
 def main():
     with sync_playwright() as p:
@@ -57,10 +36,7 @@ def main():
             browser = p.chromium.launch(headless=True)
         ctx = browser.new_context(viewport={"width": 1440, "height": 900},
                                   record_video_dir=OUTDIR, record_video_size={"width": 1440, "height": 900})
-        # OVERLAY is a bare arrow function `() => {...}`; add_init_script evaluates the
-        # expression but never calls it, so the caption/cursor/title helpers were never
-        # defined and every overlay call silently no-op'd. Wrap in an IIFE so it runs.
-        ctx.add_init_script("(" + OVERLAY + ")()")
+        ctx.add_init_script(overlay_script(caption_bar=True))
         page = ctx.new_page()
         page.set_default_timeout(15000)
         cur = [720, 450]
@@ -168,7 +144,7 @@ def main():
             if "/account/login" in page.url:
                 raise RuntimeError(
                     "LOGIN FAILED — recorder is not authenticated (still on %s). "
-                    "Check DEMO_USER/DEMO_PASS; aborting so we don't ship a login-only video."
+                    "Check DEMO_USER/DEMO_USER_PASSWORD; aborting so we don't ship a login-only video."
                     % page.url
                 )
             title("Enterprise Architect", "Know the estate &mdash; capabilities, applications, health", 2600)

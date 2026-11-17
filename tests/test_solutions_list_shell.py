@@ -102,19 +102,32 @@ def _get_list_html_with_solution(app, db_session, make_org, label):
 def _page_actions_slice(html):
     start = html.index('data-testid="page-actions"')
     tag_start = html.rindex("<", 0, start)
-    # The actions container is a small, flat div (three buttons, no nested
-    # divs) — its own close tag is the first "</div>" after the open tag.
-    end = html.index("</div>", start)
-    return html[tag_start:end]
+    # The actions container holds the More menu (nested divs) and the primary
+    # button, so find its own close tag by balancing the divs.
+    depth, pos = 0, tag_start
+    for match in re.finditer(r"<div\b|</div>", html[tag_start:]):
+        depth += 1 if match.group(0) == "<div" else -1
+        if depth == 0:
+            pos = tag_start + match.end()
+            break
+    return html[tag_start:pos]
+
+
+# A primary action is a button (or a menu trigger, or a link drawn as a
+# button) in the default variant; outline, ghost and menu items are not.
+_PRIMARY = re.compile(
+    r'<(a|button)\b[^>]*data-slot="(?:button|dropdown-menu-trigger)"[^>]*data-variant="default"[^>]*>(.*?)</\1>',
+    re.DOTALL,
+)
 
 
 def test_exactly_one_primary_cta_in_page_actions(app, db_session, make_org):
     """Three competing creation CTAs was the defect — exactly one bg-primary
     action inside the page-actions container now."""
-    _, html = _get_list_html(app, db_session, make_org, "primary")
+    _, html = _get_list_html_with_solution(app, db_session, make_org, "primary")
     actions_slice = _page_actions_slice(html)
-    assert actions_slice.count("bg-primary text-primary-foreground") == 1, (
-        "expected exactly one primary (bg-primary) action in the page "
+    assert len(_PRIMARY.findall(actions_slice)) == 1, (
+        "expected exactly one primary (default variant) action in the page "
         "actions row"
     )
 
@@ -130,24 +143,17 @@ def test_primary_cta_label_matches_destination_h1(app, db_session, make_org):
       performs, and the button must actually be wired to that action, not
       just claim to be.
     """
-    client, html = _get_list_html(app, db_session, make_org, "label")
+    client, html = _get_list_html_with_solution(app, db_session, make_org, "label")
     actions_slice = _page_actions_slice(html)
 
-    link_match = re.search(
-        r'<a[^>]*bg-primary text-primary-foreground[^>]*href="([^"]+)"[^>]*>(.*?)</a>',
-        actions_slice,
-        re.DOTALL,
-    )
-    if not link_match:
-        # href may precede the class attribute — try the other order too.
-        link_match = re.search(
-            r'<a[^>]*href="([^"]+)"[^>]*bg-primary text-primary-foreground[^>]*>(.*?)</a>',
-            actions_slice,
-            re.DOTALL,
-        )
+    primary = _PRIMARY.search(actions_slice)
+    assert primary, f"no primary action in page-actions: {actions_slice}"
+    link_match = None
+    if primary.group(1) == "a":
+        link_match = re.search(r'href="([^"]+)"', primary.group(0))
 
     if link_match:
-        href, inner = link_match.group(1), link_match.group(2)
+        href, inner = link_match.group(1), primary.group(2)
         label_text = re.sub(r"<[^>]+>", " ", inner)
         label_text = re.sub(r"\s+", " ", label_text).strip()
 
@@ -166,16 +172,11 @@ def test_primary_cta_label_matches_destination_h1(app, db_session, make_org):
         return
 
     # Not a link — must be a button that performs an action directly.
-    button_match = re.search(
-        r'<button[^>]*bg-primary text-primary-foreground[^>]*>(.*?)</button>',
-        actions_slice,
-        re.DOTALL,
-    )
-    assert button_match, (
+    assert primary.group(1) == "button", (
         "primary action in page-actions is neither a link with an href nor "
         f"a button: {actions_slice}"
     )
-    tag, inner = button_match.group(0), button_match.group(1)
+    tag, inner = primary.group(0), primary.group(2)
     label_text = re.sub(r"<[^>]+>", " ", inner)
     label_text = re.sub(r"\s+", " ", label_text).strip()
 
@@ -190,15 +191,15 @@ def test_primary_cta_label_matches_destination_h1(app, db_session, make_org):
 
 
 def test_triage_stat_cards_present(app, db_session, make_org):
-    """The triage cards (Needs Setup / In Design / Needs Attention / Ready
-    for Review) are a genuine strength of this page — they must survive the
+    """The triage cards (Needs setup / In design / Needs attention / Ready
+    for review) are a genuine strength of this page — they must survive the
     rebuild, still filtering via ?status=<key>."""
     _, html = _get_list_html_with_solution(app, db_session, make_org, "triage")
     for label in (
-        "Needs Setup",
-        "In Design",
-        "Needs Attention",
-        "Ready for Review",
+        "Needs setup",
+        "In design",
+        "Needs attention",
+        "Ready for review",
     ):
         assert label in html
     assert "?status=needs_setup" in html
@@ -216,7 +217,7 @@ def test_relationship_sentence_present(app, db_session, make_org):
     _, html = _get_list_html(app, db_session, make_org, "relationship")
     assert 'data-testid="programme-solution-relationship"' in html
     start = html.index('data-testid="programme-solution-relationship"')
-    end = html.index("</p>", start)
+    end = html.index("</span>", start)
     sentence = html[start:end]
-    assert "Programme" in sentence
+    assert "programme" in sentence.lower()
     assert "solution" in sentence.lower()

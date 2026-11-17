@@ -145,12 +145,18 @@ def test_second_request_body_nonce_matches_its_own_header_nonce(
 def test_sidebar_button_carries_a_static_aria_label(_nonce_regress_client, path):
     """The sidebar-collapse button's accessible name must not depend on
     Alpine having run: a static aria-label must be present in the HTML
-    Flask itself served, before any script executes."""
+    Flask itself served, before any script executes.
+
+    Updated for the current shell: it used to assert the old collapse button's literal class
+    string ('hidden lg:flex h-8 w-8 ...'); it now asserts the sidebar-trigger button itself
+    carries the static aria-label."""
     resp = _nonce_regress_client.get(path)
     assert resp.status_code == 200, f"{path} -> {resp.status_code}"
 
     body = resp.get_data(as_text=True)
-    assert 'class="hidden lg:flex h-8 w-8 items-center justify-center rounded-md' in body, (
+    # The shell's sidebar trigger (components/ui_sidebar.html) replaced the old class-string button;
+    # the promise is unchanged: the collapse button is in the served HTML and carries its own name.
+    assert re.search(r'<button[^>]*data-slot="sidebar-trigger"[^>]*aria-label="Toggle sidebar"', body), (
         f"{path}: the sidebar-collapse button itself is missing from the response"
     )
     assert 'aria-label="Toggle sidebar"' in body, (

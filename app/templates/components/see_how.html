@@ -1,0 +1,31 @@
+{# See how: a button that opens a short clip of the next step, for an empty screen.
+   {% from 'components/see_how.html' import see_how %}{{ see_how('applications-first') }}
+   The clip is registered in HELP_CLIPS (app/services/public_pages.py) and recorded by
+   scripts/capture_screenshots.py --help-clips. Nothing is drawn until the clip file exists, so the
+   button never opens an empty dialog. The video is muted, has controls and never starts by itself.
+   The dialog is the library's: Escape closes it and focus returns to this button. From md up it is wide
+   (max-w-5xl) so the text in the recording stays legible; below md it fills the screen so the clip
+   takes the phone's whole width. #}
+{% import 'basecoat/index.html' as ui %}
+
+{% macro see_how(clip) %}
+{%- set c = help_clip(clip) if help_clip is defined else none -%}
+{%- if c %}
+{% call ui.dialog() %}
+{{ ui.dialog_trigger(text='See how', class='mt-3', attrs={'data-testid': 'see-how-' ~ c.key, 'data-variant': 'outline'}) }}
+{{ ui.dialog_overlay() }}
+{% call ui.dialog_content(class='max-h-dvh overflow-y-auto md:max-w-5xl max-md:left-0 max-md:top-0 max-md:h-dvh max-md:max-w-none max-md:translate-x-0 max-md:translate-y-0 max-md:rounded-none', attrs={'data-testid': 'see-how-dialog-' ~ c.key}) %}
+{% call ui.dialog_header() %}
+{{ ui.dialog_title(text=c.title) }}
+{% endcall %}
+<video class="w-full rounded-md border border-border bg-muted" controls muted playsinline preload="metadata"{% if c.poster %} poster="{{ c.poster }}"{% endif %} data-testid="see-how-video-{{ c.key }}">
+  <source src="{{ c.src }}" type="video/webm">
+</video>
+{{ ui.dialog_description(text=c.line, attrs={'data-testid': 'see-how-line-' ~ c.key}) }}
+{% call ui.dialog_footer() %}
+{{ ui.dialog_close(text='Close', attrs={'data-variant': 'outline'}) }}
+{% endcall %}
+{% endcall %}
+{% endcall %}
+{%- endif %}
+{% endmacro %}

@@ -1,4 +1,5 @@
 ---
+wave: 4
 page_family: function-per-segment
 use_case_id: UC-S3-10
 segment_id: S3
@@ -28,7 +29,7 @@ you can check an answer rather than take it on faith.
 What's still coming is access for an AI assistant your team already uses elsewhere, outside
 Entelim's own chat page: MCP read tools over the same questions Ask answers.
 
-Coming soon. Join the waiting list and we'll tell you the day it ships.
+Early access. Join the waiting list and we'll email you when you can use it.
 
 ## Related
 

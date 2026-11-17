@@ -418,6 +418,15 @@ class Deliverable(TenantMixin, db.Model):
         default=_default_org_id,
     )
 
+    # The TOGAF checklist item (adm_deliverables) this deliverable fulfils; the ADM
+    # board matches a solution's deliverables to the phase checklist through it.
+    adm_template_id = db.Column(
+        db.Integer,
+        db.ForeignKey("adm_deliverables.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+
     # 50 wide to match roadmap_deliverables.status, the store merged in (R1-B04 PR 2).
     delivery_status = db.Column(db.String(50), default="planned", index=True)
     deliverable_type = db.Column(db.String(50))
@@ -452,6 +461,7 @@ class Deliverable(TenantMixin, db.Model):
     )
     assigned_user = db.relationship("User", backref="assigned_migration_deliverables")
     goal = db.relationship("Goal", backref="migration_deliverables")
+    adm_template = db.relationship("ADMDeliverable", foreign_keys=[adm_template_id])
 
     def to_dict(self) -> dict:
         """Convert to dictionary for API responses."""
@@ -693,7 +703,17 @@ class Gap(TenantMixin, db.Model):
     """
 
     __tablename__ = "gaps"
-    __table_args__ = {"extend_existing": True}
+    __table_args__ = (
+        # One gap record per Gap element of an organisation, even when two requests arrive together.
+        db.Index(
+            "uq_gaps_org_element",
+            "organization_id",
+            "archimate_element_id",
+            unique=True,
+            postgresql_where=db.text("archimate_element_id IS NOT NULL"),
+        ),
+        {"extend_existing": True},
+    )
 
     organization_id = db.Column(
         db.Integer,
@@ -852,13 +872,27 @@ class Gap(TenantMixin, db.Model):
             "description": self.description or "",
             "gap_type": self.gap_type,
             "priority": self.priority,
-            "severity": self.severity,
+            "severity": self.rated_severity,
             "resolution_status": self.resolution_status,
             "current_state_ref": self.current_state_ref,
             "target_state_ref": self.target_state_ref,
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "updated_at": self.updated_at.isoformat() if self.updated_at else None,
         }
+
+    @property
+    def rated_severity(self):
+        """The severity every screen shows: critical when either field says so, the one critical-gap rule."""
+        from app.services.gap_register_service import effective_severity
+
+        return effective_severity(self)
+
+    @property
+    def is_closed(self):
+        """Whether the gap is closed, by the one meaning every screen counts."""
+        from app.services.gap_register_service import is_closed
+
+        return is_closed(self)
 
     def to_roadmap_dict(self) -> dict:
         """Convert to dictionary for roadmap API responses."""
@@ -871,7 +905,7 @@ class Gap(TenantMixin, db.Model):
             "gap_types": self.get_all_gap_types(),
             "color": self.color or "#6B7280",
             "priority": self.priority,
-            "severity": self.severity,
+            "severity": self.rated_severity,
             "impact": self.impact,
             "resolution_status": self.resolution_status,
             "source_capability_type": self.source_capability_type,

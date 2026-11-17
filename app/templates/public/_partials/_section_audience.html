@@ -1,0 +1,14 @@
+{#- smoke-coverage-ok: covered by tests/smoke/test_module_landing_journey.py (every module page).
+   Partial: public/_partials/_section_audience.html -- "who it is for": the home page's section shell with the
+   emphasis list. Expects `items` (list of plain-text strings). -#}
+<section class="home-section" data-testid="module-audience">
+  <div class="container px-4">
+    <div class="max-w-3xl">
+      <p class="home-eyebrow">Who it is for</p>
+      <h2 class="home-h2">Made for the people who answer for this.</h2>
+    </div>
+    <ul class="home-emphasis-list mt-12 max-w-3xl">
+      {% for item in items %}<li>{{ item }}</li>{% endfor %}
+    </ul>
+  </div>
+</section>

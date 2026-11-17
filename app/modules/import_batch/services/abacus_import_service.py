@@ -32,6 +32,7 @@ from app.models.application_capability import ApplicationCapabilityMapping
 from app.models.application_portfolio import ApplicationComponent
 from app.models.business_capabilities import BusinessCapability
 from app.services.application_cost_accessor import set_annual_cost
+from app.services.application_status import StatusRefused
 
 try:
     from app.models.archimate_core import ArchiMateElement, ArchiMateRelationship
@@ -96,6 +97,7 @@ class AbacusImportService:
             connector: Configured AbacusConnector instance
         """
         self.connector = connector
+        self.refusals: List[Dict] = []
         self.stats = {
             "applications_created": 0,
             "applications_updated": 0,
@@ -221,6 +223,13 @@ class AbacusImportService:
 
                 # Commit after each application to avoid large rollbacks
                 db.session.commit()
+
+            except StatusRefused as refusal:
+                # The one refused application is skipped with its reason; the rest are kept.
+                db.session.rollback()
+                logger.warning(f"Refused application {app_data.get('name')}: {refusal}")
+                self.refusals.append({"name": app_data.get("name"), "reason": str(refusal)})
+                self.stats["applications_errors"] += 1
 
             except IntegrityError as e:
                 db.session.rollback()

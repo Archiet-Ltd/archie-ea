@@ -447,9 +447,8 @@ class SimpleDuplicateService:
         latest_run = SimpleDetectionRun.query.order_by(SimpleDetectionRun.created_at.desc()).first()
         
         # Calculate total savings from runs (groups don't have estimated_savings field)
-        total_savings = 0
-        if latest_run and latest_run.estimated_savings:
-            total_savings = latest_run.estimated_savings
+        # None when the run carries no figure: the column defaults to 0.0, which is "not estimated".
+        total_savings = (latest_run.estimated_savings or None) if latest_run else None
         
         return {
             'total_groups': total_groups,

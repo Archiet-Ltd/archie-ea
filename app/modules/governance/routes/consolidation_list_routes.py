@@ -15,12 +15,14 @@ from werkzeug.exceptions import HTTPException
 import logging
 from datetime import datetime
 
-from flask import Blueprint, jsonify, render_template, request
-from flask_login import login_required
+from flask import Blueprint, g, jsonify, render_template, request
+from flask_login import current_user, login_required
 from sqlalchemy import or_
 
+from app._bootstrap.write_access import commit_unless_read_only
 from app.decorators import audit_log
 from app.services.application_cost_accessor import set_annual_cost
+from app.services.cost_visibility import COSTS_WITHHELD, costs_visible, withhold_costs
 
 from .. import db
 from ..models.application_portfolio import ApplicationComponent
@@ -30,6 +32,7 @@ from ..models.consolidation_list import (
     CONSOLIDATION_STATUS_MAP,
 )
 from app.utils.pagination import safe_int_arg
+from app.utils.recorded_figures import sum_recorded
 
 logger = logging.getLogger(__name__)
 
@@ -87,13 +90,34 @@ def dashboard():
             logger.debug("Could not resolve dashboard registry URL: %s", e)
             dashboard_registry_url = "/auto-dashboard/registry"
         return render_template(
-            "consolidation_list/dashboard.html", dashboard_registry_url=dashboard_registry_url
+            "consolidation_list/dashboard.html", dashboard_registry_url=dashboard_registry_url,
+            costs_withheld=not costs_visible(current_user), costs_withheld_sentence=COSTS_WITHHELD,
         )
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"Error loading consolidation dashboard: {e}")
         return f"Error loading dashboard: {str(e)}", 500
+
+
+def _portfolio_annual_cost():
+    """(what the portfolio costs to run a year, a sentence saying why when there is no figure).
+
+    The figure is the one the Overview and the application list state. It is None, with the reason, when
+    the signed-in person may not read cost or when no contract or system states one.
+    """
+    from app.modules.dashboard.services.overview_figures import run_cost_line
+    from app.utils.tenant import current_organization_id
+
+    if not costs_visible(current_user):
+        return None, None  # the reply states once that costs are withheld; no second sentence rides on the figure
+    org_id = current_organization_id()
+    line = run_cost_line(org_id, current_user) if org_id is not None else None
+    if line is None:
+        return None, "No active contract or system states an annual cost yet."
+    if line["total"] is None:
+        return None, "No active contract or system states an annual cost yet."
+    return line["total"], None
 
 
 @consolidation_list_bp.route("/api/entries")
@@ -192,7 +216,7 @@ def get_entries():
                     else:
                         ed["time_action"] = None
                         ed["time_score"] = None
-                db.session.commit()
+                commit_unless_read_only()
         except HTTPException:
             raise
         except Exception as e:
@@ -202,7 +226,7 @@ def get_entries():
 
         # Calculate summary statistics
         total_entries = len(summary_entries)
-        total_savings = sum(float(e.estimated_savings or 0) for e in summary_entries)
+        total_savings = sum_recorded(e.estimated_savings for e in summary_entries)
         by_status = {}
         by_action = {}
 
@@ -212,29 +236,23 @@ def get_entries():
             action = entry.recommended_action if entry.recommended_action else "pending"
             by_action[action] = by_action.get(action, 0) + 1
 
+        annual_cost, annual_cost_note = _portfolio_annual_cost()
+
         # Enriched summary stats
         summary = {
             "total_entries": total_entries,
             "total_estimated_savings": total_savings,
             "by_status": by_status,
             "by_action": by_action,
-            "portfolio_annual_cost": sum(
-                float(getattr(e.application, "license_cost", 0) or 0)
-                + float(getattr(e.application, "support_cost", 0) or 0)
-                + float(getattr(e.application, "infrastructure_cost", 0) or 0)
-                for e in summary_entries if e.application
+            "portfolio_annual_cost": annual_cost,
+            "portfolio_annual_cost_note": annual_cost_note,
+            "savings_verified_total": sum_recorded(
+                e.estimated_savings for e in summary_entries if e.savings_verified
             ),
-            "savings_verified_total": sum(
-                float(e.estimated_savings or 0)
-                for e in summary_entries if e.savings_verified
+            "savings_estimated_total": sum_recorded(
+                e.estimated_savings for e in summary_entries if not e.savings_verified
             ),
-            "savings_estimated_total": sum(
-                float(e.estimated_savings or 0)
-                for e in summary_entries if not e.savings_verified
-            ),
-            "total_migration_cost": sum(
-                float(e.migration_cost or 0) for e in summary_entries
-            ),
+            "total_migration_cost": sum_recorded(e.migration_cost for e in summary_entries),
             "active_count": sum(
                 1 for e in summary_entries
                 if (CONSOLIDATION_STATUS_MAP.get(e.status, e.status) or "identified")
@@ -274,44 +292,43 @@ def get_entries():
                 if r.rationalization_action == "MIGRATE"
                 or (r.disposition_action or "").lower() == "consolidate"
             )
-            rat_tco_total = sum(
-                float(r.total_cost_of_ownership or 0) for r in rat_candidates
-            )
+            rat_tco_total = sum_recorded(r.total_cost_of_ownership for r in rat_candidates)
             # Estimated savings: apply a conservative 60% of TCO for ELIMINATE actions
-            rat_savings_estimate = sum(
-                float(r.total_cost_of_ownership or 0) * 0.6
-                for r in rat_candidates if r.rationalization_action == "ELIMINATE"
+            rat_eliminated_tco = sum_recorded(
+                r.total_cost_of_ownership for r in rat_candidates if r.rationalization_action == "ELIMINATE"
             )
+            rat_savings_estimate = None if rat_eliminated_tco is None else rat_eliminated_tco * 0.6
             summary["rationalization_candidates"] = len(rat_candidates)
             summary["rationalization_retire_count"] = rat_retire
             summary["rationalization_consolidate_count"] = rat_consolidate
             summary["rationalization_tco_total"] = rat_tco_total
             summary["rationalization_savings_estimate"] = rat_savings_estimate
             # If the ConsolidationListEntry table is empty, surface the rationalization totals
-            # as the primary portfolio_annual_cost and total_estimated_savings so cards are non-zero
+            # as the primary total_estimated_savings; a total nobody
+            # recorded stays None so the card says so instead of showing 0.
             if total_entries == 0:
-                summary["portfolio_annual_cost"] = rat_tco_total
                 summary["total_estimated_savings"] = rat_savings_estimate
         except HTTPException:
             raise
         except Exception as e:
             logger.warning("Could not enrich summary with rationalization data: %s", e)
 
-        return jsonify(
-            {
-                "success": True,
-                "entries": entries_data,
-                "summary": summary,
-                "pagination": {
-                    "page": pagination.page,
-                    "per_page": pagination.per_page,
-                    "total": pagination.total,
-                    "pages": pagination.pages,
-                    "has_prev": pagination.has_prev,
-                    "has_next": pagination.has_next,
-                },
-            }
-        )
+        reply = {
+            "success": True,
+            "entries": entries_data,
+            "summary": summary,
+            "pagination": {
+                "page": pagination.page,
+                "per_page": pagination.per_page,
+                "total": pagination.total,
+                "pages": pagination.pages,
+                "has_prev": pagination.has_prev,
+                "has_next": pagination.has_next,
+            },
+        }
+        if not costs_visible(current_user):
+            reply = withhold_costs(reply)
+        return jsonify(reply)
     except HTTPException:
         raise
     except Exception as e:
@@ -471,7 +488,7 @@ def get_entry_detail(entry_id):
             "architecture_assistant": "/architecture-assistant/",
         }
 
-        return jsonify({
+        reply = {
             "success": True,
             "financial": {
                 "license_cost": license_cost,
@@ -497,7 +514,10 @@ def get_entry_detail(entry_id):
                 "name": entry.target_application.name if entry.target_application else None,
             } if entry.target_application_id else None,
             "links": links,
-        })
+        }
+        if not costs_visible(current_user):
+            reply = withhold_costs(reply)
+        return jsonify(reply)
     except HTTPException:
         raise
     except Exception as e:
@@ -534,8 +554,6 @@ def update_entry(entry_id):
             entry.priority = data["priority"]
 
         if "status" in data:
-            from flask_login import current_user
-
             entry.status = data["status"]
             entry.status_changed_at = datetime.utcnow()
             entry.status_changed_by = (
@@ -578,9 +596,13 @@ def update_entry(entry_id):
             entry.regulatory_flags = data["regulatory_flags"]
 
         # Back-propagate annual operating cost to Application model if provided
-        if "annual_operating_cost" in data and data["annual_operating_cost"]:
+        cost_not_saved = None
+        if "annual_operating_cost" in data and data["annual_operating_cost"] and not costs_visible(current_user):
+            cost_not_saved = "The cost was not saved. Only a person who may set costs can record one."
+        elif "annual_operating_cost" in data and data["annual_operating_cost"]:
             try:
-                app = ApplicationComponent.query.get(entry.application_id)
+                app = ApplicationComponent.query.filter_by(
+                    id=entry.application_id, organization_id=g.current_org_id).first()
                 if app:
                     set_annual_cost(app, Decimal(str(data["annual_operating_cost"])))
                     app.updated_at = datetime.utcnow()
@@ -615,9 +637,13 @@ def update_entry(entry_id):
         db.session.commit()
 
         result = {"success": True, "entry": entry.to_dict()}
+        if cost_not_saved:
+            result["cost_not_saved"] = cost_not_saved
         if benefits_prompt:
             result["benefits_prompt"] = True
             result["estimated_savings"] = float(entry.estimated_savings or 0)
+        if not costs_visible(current_user):
+            result = withhold_costs(result)
         return jsonify(result)
 
     except HTTPException:
@@ -947,16 +973,17 @@ def recalculate_savings():
 
         logger.info(f"Recalculated savings for {updated_count} consolidation entries")
 
-        return jsonify(
-            {
-                "success": True,
-                "message": f"Recalculated savings for {updated_count} entries",
-                "updated_count": updated_count,
-                "real_data_count": real_data_count,
-                "baseline_count": baseline_count,
-                "details": entry_details,
-            }
-        )
+        reply = {
+            "success": True,
+            "message": f"Recalculated savings for {updated_count} entries",
+            "updated_count": updated_count,
+            "real_data_count": real_data_count,
+            "baseline_count": baseline_count,
+            "details": entry_details,
+        }
+        if not costs_visible(current_user):
+            reply = withhold_costs(reply)
+        return jsonify(reply)
 
     except HTTPException:
 
@@ -988,6 +1015,9 @@ def bulk_cost_import():
         if not file.filename or not file.filename.endswith(".csv"):
             return jsonify({"success": False, "error": "File must be a .csv"}), 400
 
+        if not costs_visible(current_user):
+            return jsonify({"success": False, "error": "The cost was not saved. Only a person who may set costs can record one."}), 403
+
         content = file.read().decode("utf-8-sig")
         reader = csv.DictReader(io.StringIO(content))
 
@@ -1003,10 +1033,12 @@ def bulk_cost_import():
                 app_name = row.get("application_name", "").strip()
 
                 if app_id:
-                    app = ApplicationComponent.query.get(int(app_id))
+                    app = ApplicationComponent.query.filter_by(
+                        id=int(app_id), organization_id=g.current_org_id).first()
                 elif app_name:
                     app = ApplicationComponent.query.filter(
-                        db.func.lower(ApplicationComponent.name) == app_name.lower()
+                        db.func.lower(ApplicationComponent.name) == app_name.lower(),
+                        ApplicationComponent.organization_id == g.current_org_id,
                     ).first()
 
                 if not app:

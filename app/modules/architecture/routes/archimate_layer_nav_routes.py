@@ -163,15 +163,8 @@ def business_interfaces():
 @archimate_layer_nav_bp.route('/business/processes')
 @login_required
 def business_processes():
-    """Navigate to Business Processes (APQC)."""
-    # Redirect to APQC process view if available, otherwise the element browser
-    try:
-        return redirect(url_for('apqc.process_list'))
-    except Exception:
-        # Was a bare `except:`, which also catches KeyboardInterrupt and SystemExit.
-        # The failure guarded here is url_for() not resolving when the APQC
-        # blueprint did not register — they register non-fatally.
-        return _browse('business', 'BusinessProcess')
+    """Navigate to Business Processes: the list, with its Diagram view."""
+    return redirect(url_for('business_architecture.processes'))
 
 @archimate_layer_nav_bp.route('/business/functions')
 @login_required

@@ -66,6 +66,63 @@
         });
     }
 
+    /* A question about the organisation's own estate is answered from its recorded
+       connections, as cited cards, before the model is asked. Resolves to the
+       answer ({found: true, html, page_url}) or {found: false}; rejects when the
+       answer could not be worked out, so the chat shows an error rather than
+       handing a grounded question to a model. */
+    async function askEstate(message, options) {
+        var remember = !(options && options.remember === false);
+        /* The lookup has one total limit, set by the server from the same budget and margin as the
+           turn: whatever bytes arrive, the request ends then and the chat shows the failure card. */
+        var limit = new AbortController();
+        /* The page carries the limit; with none given the lookup is not cut short by a number written here. */
+        var timer = window.chatLookupAbortMs > 0 ? setTimeout(function () { limit.abort(); }, window.chatLookupAbortMs) : null;
+        var resp, data;
+        try {
+            resp = await apiFetch('/ai-chat/estate-answer', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ message: message, thread_id: window.__threadId || null, remember: remember, part: (options && options.part) || null, element_id: (options && options.elementId) || undefined }),
+                signal: limit.signal
+            });
+            data = await resp.json().catch(function () { return {}; });
+            if (limit.signal.aborted) throw new Error('estate answer ran past its limit');
+        } finally {
+            clearTimeout(timer);
+        }
+        if (!resp.ok || data.success === false) throw new Error(data.error || 'estate answer ' + resp.status);
+        return data;
+    }
+
+    /* Save a change to an application that a preview card described. Resolves to
+       {success, html}: the card for what was saved, or the words for why it was not. */
+    async function confirmApplicationChange(token) {
+        var resp = await apiFetch('/ai-chat/application-change/confirm', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ token: token })
+        });
+        var data = await resp.json().catch(function () { return {}; });
+        if (!data.html) throw new Error(data.error || 'application change ' + resp.status);
+        return data;
+    }
+
+    /* Work out the indirect connections of the whole organisation. A run already in
+       progress (409) is reported by status so the caller can say so in plain words. */
+    async function recomputeConnections() {
+        var resp = await apiFetch('/api/v1/intelligence/derivation/recompute', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ scope: 'tenant' })
+        });
+        if (!resp.ok) {
+            var err = new Error('recompute ' + resp.status);
+            err.status = resp.status;
+            throw err;
+        }
+    }
+
     var _controller = null;
 
     /* No SSE event — not even a keepalive — for this long means the
@@ -160,19 +217,21 @@
         if (!resp.ok || !resp.body) {
             /* The body carries the only actionable sentence we get. The
                no-provider gate answers this endpoint with 503
-               {"error":"service_unavailable","message":"AI feature 'chat' is
-               not available. LLM provider must be configured."}; throwing a
-               bare 'stream 503' discarded it and the user was shown a status
-               code with a Retry that could never succeed. Read it, and mark a
-               configuration fault so the caller can offer the remedy instead
-               of a retry. Parsing is best-effort: a proxy-generated 502 is
-               HTML, not JSON, and must still produce a usable error. */
+               {"error":"service_unavailable","message":"<plain sentence
+               saying the assistant is not set up for this organisation
+               yet>"}; throwing a bare 'stream 503' discarded it and the user
+               was shown a status code with a Retry that could never succeed.
+               Read it, and mark a configuration fault so the caller can offer
+               the remedy instead of a retry. Parsing is best-effort: a
+               proxy-generated 502 is HTML, not JSON, and must still produce a
+               usable error. */
             var _detail = null;
             try { _detail = await resp.json(); } catch (_) { /* swallow-ok: non-JSON error body (proxy/CDN HTML); the status-code message below still applies */ }
             var _err = new Error(
                 (_detail && _detail.message) || ('stream ' + resp.status)
             );
             _err.status = resp.status;
+            _err.reasonCode = (_detail && _detail.reason_code) || null;
             _err.isConfigFault = isProviderConfigurationFault(_detail);
             throw _err;
         }
@@ -211,13 +270,19 @@
                            used to make this branch throw unconditionally,
                            discarding the very message the server had just
                            written to the transcript. */
-                        if (ev.error && !ev.response) throw new Error(ev.error);
+                        if (ev.error && !ev.response) { throw new Error(ev.error); }
                         /* When the server's citation gate refused the answer, its
                            response is what the user sees, whatever was streamed
                            before it. */
                         if (ev.error && ev.response) {
                             full = ev.response; /* partial tokens of a failed call are not shown */
                         } else if (ev.citation_gate && ev.citation_gate.refused && ev.response) {
+                            full = ev.response;
+                        } else if (ev.genome_answer && ev.response) {
+                            /* Checked and drawn on the server; nothing streamed is kept. */
+                            full = ev.response;
+                        } else if (ev.reworded && ev.response) {
+                            /* The server said the answer in the customer's words; what streamed is replaced. */
                             full = ev.response;
                         } else if (!full && ev.response) {
                             full = ev.response;
@@ -231,7 +296,14 @@
                             sources: ev.sources,
                             actions: ev.actions_taken || [],
                             pendingApprovals: ev.pending_approvals || [],
-                            error: ev.error || null
+                            answeredBy: ev.answered_by || null,
+                            genomeHtml: (ev.genome_answer && ev.genome_answer.html) || null,
+                            paused: !!ev.paused,
+                            retryable: !!ev.retryable,
+                            notSetUp: !!ev.not_set_up,
+                            reasonCode: ev.reason_code || null,
+                            error: ev.error || null,
+                            turnId: ev.turn_id || null
                         };
                     } else if (ev.error) {
                         throw new Error(ev.error);
@@ -267,7 +339,14 @@
             sources: meta.sources,
             actions: meta.actions || [],
             pendingApprovals: meta.pendingApprovals || [],
-            error: meta.error || null
+            answeredBy: meta.answeredBy || null,
+            genomeHtml: meta.genomeHtml || null,
+            paused: !!meta.paused,
+            retryable: !!meta.retryable,
+            notSetUp: !!meta.notSetUp,
+            reasonCode: meta.reasonCode || null,
+            error: meta.error || null,
+            turnId: meta.turnId || null
         });
         return true;
     }
@@ -335,6 +414,9 @@
         jsonHeaders: jsonHeaders,
         isProviderConfigurationFault: isProviderConfigurationFault,
         sendMessage: sendMessage,
+        askEstate: askEstate,
+        confirmApplicationChange: confirmApplicationChange,
+        recomputeConnections: recomputeConnections,
         streamMessage: streamMessage,
         abort: abort,
         isStreaming: isStreaming,

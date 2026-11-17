@@ -67,7 +67,7 @@
             </div>
             <div class="rounded-lg border border-border p-3 bg-background">
                 <p class="text-xs text-muted-foreground mb-1">Avg Coverage</p>
-                <p class="text-lg font-semibold text-foreground" x-text="(optionsAnalysisData.capabilities ? optionsAnalysisData.capabilities.average_coverage : 0) + '%'"></p>
+                <p class="text-lg font-semibold text-foreground" x-text="Platform.figure.percent(optionsAnalysisData.capabilities && optionsAnalysisData.capabilities.average_coverage)"></p>
             </div>
         </div>
 
@@ -294,7 +294,7 @@
                             </div>
                             <div class="h-1.5 bg-muted rounded-full overflow-hidden" x-show="opt.score !== null" x-cloak>
                                 <div class="h-full bg-primary rounded-full transition-all"
-                                     :style="'width:' + Math.round((opt.score || 0) * 100) + '%'"></div>
+                                     :style="'width:' + Platform.figure.barWidth(opt.score, 100) + '%'"></div>
                             </div>
                         </div>
                         {# Timeline #}

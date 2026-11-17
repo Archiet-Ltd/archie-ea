@@ -437,10 +437,10 @@ ${v.tco_estimate ? `**3-Year TCO:** $${v.tco_estimate.three_year.toLocaleString(
 
                 const c = data.criteria || {};
                 responseText += `### Scoring Breakdown\n`;
-                responseText += `- Architectural Principles: ${c.principles_alignment?.score || 0}/${c.principles_alignment?.max || 40}\n`;
-                responseText += `- Technology Standards: ${c.technology_standards?.score || 0}/${c.technology_standards?.max || 30}\n`;
-                responseText += `- Risk Coverage: ${c.risk_coverage?.score || 0}/${c.risk_coverage?.max || 20}\n`;
-                responseText += `- Completeness: ${c.completeness?.score || 0}/${c.completeness?.max || 10}\n\n`;
+                responseText += `- Architectural Principles: ${Platform.figure.score(c.principles_alignment?.score)}/${c.principles_alignment?.max || 40}\n`;
+                responseText += `- Technology Standards: ${Platform.figure.score(c.technology_standards?.score)}/${c.technology_standards?.max || 30}\n`;
+                responseText += `- Risk Coverage: ${Platform.figure.score(c.risk_coverage?.score)}/${c.risk_coverage?.max || 20}\n`;
+                responseText += `- Completeness: ${Platform.figure.score(c.completeness?.score)}/${c.completeness?.max || 10}\n\n`;
 
                 if (data.blocking_issues?.length > 0) {
                     responseText += `### Issues\n`;

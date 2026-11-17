@@ -67,8 +67,6 @@ NON_PROMPT_SURFACES = {
 REQUIRED_GUARDED_CALLS = [
     ("app/modules/ai_chat/services/agent_runner.py", "client.messages.create", 1, "assistant agent anthropic call"),
     ("app/modules/ai_chat/services/agent_runner.py", "client.chat.completions.create", 2, "assistant agent openai-compatible call"),
-    ("app/modules/ai_chat/services/ai_chat_multi_model.py", "self.openai_client.chat.completions.create", 1, "multi-model openai call"),
-    ("app/modules/ai_chat/services/ai_chat_multi_model.py", "self.anthropic_client.messages.create", 1, "multi-model anthropic call"),
     ("app/modules/ai_chat/services/ai_semantic_discovery_service.py", "openai.Model.list", 1, "semantic discovery availability probe"),
     ("app/modules/ai_chat/services/multi_domain_chat_service.py", "client.chat.completions.create", 1, "vision openai call"),
     ("app/modules/ai_chat/services/multi_domain_chat_service.py", "client.messages.create", 1, "vision anthropic call"),

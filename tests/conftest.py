@@ -24,6 +24,8 @@ import os
 import uuid
 
 import pytest
+from sqlalchemy import create_engine, text
+from sqlalchemy.engine import make_url
 
 
 # Tests must never inherit a developer's or deployment agent's LLM credentials.
@@ -34,10 +36,10 @@ _LLM_API_KEY_PROVIDERS = (
     "ANTHROPIC",
     "AZURE",
     "CLAUDE",
-    "DEEPSEEK",
     "GEMINI",
     "GOOGLE",
     "HUGGINGFACE",
+    "NVIDIA",
     "OPENAI",
     "OPENROUTER",
 )
@@ -58,8 +60,127 @@ for _llm_api_key_env_var in _LLM_API_KEY_ENV_VARS:
 os.environ["PYTHON_DOTENV_DISABLED"] = "1"
 
 
+def _quote(connection, name):
+    return connection.dialect.identifier_preparer.quote(name)
+
+
 @pytest.fixture(scope="session")
-def app():
+def run_id():
+    """A short id unique to this pytest process.
+
+    Roles are cluster-wide and database names are shared by every run on the
+    cluster, so two runs (or two seats) with the same xdist worker id must not
+    share either.
+    """
+    return uuid.uuid4().hex[:8]
+
+
+def _copy_when_source_is_free(connection, worker_q, template_q, template_db_name, wait_seconds=120):
+    """Copy the source database, waiting while another session is connected to it
+    (a serial run or a shell on the same database), then fail in plain words."""
+    import time
+
+    from sqlalchemy.exc import OperationalError
+
+    deadline = time.monotonic() + wait_seconds
+    while True:
+        try:
+            connection.execute(text(f"CREATE DATABASE {worker_q} TEMPLATE {template_q}"))  # nosec B608 - quoted identifiers
+            return
+        except OperationalError as exc:
+            if "being accessed by other users" not in str(exc):
+                raise
+            if time.monotonic() >= deadline:
+                raise RuntimeError(
+                    f"Could not copy {template_db_name} for a parallel worker: another session stayed "
+                    f"connected to it for {wait_seconds}s. Run without -n (serially), or close that session."
+                ) from exc
+            time.sleep(2)
+
+
+def _take_copy_lock(connection, lock, template_db_name, wait_seconds=120):
+    """Take the advisory lock that serialises worker copies, giving up at the same
+    deadline as the copy wait instead of blocking for ever behind a stuck holder."""
+    import time
+
+    deadline = time.monotonic() + wait_seconds
+    while not connection.execute(text("SELECT pg_try_advisory_lock(:k)"), {"k": lock}).scalar_one():
+        if time.monotonic() >= deadline:
+            raise RuntimeError(
+                f"Could not copy {template_db_name} for a parallel worker: another session held the "
+                f"copy lock for {wait_seconds}s. Run without -n (serially), or close the other session."
+            )
+        time.sleep(0.5)
+
+
+@pytest.fixture(scope="session")
+def worker_database(request, run_id):
+    """Create a per-worker database if running in parallel, otherwise use the default.
+
+    The database is copied from TEST_DATABASE_URL's own database at session start and
+    dropped at session end, so every worker starts with the schema a serial run of this
+    branch uses (TEST_TEMPLATE_DATABASE names another source when set). Its name is
+    TEST_DATABASE_URL's database with the worker id and a run id appended (e.g.
+    archie_test_xdist01_gw0_1a2b3c4d).
+    """
+    worker_id = getattr(request.config, "workerinput", {}).get("workerid", "master")
+
+    # The master worker in a parallel run can reuse the main database.
+    if worker_id == "master":
+        yield
+        return
+
+    db_url = os.environ.get("TEST_DATABASE_URL")
+    if not db_url:
+        pytest.skip("TEST_DATABASE_URL not set, skipping parallel database setup.")
+
+    base_url = make_url(db_url)
+    worker_db_name = f"{base_url.database}_{worker_id}_{run_id}"
+    worker_db_url = base_url.set(database=worker_db_name).render_as_string(hide_password=False)
+
+    # A shared seat template can lag the branch by several revisions (a column the models
+    # map is missing there), so the copy is taken from the database a serial run uses.
+    template_db_name = os.environ.get("TEST_TEMPLATE_DATABASE", base_url.database)
+
+    # Connect to the postgres database (not the template) to create the worker database,
+    # and copy one worker at a time: a copy fails with "source database is being accessed
+    # by other users" while anything else is connected to its source.
+    admin = create_engine(base_url.set(database="postgres"), isolation_level="AUTOCOMMIT")
+    try:
+        with admin.connect() as connection:
+            worker_q = _quote(connection, worker_db_name)
+            template_q = _quote(connection, template_db_name)
+            lock = connection.execute(text("SELECT hashtext(:n)"), {"n": template_db_name}).scalar_one()
+            _take_copy_lock(connection, lock, template_db_name)
+            try:
+                connection.execute(text(f"DROP DATABASE IF EXISTS {worker_q} WITH (FORCE)"))  # nosec B608 - quoted identifiers
+                _copy_when_source_is_free(connection, worker_q, template_q, template_db_name)
+            finally:
+                connection.execute(text("SELECT pg_advisory_unlock(:k)"), {"k": lock})
+    finally:
+        admin.dispose()
+
+    original_url = db_url
+    os.environ["TEST_DATABASE_URL"] = worker_db_url
+
+    def finalizer():
+        os.environ["TEST_DATABASE_URL"] = original_url
+        cleanup = create_engine(base_url.set(database="postgres"), isolation_level="AUTOCOMMIT")
+        try:
+            with cleanup.connect() as connection:
+                connection.execute(
+                    text(f"DROP DATABASE IF EXISTS {_quote(connection, worker_db_name)} WITH (FORCE)")  # nosec B608 - quoted identifier
+                )
+        finally:
+            cleanup.dispose()
+
+    request.addfinalizer(finalizer)
+
+    yield
+
+
+@pytest.fixture(scope="session")
+def app(request, worker_database):
     """Boot the application once per test session."""
     os.environ.setdefault("FLASK_CONFIG", "testing")
     from app import create_app
@@ -103,7 +224,7 @@ def _schema(app):
 
     It also seeds the standard roles, as a deployed database has them. A user
     created without an explicit role takes the default one, so without this a
-    test's permissions depended on whether some earlier test in the same run
+    test\'s permissions depended on whether some earlier test in the same run
     had happened to seed them, and a test run on its own, or in a CI shard
     without that earlier test, was refused with 403.
     """
@@ -112,6 +233,15 @@ def _schema(app):
 
     with app.app_context():
         db.create_all()
+        # create_all never builds the unique index on unified_capabilities
+        # (source_table, source_id); a deployed database gets it from a revision.
+        # Without it a new business capability is silently not projected.
+        from app.commands.apply_unified_capability_provenance_migration import (
+            ensure_provenance_index,
+        )
+
+        ensure_provenance_index(db.session.connection())
+        db.session.commit()
         Role.insert_roles()
         seed_implementation_planning_flag()
         db.session.remove()
@@ -213,6 +343,64 @@ def tenant_ctx(app):
 
 
 @pytest.fixture
+def enrolled_admin():
+    """Every administrator a test creates (a platform admin, or a user holding
+    the Administrator role or an organisation-admin flag) is recorded as having
+    enrolled for two-factor sign-in, so an administrator the test signs in by writing the session
+    passes the real enrolment checks instead of being sent to enrol. The checks
+    stay on: ``must_enrol_now`` and ``step_up_needed`` run unchanged and see an
+    enrolled user. A module asks for it with
+    ``pytest.mark.usefixtures("enrolled_admin")``; a test that is about the
+    unenrolled case does not."""
+    from datetime import datetime
+
+    from sqlalchemy import event
+    from sqlalchemy.orm import Session
+
+    def _enrol(session, flush_context, instances):
+        for user in session.new:
+            if type(user).__name__ != "User":
+                continue
+            role = getattr(user, "role", None)
+            if not (
+                getattr(user, "is_platform_admin", False)
+                or getattr(user, "is_org_admin", False)
+                or getattr(role, "name", None) == "Administrator"
+            ):
+                continue
+            if not user.mfa_enabled:
+                user.mfa_enabled = True
+            if user.mfa_enrolled_at is None:
+                user.mfa_enrolled_at = datetime.utcnow()
+
+    event.listen(Session, "before_flush", _enrol)
+    try:
+        yield
+    finally:
+        event.remove(Session, "before_flush", _enrol)
+
+
+def _listed(name):
+    import os
+
+    here = os.path.dirname(__file__)
+    with open(os.path.join(here, name)) as handle:
+        return {line.split("#")[0].strip() for line in handle if line.split("#")[0].strip()}
+
+
+def pytest_collection_modifyitems(config, items):
+    """Give the modules in enrolled_admin_modules.txt ``enrolled_admin``."""
+    import os
+
+    here = os.path.dirname(__file__)
+    enrolled = _listed("enrolled_admin_modules.txt")
+    for item in items:
+        module = os.path.relpath(str(item.path), here).replace(os.sep, "/")
+        if module in enrolled:
+            item.fixturenames.insert(0, "enrolled_admin")
+
+
+@pytest.fixture
 def client(app):
     """Repository-owned Flask client; do not depend on pytest-flask being installed."""
     return app.test_client()
@@ -272,3 +460,51 @@ def login_as(app):
                 delattr(g, cached)
 
     return _login
+
+
+@pytest.fixture(scope="module")
+def site_url(app):
+    """The app served on a loopback port for browser journeys, one server per test module.
+
+    Named site_url, not base_url: pytest-base-url owns a session-scoped base_url, and a module-scoped
+    fixture of that name fails every test that uses it with ScopeMismatch.
+    """
+    import threading
+
+    from werkzeug.serving import make_server
+
+    server = make_server("127.0.0.1", 0, app, threaded=True)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        yield f"http://127.0.0.1:{server.server_port}"
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=5)
+
+
+@pytest.fixture
+def own_visitor_events(app, monkeypatch):
+    """The ids of the visitor events this test's own requests wrote, removed again by id when the test ends.
+
+    A parallel run can write events of the same kind, so a test never deletes "the newest" one."""
+    from app import db
+    from app.models.public_visitor_event import PublicVisitorEvent
+    from app.services import public_analytics_service
+
+    written: list[int] = []
+    real = public_analytics_service._record
+
+    def recording(*args, **kwargs):
+        row = real(*args, **kwargs)
+        if row is not None:
+            written.append(row.id)
+        return row
+
+    monkeypatch.setattr(public_analytics_service, "_record", recording)
+    yield written
+    with app.app_context():
+        if written:
+            PublicVisitorEvent.query.filter(PublicVisitorEvent.id.in_(written)).delete(synchronize_session=False)
+            db.session.commit()

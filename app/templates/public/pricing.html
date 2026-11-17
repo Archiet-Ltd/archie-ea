@@ -9,11 +9,16 @@
 {% extends 'layouts/public_base.html' %}
 
 {% from 'components/public_faq.html' import faq_chevron %}
+{% from 'components/table.html' import table %}
+{% from 'components/radio_group.html' import radio_group %}
 {% block title %}{{ page.title }}{% endblock %}
 
 {% block meta_description %}
 {% from 'partials/_seo_meta.html' import seo_meta %}
 {{ seo_meta(page.self_canonical_url, page.description, page.is_held) }}
+{% for code, address in page.alternates %}
+<link rel="alternate" hreflang="{{ code }}" href="{{ address }}">
+{% endfor %}
 <meta property="og:title" content="{{ page.title }}">
 <meta name="twitter:title" content="{{ page.title }}">
 {% endblock %}
@@ -29,7 +34,7 @@
 {% endblock %}
 
 {% block content %}
-{% set _billing = 'billing.billing_index' in flask.current_app.view_functions %}
+{% set _billing = 'billing.billing_index' in flask.current_app.view_functions and payment_open() %}
 {% set _yes = '<span class="pp-yes" role="img" aria-label="Included"></span>'|safe %}
 {% set _no = '<span class="pp-no" aria-label="Not included">&mdash;</span>'|safe %}
 <div class="pricing-page">
@@ -42,25 +47,25 @@
 
     <section class="pp-section pp-section--first" aria-labelledby="plans-heading" data-testid="pricing-plans" >
       <h2 id="plans-heading" class="sr-only">Plans</h2>
-      <input type="radio" class="pp-radio" name="pp-interval" id="pp-bill-year" checked>
-      <input type="radio" class="pp-radio" name="pp-interval" id="pp-bill-month">
-      <div class="pp-toggle" role="group" aria-label="Billing period" data-testid="pricing-toggle">
-        <label for="pp-bill-year">Annual <span class="pp-save">Two months free</span></label>
-        <label for="pp-bill-month">Monthly</label>
+      <div class="pp-toggle" data-testid="pricing-toggle">
+        {{ radio_group(name='pp-interval', label='Billing period', value='year', inline=true, options=[
+          {'value': 'year', 'label': 'Annual: two months free'},
+          {'value': 'month', 'label': 'Monthly'}
+        ]) }}
       </div>
 
-      <div class="pp-plans">
+<div class="pp-plans">
         {# Community #}
         <article class="public-card" data-testid="plan-card-community">
           <h3 class="public-card-title">Community</h3>
-          <p class="pp-for">Evaluation, one-person companies and self-hosters.</p>
+          <p class="pp-for">{{ plans.free.audience }}</p>
           <p class="pp-price">Free</p>
           <p class="pp-note">No trial clock. One organisation, up to three people.</p>
-          <a href="{{ url_for('main.track_plan_click', plan='community', next=url_for('account.register')) }}" class="public-btn public-btn--wrap public-btn--lg public-btn--outline" data-testid="buy-community">Start free</a>
+          <a rel="nofollow" href="{{ url_for('main.track_plan_click', plan='community', next=url_for('account.register')) }}" class="public-btn public-btn--wrap public-btn--lg public-btn--outline" data-testid="buy-community">Start free</a>
           <div class="pp-alt"></div>
           <ul class="pp-list">
-            <li>Ask what breaks, what is at risk and who is accountable</li>
-            <li>The twin map of your systems, suppliers and dependencies</li>
+            <li>Ask the AI chat what breaks, what is at risk and who is accountable</li>
+            <li>The ArchiMate Composer, drawing your systems, suppliers and dependencies</li>
             <li>The Business Model Canvas</li>
             <li>Import from files: ArchiMate Open Exchange and spreadsheets</li>
             <li>Community support</li>
@@ -68,41 +73,35 @@
         </article>
 
         {# Startup and Team: price and buy button per interval #}
-        {% for key, name, for_whom, note_year, note_month, price_year, price_month, unit_year, unit_month, items in [
-          ('startup', 'Startup', 'Founders and small services firms, 5 to 50 people.',
-           '$490/year for a team of ten. $98 less than twelve months at $49/month.',
-           '$49/month for a team of ten, or $490/year and save $98.',
-           '$490', '$49', '/year', '/month',
-           ['Ten people', 'Email support']),
-          ('team', 'Team', 'Scale-ups and services companies, 50 to 500 people.',
-           '$290/editor/year. People who only ask questions are free.',
-           '$29/editor/month, or $290/editor/year and save $58 per editor. People who only ask questions are free.',
-           '$290', '$29', '/editor/year', '/editor/month',
-           ['Pay for editors only; everyone else asks for free', 'Single sign-on', 'The review-board workflow', 'Your own model key', 'Email support'])
-        ] %}
+        {% for key in ['startup', 'team'] %}
+        {% set plan = plans[key] %}
+        {% set name = plan.name %}
+        {% set prices = plan_prices[key] %}
         <article class="public-card" data-testid="plan-card-{{ key }}">
           <h3 class="public-card-title">{{ name }}</h3>
-          <p class="pp-for">{{ for_whom }}</p>
+          <p class="pp-for">{{ plan.audience }}</p>
           <p class="pp-price">
-            <span data-interval="year">{{ price_year }}<small>{{ unit_year }}</small></span>
-            <span data-interval="month">{{ price_month }}<small>{{ unit_month }}</small></span>
+            <span data-interval="year">{{ prices[0] }}</span>
+            {% if prices[1] %}<span data-interval="month">{{ prices[1] }}</span>{% endif %}
           </p>
           <p class="pp-note">
-            <span data-interval="year">{{ note_year }}</span>
-            <span data-interval="month">{{ note_month }}</span>
+            <span data-interval="year">{% if key == 'startup' %}USD 490/year for a team of {{ plan.people_words }}. USD 98 less than twelve months at USD 49/month.{% else %}USD 290/editor/year. People who only ask questions are free.{% endif %}</span>
+            {% if prices[1] %}<span data-interval="month">{% if key == 'startup' %}USD 49/month for a team of {{ plan.people_words }}, or USD 490/year and save USD 98.{% else %}USD 29/editor/month, or USD 290/editor/year and save USD 58 per editor. People who only ask questions are free.{% endif %}</span>{% endif %}
+            {% if not _billing %}<span class="block mt-1" data-testid="start-free-note-{{ key }}">Start free puts you on Community. {{ name }} is set up in a conversation with us.</span>{% endif %}
           </p>
           {% if _billing %}
-          <a href="{{ url_for('main.track_plan_click', plan=key, next=url_for('account.register', plan=key, interval='year')) }}"
+          <a rel="nofollow" href="{{ url_for('main.track_plan_click', plan=key, next=url_for('account.register', plan=key, interval='year')) }}"
              class="public-btn public-btn--wrap public-btn--lg public-btn--primary" data-interval="year" data-testid="buy-{{ key }}">Buy {{ name }}, billed annually</a>
-          <a href="{{ url_for('main.track_plan_click', plan=key, next=url_for('account.register', plan=key, interval='month')) }}"
+          <a rel="nofollow" href="{{ url_for('main.track_plan_click', plan=key, next=url_for('account.register', plan=key, interval='month')) }}"
              class="public-btn public-btn--wrap public-btn--lg public-btn--primary" data-interval="month" data-testid="buy-{{ key }}-monthly">Buy {{ name }}, billed monthly</a>
           {% else %}
-          <a href="{{ url_for('main.track_plan_click', plan=key, next='/contact') }}" class="public-btn public-btn--wrap public-btn--lg public-btn--outline" data-testid="buy-{{ key }}">Contact us to buy {{ name }}</a>
+          <a rel="nofollow" href="{{ url_for('main.track_plan_click', plan='community', next=url_for('account.register')) }}" class="public-btn public-btn--wrap public-btn--lg public-btn--primary" data-testid="buy-{{ key }}">Start free</a>
+          <a rel="nofollow" href="{{ url_for('main.track_plan_click', plan=key, next='/contact') }}" class="public-btn public-btn--wrap public-btn--lg public-btn--outline" data-testid="talk-{{ key }}">Talk to us about {{ name }}</a>
           {% endif %}
-          <div class="pp-alt"></div>
+          <div class="pp-alt">{% if key == 'startup' %}<a rel="nofollow" class="underline font-medium" href="{{ url_for('main.track_plan_click', plan='startup', next=url_for('account.register', plan='startup', interval='year', offer='credit')) }}" data-testid="credit-startup" title="For companies founded in the last 36 months that have raised up to USD 1M. Ten people for 90 days.">Start with 90 days free</a>{% endif %}</div>
           <ul class="pp-list">
             <li class="pp-lead-in">Everything in Community, plus</li>
-            {% for item in items %}<li>{{ item }}</li>{% endfor %}
+            {% for item in plan.features %}<li>{{ item }}</li>{% endfor %}
           </ul>
         </article>
         {% endfor %}
@@ -110,10 +109,10 @@
         {# Enterprise #}
         <article class="public-card" data-testid="plan-card-enterprise">
           <h3 class="public-card-title">Enterprise</h3>
-          <p class="pp-for">Enterprise architecture teams.</p>
-          <p class="pp-price"><span class="pp-from">From</span> $24,000<small>/year</small></p>
-          <p class="pp-note">Annual contract from $24,000/year.</p>
-          <a href="{{ url_for('main.track_plan_click', plan='enterprise', next='/contact') }}" class="public-btn public-btn--wrap public-btn--lg public-btn--outline" data-testid="buy-enterprise">Contact sales</a>
+          <p class="pp-for">{{ plans.enterprise.audience }}</p>
+          <p class="pp-price">{{ plan_prices.enterprise[0] }}</p>
+          <p class="pp-note">Annual contract from USD 24,000/year.</p>
+          <a rel="nofollow" href="{{ url_for('main.track_plan_click', plan='enterprise', next='/contact') }}" class="public-btn public-btn--wrap public-btn--lg public-btn--outline" data-testid="buy-enterprise">Contact sales</a>
           <div class="pp-alt"></div>
           <ul class="pp-list">
             <li class="pp-lead-in">Everything in Team, plus</li>
@@ -130,9 +129,9 @@
 
     <section class="pp-section" aria-labelledby="compare-heading" data-testid="pricing-compare">
       <h2 id="compare-heading">Compare plans</h2>
-      <p class="pp-sub">Every plan is priced per company, not per application. The same capabilities are in the model whichever plan you are on; the plans differ in who can edit, how people sign in and how you are supported.</p>
+      <p class="pp-sub">Entelim is priced per company, not per application. The same capabilities are in the model whichever plan you are on; the plans differ in who can edit, how people sign in and how you are supported.</p>
       <div class="pp-frame rounded-2xl border border-border">
-        <table class="public-table public-table--fit">
+        {% call table(class='public-table public-table--fit') %}
           <caption class="sr-only">What each plan includes</caption>
           <thead>
             <tr>
@@ -148,11 +147,11 @@
               ('Modelling', [
                 ('People included', ['3', '10', 'Editors you buy; askers free', 'No limit']),
                 ('Business Model Canvas', [1, 1, 1, 1]),
-                ('Twin map of systems, suppliers and dependencies', [1, 1, 1, 1]),
+                ('ArchiMate Composer for systems, suppliers and dependencies', [1, 1, 1, 1]),
                 ('Import from ArchiMate Open Exchange and spreadsheets', [1, 1, 1, 1]),
               ]),
               ('Questions and answers', [
-                ('Ask: what breaks, what is at risk, who is accountable', [1, 1, 1, 1]),
+                ('AI chat: what breaks, what is at risk, who is accountable', [1, 1, 1, 1]),
                 ('The model as of a date, and what changed between two dates', [1, 1, 1, 1]),
               ]),
               ('Governance', [
@@ -183,31 +182,8 @@
             {% endfor %}
             {% endfor %}
           </tbody>
-        </table>
+        {% endcall %}
       </div>
-    </section>
-
-    <section class="pp-section" aria-labelledby="grow-heading" data-testid="pricing-grow">
-      <h2 id="grow-heading">What every plan gains as the platform grows</h2>
-      <p class="pp-sub">Each new capability reaches Startup and Team as it ships, at no extra charge, and nothing is taken away from anyone already subscribed.</p>
-      <ol class="public-stepper">
-        <li>
-          <p class="home-eyebrow"><time>Q4 2026</time></p>
-          <p class="public-stepper__body">Save, share and export an answer, as a spreadsheet or a PDF.</p>
-        </li>
-        <li>
-          <p class="home-eyebrow"><time>Q1 2027</time></p>
-          <p class="public-stepper__body">Connections to the tools you already use, a replay and event catalogue for webhooks, and AI assistants that query your model through the Model Context Protocol.</p>
-        </li>
-        <li>
-          <p class="home-eyebrow"><time>Q2 2027</time></p>
-          <p class="public-stepper__body">Cost in one currency across the model.</p>
-        </li>
-        <li>
-          <p class="home-eyebrow"><time>Q3 2027</time></p>
-          <p class="public-stepper__body">Scenarios and what-if forecasts on top of the model.</p>
-        </li>
-      </ol>
     </section>
   </div>
 
@@ -228,13 +204,13 @@
         <div class="public-card">
           <h3 class="public-card-title">Architecture health check</h3>
           <p class="public-card-body">We run Entelim over your own application data and deliver a written report within two weeks of kickoff.</p>
-          <p class="pp-price pp-price--sm">$4,500<small>one time</small></p>
+          <p class="pp-price pp-price--sm">USD 4,500<small>one time</small></p>
           <a href="/architecture-health-check" class="public-btn public-btn--lg public-btn--outline">See what is included</a>
         </div>
         <div class="public-card">
           <h3 class="public-card-title">Team annual plan with onboarding</h3>
           <p class="public-card-body">The Team plan billed annually, plus working sessions to build your first model and import your data.</p>
-          <p class="pp-price pp-price--sm">$1,500<small>one-time onboarding</small></p>
+          <p class="pp-price pp-price--sm">USD 1,500<small>one-time onboarding</small></p>
           <a href="/team-annual-onboarding" class="public-btn public-btn--lg public-btn--outline">See what is included</a>
         </div>
       </div>
@@ -245,19 +221,35 @@
       <div class="public-faq max-w-3xl">
         <details>
           <summary>Can I cancel at any time?{{ faq_chevron() }}</summary>
+          {% if _billing %}
           <p>Yes. An organisation administrator cancels from the billing page, or by <a href="/contact" class="public-link">contacting us</a>. Cancelling stops the subscription from renewing. You keep your plan until the end of the period you have paid for, and you can withdraw a scheduled cancellation before then.</p>
+          {% else %}
+          <p>Community is free and has nothing to cancel. A paid plan is set up in a conversation with us, and <a href="/contact" class="public-link">contacting us</a> is also how you change or end it.</p>
+          {% endif %}
         </details>
         <details>
           <summary>What happens when I add or remove seats?{{ faq_chevron() }}</summary>
+          {% if _billing %}
           <p>On Team you pay for editors, and people who only ask questions are free. An organisation administrator changes the number of editor seats, or switches plan, from the billing page at any time.</p>
+          {% else %}
+          <p>On Team the price is per editor, and people who only ask questions are free. <a href="/contact" class="public-link">Contact us</a> to change the number of editor seats or switch plan.</p>
+          {% endif %}
         </details>
         <details>
           <summary>How are tax and VAT handled?{{ faq_chevron() }}</summary>
+          {% if _billing %}
           <p>Any tax due is shown on the payment page before you pay. Add your tax number in the billing portal and it is printed on every invoice issued from then on.</p>
+          {% else %}
+          <p>We agree tax and invoicing with you when a paid plan is set up. <a href="/contact" class="public-link">Contact us</a> with your tax number and any questions.</p>
+          {% endif %}
         </details>
         <details>
           <summary>Where do I find my invoices?{{ faq_chevron() }}</summary>
+          {% if _billing %}
           <p>Each payment produces an invoice, listed on your organisation's billing page. The invoice e-mail address and billing details are yours to set there.</p>
+          {% else %}
+          <p>We send the invoice for a paid plan when it is set up with you. Community is free, so it has none.</p>
+          {% endif %}
         </details>
         <details>
           <summary>What happens to my data if I move to a smaller plan?{{ faq_chevron() }}</summary>
@@ -265,7 +257,7 @@
         </details>
         <details>
           <summary>Can I pay monthly instead of annually?{{ faq_chevron() }}</summary>
-          <p>Yes. Use the toggle above. Annual billing costs ten months for twelve: $490/year for Startup and $290/editor/year for Team.</p>
+          <p>Yes. Use the toggle above. Annual billing costs ten months for twelve: USD 490/year for Startup and USD 290/editor/year for Team.</p>
         </details>
         <details>
           <summary>What if I already self-host Entelim?{{ faq_chevron() }}</summary>
@@ -278,3 +270,4 @@
   {% include 'components/public_footer.html' %}
 </div>
 {% endblock %}
+{# design-block: public #}

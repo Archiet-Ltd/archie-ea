@@ -293,7 +293,7 @@ def remediate():
     if result.get("success"):
         flash(
             f"Governed remediation queued for approval (approval #{result.get('approval_id')}). "
-            f"Nothing has been applied — a human must approve it.",
+            f"Nothing has been applied yet; it is waiting for review.",
             "success",
         )
     elif result.get("status") == "rejected":

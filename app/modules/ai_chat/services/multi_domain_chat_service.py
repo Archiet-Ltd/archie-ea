@@ -62,7 +62,6 @@ from app.services.ai_chat_extensions import (
     AutomatedActionsService,
     ComplianceStandardsService,
     PredictiveInsightsService,
-    ScenarioAnalysisService,
     VisualGenerationService,
 )
 from app.services.business_output_service import StakeholderRole
@@ -73,6 +72,7 @@ from app.services.ai_chat_approval_service import AIChatApprovalService
 from app.modules.ai_chat.services.context_window_service import ContextWindowService
 from app.modules.ai_chat.services.intent_classifier_service import IntentClassifierService
 from app.utils.validators import sanitize_html
+from app.modules.ai_chat.services.failure_messages import ASSISTANT_UNAVAILABLE
 from app.modules.architecture.services.archimate_prompts import ARCHIMATE_SYSTEM_PROMPT
 
 logger = logging.getLogger(__name__)
@@ -324,6 +324,27 @@ PERSONA_CONFIGS = {
             "Map business needs to ArchiMate elements",
         ],
     },
+    "cto_founder": {
+        "name": "CTO / technical founder",
+        "icon": "rocket",
+        "color": "violet",
+        "description": "What breaks, who owns it, what it costs and what to fix first",
+        "expertise": [
+            "Delivery risk",
+            "Ownership gaps",
+            "Run cost",
+            "Fix-first ordering",
+        ],
+        "focus_areas": ["What breaks", "Who owns it", "What it costs", "What to fix first"],
+        "default_domain": "general",
+        "context_priority": ["applications", "risks", "costs", "owners"],
+        "sample_prompts": [
+            "What breaks if the payments service goes down?",
+            "Which applications have no owner?",
+            "What does each application cost to run?",
+            "What should we fix first?",
+        ],
+    },
     "cio": {
         "name": "CIO / IT Executive",
         "icon": "crown",
@@ -571,7 +592,6 @@ class MultiDomainChatService:
 
         # Initialize AI Chat Extension Services
         self.visual_generation = VisualGenerationService()
-        self.scenario_analysis = ScenarioAnalysisService()
         self.automated_actions = AutomatedActionsService()
         self.advanced_analytics = AdvancedAnalyticsService()
         self.compliance_standards = ComplianceStandardsService()
@@ -667,7 +687,7 @@ class MultiDomainChatService:
                     "capability_architect",
                 ],
                 "analysts": ["business_analyst", "product_analyst"],
-                "executives": ["cio"],
+                "executives": ["cto_founder", "cio"],
                 "governance": ["arb_member"],
                 "stewards": [
                     "portfolio_manager",
@@ -1052,26 +1072,6 @@ class MultiDomainChatService:
             if any(resolved_entities[k] for k in resolved_entities):
                 domain_context["resolved_entities"] = resolved_entities
 
-            # AIC-018: retirement/impact keyword detection — call impact analysis if matched
-            _IMPACT_KEYWORDS = ("retire", "retiring", "retirement", "consolidate",
-                                "blast radius", "impact of retiring", "impact analysis")
-            _msg_lower = message.lower()
-            if any(kw in _msg_lower for kw in _IMPACT_KEYWORDS):
-                _impact_app_id = None
-                for _app in resolved_entities.get("applications", []):
-                    if _app.get("id"):
-                        _impact_app_id = _app["id"]
-                        break
-                if _impact_app_id:
-                    try:
-                        from app.modules.ai_chat.services.ai_impact_analysis_service import AIImpactAnalysisService
-                        _impact_result = AIImpactAnalysisService.analyze_application_impact(
-                            _impact_app_id, scenario="retirement", include_ai_analysis=False
-                        )
-                        domain_context["impact_analysis_result"] = _impact_result
-                    except Exception:
-                        logger.debug("AIC-018: impact analysis skipped", exc_info=True)
-
             # ENT-083: Governance / ARB intent classification (keyword scoring)
             _intent_svc = IntentClassifierService()
             _intent_result = _intent_svc.classify_intent(message)
@@ -1358,14 +1358,7 @@ class MultiDomainChatService:
             error_str = str(e)
             # Provide a clear, actionable message when no LLM provider is configured
             if "no enabled provider" in error_str.lower() or "no llm provider" in error_str.lower() or "valueerror" in type(e).__name__.lower():
-                user_message = (
-                    "**No AI provider configured.**\n\n"
-                    "To enable AI responses, please do one of the following:\n\n"
-                    "1. **Admin UI**: Go to [Admin → API Settings](/admin/api-settings) and add an API key for OpenAI, Anthropic, Gemini, or OpenRouter.\n"
-                    "2. **.env file**: Add your API key to the `.env` file in the project root and restart the server.\n\n"
-                    "**Recommended for demo**: Get a free OpenRouter key at [openrouter.ai/keys](https://openrouter.ai/keys) — "
-                    "it provides access to Gemini 2.5 Flash at no cost."
-                )
+                user_message = ASSISTANT_UNAVAILABLE
             else:
                 user_message = error_str
 
@@ -2853,27 +2846,6 @@ class MultiDomainChatService:
                 return {"success": False, "error": f"Unknown visual type: {visual_type}"}
         except Exception as e:
             self.logger.error(f"Error generating visual: {e}")
-            return {"success": False, "error": str(e)}
-
-    def run_scenario_analysis(
-        self,
-        scenario_type: str,
-        parameters: Dict[str, Any],
-    ) -> Dict[str, Any]:
-        """
-        Run a what-if scenario analysis.
-
-        Args:
-            scenario_type: Type of scenario (retirement, migration, vendor_change, etc.)
-            parameters: Scenario parameters
-
-        Returns:
-            Scenario analysis results
-        """
-        try:
-            return self.scenario_analysis.analyze_scenario(scenario_type, parameters)
-        except Exception as e:
-            self.logger.error(f"Error running scenario analysis: {e}")
             return {"success": False, "error": str(e)}
 
     def create_automated_action(
@@ -6441,11 +6413,23 @@ Instructions:
                 )
                 return {}
 
-            api_keys = LLMService._get_all_api_keys(provider_name)
-            if not api_keys:
+            resolved = LLMService.resolve_key(provider_name)
+            if resolved.paused:
+                from app.modules.ai_chat.services.llm_service_impl import PAUSED_MESSAGE
+
+                return {
+                    "success": True,
+                    "vision_handled": True,
+                    "paused": True,
+                    "domain": domain,
+                    "response": PAUSED_MESSAGE,
+                    "context_used": False,
+                    "insights": [],
+                }
+            if not resolved.key:
                 return {}
 
-            api_key = api_keys[0]
+            api_key = resolved.key
 
             # Build a system instruction mentioning the attached diagram
             system_instruction = (
@@ -6461,6 +6445,7 @@ Instructions:
             response_text = self._call_vision_provider(
                 provider_name, model, api_key, system_instruction,
                 message, image_data_b64, image_media_type,
+                resolved=resolved,
             )
 
             return {
@@ -6498,6 +6483,7 @@ Instructions:
         user_message: str,
         image_b64: str,
         media_type: str,
+        resolved=None,
     ) -> str:
         """Dispatch a vision request to the appropriate provider API.
 
@@ -6534,7 +6520,12 @@ Instructions:
                 temperature=0.0,
                 timeout=60.0,
             )
-            return response.choices[0].message.content
+            text = response.choices[0].message.content
+            LLMService.record_platform_call(
+                resolved, model, getattr(response, "usage", None),
+                prompt_chars=len(system_prompt) + len(user_message), output_chars=len(text or ""),
+            )
+            return text
 
         if provider == "anthropic":
             import anthropic
@@ -6560,7 +6551,12 @@ Instructions:
                     }
                 ],
             )
-            return response.content[0].text
+            text = response.content[0].text
+            LLMService.record_platform_call(
+                resolved, model, getattr(response, "usage", None),
+                prompt_chars=len(system_prompt) + len(user_message), output_chars=len(text or ""),
+            )
+            return text
 
         if provider == "gemini":
             import google.generativeai as genai
@@ -6573,6 +6569,10 @@ Instructions:
                     system_prompt + "\n\n" + user_message,
                     {"mime_type": media_type, "data": image_bytes},
                 ],
+            )
+            LLMService.record_platform_call(
+                resolved, model, getattr(response, "usage_metadata", None),
+                prompt_chars=len(system_prompt) + len(user_message), output_chars=len(response.text or ""),
             )
             return response.text
 
@@ -6666,23 +6666,8 @@ Instructions:
             # AIC-307: Inject prior decisions if recall detected
             decision_block = context.get("prior_decisions", "")
 
-            # AIC-308: Inject scenario analysis if detected
+            # Inject scenario analysis if detected
             scenario_block = context.get("scenario_analysis", "")
-
-            # AIC-301: Inject blast radius analysis when retirement/impact keywords detected
-            blast_radius_block = ""
-            impact_data = context.get("impact_analysis_result")
-            if impact_data and isinstance(impact_data, dict):
-                blast_radius_block = self._format_blast_radius_block(impact_data)
-            elif not impact_data:
-                # If no impact data but user asks about retirement, try capability-based analysis
-                _msg_lower = message.lower()
-                _RETIRE_KW = ("retire", "decommission", "sunset", "remove", "shut down", "blast radius")
-                if any(kw in _msg_lower for kw in _RETIRE_KW):
-                    resolved = context.get("resolved_entities", {})
-                    _apps = resolved.get("applications", [])
-                    if _apps:
-                        blast_radius_block = self._compute_capability_blast_radius(_apps[0])
 
             prompt = f"""You are Entelim, an AI Architecture Assistant for Enterprise Architecture. You have deep knowledge of TOGAF, ArchiMate 3.2, and the organisation's live portfolio data.
 
@@ -6690,16 +6675,16 @@ USER QUESTION: {message}
 
 LIVE PORTFOLIO SUMMARY:
 {summary_str}
-{entity_str}{cross_entity_block}{semantic_block}{health_block}{blast_radius_block}{decision_block}{scenario_block}
+{entity_str}{cross_entity_block}{semantic_block}{health_block}{decision_block}{scenario_block}
 Instructions:
 1. Answer the question using the live portfolio data above — be specific about counts and names.
 2. If the user asks about specific applications, capabilities, or vendors, use the resolved entity data.
 3. If cross-domain semantic matches are provided, incorporate the most relevant ones into your answer and cite the entity type.
 4. Apply TOGAF and ArchiMate 3.2 frameworks where relevant.
-5. If BLAST RADIUS data is provided, structure your response around: (a) affected applications and their criticality, (b) capabilities at risk of losing support, (c) risk score and level, (d) recommended mitigation steps.
-5. Suggest which domain to switch to for deeper analysis (e.g. "Switch to Gap Analysis domain for a detailed breakdown").
-6. Be concise but precise — this is an enterprise tool, not a chatbot.
-7. If you don't have enough data to answer, say so clearly and suggest the right slash command or domain."""
+5. For a retirement or failure question, answer only from the cited block above and keep its citations.
+6. Suggest which domain to switch to for deeper analysis (e.g. "Switch to Gap Analysis domain for a detailed breakdown").
+7. Be concise but precise — this is an enterprise tool, not a chatbot.
+8. If you don't have enough data to answer, say so clearly and suggest the right slash command or domain."""
 
             provider_name, model = LLMService._get_configured_provider()
 
@@ -6872,19 +6857,16 @@ Instructions:
         """Detect scenario/comparison intent and build a data-driven scenario block."""
         msg_lower = message.lower()
 
-        # Retirement/what-if scenarios
+        # Retirement/what-if scenarios: answered from the one impact answer
+        # (query_catalogue.run_entry("what_breaks_if_fails"), built on
+        # IntelligenceQueryService.cross_layer_impact) -- the same catalogue
+        # entry the MCP tool and the Ask surface already run. Never the
+        # frozen fixed-value scenario service.
         if any(kw in msg_lower for kw in self._SCENARIO_KEYWORDS):
             resolved = context.get("resolved_entities", {})
             apps = resolved.get("applications", [])
             if apps:
-                app_info = apps[0]
-                # Capability blast radius (existing, fast)
-                blast = self._compute_capability_blast_radius(app_info)
-                # Full retirement analysis (costs, users, integrations, risks)
-                full_analysis = self._build_full_retirement_block(app_info)
-                combined = (blast or "") + (full_analysis or "")
-                if combined.strip():
-                    return combined
+                return self._build_cited_impact_block(apps[0])
             return None
 
         # Vendor comparison
@@ -7488,71 +7470,85 @@ End with: "Type **'next'** to complete the design workflow."
             logger.debug("AIC-301: capability blast radius failed: %s", e)
             return ""
 
-    def _build_full_retirement_block(self, app_info: dict) -> str:
-        """Build a retirement impact block with costs, users, integrations, and risks."""
+    def _build_cited_impact_block(self, app_info: dict) -> Optional[str]:
+        """What breaks if *app_info* is retired, from the one impact answer.
+
+        Calls ``query_catalogue.run_entry("what_breaks_if_fails")`` -- the
+        same catalogue entry the MCP tool and the Ask surface already run,
+        built on ``IntelligenceQueryService.cross_layer_impact`` -- and
+        formats its answer envelope (facts, citations) into the chat block.
+        Nothing here is computed independently and the frozen fixed-value
+        scenario service is never called. When the fact
+        is missing (no element resolved, or nothing recorded depends on it),
+        the block says so plainly with a next step rather than guessing.
+        """
+        name = app_info.get("name")
+        if not name:
+            return None
+        org_id = current_org_id()
+        if org_id is None:
+            return None
         try:
-            app_id = app_info.get("id")
-            if not app_id:
-                return ""
+            from app.modules.intelligence.services.query_catalogue import run_entry
 
-            result = self.scenario_analysis.analyze_scenario(
-                "application_retirement", {"application_id": app_id}
-            )
-            if not result.get("success"):
-                return ""
-
-            summary = result.get("impact_summary", {})
-            cost = result.get("cost_impact", {})
-            risk = result.get("risk_assessment", {})
-            recs = result.get("recommendations", [])
-
-            lines = [f"\nRETIREMENT IMPACT ANALYSIS: {app_info.get('name', 'Unknown')}"]
-
-            # Cost impact
-            annual = cost.get("current_annual_cost", 0)
-            if annual > 0:
-                lines.append(f"  Current annual cost: ${annual:,.0f}")
-                lines.append(f"  Estimated migration cost: ${cost.get('migration_cost', 0):,.0f}")
-                lines.append(f"  Annual savings after retirement: ${cost.get('annual_savings', 0):,.0f}")
-                lines.append(f"  5-year net savings: ${cost.get('five_year_savings', 0):,.0f}")
-                payback = cost.get("payback_period_months", 0)
-                if payback > 0:
-                    lines.append(f"  Payback period: {payback} months")
-            else:
-                lines.append("  Cost data: Not available (no cost fields populated)")
-
-            # Integration impact
-            integrations = summary.get("affected_integrations", 0)
-            if integrations > 0:
-                lines.append(f"  Integrations affected: {integrations}")
-
-            # User impact
-            users = summary.get("affected_users", 0)
-            if users > 0:
-                lines.append(f"  Users affected: {users:,}")
-
-            # Risk assessment
-            overall_risk = risk.get("overall_risk", "Not assessed")
-            risk_score = risk.get("score", 0)
-            lines.append(f"  Overall risk: {overall_risk} (score: {risk_score}/100)")
-            for r in risk.get("risks", [])[:3]:
-                lines.append(f"    - [{r.get('severity', '?')}] {r.get('risk', '')}")
-
-            # Recommendations
-            if recs:
-                lines.append("  Recommendations:")
-                for rec in recs[:4]:
-                    lines.append(f"    [{rec.get('priority', '?')}] {rec.get('action', '')}")
-
-            # Timeline
-            timeline = result.get("timeline_suggestion", {})
-            if timeline.get("recommended_duration"):
-                lines.append(f"  Recommended timeline: {timeline['recommended_duration']} ({timeline.get('phases', 0)} phases)")
-
-            return "\n".join(lines) + "\n"
+            result = run_entry("what_breaks_if_fails", org_id, service=name)
         except Exception as e:
-            logger.debug("Full retirement analysis failed: %s", e)
-            return ""
+            logger.debug("impact answer lookup failed: %s", e)
+            return None
+
+        rows = result.get("rows") or []
+        citations_by_id = {
+            c.get("id"): c for c in (result.get("citations") or []) if isinstance(c, dict)
+        }
+        lines = [f"\nWHAT BREAKS IF '{name}' IS RETIRED:"]
+
+        if result.get("matched") is False:
+            lines.append(f"  No application called '{name}' is recorded: nothing recorded matches that name.")
+            closest = result.get("closest_names") or []
+            if closest:
+                lines.append("  Closest recorded names: " + ", ".join(closest) + ".")
+            else:
+                lines.append("  Nothing similar is recorded.")
+            lines.append(
+                "  Next step: ask again with " + ("one of the recorded names" if closest else "a recorded name")
+                + f", or record '{name}' in your model. No dependants are listed because none are recorded for it."
+            )
+            return "\n".join(lines) + "\n"
+
+        if not rows:
+            reason = result.get("reason") or "nothing is recorded as depending on this application yet"
+            reason = reason[0].upper() + reason[1:] if reason else reason
+            lines.append(f"  {reason}.")
+            lines.append(
+                "  Next step: record what calls this application and what it calls, "
+                "so a retirement question has a real answer to give."
+            )
+            return "\n".join(lines) + "\n"
+
+        lines.append(f"  {result.get('answer') or ('what breaks if %r fails' % name)}")
+        lines.append(f"  {result.get('total', len(rows))} record(s) depend on it:")
+        # The record's own name and truth class, never the internal API path
+        # the citation's "target" carries -- a person reads a page, not a route.
+        def _day(value):
+            try:
+                when = value if isinstance(value, datetime) else datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+            except (TypeError, ValueError):
+                return None
+            return "%d %s" % (when.day, when.strftime("%b %Y"))
+
+        for row in rows[:15]:
+            citation = citations_by_id.get(row.get("id"))
+            record_name = (citation or {}).get("name") or row.get("name") or "Unnamed record"
+            truth_class = row.get("truth_class") or "derived"
+            source = "drawn from your model" if truth_class == "drawn" else "derived from your model"
+            as_of = _day(row.get("as_of")) or _day(result.get("computed_at"))
+            when = f", as of {as_of}" if as_of else ", date not recorded"
+            cite = f" ({source}{when})" if citation else " (source not recorded)"
+            lines.append(f"    - {record_name}{cite}")
+        if len(rows) > 15:
+            lines.append(f"    ...and {len(rows) - 15} more, each with its own citation.")
+
+        return "\n".join(lines) + "\n"
 
     # ------------------------------------------------------------------
     # AIC-104: Analytics methods (called by analytics_routes.py)

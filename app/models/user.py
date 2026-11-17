@@ -113,12 +113,51 @@ ROLE_DISPLAY_NAMES = {
     ROLE_RISK: "Risk",
     ROLE_OPERATIONS: "Operations",
     ROLE_NON_TECHNICAL_OWNER: "Non-Technical Owner",
+    # Roles a member holds inside one organisation (OrgRole).
+    "org_admin": "Org admin",
+    "architect": "Architect",
+    "viewer": "Viewer",
 }
 
 
 class Permission:
     GENERAL = 0x01
     ADMINISTER = 0xFF
+
+
+# "Architect" is the DEFAULT role for new sign-ups. This platform is FOR
+# architects, and the CRUD route guards use require_roles("admin",
+# "architect") — so the default role MUST normalize to "architect", or
+# every normal user gets 403 on create/update/delete of their own data
+# (the "CRUD is broken" symptom). Architect gets GENERAL permission (NOT
+# ADMINISTER), so user.can(ADMINISTER)/is_admin() stays False and truly
+# admin-only areas (user mgmt, seeding) remain restricted.
+# (name, permissions, index, is_default)
+DEFAULT_ROLES = {
+    "User": (Permission.GENERAL, "main", False),
+    "Architect": (Permission.GENERAL, "main", True),
+    "Administrator": (Permission.ADMINISTER, "admin", False),
+    # A-03 (S2): "no read-only role exists" — added as a selectable
+    # Role row only. permissions=0 means user.can(GENERAL) and
+    # user.can(ADMINISTER) both evaluate False, so a Viewer can
+    # authenticate and read but every write-guarding
+    # @permission_required/@admin_required check rejects them same
+    # as an unauthenticated user would be rejected for admin routes.
+    # Purely additive: existing roles/users are untouched, and no
+    # route currently assigns this role automatically.
+    "Viewer": (0, "main", False),
+    # M-05/M-06 (S1): a distinct decision-making role, separate from
+    # the default "Architect" contributor role. Purely additive —
+    # existing roles/users are untouched and no route currently
+    # assigns this role automatically. Not yet used as a hard gate
+    # on ARBGovernanceService.record_decision (that would lock out
+    # every existing production approver, all of whom are on the
+    # default "Architect" role today); it exists so an organization
+    # can start assigning it, and record_decision already rejects
+    # any account whose role carries no GENERAL permission (e.g. a
+    # pure Viewer) regardless of this role's presence.
+    "Approver": (Permission.GENERAL, "main", False),
+}
 
 
 class Role(db.Model):
@@ -132,39 +171,7 @@ class Role(db.Model):
 
     @staticmethod
     def insert_roles():
-        # "Architect" is the DEFAULT role for new sign-ups. This platform is FOR
-        # architects, and the CRUD route guards use require_roles("admin",
-        # "architect") — so the default role MUST normalize to "architect", or
-        # every normal user gets 403 on create/update/delete of their own data
-        # (the "CRUD is broken" symptom). Architect gets GENERAL permission (NOT
-        # ADMINISTER), so user.can(ADMINISTER)/is_admin() stays False and truly
-        # admin-only areas (user mgmt, seeding) remain restricted.
-        # (name, permissions, index, is_default)
-        roles = {
-            "User": (Permission.GENERAL, "main", False),
-            "Architect": (Permission.GENERAL, "main", True),
-            "Administrator": (Permission.ADMINISTER, "admin", False),
-            # A-03 (S2): "no read-only role exists" — added as a selectable
-            # Role row only. permissions=0 means user.can(GENERAL) and
-            # user.can(ADMINISTER) both evaluate False, so a Viewer can
-            # authenticate and read but every write-guarding
-            # @permission_required/@admin_required check rejects them same
-            # as an unauthenticated user would be rejected for admin routes.
-            # Purely additive: existing roles/users are untouched, and no
-            # route currently assigns this role automatically.
-            "Viewer": (0, "main", False),
-            # M-05/M-06 (S1): a distinct decision-making role, separate from
-            # the default "Architect" contributor role. Purely additive —
-            # existing roles/users are untouched and no route currently
-            # assigns this role automatically. Not yet used as a hard gate
-            # on ARBGovernanceService.record_decision (that would lock out
-            # every existing production approver, all of whom are on the
-            # default "Architect" role today); it exists so an organization
-            # can start assigning it, and record_decision already rejects
-            # any account whose role carries no GENERAL permission (e.g. a
-            # pure Viewer) regardless of this role's presence.
-            "Approver": (Permission.GENERAL, "main", False),
-        }
+        roles = DEFAULT_ROLES
         for r in roles:
             role = Role.query.filter_by(name=r).first()
             if role is None:
@@ -219,6 +226,13 @@ class User(UserMixin, db.Model):
     mfa_enabled = db.Column(
         db.Boolean, default=False, nullable=False, server_default=db.text("false")
     )
+    # When two-factor sign-in was first turned on; never cleared, so the first-week
+    # window cannot reopen if the flag above is ever switched off.
+    mfa_enrolled_at = db.Column(db.DateTime, nullable=True)
+    # When this person's first week without two-factor sign-in began, for an account that had no sign-up time
+    # or that existed before the window rule; the window runs from the later of this and signup_at.
+    mfa_window_started_at = db.Column(db.DateTime, nullable=True)
+    mfa_recovery_codes = db.Column(db.Text)  # JSON array of salted hashes of unused recovery codes
 
     # Onboarding fields
     role_archetype = db.Column(
@@ -234,6 +248,14 @@ class User(UserMixin, db.Model):
     primary_concern = db.Column(db.Text)
     primary_frameworks = db.Column(db.Text)  # JSON array as string
     onboarding_completed_at = db.Column(db.DateTime)
+    # Where a self-serve sign-up came from (utm_source, utm_campaign and ref on the register link), when it
+    # happened, and when the founder was told it had stalled (app/services/signup_attribution.py). Nullable,
+    # plain text, length-limited; an invited member has none of them.
+    signup_source = db.Column(db.String(64), nullable=True)
+    signup_campaign = db.Column(db.String(64), nullable=True)
+    signup_ref = db.Column(db.String(64), nullable=True)
+    signup_at = db.Column(db.DateTime, nullable=True, index=True)
+    signup_alerted_at = db.Column(db.DateTime, nullable=True)
     # Dashboard "Welcome to Entelim" one-line banner, dismissed once per
     # user, forever (shell-wave-1 Task 5). Deliberately separate from
     # onboarding_completed_at: that column is set by /dashboard/api/
@@ -266,6 +288,14 @@ class User(UserMixin, db.Model):
     # (sign-in refuses it regardless), no role powers beyond the scopes of
     # the tokens issued to it, and cannot hold a session. Nullable, add-only.
     is_service_user = db.Column(db.Boolean, nullable=True, default=False)
+    # Set when an account is switched off without deleting it (``flask disable-unconfirmed-signups``).
+    # A disabled account cannot sign in and holds no live session. Nullable, add-only.
+    disabled_at = db.Column(db.DateTime, nullable=True)
+
+    @property
+    def is_active(self):
+        """flask-login's test for a usable account: a disabled one is not signed in on any request."""
+        return self.disabled_at is None
 
     @property
     def is_org_admin(self):
@@ -555,6 +585,7 @@ class User(UserMixin, db.Model):
         "solution_updates": True,
         "assignment_changes": True,
         "weekly_digest": True,
+        "alert_email": True,
         "digest_frequency": "weekly",
         "mention_notifications": True,
         "show_archimate_names": False,
@@ -629,27 +660,37 @@ def _assign_default_organization(mapper, connection, target):
 
     The email register, SSO and SAML flows all create a User without setting an
     organization, which on a fresh install (no org rows yet) violated the NOT NULL
-    constraint and 500'd the very first sign-up. Assign the shared 'default'
-    organization, creating it on first use. An explicitly-set organization_id
-    (e.g. create_admin.py, invited users) is left untouched.
+    constraint and 500'd the very first sign-up. A confirmed account gets the shared 'default'
+    organization, creating it on first use: the first administrator and a platform SSO sign-in are
+    people who work there. Only an unconfirmed public sign-up is sent to the holding organisation,
+    the one place that happens. An explicitly-set organization_id (e.g. create_admin.py, invited
+    users) is left untouched.
     """
     if target.organization_id is not None:
         return
+    from sqlalchemy.dialects.postgresql import insert as pg_insert
+
     from app.models.organization import Organization
+    from app.services.billing_plans import HOLDING_ORGANISATION_NAME, HOLDING_ORGANISATION_SLUG
 
     orgs = Organization.__table__
-    row = connection.execute(
-        select(orgs.c.id).where(orgs.c.slug == "default").limit(1)
-    ).first()
-    if row is not None:
-        target.organization_id = row[0]
-    else:
-        # Table.insert() applies the model's column defaults (plan, created_at, …),
-        # and runs on the flush connection so it is safe inside before_insert.
-        result = connection.execute(
-            orgs.insert().values(name="Default Organization", slug="default")
+    if target.confirmed:
+        # The insert is a no-op when it exists, so two first sign-ins at once cannot collide.
+        connection.execute(
+            pg_insert(orgs)
+            .values(name="Default Organization", slug="default", plan="free", is_active=True)
+            .on_conflict_do_nothing(index_elements=["slug"])
         )
-        target.organization_id = result.inserted_primary_key[0]
+        slug = "default"
+    else:
+        # A migration creates the holding organisation; this only covers a database built without it.
+        connection.execute(
+            pg_insert(orgs)
+            .values(name=HOLDING_ORGANISATION_NAME, slug=HOLDING_ORGANISATION_SLUG, plan="free", is_active=True)
+            .on_conflict_do_nothing(index_elements=["slug"])
+        )
+        slug = HOLDING_ORGANISATION_SLUG
+    target.organization_id = connection.execute(select(orgs.c.id).where(orgs.c.slug == slug)).scalar_one()
 
 
 def _install_plan_limit_guard():

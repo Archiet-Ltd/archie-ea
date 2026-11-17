@@ -106,7 +106,18 @@ def check_page(page, persona, label, path, must_contain=()):
 
 
 def discoverable(page, persona, needle):
-    """Rule: could the archetype find this without reading the source?"""
+    """Rule: could the archetype find this without reading the source?
+
+    The sidebar keeps the pages of a closed group out of the page until the group is
+    opened, so a person opens the groups to read what is in them. Do the same, by
+    clicking the groups' own buttons, before counting links.
+    """
+    for _ in range(30):
+        closed = page.locator("[data-nav-toggle][aria-expanded='false']:visible")
+        if not closed.count():
+            break
+        closed.first.click()
+        page.wait_for_timeout(150)
     hrefs = page.eval_on_selector_all("a[href]", "els => els.map(e => e.getAttribute('href'))")
     hit = any(needle in (h or "") for h in hrefs)
     note(persona, "discoverable: %s" % needle, "WORKS WELL" if hit else "WORKS BUT POOR",
@@ -125,22 +136,24 @@ def cto_classifies_in_the_ui(page, persona):
     them there with no way back but the browser's Back button.
     """
     page.goto(BASE + "/technology/radar/", wait_until="networkidle")
-    # Prefer an unclassified element; fall back to reclassifying one that is
-    # already on the radar. Both submit the same form to the same endpoint, and
-    # a step that only works on a freshly seeded database is a step that passes
-    # once and then reports a product problem that is really fixture exhaustion.
-    testid = "radar-classify-"
-    if page.locator("[data-testid^='radar-classify-']").count() == 0:
-        testid = "radar-reclassify-"
-    if page.locator("[data-testid^='%s']" % testid).count() == 0:
+    # Place a technology through the radar's own row menu: prefer one that is not on the
+    # radar yet ("Place in Trial"), else move one that is. Both submit the same form.
+    rows = page.locator("[data-testid='radar-row']")
+    target = None
+    for i in range(rows.count()):
+        row = rows.nth(i)
+        placed = row.locator("[data-testid^='radar-ring-']").first.inner_text().strip()
+        if placed == "Not placed":
+            target = row
+            break
+        target = target or row
+    if target is None:
         note(persona, "classify a technology", "WORKS BUT POOR",
              "no technology-layer element on the radar to act on")
         return
-    row = page.locator("form:has([data-testid^='%s'])" % testid).first
-    ring = row.locator("select[name='ring']")
-    if ring.count():
-        ring.select_option("trial")
-    row.locator("[data-testid^='%s']" % testid).click()
+    target.locator("[aria-haspopup='menu']").first.click()
+    items = page.locator("[data-testid^='radar-move-']:visible")
+    items.first.click()
     page.wait_for_load_state("networkidle")
 
     landed = page.url.replace(BASE, "")
@@ -167,8 +180,9 @@ def can_navigate_on_a_phone(browser, persona, email):
     -256px, 0 of 25 nav links reachable. The application was desktop-only and
     nothing in the suite looked below 1024px.
 
-    Asserts the store, the geometry AND that links are actually reachable --
-    a sidebar that is "open" but rendered off-screen is still unusable.
+    Asserts the drawer's geometry AND that links are actually reachable --
+    a sidebar that is "open" but rendered off-screen is still unusable. Below 768px the
+    library's sidebar is a drawer the header trigger opens.
     """
     ctx = browser.new_context(viewport=MOBILE)
     page = ctx.new_page()
@@ -186,16 +200,16 @@ def can_navigate_on_a_phone(browser, persona, email):
         page.goto(BASE + "/applications/", wait_until="networkidle")
         page.wait_for_timeout(600)
 
-        toggle = page.locator("button[aria-label='Open sidebar']")
+        toggle = page.locator("button[data-slot='sidebar-trigger']")
         if not toggle.count():
             note(persona, "phone: open the menu", "BROKEN",
-                 "no sidebar toggle rendered below 1024px")
+                 "no sidebar trigger rendered below 768px")
             return
         toggle.first.click()
         page.wait_for_timeout(700)
 
         geometry = page.evaluate("""() => {
-            const el = document.getElementById('admin-sidebar');
+            const el = document.querySelector('[data-fb-sidebar-mobile] [data-slot="sheet-content"]');
             if (!el) return {found: false, reachable: 0, left: null};
             const r = el.getBoundingClientRect();
             const links = [...el.querySelectorAll('a[href]')].filter(a => {

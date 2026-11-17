@@ -46,12 +46,30 @@ def _cell_alpha(cell: dict) -> float:
     return _DEFAULT_ALPHA
 
 
-def emit_coverage_matrix_html(slice_dict: dict) -> str:
+_KIND_WORDS = {"realization": "Realizes", "serving": "Serves"}
+
+
+def _capability_name(cap: dict, capability_links: dict | None) -> str:
+    href = (capability_links or {}).get(cap["id"])
+    if not href:
+        return escape(cap["name"])
+    return f'<a href="{escape(href)}" class="hover:underline">{escape(cap["name"])}</a>'
+
+
+def emit_coverage_matrix_html(
+    slice_dict: dict, planned_work: dict | None = None, capability_links: dict | None = None
+) -> str:
     """Render the coverage slice to a deterministic HTML heatmap fragment.
 
     Args:
         slice_dict: output of build_coverage_slice (must contain capabilities,
             applications, cells, capability_source, spec_hash).
+        capability_links: optional ``{capability id: url}``; a capability with a link has its name open
+            that page.
+        planned_work: optional ``{capability id: [{"name", "href"}]}``, the work packages that change each
+            capability, read by the caller through the one slice registry. When given, each row ends with
+            what is planned for it (or says none is), so a capability no application supports shows what, if
+            anything, will close the gap.
 
     Returns:
         An HTML string (table with provenance-stamped cells). Deterministic:
@@ -82,10 +100,9 @@ def emit_coverage_matrix_html(slice_dict: dict) -> str:
     # Legend / provenance banner.
     parts.append(
         '<div class="mb-4 text-sm text-muted-foreground">'
-        f'Source: <span class="font-medium text-foreground">{escape(source)}</span> '
-        f'&middot; {len(capabilities)} capabilities &times; {len(applications)} applications '
-        f'&middot; {len(cells)} mappings '
-        f'&middot; <span class="font-mono text-xs">{escape(spec_hash)}</span>'
+        f'{len(capabilities)} {"capability" if len(capabilities) == 1 else "capabilities"} '
+        f'and {len(applications)} {"application" if len(applications) == 1 else "applications"}, '
+        f'with {len(cells)} {"link" if len(cells) == 1 else "links"} between them.'
         '</div>'
     )
 
@@ -98,13 +115,16 @@ def emit_coverage_matrix_html(slice_dict: dict) -> str:
         parts.append('</div>')
         return "".join(parts)
 
-    parts.append('<div class="overflow-x-auto border border-border rounded-lg">')
-    parts.append('<table class="border-collapse text-xs">')
+    parts.append(
+        '<div class="max-w-full overflow-auto border border-border rounded-lg" data-coverage-scroll '
+        'tabindex="0" role="region" aria-label="Capability coverage matrix">'
+    )
+    parts.append('<table class="w-full border-collapse text-xs">')
 
     # Header row: application names as columns.
     parts.append('<thead><tr>')
     parts.append(
-        '<th class="sticky left-0 bg-card z-10 p-2 text-left font-medium '
+        '<th class="bg-card p-2 text-left font-medium min-w-32 '
         'text-foreground border-b border-r border-border">Capability \\ Application</th>'
     )
     for app in applications:
@@ -118,6 +138,11 @@ def emit_coverage_matrix_html(slice_dict: dict) -> str:
             'white-space: nowrap; max-height: 12rem;">'
             f'{escape(app["name"])}</div></th>'
         )
+    if planned_work is not None:
+        parts.append(
+            '<th class="min-w-32 p-2 border-b border-l border-border text-left font-medium text-foreground" '
+            'scope="col">Planned work</th>'
+        )
     parts.append('</tr></thead>')
 
     # Body: one row per capability.
@@ -127,12 +152,13 @@ def emit_coverage_matrix_html(slice_dict: dict) -> str:
         name_cls = "text-foreground" if cap_populated else "text-muted-foreground"
         parts.append('<tr>')
         parts.append(
-            '<th class="sticky left-0 bg-card z-10 p-2 text-left font-normal '
+            '<th class="bg-card p-2 text-left font-normal min-w-32 whitespace-normal '
             f'border-r border-b border-border {name_cls}" '
+            f'id="capability-{cap["id"]}" '  # raw-html-ok: cap["id"] is a db.Integer PK
             f'data-capability-id="{cap["id"]}" '  # raw-html-ok: cap["id"] is a db.Integer PK
             f'data-archimate-element-id="{escape(str(cap.get("archimate_element_id")))}" '
             'scope="row">'
-            f'{escape(cap["name"])}</th>'
+            f'{_capability_name(cap, capability_links)}</th>'
         )
         for app in applications:
             cell = cell_index.get((cap["id"], app["id"]))
@@ -147,12 +173,13 @@ def emit_coverage_matrix_html(slice_dict: dict) -> str:
             alpha = _cell_alpha(cell)
             title = (
                 f'{cap["name"]} -> {app["name"]} | '
-                f'support={m.get("support_level")}, coverage={m.get("coverage_percentage")}% | '
+                f'{_KIND_WORDS.get(m.get("kind"), "Supports")}, support={m.get("support_level")}, '
+                f'coverage={m.get("coverage_percentage")}% | '
                 f'cap element #{prov["capability_archimate_element_id"]}, '
                 f'app element #{prov["application_archimate_element_id"]}'
             )
             parts.append(
-                '<td class="border-b border-border w-6 h-6 genome-cov-cell" '
+                '<td class="border-b border-border w-6 h-6 genome-cov-cell" data-testid="coverage-cell" '
                 f'style="background-color: rgba({_HEAT_RGB}, {alpha:.2f});" '
                 f'data-capability-id="{cap["id"]}" '  # raw-html-ok: cap["id"] is a db.Integer PK
                 f'data-application-id="{app["id"]}" '  # raw-html-ok: app["id"] is a db.Integer PK
@@ -163,6 +190,20 @@ def emit_coverage_matrix_html(slice_dict: dict) -> str:
                 f'title="{escape(title)}" '
                 f'aria-label="{escape(title)}"></td>'
             )
+        if planned_work is not None:
+            work = planned_work.get(cap["id"], [])
+            parts.append(
+                '<td class="min-w-32 p-2 border-b border-l border-border align-top text-xs" '
+                f'data-planned-work-for="{cap["id"]}">'  # raw-html-ok: cap["id"] is a db.Integer PK
+            )
+            if work:
+                parts.append("<br>".join(
+                    f'<a href="{escape(w["href"])}" class="text-primary hover:underline">{escape(w["name"])}</a>'
+                    for w in work if w.get("href")
+                ))
+            else:
+                parts.append('<span class="text-muted-foreground">None planned</span>')
+            parts.append('</td>')
         parts.append('</tr>')
     parts.append('</tbody></table></div>')
     parts.append('</div>')

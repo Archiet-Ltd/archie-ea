@@ -131,6 +131,10 @@ ALLOWED_5XX = {
 
 @pytest.mark.parametrize("path", ROUTES)
 def test_route_does_not_500(admin_client, path):
+    from tests._wave_aware import answers_early_access
+
+    if answers_early_access(admin_client, path):
+        return  # the wave closes this route: its early-access answer is the whole contract
     resp = admin_client.get(path)
     allowed = ALLOWED_5XX.get(path)
     ok = resp.status_code < 500 or resp.status_code == allowed
@@ -140,6 +144,10 @@ def test_route_does_not_500(admin_client, path):
 
 
 def test_architectural_analysis_missing_id_returns_404(admin_client):
+    from tests._wave_aware import answers_early_access
+
+    if answers_early_access(admin_client, "/applications/api/v1/applications/999999/architectural-analysis"):
+        return
     """A well-formed but non-existent application id 404s cleanly.
 
     Guards the specific status code -- test_route_does_not_500 above only
@@ -204,8 +212,12 @@ def test_architectural_analysis_other_org_id_returns_404(other_org_application):
     fix did not accidentally bypass it -- a platform_admin caller here still
     gets 404 for another organisation's id, the same as any other role.
     """
+    from tests._wave_aware import answers_early_access
+
     client = other_org_application["client"]
     app_b_id = other_org_application["app_b_id"]
+    if answers_early_access(client, f"/applications/api/v1/applications/{app_b_id}/architectural-analysis"):
+        return
 
     resp = client.get(
         f"/applications/api/v1/applications/{app_b_id}/architectural-analysis"
@@ -281,6 +293,11 @@ def sweep_app(app, _schema):
 @pytest.mark.parametrize("route", sorted(FIXED_LEAKS))
 def test_fixed_leak_refuses_another_organisation(sweep_app, login_as, route):
     """Another organisation's ids are refused, and the owner is still served."""
+    from tests._wave_aware import address_of, answers_early_access
+
+    method, rule = route.split(" ", 1)
+    if answers_early_access(sweep_app.test_client(), address_of(rule), method):
+        return  # the wave closes this route: it answers the same early-access answer to every organisation
     cases, _excluded = sweep.run_sweep(sweep_app, login_as, POLICY, only=lambda c: c.key == route)
     assert cases, "%s is no longer an identifier-bearing route" % route
     for case in cases:
@@ -320,6 +337,10 @@ def test_workflow_design_list_holds_only_the_callers_organisation(
     app, db_session, make_org, client, login_as
 ):
     """The list beside the fixed detail route read every organisation's designs."""
+    from tests._wave_aware import answers_early_access
+
+    if answers_early_access(client, "/api/codegen/workflow-designs"):
+        return
     from app.modules.codegen.models import WorkflowDesign
 
     (org_a, _org_b), (user_a, user_b) = _two_orgs(db_session, make_org)
@@ -340,6 +361,10 @@ def test_workflow_design_list_holds_only_the_callers_organisation(
 def test_capability_health_override_list_holds_only_the_callers_organisation(
     app, db_session, make_org, client, login_as
 ):
+    from tests._wave_aware import answers_early_access
+
+    if answers_early_access(client, "/strategic/api/capability-health/overrides"):
+        return
     from app.models.strategic import CapabilityHealthOverride
 
     (org_a, _org_b), (user_a, user_b) = _two_orgs(db_session, make_org)
@@ -362,6 +387,11 @@ def test_sprints_cannot_be_listed_or_created_under_another_organisations_board(
 ):
     from app.models.adm_kanban import KanbanBoard
     from app.models.sprint import Sprint
+    from tests._wave_aware import answers_early_access
+
+    if answers_early_access(client, "/api/sprints?board_id=1"):
+        assert answers_early_access(client, "/api/sprints", "POST", json={"name": "x"})
+        return
 
     (org_a, _org_b), (user_a, user_b) = _two_orgs(db_session, make_org)
     sprint, token = _seed_in(db_session, Sprint, org_a, user_a)

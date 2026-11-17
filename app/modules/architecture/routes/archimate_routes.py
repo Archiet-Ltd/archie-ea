@@ -39,7 +39,7 @@ register_lucidchart_import_routes(archimate_bp)
 # Must exceed the OpenRouter client's own read timeout (80s, see
 # LLMService._call_openrouter's default) or this outer guard always loses the
 # race on a real, working generation: reproduced directly on 10 Sep 2026 —
-# a genuine deepseek/deepseek-v3.2 call for a 37-element ArchiMate model hit
+# a genuine DeepSeek call via OpenRouter for a 37-element ArchiMate model hit
 # this 45s guard, got reported as "timed out" and silently replaced with the
 # noun-extraction mock fallback, while the real call kept running in the
 # background (ThreadPoolExecutor.cancel() cannot stop an already-running
@@ -1046,8 +1046,7 @@ def api_composer_extract_from_image():
             "success": False,
             "error": "No vision-capable AI provider is configured, so a diagram "
                      "image cannot be read. Add an Anthropic, OpenAI or Gemini "
-                     "key in Admin → API Settings. A text-only provider such as "
-                     "DeepSeek cannot do this.",
+                     "key in Admin → AI settings. A text-only provider cannot do this.",
             "error_type": "no_vision_provider",
         }), 503
 
@@ -1198,6 +1197,9 @@ def composer_page():
             belongs to another organisation. Ignored when viewpoint_id is set.
         depth (int): Hops for focus mode, clamped to 1-5, default 3.
         derived (0|1): Include worked-out connections in focus mode, default 1.
+        most_connected (1): The element was chosen because it is the most
+            connected in the organisation (the bare twin-map address); the
+            banner says so.
     """
     from app.services.archimate_viewpoint_service import get_available_viewpoints, get_viewpoint_counts
 
@@ -1224,6 +1226,8 @@ def composer_page():
             "name": centre.name or f"Element #{centre.id}",
             "depth": focus_depth,
             "derived": focus_derived,
+            "most_connected": request.args.get("most_connected") == "1",
+            "from_answer": request.args.get("from") == "answer",
         }
 
     solution_name = None
@@ -1257,7 +1261,15 @@ def composer_page():
         initial_viewpoint=viewpoint,
         initial_layer=initial_layer,
         focus=focus,
+        workspace_is_empty=_composer_workspace_is_empty() if focus is None else False,
     )
+
+
+def _composer_workspace_is_empty():
+    """True when the organisation has nothing modelled, ``None`` when that
+    cannot be read (an unreadable count is never shown as an empty workspace)."""
+    from app.modules.intelligence.routes.ui import _workspace_is_empty  # noqa: PLC0415
+    return _workspace_is_empty()
 
 
 @archimate_bp.route("/api/elements/materialize", methods=["POST"])
@@ -1517,6 +1529,7 @@ def api_create_relationship():
         solution_id (int): Optional — mapped to architecture_id for scoping.
     """
     from app.models.archimate_core import ArchiMateElement, ArchiMateRelationship
+    from app.models.models import CrossOrganisationRelationship
 
     data = request.get_json(silent=True) or {}
 
@@ -1599,7 +1612,12 @@ def api_create_relationship():
     )
 
     db.session.add(rel)
-    db.session.commit()
+    try:
+        db.session.commit()
+    except CrossOrganisationRelationship as exc:
+        # Plain refusal, not a 500: the model guard refused a crossing row.
+        db.session.rollback()
+        return api_error(str(exc), 400)
 
     # Return flat JSON (no api_success wrapper) — all JS callers check data.id directly.
     return jsonify({
@@ -2523,6 +2541,8 @@ def api_elements_search():
     Query params:
         q        - name substring filter (case-insensitive)
         type     - exact element type filter (e.g. ApplicationComponent)
+        types    - comma-separated element types; an element of any of them matches
+        similar  - 1 to add "similar": names close to q (not equal to it) among the matching types
         layer    - layer filter (case-insensitive, e.g. application)
         limit    - max results (default 30, max 200)
         solution_id - restrict to elements linked to this solution
@@ -2534,6 +2554,10 @@ def api_elements_search():
     elem_type = request.args.get("type", "").strip()
     if elem_type:
         query = query.filter(ArchiMateElement.type == elem_type)
+
+    type_list = [t.strip() for t in request.args.get("types", "").split(",") if t.strip()]
+    if type_list:
+        query = query.filter(ArchiMateElement.type.in_(type_list))
 
     layer = request.args.get("layer", "").strip()
     if layer:
@@ -2629,7 +2653,7 @@ def api_elements_search():
         except Exception as exc:
             current_app.logger.debug("ARCH-002: solution count query failed: %s", exc)
 
-    return jsonify({
+    payload = {
         "data": [
             {
                 "id": el.id,
@@ -2642,10 +2666,22 @@ def api_elements_search():
             }
             for el in elements
         ]
-    })
+    }
+    if request.args.get("similar") == "1" and search_q:
+        # Names close to what was typed, from the duplicate guard's one near-match check.
+        from app.utils.duplicate_guard import find_similar_entities
+
+        payload["similar"] = find_similar_entities(
+            ArchiMateElement, search_q,
+            extra_filters=[ArchiMateElement.type.in_(type_list)] if type_list else None, threshold=0.6,
+        )
+    return jsonify(payload)
 
 
 # ── Element Detail API (for composer detail panel) ───────────────────────────
+
+_OWNER_PROPERTY_KEYS = frozenset({"owner", "owners", "business_owner", "technical_owner", "owner_name", "element_owner"})
+
 
 @archimate_bp.route("/api/elements/<int:element_id>/detail", methods=["GET"])
 @login_required
@@ -2798,6 +2834,18 @@ def api_element_detail(element_id):
     except Exception:  # noqa: BLE001
         current_app.logger.debug("CMP-detail: custom_properties access failed for element %s", element_id)
 
+    # Owners come from the one owner store (the same reader the accountability and impact answers
+    # use). A property typed into custom_properties is not an owner record, so it is not shown as one.
+    cp = {k: v for k, v in dict(cp).items() if str(k).lower() not in _OWNER_PROPERTY_KEYS}
+    owners = []
+    try:
+        from app.modules.intelligence.services.query_service import IntelligenceQueryService
+
+        owners = IntelligenceQueryService.owners_for_element(element_id)
+    except Exception:  # noqa: BLE001
+        current_app.logger.debug("CMP-detail: owner lookup failed for element %s", element_id)
+        db.session.rollback()
+
     # GAP-INT-007: Interface metadata for ApplicationInterface elements
     interface_metadata = None
     if el.type == "ApplicationInterface":
@@ -2826,6 +2874,7 @@ def api_element_detail(element_id):
         "connected_elements": connected,
         "linked_requirements": linked_requirements,
         "custom_properties": cp,
+        "owners": owners,
         "interface_metadata": interface_metadata,
     })
 
@@ -6950,7 +6999,8 @@ def api_create_diagram_from_elements():
     diagram = SavedDiagram(
         name=diagram_name,
         description=f"Auto-generated from {len(elements)} imported elements",
-        created_by=current_user.id if current_user.is_authenticated else None,
+        created_by=str(current_user.id) if current_user.is_authenticated else None,
+        created_by_id=current_user.id if current_user.is_authenticated else None,
     )
     db.session.add(diagram)
     db.session.flush()
@@ -7371,6 +7421,36 @@ def api_shared_elements():
 # ── Impact / dependency graph — the interactive blast-radius lens ────────────
 
 
+@archimate_bp.route("/model-map", methods=["GET"])
+@login_required
+def model_map_page():
+    """The whole model as one force graph: the impact graph's page in its whole-model mode.
+
+    ``?layer=<layer>`` opens one layer (the same filter the element list takes).
+    """
+    from app.services import model_map  # noqa: PLC0415
+
+    layer = request.args.get("layer", "").strip().lower()
+    layer = layer if layer in model_map.LAYERS else ""
+    counts = model_map.layer_counts()
+    total = sum(c["count"] for c in counts)
+    store_total = None if any(c["total"] is None for c in counts) else sum(c["total"] for c in counts)
+    return render_template(
+        "architecture/impact_graph.html", element=None, decisions=[], model_map=True,
+        map_layer=layer, map_counts=counts, map_total=total, map_store_total=store_total,
+    )
+
+
+@archimate_bp.route("/api/model-map", methods=["GET"])
+@login_required
+def api_model_map():
+    """Nodes, links and per-layer counts for the signed-in organisation's model."""
+    from app.services import model_map  # noqa: PLC0415
+
+    layer = request.args.get("layer", "").strip().lower()
+    return jsonify(model_map.build_model_map(layer if layer in model_map.LAYERS else None))
+
+
 @archimate_bp.route("/elements/<int:element_id>/impact", methods=["GET"])
 @login_required
 def element_impact_graph_page(element_id):
@@ -7427,8 +7507,13 @@ def get_impact_analysis(element_id):
     from app.models.solution_archimate_element import SolutionArchiMateElement
     from app.models.solution_models import Solution
 
+    from app.middleware.tenant_context import current_org_id  # noqa: PLC0415
+
     element = db.session.get(ArchiMateElement, element_id)
-    if not element:
+    active_org_id = current_org_id()
+    if not element or (
+        active_org_id is not None and element.organization_id != active_org_id
+    ):
         return jsonify({"error": "Element not found"}), 404
 
     # ── Direct dependents ────────────────────────────────────────────────────

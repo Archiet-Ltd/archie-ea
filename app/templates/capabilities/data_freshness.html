@@ -1,7 +1,11 @@
+{# shadcn-reference: example:tasks@e55b60b #}
+{# design-block: data-table #}
 {% extends 'layouts/admin_base.html' %}
 {% from "components/page_header.html" import page_header %}
-{% from "components/metrics_card.html" import metrics_card %}
+{% import "components/card.html" as card %}
 {% from "components/empty_state.html" import empty_state %}
+{% from "components/table.html" import table, table_header, table_body, table_row, table_head, table_cell, table_empty_state %}
+{% from "components/badge.html" import badge %}
 
 {% block title %}Data freshness{% endblock %}
 
@@ -12,7 +16,7 @@
 
   {{ page_header(
       title='Data freshness',
-      description='How complete and trustworthy the repository is — rolled up from every record’s completeness score. Fix the worst offenders below.',
+      description='How complete and trustworthy the repository is — rolled up from every record\'s completeness score. Fix the worst offenders below.',
       breadcrumbs=[{'label': 'Governance'}, {'label': 'Data freshness'}]
   ) }}
 
@@ -20,7 +24,7 @@
   <div class="grid grid-cols-1 lg:grid-cols-4 gap-4 mb-6">
     <div data-slot="card" class="rounded-lg border border-border bg-card p-6 flex items-center gap-5">
       {% set ring = band_class(overall.band) %}
-      <div class="relative shrink-0" style="width:80px;height:80px"> {# inline-style-ok: fixed ring #}
+      <div class="relative shrink-0" style="width:80px;height:80px">
         <svg viewBox="0 0 36 36" class="w-full h-full -rotate-90">
           <circle cx="18" cy="18" r="15.9" fill="none" stroke="currentColor" class="text-muted/40" stroke-width="3"></circle>
           <circle cx="18" cy="18" r="15.9" fill="none" stroke="currentColor" class="{{ ring }}" stroke-width="3"
@@ -36,12 +40,38 @@
       </div>
     </div>
 
-    {{ metrics_card(title='Complete records', value=overall.buckets.good, icon='circle-check',
-        footer_text='80%+ of key fields recorded') }}
-    {{ metrics_card(title='Need attention', value=overall.buckets.warn, icon='clipboard-list',
-        footer_text='50–79% recorded') }}
-    {{ metrics_card(title='Critically thin', value=overall.buckets.poor, icon='triangle-alert',
-        footer_text='under 50% recorded') }}
+    {% call card.card() %}
+      {% call card.card_header() %}
+        {% call card.card_description() %}Complete records{% endcall %}
+        {% call card.card_title(class='tabular-nums') %}{{ overall.buckets.good }}{% endcall %}
+        {% call card.card_action() %}<i data-lucide="circle-check" class="h-4 w-4 text-muted-foreground" aria-hidden="true"></i>{% endcall %}
+      {% endcall %}
+      {% call card.card_footer(direction='col') %}
+        <div class="line-clamp-1 flex gap-2 font-medium">80%+ of key fields recorded</div>
+      {% endcall %}
+    {% endcall %}
+
+    {% call card.card() %}
+      {% call card.card_header() %}
+        {% call card.card_description() %}Need attention{% endcall %}
+        {% call card.card_title(class='tabular-nums') %}{{ overall.buckets.warn }}{% endcall %}
+        {% call card.card_action() %}<i data-lucide="clipboard-list" class="h-4 w-4 text-muted-foreground" aria-hidden="true"></i>{% endcall %}
+      {% endcall %}
+      {% call card.card_footer(direction='col') %}
+        <div class="line-clamp-1 flex gap-2 font-medium">50–79% recorded</div>
+      {% endcall %}
+    {% endcall %}
+
+    {% call card.card() %}
+      {% call card.card_header() %}
+        {% call card.card_description() %}Critically thin{% endcall %}
+        {% call card.card_title(class='tabular-nums') %}{{ overall.buckets.poor }}{% endcall %}
+        {% call card.card_action() %}<i data-lucide="triangle-alert" class="h-4 w-4 text-muted-foreground" aria-hidden="true"></i>{% endcall %}
+      {% endcall %}
+      {% call card.card_footer(direction='col') %}
+        <div class="line-clamp-1 flex gap-2 font-medium">under 50% recorded</div>
+      {% endcall %}
+    {% endcall %}
   </div>
 
   {# ── Per-type breakdown ──────────────────────────────────────────────── #}
@@ -54,7 +84,7 @@
       </div>
       <div class="h-2 rounded-full bg-muted overflow-hidden mb-3">
         <div class="h-full rounded-full {{ 'bg-success' if t.summary.band == 'good' else 'bg-warning' if t.summary.band == 'warn' else 'bg-destructive' }}"
-             style="width:{{ t.summary.avg }}%"></div> {# inline-style-ok: data-driven bar #}
+             style="width:{{ t.summary.avg }}%"></div>
       </div>
       <div class="flex items-center gap-4 text-xs text-muted-foreground">
         <span><span class="text-success font-semibold">{{ t.summary.buckets.good }}</span> complete</span>
@@ -74,38 +104,40 @@
     </header>
     {% if worst %}
     <div class="overflow-x-auto">
-      <table class="dense-table w-full text-sm">
-        <thead>
-          <tr class="text-left text-xs uppercase tracking-wide text-muted-foreground border-b border-border">
-            <th class="px-6 py-2.5 font-medium">Record</th>
-            <th class="px-3 py-2.5 font-medium">Type</th>
-            <th class="px-3 py-2.5 font-medium w-40">Completeness</th>
-            <th class="px-6 py-2.5 font-medium">Missing</th>
+      {% call table() %}
+        {% call table_header() %}
+          <tr>
+            {% call table_head() %}Record{% endcall %}
+            {% call table_head() %}Type{% endcall %}
+            {% call table_head(class='w-40') %}Completeness{% endcall %}
+            {% call table_head() %}Missing{% endcall %}
           </tr>
-        </thead>
-        <tbody>
+        {% endcall %}
+        {% call table_body() %}
           {% for w in worst %}
           {% set href = url_for('unified_applications.application_fact_sheet', id=w.id) if w.kind == 'application' else url_for('enterprise_crud.capability_fact_sheet', capability_id=w.id) %}
-          <tr class="border-b border-border/60">
-            <td class="px-6 py-3">
+          {% call table_row() %}
+            {% call table_cell() %}
               <a href="{{ href }}" class="text-foreground font-medium hover:text-primary hover:underline">{{ w.name }}</a>
-            </td>
-            <td class="px-3 py-3 text-muted-foreground capitalize">{{ w.kind }}</td>
-            <td class="px-3 py-3">
+            {% endcall %}
+            {% call table_cell() %}<span class="text-muted-foreground capitalize">{{ w.kind }}</span>{% endcall %}
+            {% call table_cell() %}
               <div class="flex items-center gap-2">
                 <div class="flex-1 h-1.5 rounded-full bg-muted overflow-hidden">
-                  <div class="h-full rounded-full {{ 'bg-warning' if w.band == 'warn' else 'bg-destructive' }}" style="width:{{ w.pct }}%"></div> {# inline-style-ok: data-driven #}
+                  <div class="h-full rounded-full {{ 'bg-warning' if w.band == 'warn' else 'bg-destructive' }}" style="width:{{ w.pct }}%"></div>
                 </div>
                 <span class="tabular-nums text-xs {{ band_class(w.band) }}">{{ w.pct }}%</span>
               </div>
-            </td>
-            <td class="px-6 py-3 text-xs text-muted-foreground">
-              {{ w.missing[:4] | join(', ') }}{% if w.missing | length > 4 %} +{{ w.missing | length - 4 }} more{% endif %}
-            </td>
-          </tr>
+            {% endcall %}
+            {% call table_cell() %}
+              <span class="text-xs text-muted-foreground">
+                {{ w.missing[:4] | join(', ') }}{% if w.missing | length > 4 %} +{{ w.missing | length - 4 }} more{% endif %}
+              </span>
+            {% endcall %}
+          {% endcall %}
           {% endfor %}
-        </tbody>
-      </table>
+        {% endcall %}
+      {% endcall %}
     </div>
     {% else %}
       {{ empty_state(icon='circle-check', title='Every record is complete', description='No application or capability is missing key fields. The repository is trustworthy.', padding='py-12') }}

@@ -28,6 +28,13 @@
     white-space: normal;
 }
 
+/* A link inside a sentence is underlined at rest, so colour is never the only cue — WCAG 1.4.1.
+   Stand-alone links (block rows, buttons, cards) keep their own look. */
+#main-content :where(p, dd, figcaption, small, span.text-muted-foreground) a[href]:not(.block):not([class*="bg-"]):not([class*="border"]):not([class*="no-underline"]) {
+    text-decoration-line: underline;
+    text-underline-offset: 4px;
+}
+
 /* Focus Visible Improvements — WCAG 2.4.7 Focus Visible (Level AA) */
 *:focus-visible {
     outline: 2px solid hsl(var(--ring));
@@ -51,6 +58,24 @@ textarea:focus-visible {
     border-color: hsl(var(--ring));
 }
 
+/* The ring is there the moment the keyboard arrives. The library's buttons, sort
+   headers and menu triggers animate every property (transition-all), which faded
+   the outline and ring in from transparent, so a quick Tab landed on a control
+   that showed nothing. Focused controls keep their colour and size transitions
+   but never animate the outline or the ring. */
+:focus-visible {
+    transition-property: color, background-color, border-color, text-decoration-color, fill, stroke,
+        opacity, transform, translate, scale, rotate, width, height, padding;
+}
+
+/* And it leaves the moment the keyboard does. The library's outline-none is a
+   transparent solid outline, which those same transitions faded out over the
+   control Tab had left, so two controls looked focused at once. With no outline
+   at all when not focused, the ring is removed at once. */
+.outline-none:not(:focus-visible) {
+    outline-style: none;
+}
+
 /* Ensure mouse clicks don't show focus ring */
 *:focus:not(:focus-visible) {
     outline: none;
@@ -61,8 +86,8 @@ textarea:focus-visible {
     position: absolute;
     top: -40px;
     left: 0;
-    background: #3b82f6;
-    color: white;
+    background: hsl(var(--primary));
+    color: hsl(var(--primary-foreground));
     padding: 8px 16px;
     text-decoration: none;
     border-radius: 0 0 4px 0;

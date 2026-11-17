@@ -1,18 +1,26 @@
+{# design-block: settings #}
 {% extends 'layouts/admin_base.html' %}
-{% block title %}API Settings{% endblock %}
+{% block title %}AI settings{% endblock %}
 {% from 'components/page_header.html' import page_header %}
+{% from 'components/button.html' import button %}
 
 {% block content %}
 <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
     {{ page_header(
-        title='API Settings',
-        description='Configure API keys and settings for LLM providers (Anthropic, OpenAI, Gemini, Azure, Hugging Face, DeepSeek, OpenRouter), custom web APIs, and other services.',
+        title='AI settings',
+        description='Configure API keys and settings for LLM providers (Anthropic, OpenAI, Gemini, Azure, Hugging Face, OpenRouter, NVIDIA), custom web APIs, and other services.',
         breadcrumbs=[
             {'label': 'Home', 'href': url_for('main.index')},
             {'label': 'Admin', 'href': url_for('admin.index')},
-            {'label': 'API Settings'}
+            {'label': 'AI settings'}
         ]
     ) }}
+
+    {% if request.args.get('from') == 'signup' %}
+    <div class="mb-6">
+        {{ button(text='Back to sign-up', variant='outline', size='sm', icon='arrow-left', href=url_for('account.welcome', step=4), testid='ai-settings-back-to-signup') }}
+    </div>
+    {% endif %}
 
     <!-- Flash Messages -->
     {% with messages = get_flashed_messages(with_categories=true) %}
@@ -26,6 +34,51 @@
             </div>
         {% endif %}
     {% endwith %}
+
+    {% from 'components/card.html' import card, card_header, card_title, card_description, card_content %}
+    {% if spend_ledger %}
+    <div class="mb-6" data-testid="llm-spend-ledger">
+        {% call card() %}
+            {% call card_header() %}
+                {% call card_title('text-lg') %}Answer spend this month{% endcall %}
+                {% call card_description() %}The providers the platform pays for, in the order they answer, each with its ceiling. A provider at its ceiling is skipped; when every one is, answers are paused until the month turns or the ceiling is raised.{% endcall %}
+            {% endcall %}
+            {% call card_content() %}
+                <dl class="grid gap-4 sm:grid-cols-2">
+                    {% for row in spend_ledger %}
+                    <div class="rounded-md border p-4" data-testid="llm-spend-row" data-provider="{{ row.provider }}">
+                        <dt class="flex items-center justify-between gap-2 text-sm font-medium">
+                            <span>{{ loop.index }}. {{ row.label }}</span>
+                            {%- set _state = 'Not configured' if not row.configured else ('Answering' if row.open else 'Paused') -%}
+                            <span class="text-xs {% if _state == 'Paused' %}text-destructive{% else %}text-muted-foreground{% endif %}" data-testid="llm-spend-state">{{ _state }}</span>
+                        </dt>
+                        <dd class="mt-2 space-y-1 text-sm text-muted-foreground">
+                            {% if row.priced %}
+                                <p>Month to date: <span class="tabular-nums text-foreground" data-testid="llm-spend-usd">USD {{ '%.4f' % row.usd_spent }}</span> over {{ row.requests }} request{{ '' if row.requests == 1 else 's' }}.</p>
+                                {% if row.ceiling_usd %}
+                                    <p>Ceiling: <span class="tabular-nums">USD {{ '%.2f' % row.ceiling_usd }}</span>; remaining <span class="tabular-nums" data-testid="llm-spend-remaining">USD {{ '%.4f' % row.remaining_usd }}</span>.</p>
+                                {% else %}
+                                    <p>No spend ceiling is configured, so this provider is never called.</p>
+                                {% endif %}
+                            {% else %}
+                                <p>Free provider: <span class="tabular-nums text-foreground">{{ row.requests }}</span> request{{ '' if row.requests == 1 else 's' }} this month{% if row.request_ceiling %} of {{ row.request_ceiling }} allowed; remaining {{ row.remaining_requests }}{% else %}; no request ceiling is set{% endif %}.</p>
+                            {% endif %}
+                            {% if not row.configured %}<p>No key is stored for this provider, so it answers nothing until one is set.</p>
+                            {% elif not row.open %}<p class="text-destructive">{{ row.reason }}.</p>{% endif %}
+                        </dd>
+                    </div>
+                    {% endfor %}
+                </dl>
+                {% set _ledger_providers = spend_ledger | map(attribute='provider') | list %}
+                {% set _others = [] %}
+                {% for value, label in form.provider.choices if value not in _ledger_providers %}{% set _ = _others.append(label) %}{% endfor %}
+                {% if _others %}
+                <p class="mt-4 text-sm text-muted-foreground" data-testid="llm-spend-absent">Not listed above: {{ _others | join(', ') }}. They are not part of the platform's answer order, so no spend is counted for them here; a key saved for one is used only where that provider is chosen on purpose.</p>
+                {% endif %}
+            {% endcall %}
+        {% endcall %}
+    </div>
+    {% endif %}
 
     <!-- Load from .env Button -->
     <div class="mb-6">
@@ -214,7 +267,7 @@
                             {% endfor %}
                         </div>
                     {% else %}
-                        <p class="text-sm text-muted-foreground p-4 text-center">No API settings configured yet.</p>
+                        <p class="text-sm text-muted-foreground p-4 text-center">No AI provider keys saved yet.</p>
                     {% endif %}
                 </div>
             </div>
@@ -228,11 +281,11 @@
                         {% if edit_id %}
                             Edit {{ edit_settings.provider|title }}{% if edit_settings and edit_settings.key_label %} — {{ edit_settings.key_label }}{% endif %} Settings
                         {% else %}
-                            Add New API Settings
+                            Add an AI provider key
                         {% endif %}
                     </h3>
 
-                    <form method="POST" action="{{ url_for('admin.api_settings') }}">
+                    <form method="POST" action="{{ settings_url or url_for('admin.api_settings') }}">
                         {{ form.hidden_tag() }}
                         
                         <div class="space-y-4">
@@ -285,7 +338,7 @@
                                     <p class="text-sm text-destructive-emphasis mt-1">{{ form.default_model.errors[0] }}</p>
                                 {% endif %}
                                 <p class="text-xs text-muted-foreground mt-1">
-                                    Examples: claude-opus-5, gpt-4o, gemini-2.0-flash, deepseek-chat. For OpenRouter, use the model browser to select up to 5 models (comma-separated, first is primary).
+                                    Examples: claude-opus-5, gpt-4o, gemini-2.0-flash, google/gemma-4-31b-it:free. For OpenRouter, use the model browser to select up to 5 models (comma-separated, first is primary).
                                 </p>
                             </div>
 
@@ -423,15 +476,16 @@
             </div>
 
             <!-- Help Section -->
-            <div class="mt-6 rounded-md border bg-muted/50 p-4">
-                <h4 class="font-semibold mb-2">Provider Information</h4>
+            <details class="mt-6 rounded-md border bg-muted/50 p-4" data-testid="provider-help">
+                <summary class="cursor-pointer font-semibold">Where to get a key for each provider</summary>
+                <div class="mt-2">
                 <div class="text-sm text-muted-foreground space-y-2">
                     <p><strong>Anthropic:</strong> Get your API key from <a href="https://console.anthropic.com/" target="_blank" class="text-primary underline">console.anthropic.com</a></p>
                     <p><strong>OpenAI:</strong> Get your API key from <a href="https://platform.openai.com/api-keys" target="_blank" class="text-primary underline">platform.openai.com</a></p>
                     <p><strong>Gemini:</strong> Get your API key from <a href="https://makersuite.google.com/app/apikey" target="_blank" class="text-primary underline">Google AI Studio</a></p>
                     <p><strong>Azure:</strong> Configure through Azure Portal and set endpoint via environment variable</p>
                     <p><strong>Hugging Face:</strong> Get your API key from <a href="https://huggingface.co/settings/tokens" target="_blank" class="text-primary underline">huggingface.co/settings/tokens</a>. Choose from thousands of models including Llama, Mistral, Gemma, and more.</p>
-                    <p><strong>DeepSeek:</strong> Get your API key from <a href="https://platform.deepseek.com/" target="_blank" class="text-primary underline">platform.deepseek.com</a>. Access powerful reasoning and coding models.</p>
+                    <p><strong>NVIDIA:</strong> Get your API key from <a href="https://build.nvidia.com/" target="_blank" class="text-primary underline">build.nvidia.com</a>. Free hosted models, used when OpenRouter is unavailable.</p>
                     <p><strong>OpenRouter:</strong> Get your API key from <a href="https://openrouter.ai/keys" target="_blank" class="text-primary underline">openrouter.ai/keys</a>. Access 65+ models from multiple providers through a single API key, including free models.</p>
                     <p><strong>Custom API:</strong> Connect to any REST API with flexible authentication options (Bearer token, API key header, Basic auth, or no auth).</p>
                     <p><strong>JIRA:</strong> Configure JIRA integration for project management</p>
@@ -444,8 +498,8 @@
                         <p><strong>OpenAI:</strong> gpt-4o, gpt-4-turbo, gpt-3.5-turbo</p>
                         <p><strong>Gemini:</strong> gemini-2.0-flash, gemini-2.0-flash-lite</p>
                         <p><strong>Hugging Face:</strong> meta-llama/Llama-3.1-8B-Instruct, mistralai/Mistral-7B-Instruct-v0.2, google/gemma-2-9b-it</p>
-                        <p><strong>DeepSeek:</strong> deepseek-chat, deepseek-coder</p>
-                        <p><strong>OpenRouter:</strong> google/gemini-2.5-flash-preview:free, meta-llama/llama-3-8b-instruct:free, mistralai/mistral-7b-instruct:free</p>
+                        <p><strong>NVIDIA:</strong> mistralai/mistral-large-4-1t-a52b</p>
+                        <p><strong>OpenRouter:</strong> google/gemma-4-31b-it:free, nvidia/nemotron-3-super-120b-a12b:free</p>
                     </div>
                 </div>
                 
@@ -459,6 +513,7 @@
                     </div>
                 </div>
             </div>
+            </details>
         </div>
     </div>
 </div>

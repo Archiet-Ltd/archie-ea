@@ -292,6 +292,12 @@ def init_cli(app):
         app.logger.warning(f"\u26a0\ufe0f  Failed to register dedupe entities CLI: {e}")
 
     try:
+        from app.commands.unconfirmed_signups import init_app as init_unconfirmed_signups
+        init_unconfirmed_signups(app)
+    except Exception as e:
+        app.logger.warning(f"Failed to register unconfirmed sign-up CLI: {e}")
+
+    try:
         from app.commands.prune_oauth_clients import init_app as init_prune_oauth_clients
         init_prune_oauth_clients(app)
         app.logger.info("OAuth client pruning CLI command registered")
@@ -341,6 +347,12 @@ def init_cli(app):
         app.logger.warning(f"⚠️  Failed to register principle tenancy backfill CLI: {e}")
 
     try:
+        from app.commands.backfill_vendor_links import init_app as init_vendor_links
+        init_vendor_links(app)
+    except Exception as e:
+        app.logger.warning(f"⚠️  Failed to register vendor link backfill CLI: {e}")
+
+    try:
         from app.commands.backfill_outcome_org import init_app as init_outcome_org
         init_outcome_org(app)
         app.logger.info("✅ Outcome tenancy backfill CLI command registered")
@@ -367,6 +379,19 @@ def init_cli(app):
         app.logger.info("Capability tenancy cutover CLI command registered")
     except Exception as e:
         app.logger.warning(f"Failed to register capability tenancy cutover CLI: {e}")
+
+    try:
+        from app.commands.refresh_company_signals import init_app as init_company_signals
+        init_company_signals(app)
+    except Exception as e:
+        app.logger.warning(f"Failed to register company signals CLI: {e}")
+
+    try:
+        from app.commands.backfill_capability_types import init_app as init_capability_types
+
+        init_capability_types(app)
+    except Exception as e:
+        app.logger.warning(f"Failed to register capability type backfill CLI: {e}")
 
     try:
         from app.commands.project_capabilities import init_app as init_capability_projection
@@ -459,6 +484,13 @@ def init_cli(app):
     except Exception as e:
         app.logger.warning(f"\u26a0\ufe0f  Failed to register codegen drift CLI: {e}")
 
+    # Customer zero: the organisation's own products and what each can do
+    try:
+        from app.commands.customer_zero import init_app as init_customer_zero
+        init_customer_zero(app)
+    except Exception as e:
+        app.logger.warning(f"\u26a0\ufe0f  Failed to register customer-zero CLI: {e}")
+
     # Motivation bridge CLI command (journey Solution* motivation -> enterprise layer)
     try:
         from app.commands.bridge_motivation import init_app as init_bridge_motivation
@@ -532,6 +564,14 @@ def init_cli(app):
     except Exception as e:
         app.logger.warning(f"⚠️  Failed to register demo company seed CLI: {e}")
 
+    # T-seed04: remove and re-seed the demonstration company
+    try:
+        from app.commands import reset_demo_company
+        reset_demo_company.init_app(app)
+        app.logger.info("Demo company reset CLI command registered")
+    except Exception as e:
+        app.logger.warning(f"Failed to register demo company reset CLI: {e}")
+
 # Domain element backfill
     try:
         from app.commands.backfill_domain_elements import init_app as init_domain_elements
@@ -555,6 +595,27 @@ def init_cli(app):
         app.logger.info("✅ Application owners backfill CLI command registered")
     except Exception as e:
         app.logger.warning(f"⚠️  Failed to register application owners backfill CLI: {e}")
+
+# Owners of connector-imported applications worked out from their commits
+    try:
+        from app.commands import owners_from_commits
+        owners_from_commits.init_app(app)
+        app.logger.info("Owners from commits CLI command registered")
+    except Exception as e:
+        app.logger.warning(f"Failed to register owners from commits CLI: {e}")
+
+# Backlog requirements projected onto the requirements prioritisation ranks
+    try:
+        from app.commands import backfill_backlog_requirements
+        backfill_backlog_requirements.init_app(app)
+    except Exception as e:
+        app.logger.warning(f"⚠️  Failed to register backlog requirements backfill CLI: {e}")
+
+    try:
+        from app.commands import rescore_consolidation_candidates
+        rescore_consolidation_candidates.init_app(app)
+    except Exception as e:
+        app.logger.warning(f"⚠️  Failed to register consolidation candidate re-score CLI: {e}")
 
 # ServiceNow connector config backfill (M2, cloud-review-pr448-961a0c35-v1.md)
     try:
@@ -588,6 +649,12 @@ def init_cli(app):
         app.logger.warning(f"⚠️  Failed to register clear foreign assignees CLI: {e}")
 
     try:
+        from app.commands.vendor_catalogue import init_app as init_vendor_catalogue
+        init_vendor_catalogue(app)
+    except Exception as e:
+        app.logger.warning(f"Failed to register vendor catalogue CLI: {e}")
+
+    try:
         from app.commands.scan_eol_alerts import init_app as init_scan_eol_alerts
         init_scan_eol_alerts(app)
         app.logger.info("✅ End-of-support alert scan CLI command registered")
@@ -601,6 +668,13 @@ def init_cli(app):
         app.logger.info("✅ Solution risk merge backfill CLI command registered")
     except Exception as e:
         app.logger.warning(f"⚠️  Failed to register solution risk merge backfill CLI: {e}")
+
+    try:
+        from app.commands.backfill_risk_link_relationships import init_app as init_risk_link_relationships
+        init_risk_link_relationships(app)
+        app.logger.info("✅ Risk link relationship backfill CLI command registered")
+    except Exception as e:
+        app.logger.warning(f"⚠️  Failed to register risk link relationship backfill CLI: {e}")
 
     # Gap register consolidation: merge roadmap_gaps, implementation_gaps and compliance_gaps into gaps
     try:
@@ -617,3 +691,13 @@ def init_cli(app):
         app.logger.info("✅ Work package consolidation CLI commands registered")
     except Exception as e:
         app.logger.warning(f"⚠️  Failed to register work package consolidation CLI: {e}")
+
+    # The schema-deploy data steps run as the schema owner, which row-level
+    # security binds; give each its explicit platform scope (after every
+    # command above has registered).
+    try:
+        from app.commands.deploy_scope import scope_deploy_commands
+        scope_deploy_commands(app)
+    except Exception as e:
+        app.logger.error(f"Failed to scope the deploy commands: {e}")
+        raise

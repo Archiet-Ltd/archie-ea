@@ -79,16 +79,12 @@ def _tile_text(soup, label):
 
 def _score_on_every_screen(client, login_as, user):
     """The health score as each place that shows it renders it."""
-    overview = _page(client, login_as, user, "/dashboard/overview")
     login_as(client, user)
     summary = client.get("/dashboard/api/executive-summary")
     assert summary.status_code == 200
     scorecard = _page(client, login_as, user, "/dashboard/health")
     return {
-        "overview tab": _text(overview, "health-score-value"),
         "executive summary": summary.get_json()["data"]["Health Score"],
-        "cto card": _text(overview, "cto-health-score-value"),
-        "cfo card": _text(overview, "cfo-health-score-value"),
         "health scorecard": _text(scorecard, "health-score-value"),
     }
 
@@ -115,11 +111,6 @@ def test_the_score_is_one_value_in_one_format_on_every_screen(
 
     # The two maturity figures are two measures, each stating its definition,
     # and each equal to what the phase distribution says.
-    overview = _page(client, login_as, user, "/dashboard/overview")
-    tile = _tile_text(overview, "Phase Maturity")
-    assert phase_maturity in tile
-    assert "Share of solutions with a recorded ADM phase that are in phase C or later" in tile
-
     scorecard = _page(client, login_as, user, "/dashboard/health")
     tile = _tile_text(scorecard, "Avg Solution Maturity")
     assert avg_maturity in tile
@@ -153,8 +144,6 @@ def test_the_two_maturity_figures_are_recomputable_from_the_phase_distribution(
     # Three of four solutions are in phase C or later, which is the dashboard's
     # Phase Maturity and, alone among the components measured, the score.
     assert _text(scorecard, "health-score-value") == "75.0"
-    overview = _page(client, login_as, user, "/dashboard/overview")
-    assert "75.0%" in _tile_text(overview, "Phase Maturity")
     # Phase progress averages (12 + 37 + 37 + 75) / 4 = 40.25, so 40%.
     assert "40%" in _tile_text(scorecard, "Avg Solution Maturity")
 
@@ -169,28 +158,10 @@ def test_a_score_that_cannot_be_computed_is_an_em_dash_on_every_screen(
     assert shown["executive summary"] is None, "the API sends null, and the fragment renders null as a dash"
     assert {value for name, value in shown.items() if name != "executive summary"} == {EM_DASH}, shown
 
-    overview = _page(client, login_as, user, "/dashboard/overview")
-    assert EM_DASH in _tile_text(overview, "Phase Maturity")
-    assert not re.search(r"Phase Maturity\s+0", _tile_text(overview, "Phase Maturity"))
-
     scorecard = _page(client, login_as, user, "/dashboard/health")
     tile = _tile_text(scorecard, "Avg Solution Maturity")
     assert tile.startswith(f"Avg Solution Maturity {EM_DASH}"), tile
     assert not re.search(r"Avg Solution Maturity\s+0", tile)
-
-
-def test_the_executive_summary_fragment_renders_the_string_it_is_given():
-    """The fragment must show the API's Health Score verbatim (no locale
-    formatting of a number), and a missing one as a dash."""
-    from pathlib import Path
-
-    source = (Path(__file__).resolve().parents[1] / "app/templates/dashboards/overview.html").read_text(
-        encoding="utf-8"
-    )
-    expression = re.search(r'x-text="(typeof val ===[^"\n]+)"', source).group(1)
-    # Strings and null take the branch that does not reformat them.
-    assert "typeof val === 'number' ?" in expression
-    assert "(val ?? '—')" in expression
 
 
 def test_a_failed_score_computation_is_an_em_dash_not_a_zero(
@@ -207,9 +178,6 @@ def test_a_failed_score_computation_is_an_em_dash_not_a_zero(
 
     scorecard = _page(client, login_as, user, "/dashboard/health")
     assert _text(scorecard, "health-score-value") == EM_DASH
-    overview = _page(client, login_as, user, "/dashboard/overview")
-    assert _text(overview, "health-score-value") == EM_DASH
-    assert _text(overview, "cto-health-score-value") == EM_DASH
 
 
 def test_soft_deleted_solutions_are_left_out_of_both_maturity_figures(
@@ -233,15 +201,6 @@ def test_soft_deleted_solutions_are_left_out_of_both_maturity_figures(
 
     scorecard = _page(client, login_as, user, "/dashboard/health")
     assert "37%" in _tile_text(scorecard, "Avg Solution Maturity")
-    overview = _page(client, login_as, user, "/dashboard/overview")
-    assert "100.0%" in _tile_text(overview, "Phase Maturity")
-
-
-def _health_block_tile(soup, label):
-    """Text of the tile in the Overview's Architecture Health block with this label."""
-    for node in soup.find_all("p", string=lambda value: value and value.strip() == label):
-        return " ".join(node.parent.get_text().split())
-    raise AssertionError(f"no Architecture Health tile labelled {label!r}")
 
 
 def _score_line(soup):
@@ -279,11 +238,6 @@ def test_the_scorecard_names_only_what_the_score_was_weighted_from(db_session, t
         "Health Score 100.0 out of 100, weighted from phase maturity. "
         "Not measured: risk posture, capability coverage and governance."
     )
-
-    overview = _page(client, login_as, user, "/dashboard/overview")
-    for label in ("Risk Posture", "Capability Coverage", "Governance"):
-        assert _health_block_tile(overview, label) == f"{label} {EM_DASH}", label
-    assert "100.0%" in _health_block_tile(overview, "Phase Maturity")
 
 
 @pytest.mark.parametrize(
@@ -404,9 +358,6 @@ def test_every_screen_reads_the_formatted_score_not_the_plain_number(
     _force_health_score(monkeypatch, composite, _components(phase_maturity=composite))
 
     assert _score_on_every_screen(client, login_as, user) == {
-        "overview tab": shown,
         "executive summary": shown,
-        "cto card": shown,
-        "cfo card": shown,
         "health scorecard": shown,
     }

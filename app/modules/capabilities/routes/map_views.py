@@ -14,10 +14,11 @@ Helpers:
     - build_nodes_edges(catalog)   — used by mapping_routes.api_nodes_edges()
 """
 
-from flask import abort, current_app, flash, g, render_template  # dead-code-ok
-from flask_login import login_required
+from flask import abort, current_app, flash, g, jsonify, redirect, render_template, request, url_for  # dead-code-ok
+from flask_login import current_user, login_required
 
 from app.extensions.cache import cached
+from app import db
 
 from . import capability_map
 
@@ -46,8 +47,6 @@ def _compute_capability_mapping_counts():
         return None
 
     from sqlalchemy import func
-
-    from app import db
     from app.models.unified_application_capability_mapping import UnifiedApplicationCapabilityMapping
     from app.models.unified_capability import UnifiedCapability
 
@@ -76,24 +75,86 @@ def _compute_capability_mapping_counts():
 @capability_map.route("/")
 @login_required
 def index():
-    """Main capability mapping page"""
+    """Main capability mapping page - new consolidated view with Map/Health/Maturity lenses"""
     from app.modules.capabilities.services.capability_count_service import (
         count_capabilities,
     )
 
-    try:
-        total_capabilities = count_capabilities()
-    except Exception:
-        current_app.logger.exception("Could not count business capabilities")
-        total_capabilities = None
+    # A failure while building the page is a failure: it reaches the 500 handler, not a page that
+    # quietly leaves the figure out.
+    total_capabilities = count_capabilities()
 
-    return render_template("capability_map/index.html", total_capabilities=total_capabilities)
+    from app.modules.account.services import onboarding_service
+
+    # Only when nothing is on the map at all: with capabilities present, an empty result is a filter.
+    no_industry_chosen = not total_capabilities and not onboarding_service.choices(current_user.organization)["industry"]
+
+    from app.services.cost_visibility import COSTS_WITHHELD, costs_visible
+
+    return render_template(
+        "capability_map/consolidated.html",
+        costs_withheld=not costs_visible(current_user),
+        costs_withheld_sentence=COSTS_WITHHELD,
+        total_capabilities=total_capabilities,
+        no_industry_chosen=no_industry_chosen,
+    )
+
+
+# Redirects from old capability pages to the consolidated page with lens/view params.
+# Each old address redirects to /capability-map/ with its lens or view preset and the
+# same filter; nothing returns 404 and no content is lost.
+
+
+@capability_map.route("/health")
+@login_required
+def redirect_health():
+    """Redirect old health page to consolidated page with health lens."""
+    return redirect(url_for("capability_map.index", lens="health"))
+
+
+@capability_map.route("/maturity")
+@login_required
+def redirect_maturity():
+    """Redirect old maturity page to consolidated page with maturity lens."""
+    return redirect(url_for("capability_map.index", lens="maturity"))
+
+
+@capability_map.route("/heatmap")
+@login_required
+def redirect_heatmap():
+    """Redirect old heat-map page to consolidated page with health lens."""
+    return redirect(url_for("capability_map.index", lens="health"))
+
+
+@capability_map.route("/list")
+@login_required
+def redirect_list():
+    """Redirect old capability list page to consolidated page with list view."""
+    return redirect(url_for("capability_map.index", view="list"))
+
+
+@capability_map.route("/tree")
+@login_required
+def redirect_tree():
+    """Redirect old tree page to consolidated page with list view."""
+    return redirect(url_for("capability_map.index", view="list"))
+
+
+@capability_map.route("/search")
+@login_required
+def redirect_search():
+    """Redirect old search page to consolidated page with list view and search query."""
+    q = request.args.get("q", "")
+    return redirect(url_for("capability_map.index", view="list", search=q))
 
 
 # ARCH-064: dialogs that are closed on arrival are no longer serialised into
 # /capability-map/'s initial HTML. They are fetched from here the first time
 # something opens one. The allow-list is explicit so the variant name — which
 # arrives from the client — can never select an arbitrary template.
+# What a top-level starter capability is, in its framework's words, shown instead of repeating its own name.
+_FRAMEWORK_TOP_LEVEL = {"BIAN": "BIAN business area", "APQC": "APQC category"}
+
 LAZY_MODAL_VARIANTS = frozenset(
     {
         "mapping-modal",
@@ -118,6 +179,7 @@ def mapping_modal_partial(variant):
     ttl=300,
     key_prefix="capability_map:hierarchy",
     key_func=lambda: getattr(g, "current_org_id", None),
+    skip_store=lambda result: bool(result.get("load_error")),
 )
 def _hierarchy_context():
     """Build the hierarchy page's template context (the query results only).
@@ -137,13 +199,9 @@ def _hierarchy_context():
         count_capabilities,
     )
 
+    total_capabilities = None
     try:
         total_capabilities = count_capabilities()
-    except Exception:
-        current_app.logger.exception("Could not count capabilities")
-        total_capabilities = None
-
-    try:
         from app.models.unified_capability import UnifiedCapability
 
         capabilities = UnifiedCapability.query.order_by(
@@ -248,33 +306,51 @@ def _simple_view_context():
             UnifiedCapability.level, UnifiedCapability.name
         ).all()
 
-        children_by_parent = {}
-        for c in capabilities:
-            if c.parent_capability_id:
-                children_by_parent.setdefault(c.parent_capability_id, []).append(c)
+        from app.services.capability_type import (
+            CAPABILITY_TYPE_HELP,
+            CAPABILITY_TYPE_LABELS,
+            CAPABILITY_TYPES,
+            normalise_capability_type,
+        )
 
-        def child_to_dict(cap):
+        def capability_row(cap):
+            fact_sheet_id = None
+            if cap.source_table == "business_capability" and str(cap.source_id).isdigit():
+                fact_sheet_id = int(cap.source_id)
             return {
                 "name": cap.name,
                 "description": cap.description or "",
                 "level": cap.level,
                 "domain": cap.domain.name if cap.domain else "",
+                "fact_sheet_id": fact_sheet_id,
             }
 
-        roots = [c for c in capabilities if c.level == 1]
+        by_type = {key: [] for key in CAPABILITY_TYPES}
+        unclassified = []
+        for cap in capabilities:
+            key = normalise_capability_type(cap.capability_type)
+            (by_type[key] if key else unclassified).append(capability_row(cap))
+
         capability_groups = [
             {
-                "name": root.name,
-                "description": root.description or "",
-                "level": root.level,
-                "domain": root.domain.name if root.domain else "",
-                "children": [
-                    child_to_dict(child) for child in children_by_parent.get(root.id, [])
-                ],
+                "key": key,
+                "name": CAPABILITY_TYPE_LABELS[key],
+                "description": CAPABILITY_TYPE_HELP[key],
+                "capabilities": by_type[key],
             }
-            for root in roots
+            for key in CAPABILITY_TYPES
         ]
+        if unclassified:
+            capability_groups.append(
+                {
+                    "key": "unclassified",
+                    "name": "Not yet classified",
+                    "description": "No one has said whether these are strategic, operational or supporting.",
+                    "capabilities": unclassified,
+                }
+            )
 
+        roots = [c for c in capabilities if c.level == 1]
         levels = [c.level for c in capabilities if c.level is not None]
         domains = {c.domain.name for c in capabilities if c.domain}
 
@@ -377,7 +453,7 @@ def dashboard():
         return render_template(
             "capability_map/error.html",
             error="An unexpected error occurred. Please try again.",
-        )
+        ), 500
     return render_template(
         "capability_map/index.html",
         catalog=context["catalog"],
@@ -454,3 +530,306 @@ def build_nodes_edges(catalog):
             node_id += 1
 
     return nodes, edges
+
+
+@cached(
+    ttl=300,
+    key_prefix="capability_map:api_hierarchy",
+    key_func=lambda: getattr(g, "current_org_id", None),
+    skip_store=lambda result: bool(result.get("load_error")),
+)
+def _api_hierarchy_context():
+    """Build the capability hierarchy for the new capability map page.
+
+    Returns domains with their capabilities, including health scores,
+    maturity levels, application counts, and ownership.
+    """
+    from app.modules.capabilities.services.capability_count_service import (
+        count_capabilities,
+    )
+    from app.models.unified_capability import UnifiedCapability
+    from app.models.unified_application_capability_mapping import UnifiedApplicationCapabilityMapping
+    from app.models.application_layer import ApplicationComponent
+    from sqlalchemy import func
+
+    total_capabilities = None
+    try:
+        total_capabilities = count_capabilities()
+        org_id = getattr(g, "current_org_id", None)
+
+        from app import db
+
+        # Get all capabilities visible to this organisation
+        capabilities = UnifiedCapability.query.order_by(
+            UnifiedCapability.level, UnifiedCapability.name
+        ).all()
+
+        # Build parent lookup
+        children_by_parent = {}
+        for c in capabilities:
+            if c.parent_capability_id:
+                children_by_parent.setdefault(c.parent_capability_id, []).append(c)
+
+        # Capabilities that came from the starter model chosen at sign-up, by the id of the row they are projected from.
+        from app.models.business_capabilities import BusinessCapability
+
+        starter_sources = {
+            str(row_id): source
+            for row_id, source in db.session.query(
+                BusinessCapability.id, BusinessCapability.discovery_source
+            ).filter(
+                BusinessCapability.organization_id == org_id,
+                BusinessCapability.discovery_source.like("starter:%"),
+            ).all()
+        } if org_id is not None else {}
+
+        # Get application mapping counts
+        mapping_counts = {}
+        # A failed count is a failed load (the outer handler answers with an error), never a 0.
+        if org_id is not None:
+            rows = (
+                db.session.query(
+                    UnifiedApplicationCapabilityMapping.unified_capability_id,
+                    func.count(UnifiedApplicationCapabilityMapping.id),
+                )
+                .join(
+                    UnifiedCapability,
+                    UnifiedApplicationCapabilityMapping.unified_capability_id == UnifiedCapability.id,
+                )
+                .filter(UnifiedCapability.organization_id == org_id)
+                .group_by(UnifiedApplicationCapabilityMapping.unified_capability_id)
+                .all()
+            )
+            mapping_counts = dict(rows)
+
+        # Get application details for each capability
+        app_details = {}
+        if org_id is not None and mapping_counts:
+            cap_ids = list(mapping_counts.keys())
+            # Scoped through the capability's organisation, as the count above is: the mapping
+            # table carries no organisation of its own.
+            mappings = (
+                UnifiedApplicationCapabilityMapping.query
+                .join(
+                    UnifiedCapability,
+                    UnifiedApplicationCapabilityMapping.unified_capability_id == UnifiedCapability.id,
+                )
+                .filter(
+                    UnifiedApplicationCapabilityMapping.unified_capability_id.in_(cap_ids),
+                    UnifiedCapability.organization_id == org_id,
+                )
+                .all()
+            )
+
+            app_ids = list(set(m.application_component_id for m in mappings))
+            apps = ApplicationComponent.query.filter(
+                ApplicationComponent.id.in_(app_ids)
+            ).all() if app_ids else []
+            app_map = {a.id: a for a in apps}
+
+            # The application page link is left out, not fatal, when that module did not register.
+            can_link = "unified_applications.application_detail" in current_app.view_functions
+
+            for m in mappings:
+                app = app_map.get(m.application_component_id)
+                if app:
+                    app_details.setdefault(m.unified_capability_id, []).append({
+                        "id": app.id,
+                        "name": app.name,
+                        "lifecycleStatus": app.lifecycle_status,
+                        "supportLevel": m.support_level,
+                        "coveragePercentage": m.coverage_percentage,
+                        "url": url_for('unified_applications.application_detail', id=app.id) if can_link else None,
+                    })
+
+            # One count, one list: coverage is the number of applications listed, which went
+            # through the application's own tenant filter, so a mapping row pointing at another
+            # organisation's application is neither counted nor revealed.
+            mapping_counts = {
+                cap_id: len(app_details.get(cap_id, [])) for cap_id in mapping_counts
+            }
+
+        # Group capabilities by domain. A capability starts a branch when it is a top-level one
+        # or when its parent is not among those this organisation can see: a sub-level capability
+        # with no parent is listed, not dropped.
+        visible_ids = {c.id for c in capabilities}
+        domains_map = {}
+        for cap in capabilities:
+            if cap.level != 1 and cap.parent_capability_id in visible_ids:
+                continue
+            domain_name = cap.domain.name if cap.domain else "Uncategorised"
+            domain_code = cap.domain.code if cap.domain else "UNCAT"
+            if domain_name not in domains_map:
+                domains_map[domain_name] = {
+                    "id": cap.domain.id if cap.domain else 0,
+                    "name": domain_name,
+                    "code": domain_code,
+                    "capabilities": []
+                }
+            domains_map[domain_name]["capabilities"].append(cap)
+
+        def not_assessed(cap, mapping_count):
+            """A starter capability nobody has rated or mapped an application to: it has no health or
+            coverage to show yet, and a figure for it would be invented."""
+            if cap.source_table != "business_capability" or not starter_sources.get(str(cap.source_id)):
+                return False
+            recorded = (
+                cap.current_maturity_level, cap.target_maturity_level, cap.reliability_score,
+                cap.performance_score, cap.security_score, cap.scalability_score,
+            )
+            return all(value is None for value in recorded) and not mapping_count
+
+        # Health is the capability health computation, the one the capability health page shows.
+        # A capability projected from a business capability takes that capability's figure; one
+        # with nothing recorded has none (None), and a capability not projected from one has none.
+        from app.modules.capabilities.services.capability_health_service import CapabilityHealthService
+
+        health_by_business_capability = (
+            {
+                row["id"]: row["score"]
+                for row in CapabilityHealthService().get_capability_health_metrics()["health_by_capability"]
+            }
+            if org_id is not None else {}
+        )
+
+        # Owners are read from the owner record, the same answer the risk assessment gives.
+        from app.services.risk_service import capability_owner_names
+
+        owner_names = (
+            capability_owner_names([c.id for c in capabilities], org_id) if org_id is not None else {}
+        )
+
+        def compute_health_score(cap):
+            if cap.source_table != "business_capability" or not str(cap.source_id or "").isdigit():
+                return None
+            return health_by_business_capability.get(int(cap.source_id))
+
+        def cap_to_detail(cap):
+            kids = children_by_parent.get(cap.id, [])
+            mapping_count = mapping_counts.get(cap.id, 0)
+            apps = app_details.get(cap.id, [])
+
+            health_score = compute_health_score(cap)
+
+            # Six lens measures
+            # Maturity: current and target levels with gap
+            maturity_current = cap.current_maturity_level
+            maturity_target = cap.target_maturity_level
+            maturity_gap_val = None
+            if maturity_current is not None and maturity_target is not None:
+                maturity_gap_val = maturity_target - maturity_current
+
+            # Importance: strategic importance rating
+            importance = cap.strategic_importance
+
+            # Investment: annual cost and investment required
+            investment_now = cap.annual_cost
+            investment_planned = cap.investment_required
+
+            # Control coverage: security score
+            control_coverage = cap.security_score
+
+            # Application coverage: count of mapped applications
+            application_coverage = mapping_count
+
+            domain_name = cap.domain.name if cap.domain else "Uncategorised"
+            starter_model = (
+                starter_sources.get(str(cap.source_id), "")[len("starter:"):] or None
+                if cap.source_table == "business_capability" else None
+            )
+            return {
+                "id": cap.id,
+                "name": cap.name,
+                "description": cap.description or "",
+                "level": cap.level,
+                "domainName": domain_name,
+                # What a card or panel shows beside the name: never the capability's own name.
+                "domainLabel": (
+                    _FRAMEWORK_TOP_LEVEL.get(starter_model, "Top-level capability")
+                    if domain_name == cap.name else domain_name
+                ),
+                "domainCode": cap.domain.code if cap.domain else "UNCAT",
+                "type": cap.capability_type or cap.category or "business",
+                "code": cap.code,
+                "starterModel": starter_model,
+                "owner": owner_names.get(cap.id),
+                "businessOwner": cap.business_owner,
+                "itOwner": cap.it_owner,
+                "capabilityOwner": cap.capability_owner,
+                "productManager": cap.product_manager,
+                "strategicImportance": cap.strategic_importance,
+                "businessCriticality": cap.business_criticality,
+                "isCoreDifferentiator": cap.is_core_differentiator,
+                # Maturity lens
+                "currentMaturity": maturity_current,
+                "targetMaturity": maturity_target,
+                "maturityGap": maturity_gap_val,
+                "maturityAssessmentDate": cap.maturity_assessment_date.isoformat() if cap.maturity_assessment_date else None,
+                "maturityAssessmentNotes": cap.maturity_assessment_notes,
+                # Importance lens
+                "importance": importance,
+                # Investment lens
+                "investmentNow": investment_now,
+                "investmentPlanned": investment_planned,
+                # Health lens
+                "healthScore": health_score,
+                "notAssessed": not_assessed(cap, mapping_count),
+                "reliabilityScore": cap.reliability_score,
+                "performanceScore": cap.performance_score,
+                "securityScore": cap.security_score,
+                "scalabilityScore": cap.scalability_score,
+                # Control coverage lens
+                "controlCoverage": control_coverage,
+                # Application coverage lens
+                "applicationCoverage": application_coverage,
+                "applicationCount": mapping_count,
+                "applications": apps,
+                "children": [cap_to_detail(k) for k in kids]
+            }
+
+        # Build domain list with L1 capabilities and their children
+        domains = []
+        for domain_name, domain_data in sorted(domains_map.items()):
+            l1_caps = domain_data["capabilities"]
+            domain_caps = []
+            for cap in l1_caps:
+                domain_caps.append(cap_to_detail(cap))
+
+            domains.append({
+                "id": domain_data["id"],
+                "name": domain_data["name"],
+                "code": domain_data["code"],
+                "capabilities": domain_caps
+            })
+
+        return {
+            "domains": domains,
+            "total_capabilities": total_capabilities,
+            "load_error": None,
+        }
+    except Exception as e:
+        from app import db
+        db.session.rollback()
+        current_app.logger.exception("Unexpected error loading API hierarchy: %s", e)
+        return {
+            "domains": [],
+            "total_capabilities": total_capabilities,
+            "load_error": "The capability hierarchy could not be read.",
+        }
+
+
+@capability_map.route("/api/capabilities/hierarchy")
+@login_required
+def api_capabilities_hierarchy():
+    """API endpoint for the new capability map page."""
+    from app.services.cost_visibility import costs_visible, withhold_costs
+
+    context = _api_hierarchy_context()
+    if context["load_error"]:
+        return jsonify({"error": context["load_error"], "domains": []}), 500
+    if not costs_visible(current_user):
+        # The context is stored for the organisation, whoever asked first: the money is left out on the way
+        # out, never in the stored copy, so the person it is withheld from and the person it is shown to
+        # each get their own answer from the same store.
+        context = withhold_costs(context)
+    return jsonify(context)

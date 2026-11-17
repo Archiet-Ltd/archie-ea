@@ -269,7 +269,7 @@ async function loadTargets() {
                     description: item.description || '',
                     type: item.type || 'Element',
                     layer: item.layer || 'business',
-                    layer_color: item.layer_color || '#CCCCCC',
+                    layer_color: item.layer_color || null,
                     table: item.table || '',
                     is_template: item.is_template || false,
                     category: item.layer  // Use layer as category for filtering
@@ -786,7 +786,7 @@ async function loadUnifiedApplications(targetId) {
 function buildMappingData(app) {
     let data = {
         support_level: app.support_level || 'partial',
-        coverage_percentage: app.coverage_percentage || 0,
+        coverage_percentage: app.coverage_percentage ?? null,
         support_quality: app.support_quality || 3,
         relationship_type: app.relationship_type || 'enables',
         relationship_strength: app.relationship_strength || 3,
@@ -810,9 +810,9 @@ function buildMappingData(app) {
         data.process_contribution = app.process_contribution || 50;
         data.process_criticality = app.process_criticality || 'medium';
         data.application_role = app.application_role || 'supporting';
-        data.cycle_time_reduction = app.cycle_time_reduction || 0;
-        data.quality_improvement = app.quality_improvement || 0;
-        data.cost_reduction = app.cost_reduction || 0;
+        data.cycle_time_reduction = app.cycle_time_reduction ?? null;
+        data.quality_improvement = app.quality_improvement ?? null;
+        data.cost_reduction = app.cost_reduction ?? null;
     }
 
     if (UnifiedMappingModal.context === 'vendor') {
@@ -823,7 +823,7 @@ function buildMappingData(app) {
         data.integration_level = app.integration_level || 'standard';
         data.customization_level = app.customization_level || 'minimal';
         data.vendor_support_tier = app.vendor_support_tier || 'standard';
-        data.annual_cost = app.annual_cost || 0;
+        data.annual_cost = app.annual_cost ?? null;
         data.user_count = app.user_count || 0;
     }
 
@@ -1032,7 +1032,7 @@ function renderUnifiedApplicationSettings(appId, mapping) {
             '</div>' +
             '<div>' +
                 '<label class="block text-xs font-medium text-foreground mb-1">Coverage %</label>' +
-                '<input type="number" min="0" max="100" value="' + (mappingData.coverage_percentage || 0) + '" class="w-full text-sm border border-border rounded px-2 py-1" data-umm-app="' + appIdAttr + '" data-umm-field="coverage_percentage" data-umm-cast="int"/>' +
+                '<input type="number" min="0" max="100" value="' + (mappingData.coverage_percentage ?? '') + '" class="w-full text-sm border border-border rounded px-2 py-1" data-umm-app="' + appIdAttr + '" data-umm-field="coverage_percentage" data-umm-cast="int"/>' +
             '</div>' +
             '<div>' +
                 '<label class="block text-xs font-medium text-foreground mb-1">Quality (1-5)</label>' +
@@ -1199,7 +1199,7 @@ function renderUnifiedApplicationSettings(appId, mapping) {
                 '</div>' +
                 '<div>' +
                     '<label class="block text-xs font-medium text-foreground mb-1">Annual Cost ($)</label>' +
-                    '<input type="number" min="0" value="' + (mappingData.annual_cost || 0) + '" class="w-full text-sm border border-border rounded px-2 py-1" data-umm-app="' + appIdAttr + '" data-umm-field="annual_cost" data-umm-cast="int"/>' +
+                    '<input type="number" min="0" value="' + (mappingData.annual_cost ?? '') + '" class="w-full text-sm border border-border rounded px-2 py-1" data-umm-app="' + appIdAttr + '" data-umm-field="annual_cost" data-umm-cast="int"/>' +
                 '</div>' +
                 '<div>' +
                     '<label class="block text-xs font-medium text-foreground mb-1">User Count</label>' +
@@ -1486,6 +1486,8 @@ document.addEventListener('click', function(event) {
     // refused by the CSP. It is deliberately allowed to fall through to the
     // card handler now: toggleTargetSelection() re-renders the card with the
     // correct checked state, so checkbox and card agree.
+    // The global [data-action] delegator, where the page carries it, already runs this click once.
+    if (window.__dataActionDelegator) return;
     let card = event.target.closest('#unified-targets-list [data-action="selectTarget"]');
     if (!card) return;
     let params;

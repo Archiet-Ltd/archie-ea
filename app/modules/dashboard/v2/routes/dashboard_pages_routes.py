@@ -18,8 +18,8 @@ All 40 routes preserved exactly from v1 dashboard_pages_routes.py.
 import logging
 
 from werkzeug.exceptions import HTTPException
-from flask import Blueprint, current_app, flash, jsonify, redirect, render_template, request, url_for
-from flask_login import login_required
+from flask import Blueprint, current_app, flash, g, jsonify, redirect, render_template, request, url_for
+from flask_login import current_user, login_required
 
 from app.core.compat import mark_blueprint_guardrailed
 from app.core.decorators import timed_route
@@ -32,6 +32,7 @@ from app.modules.dashboard.v2.services import (
 )
 from app.services import scoring_configuration_service
 from app.services.application_cost_accessor import set_annual_cost
+from app.services.cost_visibility import costs_visible
 from app.utils.pagination import safe_int_arg
 
 logger = logging.getLogger(__name__)
@@ -55,10 +56,18 @@ def api_capability_heatmap():
                     measured zero.
     """
     try:
+        from flask_login import current_user
+
+        from app.services.cost_visibility import COSTS_WITHHELD, costs_visible
+
         heatmap_service = CapabilityHeatmapService()
         heatmap_data = heatmap_service.get_maturity_heatmap()
+        if not costs_visible(current_user):
+            # No investment is worked out for a person the one cost rule withholds from.
+            heatmap_data["costs_withheld"] = True
+            heatmap_data["costs_withheld_sentence"] = COSTS_WITHHELD
 
-        if request.args.get("group_by", "") == "domain":
+        if request.args.get("group_by", "") == "domain" and costs_visible(current_user):
             investment_by_domain = _aggregate_investment_by_domain()
             inv_lookup = {d["domain_code"]: d for d in investment_by_domain}
             for domain_row in heatmap_data.get("domains", []):
@@ -175,9 +184,15 @@ def capability_heatmap_page():
     except Exception:
         currency_symbol = "£"
 
+    from flask_login import current_user
+
+    from app.services.cost_visibility import COSTS_WITHHELD, costs_visible
+
     return render_template(
         "dashboard/capability_heatmap.html",
         currency_symbol=currency_symbol,
+        costs_withheld=not costs_visible(current_user),
+        costs_withheld_sentence=COSTS_WITHHELD,
     )
 
 
@@ -214,6 +229,8 @@ def rationalization_dashboard():
     except Exception:
         currency_symbol = "\u00a3"
 
+    from app.utils.recorded_figures import sum_recorded
+
     try:
         service = UnifiedDuplicateDetectionService()
         total_apps = ApplicationComponent.query.count()
@@ -225,7 +242,8 @@ def rationalization_dashboard():
         resolved_groups = len(
             [g for g in groups if g.get("status") in ["resolved", "approved"]]
         )
-        estimated_savings = sum(g.get("estimated_savings", 0) for g in groups)
+        # A group whose saving was never estimated carries the column default 0.0: no figure, not a nil.
+        estimated_savings = sum_recorded(g.get("estimated_savings") or None for g in groups)
 
         stats = {
             "total_applications": total_apps,
@@ -255,12 +273,24 @@ def rationalization_dashboard():
         except Exception:
             stats["roadmap_count"] = 0
 
+        # The one cost rule decides; the page prints what it is given.
+        from flask_login import current_user
+
+        from app.services.cost_visibility import COSTS_WITHHELD, costs_visible, withhold_costs
+
+        costs_withheld = not costs_visible(current_user)
+        if costs_withheld:
+            stats = withhold_costs(stats)
+            groups = withhold_costs(groups)
+
         return render_template(
             "applications/rationalization.html",
             stats=stats,
             groups=groups,
             runs=runs[:10] if runs else [],
             currency_symbol=currency_symbol,
+            costs_withheld=costs_withheld,
+            costs_withheld_sentence=COSTS_WITHHELD,
         )
     except Exception as e:
         from app import db
@@ -418,7 +448,9 @@ def calculate_portfolio_scores():
         # get_json(silent=True) returns None instead of raising.
         payload = request.get_json(silent=True) or {}
         force_recalc = bool(payload.get("force_recalculate", False))
-        results = RationalizationScoringService.calculate_portfolio_scores(force_recalc)
+        results = RationalizationScoringService.calculate_portfolio_scores(
+            getattr(g, "current_org_id", None), force_recalc
+        )
         # Add flat keys expected by scorecard JS (updateMetrics function)
         avg = results.get("average_scores", {})
         results["total_scored"] = results.get("processed", 0)
@@ -662,7 +694,9 @@ def get_blast_radius(app_id):
         if "error" in blast_radius:
             return jsonify({"success": False, "error": blast_radius["error"]}), 404
 
-        return jsonify({"success": True, "data": blast_radius})
+        from app.services.cost_visibility import withhold_reply
+
+        return jsonify(withhold_reply({"success": True, "data": blast_radius}))
     except Exception as e:
         logger.error(
             f"Error calculating blast radius for app {app_id}: {e}", exc_info=True
@@ -903,6 +937,18 @@ def submit_rationalization_assessment():
 def get_tco_cost_tiers():
     """Get TCO cost range tiers for executive reporting."""
     try:
+        # The tiers are bands of what applications cost, so a person the one cost rule withholds from gets none.
+        from flask_login import current_user
+
+        from app.services.cost_visibility import COSTS_WITHHELD, costs_visible, withhold_costs
+
+        if not costs_visible(current_user):
+            return jsonify({
+                "success": True,
+                "data": [],
+                "summary": withhold_costs({"total_tco": None}),
+                "costs_withheld_sentence": COSTS_WITHHELD,
+            })
         from app.models import ApplicationComponent
         from app.extensions import db
         from sqlalchemy import func
@@ -1041,7 +1087,8 @@ def api_rationalization_onboard():
             application_type=data.get("type"),
             lifecycle_status=data.get("lifecycle_status", "planning"),
         )
-        set_annual_cost(app, data.get("annual_cost"))
+        if costs_visible(current_user):
+            set_annual_cost(app, data.get("annual_cost"))
         db.session.add(app)
         db.session.flush()
 

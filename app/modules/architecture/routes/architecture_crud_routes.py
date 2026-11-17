@@ -22,9 +22,16 @@ from werkzeug.wsgi import ClosingIterator
 
 from app.decorators import audit_log, require_roles
 from app.extensions import db
+from app.middleware.tenant_context import current_org_id
 from app.models.archimate_core import (
     ArchiMateElement as ArchitectureElement,
     ArchiMateRelationship as Relationship,
+)
+from app.modules.intelligence.services.query_service import (
+    RELATIONSHIP_PAGE_SIZES,
+    filter_relationships_by_org,
+    relationship_sort_args,
+    relationships_page,
 )
 from app.services.architecture_validation_service import ArchitectureValidator
 from app.services.architecture_search_service import ArchitectureSearchService
@@ -43,6 +50,20 @@ architecture_crud_bp = Blueprint(
 validator = ArchitectureValidator()
 search_service = ArchitectureSearchService()
 import_export_service = ArchitectureImportExportService()
+
+
+def _own_element_or_404(element_id):
+    """The element with this id inside the signed-in organisation, else 404."""
+    return ArchitectureElement.query.filter_by(
+        id=element_id, organization_id=current_org_id()
+    ).first_or_404()
+
+
+def _own_relationship_or_404(rel_id):
+    """The relationship with this id inside the signed-in organisation, else 404."""
+    return Relationship.query.filter_by(
+        id=rel_id, organization_id=current_org_id()
+    ).first_or_404()
 
 
 # ==================== ELEMENT ROUTES ====================
@@ -185,11 +206,16 @@ def create_element():
 @login_required
 def view_element(element_id):
     """View element details."""
-    element = ArchitectureElement.query.get_or_404(element_id)
+    element = _own_element_or_404(element_id)
 
-    # Get relationships
-    incoming = Relationship.query.filter_by(target_id=element_id).all()
-    outgoing = Relationship.query.filter_by(source_id=element_id).all()
+    # Get relationships, leaving out any whose far end is in another organisation
+    org_id = current_org_id()
+    incoming = filter_relationships_by_org(
+        Relationship.query.filter_by(target_id=element_id).all(), org_id, direction="incoming"
+    )
+    outgoing = filter_relationships_by_org(
+        Relationship.query.filter_by(source_id=element_id).all(), org_id, direction="outgoing"
+    )
 
     return render_template(
         "architecture/elements.html",
@@ -204,7 +230,7 @@ def view_element(element_id):
 @require_roles("admin", "architect")
 def edit_element_form(element_id):
     """Show edit element form."""
-    element = ArchitectureElement.query.get_or_404(element_id)
+    element = _own_element_or_404(element_id)
     return jsonify(
         {"success": True, "data": element.to_dict(), "message": "Use PUT to update"}
     )
@@ -216,7 +242,7 @@ def edit_element_form(element_id):
 @audit_log("architecture_element_update")
 def update_element(element_id):
     """Update element."""
-    element = ArchitectureElement.query.get_or_404(element_id)
+    element = _own_element_or_404(element_id)
     data = request.get_json() or {}
 
     # Validate
@@ -247,7 +273,7 @@ def update_element(element_id):
 @audit_log("architecture_element_delete")
 def delete_element(element_id):
     """Delete element and all related relationships."""
-    element = ArchitectureElement.query.get_or_404(element_id)
+    element = _own_element_or_404(element_id)
     element_name = element.name
 
     # Delete related relationships
@@ -291,43 +317,36 @@ def list_relationships():
     bare id, which is how BOTH routes produced the same "IDs, no names" bug
     from two different causes. Resolve real names/types here explicitly
     instead of relying on attributes that were never declared.
+
+    A relationship row may cross the organisation boundary (its own organization_id
+    is the caller's org while the far element belongs to another). Only relationships
+    where both source and target elements belong to the current organisation are listed.
     """
-    from app.models.archimate_core import ArchiMateElement, ArchiMateRelationship
-
     page = safe_int_arg('page', 1, minimum=1)
-    per_page = 20
+    per_page = request.args.get("per_page", 20, type=int)
+    if per_page not in RELATIONSHIP_PAGE_SIZES:
+        per_page = 20
 
-    pagination = ArchiMateRelationship.query.order_by(
-        ArchiMateRelationship.type
-    ).paginate(page=page, per_page=per_page)
-
-    element_ids = {
-        eid for rel in pagination.items
-        for eid in (rel.source_id, rel.target_id) if eid is not None
-    }
-    names_by_id = {}
-    if element_ids:
-        names_by_id = dict(
-            db.session.query(ArchiMateElement.id, ArchiMateElement.name)
-            .filter(ArchiMateElement.id.in_(element_ids))
-        )
-
-    relationships = [
-        {
-            "id": rel.id,
-            "type": rel.type,
-            "source_id": rel.source_id,
-            "target_id": rel.target_id,
-            "source_name": names_by_id.get(rel.source_id),
-            "target_name": names_by_id.get(rel.target_id),
-        }
-        for rel in pagination.items
-    ]
+    # An address that names one relationship ("Open relationship record" in an
+    # answer) shows that relationship, so the row it points at is on the page.
+    focus_id = request.args.get("relationship", type=int)
+    sort, direction = relationship_sort_args(request.args)
+    listing = relationships_page(current_org_id(), page, per_page, focus_id, sort, direction)
+    relationships, total, pages, page = (
+        listing["relationships"], listing["total"], listing["pages"], listing["page"]
+    )
 
     return render_template(
         "architecture/relationships.html",
+        relationship_page_sizes=RELATIONSHIP_PAGE_SIZES,
         relationships=relationships,
-        total=pagination.total,
+        total=total,
+        page=page,
+        per_page=per_page,
+        pages=pages,
+        focus_id=focus_id,
+        sort=sort,
+        sort_dir=direction,
     )
 
 
@@ -373,7 +392,7 @@ def create_relationship():
 @audit_log("architecture_relationship_update")
 def update_relationship(rel_id):
     """Update relationship."""
-    relationship = Relationship.query.get_or_404(rel_id)
+    relationship = _own_relationship_or_404(rel_id)
     data = request.get_json() or {}
 
     # Validate
@@ -402,7 +421,7 @@ def update_relationship(rel_id):
 @audit_log("architecture_relationship_delete")
 def delete_relationship(rel_id):
     """Delete relationship."""
-    relationship = Relationship.query.get_or_404(rel_id)
+    relationship = _own_relationship_or_404(rel_id)
 
     db.session.delete(relationship)
     db.session.commit()
@@ -691,22 +710,51 @@ def api_list_relationships():
     )
 
 
+def _relationships_for_drawer(relationships):
+    """Relationships as the element drawer reads them: the type and both ends by name and layer."""
+    ids = {r.source_id for r in relationships} | {r.target_id for r in relationships}
+    ends = {}
+    if ids:
+        ends = {e.id: e for e in ArchitectureElement.query.filter(ArchitectureElement.id.in_(ids)).all()}
+    rows = []
+    for r in relationships:
+        row = _relationship_to_dict(r)
+        source, target = ends.get(r.source_id), ends.get(r.target_id)
+        row["relationship_type"] = r.type
+        row["source_name"] = source.name if source else None
+        row["source_layer"] = source.layer if source else None
+        row["target_name"] = target.name if target else None
+        row["target_layer"] = target.layer if target else None
+        rows.append(row)
+    return rows
+
+
 @architecture_crud_bp.route(
     "/api/elements/<int:element_id>/relationships", methods=["GET"]
 )
 @login_required
 def api_element_relationships(element_id):
-    """API: Get relationships for an element."""
-    ArchitectureElement.query.get_or_404(element_id)
+    """API: Get relationships for an element, scoped to the element's organisation.
 
-    incoming = Relationship.query.filter_by(target_id=element_id).all()
-    outgoing = Relationship.query.filter_by(source_id=element_id).all()
+    A relationship row may cross the organisation boundary (its own organization_id
+    is the caller's org while the far element belongs to another). Only relationships
+    where the far element belongs to the same organisation as the centre element
+    are returned.
+    """
+    org_id = current_org_id()
+    _own_element_or_404(element_id)
+
+    incoming_rels = Relationship.query.filter_by(target_id=element_id).all()
+    outgoing_rels = Relationship.query.filter_by(source_id=element_id).all()
+
+    incoming_rels = filter_relationships_by_org(incoming_rels, org_id, direction="incoming")
+    outgoing_rels = filter_relationships_by_org(outgoing_rels, org_id, direction="outgoing")
 
     return jsonify(
         {
             "status": "success",
-            "incoming": [_relationship_to_dict(r) for r in incoming],
-            "outgoing": [_relationship_to_dict(r) for r in outgoing],
+            "incoming": _relationships_for_drawer(incoming_rels),
+            "outgoing": _relationships_for_drawer(outgoing_rels),
         }
     )
 
@@ -744,14 +792,16 @@ def api_application_technology_links(application_id):
     """API: the nodes and system software an application is mapped to."""
     from app.modules.architecture.services.application_technology_links import (
         TechnologyLinkError,
+        list_linked,
         list_links,
     )
 
     try:
         links = list_links(application_id)
+        linked = list_linked(application_id)
     except TechnologyLinkError as exc:
         return _technology_link_error(exc)
-    return jsonify({"status": "success", "links": links})
+    return jsonify({"status": "success", "links": links, "linked": linked})
 
 
 @architecture_crud_bp.route(

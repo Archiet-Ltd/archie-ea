@@ -9,39 +9,38 @@ from types import SimpleNamespace
 import pytest
 
 
-def _overview_health_context():
-    """Execute the route's actual health block without its unrelated DB queries."""
-    source = Path(__file__).resolve().parents[1] / "app/modules/dashboard/v2/routes/dashboard_views.py"
-    overview = next(node for node in ast.parse(source.read_text(encoding="utf-8")).body
-                    if isinstance(node, ast.FunctionDef) and node.name == "overview")
-    def assignment(node, name):
-        return isinstance(node, ast.Assign) and any(
-            isinstance(target, ast.Name) and target.id == name for target in node.targets)
-    start = next(i for i, node in enumerate(overview.body) if assignment(node, "health_score"))
-    end = next(i for i, node in enumerate(overview.body) if assignment(node, "data_coverage"))
-    namespace = {"persona_metrics": {}, "solutions": [], "capability_health": [],
-                 "logger": logging.getLogger(__name__)}
-    exec(compile(ast.Module(body=overview.body[start:end], type_ignores=[]), str(source), "exec"), namespace)
-    return namespace
-
-
 @pytest.mark.parametrize("score,components", [
     (42.9, {"phase_maturity": 0.0, "risk_posture": None, "capability_coverage": 100.0, "governance": 100.0}),
     (0.0, {"phase_maturity": 0.0, "risk_posture": 0.0, "capability_coverage": 0.0, "governance": None}),
     (None, {"phase_maturity": None, "risk_posture": None, "capability_coverage": None, "governance": None}),
 ])
-def test_overview_preserves_canonical_score_precision_and_missing_components(monkeypatch, score, components):
+def test_overview_preserves_canonical_score_precision_and_missing_components(
+    monkeypatch, score, components, db_session, client, login_as, tenant_ctx
+):
+    from app import db
     from app.modules.dashboard.v2.services.executive_dashboard_service import ExecutiveDashboardService
+    from tests.test_dashboard_health_score_honesty import _org, _user
+
     monkeypatch.setattr(ExecutiveDashboardService, "_get_health_score", lambda self: {
         "composite_score": score, "components": components,
         "unavailable_components": [key for key, value in components.items() if value is None],
     })
-    context = _overview_health_context()
-    assert context["health_score"] == score
-    assert context["health_components"] == {
-        "phase_maturity": components["phase_maturity"], "risk_health": components["risk_posture"],
-        "capability_coverage": components["capability_coverage"], "governance": components["governance"],
-    }
+    org = _org(db_session, "agreement-precision")
+    with tenant_ctx(org.id):
+        user = _user(org, "precision")
+        db.session.flush()
+    login_as(client, user)
+    html = client.get("/dashboard/health").get_data(as_text=True)
+    shown = re.search(r'data-testid="health-score-value">([^<]+)</strong>', html).group(1)
+    assert shown == ("—" if score is None else f"{score:.1f}")
+    missing = re.search(r'data-testid="health-score-not-measured">Not measured: ([^<]+)\.</span>', html)
+    names = {"phase_maturity": "phase maturity", "risk_posture": "risk posture",
+             "capability_coverage": "capability coverage", "governance": "governance"}
+    for key, value in components.items():
+        if value is None:
+            assert missing is not None and names[key] in missing.group(1)
+        elif missing is not None:
+            assert names[key] not in missing.group(1)
 
 
 def test_health_card_browser_assertion_uses_rendered_value_element():
@@ -87,18 +86,24 @@ def test_empty_portfolio_has_no_measured_health_components(monkeypatch):
     assert result["unavailable_components"] == ["capability_coverage", "governance", "phase_maturity", "risk_posture"]
 
 
-def test_executive_summary_formats_missing_value_without_hiding_measured_zero():
-    from playwright.sync_api import sync_playwright
-    source = (Path(__file__).resolve().parents[1] / "app/templates/dashboards/overview.html").read_text(encoding="utf-8")
-    expression = re.search(r'x-text="(typeof val ===[^"\n]+)"', source).group(1)
-    with sync_playwright() as playwright:
-        browser = playwright.chromium.launch()
-        page = browser.new_page()
-        try:
-            values = page.evaluate("expression => [null, 0, 42.9].map(val => new Function('val', 'return ' + expression)(val))", expression)
-            assert values == ["—", "0", "42.9"]
-        finally:
-            browser.close()
+@pytest.mark.parametrize("score,want", [(None, None), (0.0, "0.0"), (42.9, "42.9")])
+def test_executive_summary_formats_missing_value_without_hiding_measured_zero(
+    monkeypatch, score, want, db_session, client, login_as, tenant_ctx
+):
+    from app import db
+    from app.modules.dashboard.v2.services.executive_dashboard_service import ExecutiveDashboardService
+    from tests.test_dashboard_health_score_honesty import _org, _user
+
+    monkeypatch.setattr(ExecutiveDashboardService, "get_executive_summary",
+                        lambda self: {"architecture_health": {"composite_score": score}})
+    org = _org(db_session, "agreement-summary")
+    with tenant_ctx(org.id):
+        user = _user(org, "summary")
+        db.session.flush()
+    login_as(client, user)
+    data = client.get("/dashboard/api/executive-summary").get_json()["data"]
+    # A missing score is null (the page draws it as a dash); a measured zero stays "0.0".
+    assert data["Health Score"] == want
 
 
 @pytest.mark.parametrize("phases,want", [

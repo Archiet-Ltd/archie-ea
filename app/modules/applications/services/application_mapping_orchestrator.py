@@ -239,7 +239,6 @@ class ApplicationMappingOrchestrator:
         result: MappingResult
     ) -> None:
         """Create capability mappings in atomic transaction."""
-        from app import db
         from app.models.unified_application_capability_mapping import (
             UnifiedApplicationCapabilityMapping,
         )
@@ -262,12 +261,9 @@ class ApplicationMappingOrchestrator:
             for m in caps:
                 if m.get("confidence_score", 0) >= options.confidence_threshold:
                     if m["capability_id"] not in existing_cap_set:
-                        db.session.add(
-                            UnifiedApplicationCapabilityMapping(
-                                application_component_id=app.id,
-                                unified_capability_id=m["capability_id"],
-                            )
-                        )
+                        from app.services.capability_support import record_support_for_records
+
+                        record_support_for_records(app.organization_id, app.id, m["capability_id"])
                         result.mappings_created["capabilities"] += 1
         except Exception as e:
             result.errors.append(f"Capability mapping error: {e}")

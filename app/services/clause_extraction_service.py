@@ -14,6 +14,8 @@ import logging
 from datetime import datetime, timedelta
 
 from app.models.application_portfolio import VendorContract
+from app.services import vendor_register
+from app.services.vendor_register import days_until, renewal_band
 
 logger = logging.getLogger(__name__)
 
@@ -52,6 +54,13 @@ EXPECTED_FIELDS = [
 ]
 
 
+def _deadline_urgency(days):
+    """A dated obligation's urgency, from the one renewal banding: critical or warning when it is near or
+    past, info otherwise."""
+    band = renewal_band(days)
+    return "critical" if band == "expired" else band if band in ("critical", "warning") else "info"
+
+
 class ClauseExtractionService:
     """Extracts structured clause data from VendorContract records."""
 
@@ -76,7 +85,7 @@ class ClauseExtractionService:
                 "summary": {
                     "total_contracts": 0,
                     "active_count": 0,
-                    "total_annual_spend": 0,
+                    "total_annual_spend": None,
                     "upcoming_renewals": 0,
                     "high_risk_count": 0,
                     "avg_confidence": 0,
@@ -144,7 +153,10 @@ class ClauseExtractionService:
             )
 
         # MONEY entities
-        currency = contract.currency or "USD"
+        # a contract that states no currency is in the organisation's, as the contract ledger reads it
+        from app.services.application_cost_accessor import get_reporting_currency
+
+        currency = contract.currency or get_reporting_currency(contract.organization_id)
         if contract.contract_value:
             entities.append(
                 {
@@ -416,6 +428,13 @@ class ClauseExtractionService:
         now = datetime.utcnow().date()
         events = []
 
+        def when(contract, target):
+            """Days to a dated obligation and its urgency; a contract that is not active has neither."""
+            if not vendor_register.is_marked_active(contract):
+                return None, None
+            days = days_until(target, now)
+            return days, _deadline_urgency(days)
+
         for contract in contracts:
             source = (
                 contract.contract_name or contract.contract_number or f"Contract #{contract.id}"
@@ -432,13 +451,7 @@ class ClauseExtractionService:
                     }
                 )
             if contract.end_date:
-                days_until = (contract.end_date - now).days
-                if days_until < 30:
-                    urgency = "critical"
-                elif days_until < 90:
-                    urgency = "warning"
-                else:
-                    urgency = "info"
+                days_remaining, urgency = when(contract, contract.end_date)
                 events.append(
                     {
                         "date": contract.end_date.isoformat(),
@@ -446,18 +459,12 @@ class ClauseExtractionService:
                         "description": f"{source} — Contract expiration",
                         "event_type": "end",
                         "urgency": urgency,
-                        "days_remaining": days_until,
+                        "days_remaining": days_remaining,
                         "source": source,
                     }
                 )
             if contract.renewal_date:
-                days_until = (contract.renewal_date - now).days
-                if days_until < 30:
-                    urgency = "critical"
-                elif days_until < 90:
-                    urgency = "warning"
-                else:
-                    urgency = "info"
+                days_remaining, urgency = when(contract, contract.renewal_date)
                 events.append(
                     {
                         "date": contract.renewal_date.isoformat(),
@@ -465,19 +472,13 @@ class ClauseExtractionService:
                         "description": f"{source} — Renewal deadline",
                         "event_type": "renewal",
                         "urgency": urgency,
-                        "days_remaining": days_until,
+                        "days_remaining": days_remaining,
                         "source": source,
                     }
                 )
             if contract.end_date and contract.notice_period_days:
                 notice_date = contract.end_date - timedelta(days=contract.notice_period_days)
-                days_until = (notice_date - now).days
-                if days_until < 30:
-                    urgency = "critical"
-                elif days_until < 90:
-                    urgency = "warning"
-                else:
-                    urgency = "info"
+                days_remaining, urgency = when(contract, notice_date)
                 events.append(
                     {
                         "date": notice_date.isoformat(),
@@ -485,7 +486,7 @@ class ClauseExtractionService:
                         "description": f"{source} — Notice period begins ({contract.notice_period_days}d)",
                         "event_type": "notice",
                         "urgency": urgency,
-                        "days_remaining": days_until,
+                        "days_remaining": days_remaining,
                         "source": source,
                     }
                 )
@@ -546,11 +547,16 @@ class ClauseExtractionService:
     def _build_summary(self, contracts, entities, relations, confidences):
         """Build aggregate summary statistics."""
         now = datetime.utcnow().date()
-        active_count = sum(1 for c in contracts if c.status == "active")
-        total_annual = sum(float(c.annual_cost or 0) for c in contracts)
-        upcoming_renewals = sum(
-            1 for c in contracts if c.renewal_date and 0 <= (c.renewal_date - now).days <= 90
-        )
+        # active is the ledger's one definition; the annual spend is read from the one contract ledger:
+        # active, in the organisation's currency
+        from app.services import vendor_register
+
+        active_count = sum(1 for c in contracts if vendor_register.is_active(c, now))
+
+        ledger = vendor_register.contract_ledger(contracts[0].organization_id) if contracts else None
+        in_ledger = {c.id for c in ledger["counted"]} if ledger else set()
+        total_annual, _ = vendor_register.stated_annual_cost([c for c in contracts if c.id in in_ledger])
+        upcoming_renewals = sum(1 for c in contracts if vendor_register.contract_renewal_due(c, now))
         high_risk = sum(
             1
             for c in contracts

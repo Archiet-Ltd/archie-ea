@@ -33,6 +33,7 @@ other way.
 
 import json as _json
 import logging
+from functools import wraps
 
 from flask import Blueprint, abort, flash, jsonify, redirect, render_template, request, url_for
 from flask_login import login_required
@@ -43,6 +44,26 @@ from app.models.connector_config import _is_sensitive_key
 logger = logging.getLogger(__name__)
 
 m365_connector_bp = Blueprint("m365_connector", __name__, url_prefix="/admin/connectors")
+
+
+def connections_access(f):
+    """Who may open and change connectors: administrators of the active
+    organisation (what ``admin_required`` asks) and the architects who bring a
+    source in, answered by ``may_use_connections`` -- the same predicate the
+    sidebar's Connections link uses, so the link and the page cannot disagree."""
+    admin_gated = admin_required(f)
+
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        from flask_login import current_user
+
+        from app.utils.role_access import may_use_connections
+
+        if current_user.is_authenticated and may_use_connections(current_user):
+            return f(*args, **kwargs)
+        return admin_gated(*args, **kwargs)
+
+    return decorated
 
 
 def _active_org_id():
@@ -77,7 +98,7 @@ def _permit_connector_type(connector_type: str):
 
 @m365_connector_bp.route("", methods=["GET"])
 @login_required
-@admin_required
+@connections_access
 def connectors_index():
     """The one connectors page: every connector of the signed-in
     organisation with health, last synchronisation, the masked credential
@@ -114,7 +135,7 @@ def connectors_index():
 
 @m365_connector_bp.route("", methods=["POST"])
 @login_required
-@admin_required
+@connections_access
 def connectors_save():
     """Add or update a connector of the signed-in organisation.
 
@@ -235,7 +256,7 @@ def connectors_save():
 
 @m365_connector_bp.route("/<string:connector_id>/sync", methods=["POST"])
 @login_required
-@admin_required
+@connections_access
 def connectors_sync(connector_id):
     """Propose a sync for one connector of the signed-in organisation, or run
     it directly when the organisation has delegated the sync action.
@@ -248,7 +269,7 @@ def connectors_sync(connector_id):
     from app.services.connector_framework import (
         CONNECTOR_ACTION_SYNC,
         _load_org_connector,
-        propose_or_apply_connector_change,
+        propose_connector_sync,
         run_connector_sync,
     )
 
@@ -265,33 +286,31 @@ def connectors_sync(connector_id):
         db.session.commit()
         if result.get("success"):
             flash(f"Sync completed for '{cfg.name}'.", "success")
+        elif result.get("busy"):
+            flash(f"'{cfg.name}' is already being read. Its page shows the result when that read finishes.", "info")
         else:
             flash(f"Sync failed: {result.get('error', 'unknown error')}", "error")
         return redirect(url_for("m365_connector.connectors_index"))
 
-    result = propose_or_apply_connector_change(
-        org_id=org_id,
-        actor_user_id=current_user_id(),
-        action=CONNECTOR_ACTION_SYNC,
-        connector_type=cfg.connector_type,
-        summary=f"Run sync for connector '{cfg.name}'",
-        payload={"connector_id": cfg_id, "connector_type": cfg.connector_type},
-    )
+    from app.services.connector_schedule import pending_sync_proposal
+
+    already_asked = pending_sync_proposal(org_id, cfg_id) is not None
+    propose_connector_sync(org_id=org_id, cfg=cfg, actor_user_id=current_user_id())
     db.session.commit()
-    if result.get("queued"):
-        flash(
-            f"Sync queued for approval (proposal #{result['approval_id']}). "
-            "It runs once an approver in this organisation approves it.",
-            "success",
-        )
-    else:
-        flash("Sync completed.", "success")
+    if already_asked:
+        flash(f"A sync of '{cfg.name}' is already waiting for approval. It runs once an approver approves it.", "info")
+        return redirect(url_for("m365_connector.connectors_index"))
+    flash(
+        f"Sync of '{cfg.name}' queued for approval. "
+        "It runs once an approver in this organisation approves it.",
+        "success",
+    )
     return redirect(url_for("m365_connector.connectors_index"))
 
 
 @m365_connector_bp.route("/<string:connector_id>/delete", methods=["POST"])
 @login_required
-@admin_required
+@connections_access
 def connectors_delete(connector_id):
     """Propose removal of one connector, or remove it directly when the
     organisation has delegated the delete action. Removal also clears the
@@ -342,7 +361,7 @@ def current_user_id():
 
 @m365_connector_bp.route("/m365", methods=["GET"])
 @login_required
-@admin_required
+@connections_access
 def m365_config():
     """Render the M365 connector configuration form for the active org."""
     from app.modules.codegen.services.credential_vault import OrgCredentialVault
@@ -364,7 +383,7 @@ def m365_config():
 
 @m365_connector_bp.route("/m365", methods=["POST"])
 @login_required
-@admin_required
+@connections_access
 def m365_config_save():
     """Persist M365 connector configuration through the change path.
 
@@ -457,7 +476,7 @@ def m365_config_save():
 
 @m365_connector_bp.route("/m365/test", methods=["POST"])
 @login_required
-@admin_required
+@connections_access
 def m365_test():
     """Test M365 OAuth2 authentication and return JSON status.
 
@@ -502,7 +521,7 @@ def m365_test():
 
 @m365_connector_bp.route("/servicenow", methods=["GET"])
 @login_required
-@admin_required
+@connections_access
 def servicenow_config():
     """Display the ServiceNow connector configuration form for the active org."""
     from app.modules.codegen.services.credential_vault import OrgCredentialVault
@@ -524,7 +543,7 @@ def servicenow_config():
 
 @m365_connector_bp.route("/servicenow", methods=["POST"])
 @login_required
-@admin_required
+@connections_access
 def servicenow_config_save():
     """Save ServiceNow connector configuration through the change path.
 
@@ -611,7 +630,7 @@ def servicenow_config_save():
 
 @m365_connector_bp.route("/servicenow/sync", methods=["POST"])
 @login_required
-@admin_required
+@connections_access
 def servicenow_sync():
     """Route a ServiceNow sync through the organisation's approval queue (or
     run it directly when the org has delegated the sync action)."""
@@ -656,7 +675,7 @@ def servicenow_sync():
 
 @m365_connector_bp.route("/servicenow/status", methods=["GET"])
 @login_required
-@admin_required
+@connections_access
 def servicenow_status():
     """Return JSON status for the ServiceNow connector of the active org."""
     from app.services.connector_framework import _load_org_connector
@@ -695,7 +714,7 @@ def _get_jira_config(org_id: int):
 
 @m365_connector_bp.route("/jira", methods=["GET"])
 @login_required
-@admin_required
+@connections_access
 def jira_config():
     """Display the Jira connector configuration form for the active org."""
     from app.modules.codegen.services.credential_vault import OrgCredentialVault
@@ -713,7 +732,7 @@ def jira_config():
 
 @m365_connector_bp.route("/jira", methods=["POST"])
 @login_required
-@admin_required
+@connections_access
 def jira_config_save():
     """Persist Jira connector configuration through the change path.
 
@@ -799,7 +818,7 @@ def jira_config_save():
 
 @m365_connector_bp.route("/jira/test", methods=["POST"])
 @login_required
-@admin_required
+@connections_access
 def jira_config_test():
     """Test Jira credentials by calling /rest/api/3/myself. Returns JSON."""
     from app.services.jira_connector_service import JiraConnectorService
@@ -824,6 +843,24 @@ def jira_config_test():
 # ---------------------------------------------------------------------------
 
 
+def _product_asked_for(org_id: int, raw):
+    """The Product (id, name, page address) a person came from to connect GitHub, only when it is a Product
+    of the active organisation; anything else is ignored and the person stays on the connect page."""
+    from app.models.archimate_core import ArchiMateElement
+
+    if not str(raw or "").isdigit():
+        return None
+    product = ArchiMateElement.query.filter_by(id=int(raw), type="Product", organization_id=org_id).first()
+    if product is None:
+        return None
+    return {
+        "id": product.id,
+        "name": product.name,
+        "url": url_for("archimate_crud.detail_element", layer="business", element_type="Product",
+                       element_id=product.id, ae=1, bring_in=1) + "#bring-in",
+    }
+
+
 def _github_state(org_id: int) -> dict:
     """What the connect page and its status route report: the connection, the latest read and the counts.
     Never the token, only whether one is stored."""
@@ -836,8 +873,12 @@ def _github_state(org_id: int) -> dict:
     cfg = _load_org_connector(org_id, connector_type="github")
     if cfg is None:
         return {"state": "not_connected", "organization": None, "has_token": False, "counts": {}, "job": None}
-    jobs = get_job_queue_service().list_jobs(org_id, limit=1, task=gh.FIRST_SYNC_TASK)
-    job = jobs[0] if jobs else None
+    # The latest read, whether the connect page started it or sign-up did.
+    from app.modules.account.services.onboarding_service import GITHUB_TASK as SIGNUP_TASK
+
+    queue = get_job_queue_service()
+    reads = queue.list_jobs(org_id, limit=1, task=gh.FIRST_SYNC_TASK) + queue.list_jobs(org_id, limit=1, task=SIGNUP_TASK)
+    job = max(reads, key=lambda j: j.id) if reads else None
     state = {
         None: "connected",
         JobStatus.PENDING.value: "waiting",
@@ -866,21 +907,28 @@ def _github_state(org_id: int) -> dict:
 
 @m365_connector_bp.route("/github", methods=["GET"])
 @login_required
-@admin_required
+@connections_access
 def github_connect():
-    """The one page that connects GitHub: paste a read-only token, and the first read starts at once."""
+    """The one page that connects GitHub: one click through the Entelim GitHub App, or
+    paste a read-only token, and the first read starts at once either way."""
+    from app.connectors import github_app
+
     org_id = _require_active_org()
+    configured = github_app.app_configured()
     return render_template(
         "admin/connectors/github.html",
         status=_github_state(org_id),
+        for_product=_product_asked_for(org_id, request.args.get("product")),
         review_url=url_for("m365_connector.github_review"),
         status_url=url_for("m365_connector.github_status"),
+        github_app_configured=configured,
+        github_app_install_url=github_app.install_url(org_id) if configured else None,
     )
 
 
 @m365_connector_bp.route("/github/status", methods=["GET"])
 @login_required
-@admin_required
+@connections_access
 def github_status():
     """JSON for the connect page to poll while the first read runs."""
     return jsonify(_github_state(_require_active_org()))
@@ -888,7 +936,7 @@ def github_status():
 
 @m365_connector_bp.route("/github", methods=["POST"])
 @login_required
-@admin_required
+@connections_access
 def github_connect_save():
     """Store the read-only token in the organisation's vault, save the connection and start the first read.
 
@@ -898,64 +946,119 @@ def github_connect_save():
     the connector's settings, a flash message or a response.
     """
     from app.connectors import github as gh
-    from app.extensions import db
-    from app.modules.codegen.services.credential_vault import OrgCredentialVault
-    from app.services.connector_framework import (
-        CONNECTOR_ACTION_CREATE,
-        CONNECTOR_ACTION_UPDATE,
-        _load_org_connector,
-        apply_connector_change,
-    )
-    from app.services.job_queue_service import get_job_queue_service
 
     org_id = _require_active_org()
-    organization = (request.form.get("organization") or "").strip()
-    token = (request.form.get("api_token") or "").strip()
-    existing = _load_org_connector(org_id, connector_type="github")
-    has_token = OrgCredentialVault().get_masked(org_id, "github", "api_token") is not None
-
-    if not gh.is_valid_organization(organization):
-        flash("Enter your GitHub organisation name exactly as it appears in github.com/<name>.", "error")
-        return redirect(url_for("m365_connector.github_connect"))
-    if not token and not has_token:
-        flash("Paste a read-only GitHub token to connect.", "error")
-        return redirect(url_for("m365_connector.github_connect"))
-    if token and (len(token) > 255 or any(ch.isspace() for ch in token)):
-        flash("That does not look like a GitHub token.", "error")
-        return redirect(url_for("m365_connector.github_connect"))
-
-    config = dict((existing.config or {}) if existing else {})
-    config["organization"] = organization
-    payload = {
-        "connector_type": "github",
-        "connector_id": existing.id if existing else None,
-        "name": "GitHub",
-        "config": config,
-        "status": "active",
-        "credential_provided": bool(token),
-    }
-    cfg = apply_connector_change(
-        org_id=org_id,
-        action=CONNECTOR_ACTION_UPDATE if existing else CONNECTOR_ACTION_CREATE,
-        payload=payload,
-        delegated=True,
-    )
-    if token:
-        OrgCredentialVault().store(org_id=org_id, connector_type="github", credential_type="api_token", value=token)
-    db.session.commit()
-    get_job_queue_service().create_job(
-        "GitHub: read repositories",
-        gh.FIRST_SYNC_TASK,
-        {"connector_id": cfg.id},
-        organization_id=org_id,
-    )
+    try:
+        gh.connect_and_start(org_id, request.form.get("organization"), request.form.get("api_token"))
+    except gh.ConnectRefused as exc:
+        flash(str(exc), "error")
+        return redirect(url_for("m365_connector.github_connect", product=request.form.get("product") or None))
+    product = _product_asked_for(org_id, request.form.get("product"))
+    if product is not None:
+        flash("Connected. Choose the repositories to read for %s." % product["name"], "success")
+        return redirect(product["url"])
     flash("Connected. Reading your repositories now; this page shows when it is done.", "success")
     return redirect(url_for("m365_connector.github_connect"))
 
 
+@m365_connector_bp.route("/github/installed", methods=["GET"])
+@login_required
+@connections_access
+def github_installed():
+    """Where GitHub sends a person back after they install the Entelim GitHub App.
+
+    The query string a browser redirect carries is never trusted on its own:
+    ``state`` must be a value this server signed for the signed-in organisation,
+    within its 30-minute window, and the ``installation_id`` GitHub sends is
+    independently confirmed with GitHub's own API before anything is stored. An
+    installation that is cancelled, has no repositories selected, or whose state
+    is forged or expired is refused with a plain message -- never a stack trace.
+    """
+    from app.connectors import github as gh
+    from app.connectors import github_app
+    from app.extensions import db
+    from app.modules.codegen.services.credential_vault import OrgCredentialVault
+
+    org_id = _require_active_org()
+
+    def _back(return_to: str):
+        if return_to == "welcome":
+            return redirect(url_for("account.welcome", step=2))
+        return redirect(url_for("m365_connector.github_connect"))
+
+    try:
+        return_to = github_app.read_state(request.args.get("state", ""), org_id)
+    except github_app.GitHubAppStateError as exc:
+        flash(str(exc), "error")
+        return redirect(url_for("m365_connector.github_connect"))
+
+    setup_action = request.args.get("setup_action")
+    if setup_action == "request":
+        flash(
+            "The installation is waiting for an owner of that GitHub organisation "
+            "to approve it. Try again once it is approved.",
+            "info",
+        )
+        return _back(return_to)
+
+    raw_id = request.args.get("installation_id", "")
+    if not raw_id.isdigit():
+        flash("GitHub did not send a valid installation. Try Connect GitHub again.", "error")
+        return _back(return_to)
+    installation_id = int(raw_id)
+
+    code = request.args.get("code", "")
+    if not code:
+        flash(
+            "GitHub did not say who completed this installation. Start again from Connect GitHub.",
+            "error",
+        )
+        return _back(return_to)
+
+    try:
+        user_token = github_app.exchange_code(code)
+        if not github_app.user_can_see_installation(user_token, installation_id):
+            flash(
+                "Your GitHub account can't see that GitHub installation, so it was not connected. "
+                "Install the app yourself from Connect GitHub.",
+                "error",
+            )
+            return _back(return_to)
+        if github_app.installation_bound_elsewhere(org_id, installation_id):
+            flash(
+                "That GitHub installation is already connected to another organisation.",
+                "error",
+            )
+            return _back(return_to)
+        confirmed = github_app.confirm_installation(installation_id)
+    except github_app.GitHubAppError as exc:
+        flash(str(exc), "error")
+        return _back(return_to)
+
+    account = confirmed["account"]
+    if not gh.is_valid_github_name(account):
+        flash("GitHub did not name a valid organisation or account for this installation.", "error")
+        return _back(return_to)
+
+    # Stored in the open transaction only: connect_and_start commits it once the
+    # connection is made, and a refusal rolls it back, so a refused connection
+    # leaves no installation in the vault.
+    OrgCredentialVault().store(
+        org_id=org_id, connector_type="github", credential_type="installation_id", value=str(installation_id)
+    )
+    try:
+        gh.connect_and_start(org_id, account, None)
+    except gh.ConnectRefused as exc:
+        db.session.rollback()
+        flash(str(exc), "error")
+        return _back(return_to)
+    flash("Connected through the GitHub App. Reading your repositories now; this page shows when it is done.", "success")
+    return _back(return_to)
+
+
 @m365_connector_bp.route("/github/sync", methods=["POST"])
 @login_required
-@admin_required
+@connections_access
 def github_resync():
     """Read the repositories again: adds what is new and changes nothing a person edited."""
     from app.connectors import github as gh
@@ -976,7 +1079,7 @@ def github_resync():
 
 @m365_connector_bp.route("/github/review", methods=["GET"])
 @login_required
-@admin_required
+@connections_access
 def github_review():
     """The review screen: every proposal the read made, grouped, with one Approve all."""
     from app.connectors import github as gh
@@ -985,6 +1088,7 @@ def github_review():
     return render_template(
         "admin/connectors/github_review.html",
         review=gh.pending_review(org_id),
+        model_counts=gh.model_counts(org_id),
         status=_github_state(org_id),
         classifications=gh.CLASSIFICATIONS,
     )
@@ -992,7 +1096,7 @@ def github_review():
 
 @m365_connector_bp.route("/github/review/approve-all", methods=["POST"])
 @login_required
-@admin_required
+@connections_access
 def github_review_approve_all():
     from app.connectors import github as gh
 
@@ -1013,7 +1117,7 @@ def github_review_approve_all():
 
 @m365_connector_bp.route("/github/review/<int:approval_id>/classify", methods=["POST"])
 @login_required
-@admin_required
+@connections_access
 def github_review_classify(approval_id):
     from app.connectors import github as gh
     from app.extensions import db
@@ -1031,7 +1135,7 @@ def github_review_classify(approval_id):
 
 @m365_connector_bp.route("/github/review/<int:approval_id>/skip", methods=["POST"])
 @login_required
-@admin_required
+@connections_access
 def github_review_skip(approval_id):
     from app.connectors import github as gh
 

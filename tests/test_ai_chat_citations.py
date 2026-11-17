@@ -349,26 +349,24 @@ def test_an_unmapped_turn_offers_no_next_step():
     assert "NEXT_ARTIFACT" in js and "create_option" in js
 
 
-def test_pending_approvals_card_states_whose_queue_it_is_not_a_dead_control():
-    """The inline pending-approvals card must NOT offer a modal-open button.
+def test_the_change_card_says_what_happened_and_links_to_its_record():
+    """The card under an answer says what the server did with each change it asked for.
 
-    Segregation of duties: AIChatApprovalService.get_approver_queue() excludes
-    the actor's own requests, so the requester — the only person who ever sees
-    this card — opening the approvals modal always gets "No approvals waiting
-    for your review". A button that always opens an empty modal for its only
-    viewer reads as broken, so the card instead names whose queue it is and who
-    can act. This locks in that deliberate decision (see render.js), replacing
-    an earlier assertion that demanded the dead modal-open button.
+    No change waits for a second person: the server checks it, has a model other than the drafter
+    review it, and applies or declines it in the same turn. So the card reads "Applied" or
+    "Declined" (or "In review" while a reviewer is reached), links to the record that shows how it
+    was checked, and never tells the person that someone else must approve it. It still offers no
+    modal-open button.
     """
     js = _render_js()
     assert "function renderPendingApprovals(" in js
-    assert 'data-modal-open="ai-chat-approvals-modal"' not in js, (
-        "the requester's own card must not open an approvals modal that is "
-        "always empty for them (segregation of duties)"
-    )
-    assert "Approvals for review" in js, (
-        "the card must point to where another reviewer acts on it"
-    )
+    assert 'data-modal-open="ai-chat-approvals-modal"' not in js
+    for word in ("word: 'Applied'", "word: 'Declined'", "word: 'In review'"):
+        assert word in js, word
+    assert 'data-testid="change-record-link"' in js and "c.record_url" in js
+    assert "different reviewer" not in js
+    assert "must approve" not in js
+    assert "awaiting approval" not in js
 
 
 def test_every_answer_path_renders_the_same_footer():
@@ -387,3 +385,10 @@ def test_every_answer_path_renders_the_same_footer():
     assert "actions: data.actions_taken || []" in app_js, (
         "the non-streaming fallback drops receipts"
     )
+
+
+def test_a_url_is_built_on_a_background_thread_with_only_an_application_context(app):
+    """A streamed turn has no request, yet its sources must still link to the record."""
+    with app.app_context():
+        url = AgentRunner._source_url("application", {"id": 7, "name": "Salesforce"})
+    assert url == "/applications/7", url

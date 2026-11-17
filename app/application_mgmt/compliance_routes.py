@@ -1,13 +1,21 @@
 """API routes for compliance framework management."""
 
-from flask import current_app, jsonify, render_template, request
+import re
+
+from flask import current_app, g, jsonify, render_template, request, url_for
 from flask_login import current_user, login_required
 
 from app import db
 from app.application_mgmt import application_mgmt
 from app.decorators import require_roles
 from app.models.application_compliance import ApplicationComplianceControl
+from app.models.application_portfolio import ApplicationComponent
 from app.models.compliance_models import ComplianceControl, RegulatoryFramework
+from app.modules.compliance.services.applicability_service import (
+    ApplicabilityService, FrameworkNotAdopted, IMPLEMENTATION_STATUSES, NotFoundInOrganisation,
+)
+from app.seed_data.standard_control_totals import all_controls_loaded_text, controls_loaded_text, scope_note
+from app.services.compliance.earlier_catalogue_seeds import article_order
 from app.utils.route_guards import require_entity
 
 
@@ -34,8 +42,21 @@ def compliance_frameworks_dashboard():
         .all()
     )
 
+    from flask import g
+
+    from app.models.regulatory_framework import FrameworkAdoption
+
+    adopted = {
+        a.framework_id: a.source
+        for a in FrameworkAdoption.query.filter_by(
+            organization_id=getattr(g, "current_org_id", None), status="active"
+        ).all()
+    }
+    counts = {f.id: f.controls.count() for f in frameworks}
     framework_rows = [
         {
+            "adopted": f.id in adopted,
+            "source": adopted.get(f.id),
             "id": f.id,
             "code": f.code,
             "name": f.name,
@@ -43,7 +64,10 @@ def compliance_frameworks_dashboard():
             "jurisdiction": f.jurisdiction,
             "enforcement_level": f.enforcement_level,
             "penalty_risk": f.penalty_risk,
-            "control_count": f.controls.count(),
+            "control_count": counts[f.id],
+            "partly_loaded": controls_loaded_text(f.code, counts[f.id]),
+            "whole_loaded": None if f.category == "method" else all_controls_loaded_text(f.code, counts[f.id]),
+            "scope_note": scope_note(f.code),
         }
         for f in frameworks
     ]
@@ -51,21 +75,189 @@ def compliance_frameworks_dashboard():
     total_controls = ComplianceControl.query.filter_by(is_active=True).count()
 
     # Org-scoped mapping coverage (TenantMixin auto-filters inside the request).
-    mappings = ApplicationComplianceControl.query.all()
+    # A control adopted with its framework is not yet mapped to an application, so it is not counted here.
+    mappings = ApplicationComplianceControl.query.filter(ApplicationComplianceControl.application_id.isnot(None)).all()
     mapped_by_status = {}
     for m in mappings:
         status = m.implementation_status or "planned"
         mapped_by_status[status] = mapped_by_status.get(status, 0) + 1
 
+    capability_rows, finding_rows = _capability_compliance_and_findings()
+    from app.services.compliance.compliance_inheritance_service import ComplianceInheritanceService as Compliance
+
+    not_in_place = Compliance.controls_not_in_place()
     return render_template(
         "compliance/frameworks_dashboard.html",
+        capability_rows=capability_rows,
+        finding_rows=finding_rows,
+        not_in_place=not_in_place,
+        not_in_place_text=Compliance.not_in_place_text(not_in_place),
+        control_panel=_control_panel(request.args.get("control", type=int)),
         frameworks=framework_rows,
         total_frameworks=len(framework_rows),
+        adopted_count=len(adopted),
         total_controls=total_controls,
         total_mappings=len(mappings),
         mapped_by_status=mapped_by_status,
+        open_framework_id=request.args.get("framework", type=int),
         load_error=False,
     )
+
+
+def _capability_compliance_and_findings():
+    """(one row per capability with its compliance figure, one row per missing control), both from
+    ComplianceInheritanceService, the one computation of compliance."""
+    from app.models.application_portfolio import ApplicationComponent
+    from app.models.business_capability import BusinessCapability
+    from app.services.compliance.compliance_inheritance_service import ComplianceInheritanceService as Compliance
+
+    capabilities = BusinessCapability.query.order_by(BusinessCapability.name).all()
+    assessments = Compliance.assess_capabilities([c.id for c in capabilities])
+    rows = [
+        {
+            "id": c.id,
+            "name": c.name,
+            "figure": Compliance.figure(assessments[c.id]),
+            "status": Compliance.status(assessments[c.id]),
+            "missing": assessments[c.id]["not_in_place"],
+            "assessed": assessments[c.id]["assessed_controls"],
+            "score": assessments[c.id]["score"],
+        }
+        for c in capabilities
+    ]
+    rows.sort(key=lambda r: (r["score"] is None, r["score"] if r["score"] is not None else 0, r["name"]))
+    from app.middleware.tenant_context import current_org_id
+    from app.models.application_capability import ApplicationCapabilityMapping
+
+    apps = ApplicationComponent.query.order_by(ApplicationComponent.name).all()
+    by_app = Compliance.assess_applications([a.id for a in apps])
+    capability_names = {c.id: c.name for c in capabilities}
+    served = {}
+    capability_links = {}
+    org_id = current_org_id()
+    mappings = (
+        db.session.query(
+            ApplicationCapabilityMapping.business_capability_id, ApplicationCapabilityMapping.application_component_id
+        )
+        .join(ApplicationComponent, ApplicationComponent.id == ApplicationCapabilityMapping.application_component_id)
+        .filter(ApplicationComponent.organization_id == org_id)
+    )
+    for cap_id, app_id in mappings.all():
+        if cap_id in capability_names:
+            served.setdefault(app_id, []).append(capability_names[cap_id])
+            capability_links.setdefault(app_id, {})[cap_id] = capability_names[cap_id]
+    from app.services import result_footer_service as footers
+
+    origins = footers.application_origins(org_id, apps)
+    findings = []
+    for app in apps:
+        capabilities = [
+            {"name": name, "href": footers.page_link(
+                "archimate_crud.detail_element", layer="strategy", element_type="Capability", element_id=cap_id)}
+            for cap_id, name in sorted(capability_links.get(app.id, {}).items(), key=lambda kv: kv[1])
+        ]
+        for f in by_app[app.id]["findings"]:
+            findings.append({
+                "id": f["mapping_id"],
+                "capability": ", ".join(c["name"] for c in capabilities) or "No capability mapped",
+                "capabilities": capabilities,
+                "application": app.name,
+                "application_href": footers.page_link("unified_applications.application_detail", id=app.id),
+                "control_id": f["control_id"],
+                "control_code": f["control_code"],
+                "control_title": f["control_title"],
+                "status": f["status"].replace("_", " "),
+                "footer": footers.build_footer(_finding_facts(f, app, origins)),
+            })
+    # Control by control, each with the applications that miss it, so the head of the list shows several
+    # applications rather than every control of the first one.
+    findings.sort(key=lambda f: ([(0, int(t), "") if t.isdigit() else (1, 0, t) for t in re.split(r"(\d+)", f["control_code"] or "")],
+                                 f["application"]))
+    return rows, findings
+
+
+@application_mgmt.route("/compliance/controls/<int:mapping_id>/evidence", methods=["GET"])
+@login_required
+def compliance_control_evidence(mapping_id):
+    """The evidence for one control on one application, inside the app, with the way back to the register.
+
+    A mapping of another organisation answers not found, the same as one that does not exist.
+    """
+    from app.middleware.tenant_context import current_org_id
+
+    mapping = ApplicationComplianceControl.query.filter_by(
+        id=mapping_id, organization_id=current_org_id()
+    ).first_or_404()
+    control = mapping.control
+    application = mapping.application
+    status = (mapping.implementation_status or "planned").replace("_", " ")
+    recorded = mapping.verified_date if mapping.implementation_status == "verified" and mapping.verified_date else (
+        mapping.updated_at or mapping.created_at)
+    return render_template(
+        "compliance/control_evidence.html",
+        control={
+            "code": control.control_code,
+            "title": control.title,
+            "description": control.description,
+            "framework": control.framework.name if control.framework else None,
+        },
+        application_name=application.name if application else None,
+        application_href=url_for("unified_applications.application_detail", id=application.id) if application else None,
+        status=status,
+        evidence=(mapping.notes or "").strip() or None,
+        recorded=recorded.strftime("%-d %B %Y") if recorded else None,
+        register_href=url_for("application_mgmt.compliance_frameworks_dashboard", _anchor="control-%d" % mapping.id),
+    )
+
+
+def _finding_facts(finding, app, origins):
+    """The facts one finding rests on: the application-to-control record, and the evidence document or its absence."""
+    from app.services import result_footer_service as footers
+
+    origin = footers.application_origin(app, origins)
+    facts = [
+        footers.fact(
+            "%s on %s: %s" % (finding["control_code"], app.name, finding["status"].replace("_", " ")),
+            source_kind="manual", as_of=finding["recorded_at"], subject="Mapping"),
+        footers.fact(
+            "Application %s" % app.name,
+            href=footers.page_link("unified_applications.application_detail", id=app.id),
+            source_kind=origin["source_kind"], source_label=origin["source_label"],
+            as_of=app.updated_at or app.created_at, subject="Application"),
+    ]
+    if finding["evidence_url"]:
+        facts.append(footers.fact("Evidence document", href=finding["evidence_url"], source_kind="manual",
+                                  as_of=finding["recorded_at"], subject="Document"))
+    else:
+        facts.append(footers.fact("No evidence document is recorded for this control", missing=True))
+    return facts
+
+
+def _control_panel(control_id):
+    """The facts of one control and where the organisation stands on it, or None when none is asked for."""
+    if control_id is None:
+        return None
+    from app.models.application_portfolio import ApplicationComponent
+
+    control = ComplianceControl.query.get(control_id)
+    if control is None:
+        return None
+    mappings = ApplicationComplianceControl.query.filter(
+        ApplicationComplianceControl.control_id == control.id,
+        ApplicationComplianceControl.application_id.isnot(None),
+    ).all()
+    names = {a.id: a.name for a in ApplicationComponent.query.filter(
+        ApplicationComponent.id.in_([m.application_id for m in mappings] or [0])).all()}
+    return {
+        "code": control.control_code,
+        "title": control.title,
+        "description": control.description,
+        "framework": control.framework.name if control.framework else None,
+        "applications": [
+            {"name": names.get(m.application_id, "An application"), "status": (m.implementation_status or "planned").replace("_", " ")}
+            for m in mappings
+        ],
+    }
 
 
 @application_mgmt.route("/api/compliance/frameworks", methods=["GET"])
@@ -104,7 +296,7 @@ def get_framework_controls(framework_id):
     if category:
         query = query.filter_by(category=category)
 
-    controls = query.order_by(ComplianceControl.control_code).all()
+    controls = sorted(query.all(), key=lambda c: article_order(c.control_code, c.id))
     return jsonify(
         [
             {
@@ -114,6 +306,7 @@ def get_framework_controls(framework_id):
                 "description": c.description,
                 "category": c.category,
                 "priority": c.priority,
+                "official_reference": c.official_reference,
             }
             for c in controls
         ]
@@ -140,39 +333,41 @@ def get_application_compliance(app_id):
     return jsonify(result)
 
 
-@application_mgmt.route("/api/applications/<string:app_id>/compliance/map", methods=["POST"])
+@application_mgmt.route("/api/applications/<int:app_id>/compliance/map", methods=["POST"])
 @login_required
 @require_roles("admin", "architect", "business_architect")
 def map_compliance_control(app_id):
-    """Map a compliance control to an application component."""
-    data = request.get_json()
+    """Map a compliance control to an application of the organisation, through the one writer."""
+    data = request.get_json(silent=True)
 
     if not data or "control_id" not in data:
         return jsonify({"error": "control_id required"}), 400
-
-    # Check if mapping already exists
-    existing = ApplicationComplianceControl.query.filter_by(
-        control_id=data["control_id"], application_id=app_id
-    ).first()
-
-    if existing:
+    control_id = data["control_id"]
+    if not isinstance(control_id, int) or isinstance(control_id, bool):
+        return jsonify({"error": "control_id must be a whole number"}), 400
+    status = data.get("implementation_status", "planned")
+    if status not in IMPLEMENTATION_STATUSES:
+        return jsonify({"error": "implementation_status must be one of: " + ", ".join(IMPLEMENTATION_STATUSES)}), 400
+    if ComplianceControl.query.get(control_id) is None:
+        return jsonify({"error": "Unknown control"}), 404
+    # An application of another organisation answers exactly as a missing one does.
+    if not ApplicationComponent.query.filter_by(id=app_id, organization_id=g.current_org_id).first():
+        return jsonify({"error": "Application not found"}), 404
+    if ApplicationComplianceControl.query.filter_by(
+        organization_id=g.current_org_id, control_id=control_id, application_id=app_id
+    ).first():
         return jsonify({"error": "Mapping already exists"}), 409
 
     try:
-        mapping = ApplicationComplianceControl(
-            application_id=app_id,
-            control_id=data["control_id"],
-            status=data.get("status", "not_implemented"),
-            coverage_percentage=data.get("coverage_percentage", 0),
-            implementation_notes=data.get("implementation_notes"),
-            evidence=data.get("evidence"),
+        mapping = ApplicabilityService.link_requirement(
+            g.current_org_id, app_id, control_id,
+            implementation_status=status, notes=data.get("notes"), evidence_url=data.get("evidence_url"),
         )
-
-        db.session.add(mapping)
-        db.session.commit()
-
         return jsonify({"success": True, "mapping": mapping.to_dict()})
-
+    except NotFoundInOrganisation:
+        return jsonify({"error": "Application not found"}), 404
+    except FrameworkNotAdopted:
+        return jsonify({"error": "Adopt this framework first."}), 409
     except Exception as e:
         db.session.rollback()
         current_app.logger.error(f"Error creating compliance mapping: {str(e)}")

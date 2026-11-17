@@ -10,8 +10,9 @@ let CURRENCY_SYMBOL = APP_CONFIG.currencySymbol || '£';
 
 // Currency formatting helper - uses CurrencyManager when available, falls back to CURRENCY_SYMBOL
 function formatCurrency(amount) {
+  if (amount === null || amount === undefined || amount === '') return Platform.figure.NOT_RECORDED;
   if (window.currencyManager) return window.currencyManager.format(amount);
-  return CURRENCY_SYMBOL + Number(amount || 0).toLocaleString();
+  return CURRENCY_SYMBOL + Number(amount).toLocaleString();
 }
 let selectedStrategy = 'hybrid';
 let thresholdSlider = null;
@@ -275,7 +276,8 @@ async function runDetection() {
       document.getElementById('result-groups').textContent = data.groups_found;
       document.getElementById('result-exact').textContent = data.exact_matches || 0;
       document.getElementById('result-fuzzy').textContent = data.fuzzy_matches || 0;
-      document.getElementById('result-savings').textContent = formatCurrency(data.estimated_savings || 0);
+      let savingsEl = document.getElementById('result-savings');  // absent for a role the cost rule withholds from
+      if (savingsEl) savingsEl.textContent = formatCurrency(data.estimated_savings);
 
       // Update "View Results" link to go to this specific run
       let viewResultsLink = document.getElementById('view-results-link');
@@ -2458,7 +2460,7 @@ function _dispositionBadgeHtml(disposition) {
     case 'replatform':  cls = 'bg-violet-500/10 text-violet-600 border border-violet-500/30'; break; // token-migration-ok
     case 'rehost':      cls = 'bg-sky-500/10 text-sky-600 border border-sky-500/30'; break;      // token-migration-ok
     case 'refactor':    cls = 'bg-amber-500/10 text-amber-600 border border-amber-500/30'; break; // token-migration-ok
-    case 'retain':      cls = 'bg-blue-500/10 text-blue-600 border border-blue-500/30'; break;   // token-migration-ok
+    case 'retain':      cls = 'bg-info/10 text-info-emphasis border border-info/30'; break;   // token-migration-ok
     default:            cls = 'bg-muted/50 text-muted-foreground border border-border';
   }
   return '<span class="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium ' + cls + '">' +
@@ -2786,7 +2788,7 @@ function renderDecisionDossier(data, containerId) {
     replatform: 'bg-violet-500/10 text-violet-600 border border-violet-500/30', // token-migration-ok
     rehost: 'bg-sky-500/10 text-sky-600 border border-sky-500/30', // token-migration-ok
     refactor: 'bg-amber-500/10 text-amber-600 border border-amber-500/30', // token-migration-ok
-    retain: 'bg-blue-500/10 text-blue-600 border border-blue-500/30', // token-migration-ok
+    retain: 'bg-info/10 text-info-emphasis border border-info/30', // token-migration-ok
   };
   let confMap = {
     high: 'bg-emerald-500/10 text-emerald-600 border border-emerald-500/30', // token-migration-ok
@@ -2881,7 +2883,7 @@ function renderWorkflowStatus(data, containerId) {
     html += '<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium border ' + cls + '">' + (labels[step] || step) + '</span>';
   });
   html += '</div>';
-  html += '<p class="text-xs text-muted-foreground mt-1">' + (data.completion_pct || 0) + '% complete \u00b7 Phase: ' + (data.current_phase || 'initial') + '</p>';
+  html += '<p class="text-xs text-muted-foreground mt-1">' + Platform.figure.percent(data.completion_pct) + ' complete \u00b7 Phase: ' + (data.current_phase || 'initial') + '</p>';
   safeHTML(container, html);
 }
 
@@ -2919,12 +2921,13 @@ function executiveSummary() {
     },
 
     fmtCurrency: function(amount) {
-      return formatCurrency(amount || 0);
+      return Platform.figure.money(amount, 'Not estimated yet');
     },
 
     netBenefit: function() {
-      if (!this.data.financial) return 0;
-      return (this.data.financial.total_projected_savings || 0) - (this.data.financial.total_investment_needed || 0);
+      const f = this.data.financial;
+      if (!f || f.total_projected_savings == null || f.total_investment_needed == null) return null;
+      return f.total_projected_savings - f.total_investment_needed;
     },
 
     totalReadiness: function() {
@@ -2943,16 +2946,9 @@ function executiveSummary() {
     },
 
     dispositionLabel: function(action) {
-      const labels = {
-        'retain':      'Retain',
-        'retire':      'Retire',
-        'replace':     'Replace',
-        'consolidate': 'Consolidate',
-        'migrate':     'Migrate',
-        'invest':      'Invest',
-        'tolerate':    'Tolerate'
-      };
-      return labels[action] || action;
+      // The server's label for the code: the model's one map.
+      const served = this.data.disposition_labels || {};
+      return served[action] || action;
     },
 
     reviewLabel: function(status) {
@@ -2971,7 +2967,7 @@ function executiveSummary() {
       const classes = {
         'approved':        'bg-emerald-500/10 text-emerald-600 border border-emerald-500/30',
         'rejected':        'bg-red-500/10 text-red-600 border border-red-500/30', // token-migration-ok
-        'under_review':    'bg-blue-500/10 text-blue-600 border border-blue-500/30', // token-migration-ok
+        'under_review':    'bg-info/10 text-info-emphasis border border-info/30', // token-migration-ok
         'pending':         'bg-muted text-muted-foreground border border-border',
         'needs_more_info': 'bg-amber-500/10 text-amber-600 border border-amber-500/30', // token-migration-ok
         'escalated':       'bg-purple-500/10 text-purple-600 border border-purple-500/30' // token-migration-ok

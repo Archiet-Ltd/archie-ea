@@ -35,6 +35,7 @@ from datetime import datetime
 from flask import Blueprint, jsonify, request
 from flask_login import current_user, login_required
 
+from app.core.auth.permissions import can
 from app.decorators import audit_log
 
 from ..services.roadmap_builder_service import RoadmapBuilderService
@@ -78,7 +79,9 @@ def list_work_packages():
         status_filter=status_filter, priority_filter=priority_filter, limit=limit, offset=offset
     )
 
-    return jsonify({"success": True, "data": result})
+    from app.services.cost_visibility import withhold_reply
+
+    return jsonify(withhold_reply({"success": True, "data": result}))
 
 
 @roadmap_builder_bp.route("/work-packages", methods=["POST"])
@@ -105,6 +108,9 @@ def create_work_package():
     Returns:
         JSON with created work package
     """
+    if not can(current_user, "create", "work_package"):
+        return jsonify({"error": "Your role may read work packages but not change them. Administrators and architects may create, edit and delete work packages."}), 403
+
     data = request.get_json()
     if not data:
         return jsonify({"success": False, "error": "Request body is required"}), 400
@@ -164,7 +170,9 @@ def get_work_package(work_package_id: int):
     if not result.get("success"):
         return jsonify(result), 404
 
-    return jsonify({"success": True, "data": result})
+    from app.services.cost_visibility import withhold_reply
+
+    return jsonify(withhold_reply({"success": True, "data": result}))
 
 
 @roadmap_builder_bp.route("/work-packages/<int:work_package_id>", methods=["PUT"])
@@ -183,6 +191,9 @@ def update_work_package(work_package_id: int):
     Returns:
         JSON with updated work package
     """
+    if not can(current_user, "edit", "work_package"):
+        return jsonify({"error": "Your role may read work packages but not change them. Administrators and architects may create, edit and delete work packages."}), 403
+
     data = request.get_json()
     if not data:
         return jsonify({"success": False, "error": "Request body is required"}), 400
@@ -218,6 +229,9 @@ def delete_work_package(work_package_id: int):
     Returns:
         JSON with deletion result
     """
+    if not can(current_user, "delete", "work_package"):
+        return jsonify({"error": "Your role may read work packages but not change them. Administrators and architects may create, edit and delete work packages."}), 403
+
     service = _get_service()
     result = service.delete_work_package(work_package_id)
 
@@ -245,6 +259,9 @@ def add_dependency(work_package_id: int):
     Returns:
         JSON with result
     """
+    if not can(current_user, "edit", "work_package"):
+        return jsonify({"error": "Your role may read work packages but not change them. Administrators and architects may create, edit and delete work packages."}), 403
+
     data = request.get_json()
     if not data or "depends_on_id" not in data:
         return jsonify({"success": False, "error": "depends_on_id is required"}), 400
@@ -253,7 +270,7 @@ def add_dependency(work_package_id: int):
     result = service.add_dependency(work_package_id, data["depends_on_id"])
 
     if not result.get("success"):
-        return jsonify(result), 400
+        return jsonify(result), 404 if result.get("not_found") else 400
 
     return jsonify({"success": True, "data": result})
 
@@ -273,6 +290,9 @@ def remove_dependency(work_package_id: int, dep_id: int):
     Returns:
         JSON with result
     """
+    if not can(current_user, "edit", "work_package"):
+        return jsonify({"error": "Your role may read work packages but not change them. Administrators and architects may create, edit and delete work packages."}), 403
+
     service = _get_service()
     result = service.remove_dependency(work_package_id, dep_id)
 
@@ -408,7 +428,9 @@ def get_dependency_graph():
         include_plateaus=include_plateaus, include_gaps=include_gaps, status_filter=status_filter
     )
 
-    return jsonify({"success": True, "data": result})
+    from app.services.cost_visibility import withhold_reply
+
+    return jsonify(withhold_reply({"success": True, "data": result}))
 
 
 @roadmap_builder_bp.route("/critical-path", methods=["GET"])
@@ -472,7 +494,9 @@ def get_roadmap_summary():
     service = _get_service()
     result = service.get_roadmap_summary()
 
-    return jsonify({"success": True, "data": result})
+    from app.services.cost_visibility import withhold_reply
+
+    return jsonify(withhold_reply({"success": True, "data": result}))
 
 
 # =============================================================================

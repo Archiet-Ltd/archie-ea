@@ -22,7 +22,8 @@ from __future__ import annotations
 from datetime import date, datetime
 from typing import Any, Dict, List, Optional
 
-from app.services import gap_register_service, work_package_service
+
+from app.services import gap_register_service, result_footer_service, work_package_service
 
 RANKING_RULE = (
     "Ranked by severity, critical first; within a severity, gaps with no work package come first, "
@@ -82,20 +83,76 @@ def _item(kind, record_id, name, action, severity, group, second, why, **extra) 
     return row
 
 
+def _footer(label, href, severity, updated_at, created_at, who=None, severity_word="Severity", subject=None):
+    """The footer for an action: the record it was worked out from, plus its severity as a second input.
+
+    ``href`` is the input's own page, never the action's address (the action title already goes there); None
+    leaves the evidence unlinked. The severity is an input to the ranking; when none is recorded it is a
+    missing input and is named."""
+    facts = [result_footer_service.fact(label, href=href, who=who, as_of=updated_at or created_at,
+                                        subject=subject)]
+    if not _tier(severity):
+        facts.append(result_footer_service.fact("%s not recorded" % severity_word, missing=True))
+    return result_footer_service.build_footer(facts)
+
+
+def _bare_name(name: Optional[str]) -> str:
+    """A gap's name without the "Gap:" label some generators put in front of it.
+
+    The row already says it is a gap, so a stored "Gap: Gap: Billing" reads
+    as "Billing" and the sentence names the thing once.
+    """
+    text = (name or "").strip()
+    while text[:4].lower() == "gap:":
+        text = text[4:].strip()
+    return text or _EM_DASH
+
+
 def _gap_rows(organization_id: int) -> List[Dict[str, Any]]:
-    rows = []
+    """One row per gap name and verb.
+
+    The register can hold several open gaps with one name (one per generated
+    pass); each would print the same sentence. They are listed once, ranked by
+    the most severe of them, and the row says how many records it stands for.
+    """
+    best: Dict[Any, Dict[str, Any]] = {}
     for gap, addressed in gap_register_service.open_gaps_with_coverage(organization_id):
-        sev = _severity_label(gap.severity)
+        name = _bare_name(gap.name)
+        key = (name.lower(), bool(addressed))
+        sev = _severity_label(gap_register_service.effective_severity(gap))
         lead = ("%s severity" % sev) if sev else "Severity not recorded"
         if addressed:
-            action = "Close the %s once its work is done" % gap.name
+            action = "Close the gap \u201c%s\u201d once its work is done" % name
             why = "%s; work is linked but the gap is still open." % lead
             group = _GROUP_GAP_COVERED
         else:
-            action = "Convert the %s to a work package" % gap.name
+            action = "Convert the gap \u201c%s\u201d to a work package" % name
             why = "%s; no work package addresses it yet." % lead
             group = _GROUP_GAP_UNCOVERED
-        rows.append(_item("gap", gap.id, gap.name, action, gap.severity, group, 0, why, covered=bool(addressed)))
+        record = result_footer_service.page_link(
+            "archimate_crud.detail_element", layer="implementation", element_type="Gap", element_id=gap.id)
+        # The gap analysis row for this gap carries the "Convert to Work Package" button the action names.
+        analysis = result_footer_service.page_link("enterprise.gap_analysis")
+        analysis = "%s#gap-%d" % (analysis, gap.id) if analysis else None
+        href = record if addressed else analysis
+        # The footer points at the other page about the same gap, never at the action's own address.
+        row = _item("gap", gap.id, name, action, gap_register_service.effective_severity(gap), group, 0, why, covered=bool(addressed),
+                    href=href, footer=_footer("The gap record", analysis if addressed else record,
+                                              gap_register_service.effective_severity(gap), gap.updated_at, gap.created_at, subject="Gap"))
+        row["_records"] = 1
+        kept = best.get(key)
+        if kept is None:
+            best[key] = row
+            continue
+        kept["_records"] += 1
+        if row["_key"] < kept["_key"]:
+            row["_records"] = kept["_records"]
+            best[key] = row
+    rows = list(best.values())
+    for row in rows:
+        records = row.pop("_records")
+        if records > 1:
+            row["why"] = "%s %d open gap records share this name." % (row["why"], records)
     return rows
 
 
@@ -105,7 +162,8 @@ def _work_package_rows(organization_id: int, today: date) -> List[Dict[str, Any]
         if work_package_service.is_resolved(wp.status):
             continue
         overdue = 0
-        if wp.end_date is not None and wp.end_date.date() < today and (wp.progress_percentage or 0) < 100:
+        progress = work_package_service.progress_percent(wp, today)
+        if wp.end_date is not None and wp.end_date.date() < today and (progress or 0) < 100:
             overdue = (today - wp.end_date.date()).days
         if overdue or work_package_service.status_key(wp.status) == "on_hold":
             candidates[wp.id] = [wp, overdue, []]
@@ -116,7 +174,7 @@ def _work_package_rows(organization_id: int, today: date) -> List[Dict[str, Any]
 
     rows = []
     for wp, overdue, blockers in candidates.values():
-        pct, due = _percent(wp.progress_percentage), _day(wp.end_date)
+        pct, due = _percent(work_package_service.progress_percent(wp, today)), _day(wp.end_date)
         reasons = []
         if overdue:
             action = "Finish %s: due %s, %s percent done" % (wp.name, due, pct)
@@ -129,36 +187,55 @@ def _work_package_rows(organization_id: int, today: date) -> List[Dict[str, Any]
             reasons.append("waiting on work in another programme")
         if work_package_service.status_key(wp.status) == "on_hold":
             reasons.append("on hold")
+        package = result_footer_service.page_link("implementation_planning.work_package_detail",
+                                                  work_package_id=wp.id)
+        # The action opens the package; the footer's evidence names the same page as its input, so the
+        # action's address carries a fragment to stay a different address from the evidence link.
+        href = package + "#work-package" if package else result_footer_service.page_link("enterprise.work_packages")
         sev = _severity_label(wp.priority)
         lead = ("%s priority" % sev) if sev else "Priority not recorded"
         rows.append(
             _item("work_package", wp.id, wp.name, action, wp.priority, _GROUP_WORK, overdue,
-                  "%s; %s." % (lead, ", ".join(reasons)))
+                  "%s; %s." % (lead, ", ".join(reasons)), href=href,
+                  footer=_footer("The work package: due %s, %s percent done" % (due, pct), package, wp.priority,
+                                 wp.updated_at, wp.created_at, severity_word="Priority", subject="Work package"))
         )
     return rows
 
 
-def _risk_rows(organization_id: int) -> List[Dict[str, Any]]:
+def _risk_rows(organization_id: int, risk_footers: Optional[Dict[int, Dict[str, Any]]] = None) -> List[Dict[str, Any]]:
+    """The open risks, highest score first. ``risk_footers`` (``risk_service.footers_by_risk``) gives each
+    risk the footer the register shows for it, so its confidence is the register's."""
     from app.models.risk import Risk, RiskStatus
 
     risks = Risk.query.filter(
         Risk.organization_id == organization_id, Risk.status == RiskStatus.OPEN
     ).all()
     scored = sorted(risks, key=lambda r: (-r._effective_score, (r.title or "").lower(), r.id))[:RISK_LIMIT]
-    return [
-        _item(
+    rows = []
+    for r in scored:
+        href = result_footer_service.page_link("risk.risk_page", risk_id=r.id)
+        rows.append(_item(
             "risk", r.id, r.title, "Reduce the risk: %s" % r.title, r.risk_level, _GROUP_RISK,
             r._effective_score,
-            "%s risk, recorded score %d of 25." % (r.risk_level.capitalize(), r._effective_score),
-        )
-        for r in scored
-    ]
+            "%s risk, %s of 25." % (r.risk_level.capitalize(), r.score_text),
+            href=href,
+            footer=(risk_footers or {}).get(r.id) or _footer(
+                "%s: %s" % (r.score_word.capitalize(), r.score_pair_text),
+                None, r.risk_level, r.updated_at, r.created_at, who=r.owner, subject="Score"),
+        ))
+    return rows
 
 
-def prioritised_actions(organization_id: int, limit: Optional[int] = None, today: Optional[date] = None) -> Dict[str, Any]:
-    """The ordered rows, the total before any limit, and the one-sentence rule."""
+def prioritised_actions(organization_id: int, limit: Optional[int] = None, today: Optional[date] = None,
+                        risk_footers: Optional[Dict[int, Dict[str, Any]]] = None) -> Dict[str, Any]:
+    """The ordered rows, the total before any limit, and the one-sentence rule.
+
+    A screen that shows the rows passes ``risk_footers=risk_service.footers_by_risk(organization_id)``, so
+    a risk reads the confidence the register gives it."""
     today = today or datetime.utcnow().date()
-    rows = _gap_rows(organization_id) + _work_package_rows(organization_id, today) + _risk_rows(organization_id)
+    rows = (_gap_rows(organization_id) + _work_package_rows(organization_id, today)
+            + _risk_rows(organization_id, risk_footers))
     rows.sort(key=lambda r: r["_key"])
     for position, row in enumerate(rows, start=1):
         row["position"] = position

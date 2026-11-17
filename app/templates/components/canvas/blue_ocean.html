@@ -1,0 +1,17 @@
+{# Vendored from flask-basecoat, branch feat/canvases-capability-map, commit 2b02744, flask_basecoat/templates/basecoat/canvas/ blue-ocean.html, reduced to its factors and Four Actions grid. #}
+{# Blue Ocean Strategy, C2. After W. Chan Kim and Renee Mauborgne (2005): the factors the industry competes on, above the Four Actions Framework, Eliminate and Raise on the top row, Reduce and Create beneath. Entelim holds no offering level per factor yet, so the value curve is not drawn. #}
+{% import 'components/canvas/_frame.html' as f with context %}
+{% set SPEC = {
+  'form': 'C2', 'name': 'Blue ocean strategy canvas', 'grid': 'grid-cols-12', 'width': 'min-w-240',
+  'hint': 'Scroll sideways on a narrow screen to see the Four Actions grid.',
+  'credit': 'Strategy Canvas and Four Actions Framework after W. Chan Kim and Renee Mauborgne, Blue Ocean Strategy.',
+  'boxes': [
+    {'key': 'factors', 'title': 'Competing factors', 'icon': 'chart-line', 'question': 'What does the industry compete on, and what do customers weigh?', 'empty': 'No factors yet. Add the values customers weigh when they choose.', 'area': 'col-span-12 row-start-1'},
+    {'key': 'eliminate', 'title': 'Eliminate', 'icon': 'circle-x', 'question': 'Which factors the industry takes for granted should be eliminated?', 'empty': 'No courses of action yet. Add what to stop doing.', 'area': 'col-span-6 col-start-1 row-start-2'},
+    {'key': 'raise', 'title': 'Raise', 'icon': 'arrow-up', 'question': 'Which factors should be raised well above the industry standard?', 'empty': 'No courses of action yet. Add what to do far better.', 'area': 'col-span-6 col-start-7 row-start-2'},
+    {'key': 'reduce', 'title': 'Reduce', 'icon': 'arrow-down', 'question': 'Which factors should be reduced well below the industry standard?', 'empty': 'No courses of action yet. Add what to do far less of.', 'area': 'col-span-6 col-start-1 row-start-3'},
+    {'key': 'create', 'title': 'Create', 'icon': 'sparkles', 'question': 'Which factors should be created that the industry has never offered?', 'empty': 'No courses of action yet. Add what to offer that is new.', 'area': 'col-span-6 col-start-7 row-start-3'},
+  ]} %}
+{% macro blue_ocean(data, id='blue-ocean') -%}
+{{ f.grid_canvas(SPEC, data, id) }}
+{%- endmacro %}

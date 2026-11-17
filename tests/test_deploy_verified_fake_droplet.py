@@ -57,16 +57,37 @@ exec bash "$@"
 FAKE_DOCKER = """#!/bin/bash
 S="$FAKE_STATE"
 echo "docker $*" >> "$S/docker.log"
+# Where the call ran, and which commit the live tree (the one the running server
+# serves from) held at that moment.
+echo "$1 $2 cwd=$(pwd) live=$(git -C "$APP_DIR" rev-parse HEAD)" >> "$S/docker.where"
 if [ "$1" = compose ]; then
+    # What compose would resolve here: the shell environment beats the .env file in
+    # the project directory, which beats the directory-derived default.
+    envval() { [ -f .env ] && sed -n "s/^[[:space:]]*\\(export[[:space:]]\\{1,\\}\\)\\{0,1\\}$1[[:space:]]*=[[:space:]]*//p" .env | tail -1; }
+    eff_project="${COMPOSE_PROJECT_NAME:-$(envval COMPOSE_PROJECT_NAME)}"
+    eff_backup="${ARCHIE_BACKUP_HOST_DIR:-$(envval ARCHIE_BACKUP_HOST_DIR)}"
+    echo "$2 cwd=$(pwd) env_file=$([ -f .env ] && echo yes || echo no) project=${eff_project:-$(basename "$(pwd)")} backup=${eff_backup:-none}" >> "$S/docker.effective"
     case "$2" in
-        rm) exit 0 ;;
+        build) exit "${FAKE_BUILD_EXIT:-0}" ;;
+        run)
+            # A real `docker compose run` reads stdin, which here is the rest of
+            # the deploy script: reading it ends the deploy early.
+            cat > /dev/null
+            # One-shot steps. Each is logged above; FAKE_FAIL_STEP names the one
+            # that fails, as a real schema or ACL failure would.
+            for arg in "$@"; do
+                if [ "$arg" = "${FAKE_FAIL_STEP:-none}" ]; then exit 1; fi
+            done
+            if [[ " $* " == *" database-acl "* ]]; then
+                echo "database-acl-1  | postgres://app:hunter2-SECRET@db:5432/archie"
+            fi
+            exit 0 ;;
         up)
             if [[ " $* " == *" --force-recreate "* ]]; then
                 git rev-parse HEAD > "$S/running"
                 exit 0
             fi
-            echo "database-acl-1  | postgres://app:hunter2-SECRET@db:5432/archie"
-            exit "${FAKE_ACL_EXIT:-0}" ;;
+            exit 1 ;;
     esac
     exit 0
 fi
@@ -209,6 +230,7 @@ class FakeDroplet:
         env = {
             **os.environ,
             "PATH": str(self.bin) + os.pathsep + os.environ["PATH"],
+            "DEPLOY_BACKUP_COMMAND": "true",
             "DROPLET": "root@fake-droplet",
             "APP_DIR": self.app.as_posix(),
             "FAKE_STATE": self.state.as_posix(),
@@ -223,6 +245,17 @@ class FakeDroplet:
 
     def recorded(self) -> str | None:
         return self.runner_state.read_text().strip() if self.runner_state.exists() else None
+
+    def where(self) -> list[str]:
+        path = self.state / "docker.where"
+        lines = path.read_text().splitlines() if path.exists() else []
+        return [entry for entry in lines if entry.startswith("compose")]
+
+    def effective(self) -> list[dict[str, str]]:
+        """What compose resolved for each call: directory, .env present, project, backup mount."""
+        path = self.state / "docker.effective"
+        lines = path.read_text().splitlines() if path.exists() else []
+        return [dict(item.split("=", 1) for item in line.split(" ")[1:]) | {"step": line.split(" ")[0]} for line in lines]
 
     def docker_calls(self) -> list[str]:
         path = self.state / "docker.log"
@@ -398,6 +431,199 @@ def test_the_deploy_script_itself_is_the_committed_one():
     """The wrapper must not change verification logic: these markers are what
     the workflow's classifier and the runbook depend on."""
     text = SCRIPT.read_text(encoding="utf-8")
-    for marker in ("docker compose up -d --force-recreate server", "docker compose rm -f database-bootstrap schema-deploy database-acl",
+    for marker in ("docker compose up -d --no-deps --force-recreate server", "docker compose run --rm --no-deps -T database-bootstrap",
+                   "docker compose build server schema-deploy",
                    "DEPLOY VERIFIED: commit", "ROLLED BACK SUCCESSFULLY", "nothing to roll back to"):
         assert marker in text
+
+
+def _compose_steps(droplet):
+    return [c for c in droplet.docker_calls() if c.startswith("docker compose")]
+
+
+def test_the_server_is_replaced_only_after_the_schema_steps_have_run(droplet):
+    rc, out = droplet.run(sha(droplet, "B"))
+
+    assert rc == 0, out
+    steps = _compose_steps(droplet)
+    order = ["build", "run --rm --no-deps -T database-bootstrap", "ALLOW_DOWNTIME_MIGRATIONS", "run --rm --no-deps -T database-acl", "up -d --no-deps --force-recreate server"]
+    positions = [next(i for i, c in enumerate(steps) if marker in c) for marker in order]
+    assert positions == sorted(positions) and len(set(positions)) == len(order), steps
+
+
+@pytest.mark.parametrize("step", ["database-bootstrap", "schema-deploy", "database-acl"])
+def test_a_failing_schema_step_leaves_the_old_server_serving(droplet, step):
+    """No swap happens: the container keeps running the commit it was on."""
+    rc, out = droplet.run(sha(droplet, "B"), AUTO_ROLLBACK="0", FAKE_FAIL_STEP=step)
+
+    assert rc == 1, out
+    assert droplet.running() == sha(droplet, "A")
+    assert not any("--force-recreate" in c for c in _compose_steps(droplet))
+
+
+def test_a_failing_backup_changes_nothing(droplet):
+    rc, out = droplet.run(sha(droplet, "B"), AUTO_ROLLBACK="0", DEPLOY_BACKUP_COMMAND="false")
+
+    assert rc == 1, out
+    assert droplet.running() == sha(droplet, "A")
+    assert _compose_steps(droplet) == []
+
+
+FAILING_STEPS = [
+    ("backup", {"DEPLOY_BACKUP_COMMAND": "false"}),
+    ("build", {"FAKE_BUILD_EXIT": "1"}),
+    ("database-bootstrap", {"FAKE_FAIL_STEP": "database-bootstrap"}),
+    ("schema-deploy", {"FAKE_FAIL_STEP": "schema-deploy"}),
+    ("database-acl", {"FAKE_FAIL_STEP": "database-acl"}),
+]
+
+
+@pytest.mark.parametrize("name,env", FAILING_STEPS, ids=[n for n, _ in FAILING_STEPS])
+def test_a_failing_step_leaves_the_live_tree_at_the_current_commit(droplet, name, env):
+    """The old server serves code and templates from the live tree: it must still
+    be on the commit it was running, and the server must not have been replaced."""
+    rc, out = droplet.run(sha(droplet, "B"), AUTO_ROLLBACK="0", **env)
+
+    assert rc == 1, out
+    assert head(droplet) == sha(droplet, "A")
+    assert droplet.running() == sha(droplet, "A")
+    assert not any("--force-recreate" in c for c in _compose_steps(droplet))
+    assert (droplet.app / "f.txt").read_text() == "A"
+
+
+def test_the_live_tree_changes_only_at_the_swap(droplet):
+    rc, out = droplet.run(sha(droplet, "B"))
+
+    assert rc == 0, out
+    seen = {line.split(" cwd=")[0]: line.split(" live=")[1] for line in droplet.where()}
+    for step in ("compose build", "compose run"):
+        assert seen[step] == sha(droplet, "A"), droplet.where()
+    # The swap is the last compose call and sees the new commit.
+    assert droplet.where()[-1].startswith("compose up") and droplet.where()[-1].endswith("live=" + sha(droplet, "B"))
+    assert [entry for entry in droplet.where() if entry.endswith("live=" + sha(droplet, "B"))] == [droplet.where()[-1]]
+
+
+def test_the_build_and_schema_steps_run_from_a_copy_of_the_target_not_the_live_tree(droplet):
+    rc, out = droplet.run(sha(droplet, "B"))
+
+    assert rc == 0, out
+    before_swap = [entry for entry in droplet.where() if not entry.startswith("compose up")]
+    assert before_swap
+    for line in before_swap:
+        cwd = line.split(" cwd=")[1].split(" live=")[0]
+        assert cwd != droplet.app.as_posix(), line
+    swap = droplet.where()[-1]
+    assert " cwd=%s " % droplet.app.as_posix() in swap
+
+
+def test_the_old_server_serves_the_current_build_until_the_swap(droplet):
+    """Observed from the outside, as the health probe sees it: the build id the
+    running server reports is CURRENT's right up to the replacement."""
+    rc, out = droplet.run(sha(droplet, "B"))
+
+    assert rc == 0, out
+    log = droplet.docker_calls()
+    swap_at = next(i for i, c in enumerate(log) if "--force-recreate" in c)
+    assert all("--force-recreate" not in c for c in log[:swap_at])
+    assert all(line.endswith("live=" + sha(droplet, "A")) for line in droplet.where()[:-1])
+    assert droplet.running() == sha(droplet, "B")
+
+
+def test_the_backup_command_cannot_read_the_rest_of_the_deploy_script(droplet):
+    """The deploy script arrives on stdin: a backup that reads stdin would end the
+    deploy early, after the backup and before the build."""
+    rc, out = droplet.run(sha(droplet, "B"), DEPLOY_BACKUP_COMMAND="cat > /dev/null")
+
+    assert rc == 0, out
+    assert droplet.running() == sha(droplet, "B")
+
+
+def _production_env(droplet, text):
+    (droplet.app / ".env").write_text(text, encoding="utf-8")
+
+
+def test_the_copy_gets_the_live_env_file_and_the_live_project_name(droplet):
+    _production_env(droplet, "SECRET_KEY=x\n")
+    rc, out = droplet.run(sha(droplet, "B"))
+
+    assert rc == 0, out
+    before_swap = [e for e in droplet.effective() if e["step"] != "up"]
+    assert before_swap
+    for entry in before_swap:
+        assert entry["env_file"] == "yes", entry
+        assert entry["project"] == droplet.app.name, entry
+    assert droplet.effective()[-1]["project"] == droplet.app.name
+
+
+def test_the_backup_mount_in_the_copy_is_the_one_the_env_file_sets(droplet):
+    _production_env(droplet, "ARCHIE_BACKUP_HOST_DIR=/opt/archie/backups\n")
+    rc, out = droplet.run(sha(droplet, "B"))
+
+    assert rc == 0, out
+    assert [e["backup"] for e in droplet.effective()] == ["/opt/archie/backups"] * len(droplet.effective())
+
+
+def test_a_project_name_set_in_the_env_file_is_not_overridden(droplet):
+    _production_env(droplet, "COMPOSE_PROJECT_NAME=archie\n")
+    rc, out = droplet.run(sha(droplet, "B"))
+
+    assert rc == 0, out
+    assert {e["project"] for e in droplet.effective()} == {"archie"}
+
+
+def test_a_silent_env_file_falls_back_to_the_live_defaults(droplet):
+    _production_env(droplet, "SECRET_KEY=x\n")
+    rc, out = droplet.run(sha(droplet, "B"))
+
+    assert rc == 0, out
+    assert {e["backup"] for e in droplet.effective()} == {droplet.app.as_posix() + "/deploy/backups"}
+
+
+def test_a_checkout_that_fails_after_the_swap_point_fails_the_deploy(droplet):
+    """A hook that refuses the checkout: the deploy must stop, say so, and not go on
+    to replace the server."""
+    hook = droplet.app / ".git" / "hooks" / "post-checkout"
+    hook.write_text("#!/bin/sh\nexit 1\n")
+    hook.chmod(0o755)
+    rc, out = droplet.run(sha(droplet, "B"), AUTO_ROLLBACK="0")
+
+    assert rc != 0, out
+    assert "checking %s out in the live tree failed" % sha(droplet, "B") in out
+    assert not any("--force-recreate" in c for c in _compose_steps(droplet))
+    assert droplet.running() == sha(droplet, "A")
+
+
+def test_a_checkout_that_fails_after_head_moved_puts_the_live_tree_back(droplet):
+    """The hook runs after the checkout has moved HEAD, so the failed command leaves
+    the live tree at the target under the old server: it must go back to current."""
+    hook = droplet.app / ".git" / "hooks" / "post-checkout"
+    hook.write_text("#!/bin/sh\nexit 1\n")
+    hook.chmod(0o755)
+    rc, out = droplet.run(sha(droplet, "B"), AUTO_ROLLBACK="0")
+
+    assert rc != 0, out
+    assert head(droplet) == sha(droplet, "A")
+    assert (droplet.app / "f.txt").read_text() == "A"
+    assert "the live tree is at" not in out
+    assert droplet.running() == sha(droplet, "A")
+    assert not any("--force-recreate" in c for c in _compose_steps(droplet))
+
+
+def test_an_empty_env_value_is_not_a_definition(droplet):
+    """Compose reads `NAME=` as empty and its `:-` defaults then apply, so the live
+    defaults must still be pinned for the copy."""
+    _production_env(droplet, "COMPOSE_PROJECT_NAME=\nARCHIE_BACKUP_HOST_DIR=\n")
+    rc, out = droplet.run(sha(droplet, "B"))
+
+    assert rc == 0, out
+    assert {e["project"] for e in droplet.effective()} == {droplet.app.name}
+    assert {e["backup"] for e in droplet.effective()} == {droplet.app.as_posix() + "/deploy/backups"}
+
+
+def test_a_space_before_the_equals_sign_still_counts_as_a_definition(droplet):
+    _production_env(droplet, "COMPOSE_PROJECT_NAME = archie\nARCHIE_BACKUP_HOST_DIR =/opt/archie/backups\n")
+    rc, out = droplet.run(sha(droplet, "B"))
+
+    assert rc == 0, out
+    assert {e["project"] for e in droplet.effective()} == {"archie"}
+    assert {e["backup"] for e in droplet.effective()} == {"/opt/archie/backups"}

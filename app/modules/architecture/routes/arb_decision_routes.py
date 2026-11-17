@@ -4,7 +4,8 @@ from flask import request, jsonify
 from flask_login import login_required, current_user
 from sqlalchemy import or_
 
-from app.modules.architecture.routes.arb_routes import arb_bp
+from app.decorators import require_roles
+from app.modules.architecture.routes.arb_routes import ARB_APPROVER_ROLES, arb_bp
 from app.extensions import db
 from app.utils.pagination import safe_int_arg
 
@@ -122,6 +123,14 @@ def capability_governance_panel(capability_id):
         and d.superseded_by_id is None
     ]
 
+    # Governing decisions with no strategic or tactical horizon: the impact list names them,
+    # so this page must too.
+    active_other = [
+        d for d in all_decisions
+        if d.horizon not in ('strategic', 'tactical') and d.status in ('accepted', 'under_review')
+        and d.superseded_by_id is None
+    ]
+
     # Decision history — superseded chain, newest first
     history = sorted(
         [d for d in all_decisions if d.status == 'superseded'],
@@ -131,9 +140,13 @@ def capability_governance_panel(capability_id):
 
     # Open change requests affecting this capability
     try:
-        open_impacts = ChangeImpactAssessment.query.filter_by(
-            affected_capability_id=capability_id
-        ).all()
+        # Impacts point at the unified capability this business capability was projected into.
+        from app.models.unified_capability import UnifiedCapability
+        unified_ids = [u.id for u in UnifiedCapability.query.filter_by(
+            source_table='business_capability', source_id=str(capability_id)).all()]
+        open_impacts = ChangeImpactAssessment.query.filter(
+            ChangeImpactAssessment.affected_capability_id.in_(unified_ids)
+        ).all() if unified_ids else []
         open_change_request_ids = list({i.change_request_id for i in open_impacts})
         open_change_requests = ArchitectureChangeRequest.query.filter(
             ArchitectureChangeRequest.id.in_(open_change_request_ids),
@@ -146,6 +159,7 @@ def capability_governance_panel(capability_id):
         'capability_id': capability_id,
         'active_strategic_decision': active_strategic.to_dict() if active_strategic else None,
         'active_tactical_decisions': [d.to_dict() for d in active_tactical],
+        'active_other_decisions': [d.to_dict() for d in active_other],
         'open_change_requests': [r.to_dict() for r in open_change_requests],
         'decision_history': [d.to_dict() for d in history],
         'total_decisions': len(all_decisions),
@@ -297,25 +311,62 @@ def supersede_decision(decision_id):
 
 # ── ARB-006: Phase H change request API ──────────────────────────────────────
 
+def _linked_id(data, key, model, label, errors):
+    """The optional id of a record in the caller's own organisation, or None.
+
+    The tenant filter on the read means another organisation's id is
+    indistinguishable from one that does not exist, and is refused the same way.
+    """
+    raw = data.get(key)
+    if raw in (None, ''):
+        return None
+    try:
+        record_id = int(raw)
+    except (TypeError, ValueError):
+        errors[key] = [f'Enter the number of a {label}, or leave this empty.']
+        return None
+    if model.query.filter_by(id=record_id).first() is None:
+        errors[key] = [f'No {label} with number {record_id} exists in your organisation.']
+        return None
+    return record_id
+
+
 @arb_bp.route('/api/change-requests', methods=['POST'])
 @login_required
 def create_change_request():
     """ARB-006: Create a Phase H change request."""
-    data = request.get_json() or {}
-    required = ['title', 'description', 'trigger_type']
-    for f in required:
-        if not data.get(f):
-            return jsonify({'error': f'{f} required'}), 400
-
     from app.models.architecture_decision import ArchitectureChangeRequest, VALID_TRIGGER_TYPES
-    if data['trigger_type'] not in VALID_TRIGGER_TYPES:
-        return jsonify({'error': f"trigger_type must be one of {VALID_TRIGGER_TYPES}"}), 400
+    from app.models.solution_models import Solution
+    from app.models.unified_capability import UnifiedCapability
+
+    data = request.get_json(silent=True) or {}
+    errors = {}
+    title = str(data.get('title') or '').strip()
+    description = str(data.get('description') or '').strip()
+    trigger_type = data.get('trigger_type')
+    if not title:
+        errors['title'] = ['Enter a title for the change request.']
+    elif len(title) > 200:
+        errors['title'] = ['Keep the title to 200 characters or fewer.']
+    if not description:
+        errors['description'] = ['Describe the change, why it is needed and what it will affect.']
+    if not trigger_type:
+        errors['trigger_type'] = ['Choose what triggered this change.']
+    elif trigger_type not in VALID_TRIGGER_TYPES:
+        errors['trigger_type'] = ['Choose one of the listed triggers.']
+    capability_id = _linked_id(data, 'capability_id', UnifiedCapability, 'capability', errors)
+    solution_id = _linked_id(data, 'solution_id', Solution, 'solution', errors)
+    if errors:
+        first = next(iter(errors.values()))[0]
+        return jsonify({'error': first, 'errors': errors}), 400
 
     cr = ArchitectureChangeRequest(
         acr_reference=ArchitectureChangeRequest.next_acr_reference(),
-        title=data['title'],
-        description=data['description'],
-        trigger_type=data['trigger_type'],
+        title=title,
+        description=description,
+        trigger_type=trigger_type,
+        capability_id=capability_id,
+        solution_id=solution_id,
         raised_by_id=current_user.id,
     )
     db.session.add(cr)
@@ -326,50 +377,78 @@ def create_change_request():
 @arb_bp.route('/api/change-requests/<int:cr_id>/assess-impact', methods=['POST'])
 @login_required
 def assess_change_impact(cr_id):
-    """ARB-006: Auto-query capabilities → decisions to create impact assessments."""
+    """ARB-006: Auto-query capabilities → decisions to create impact assessments.
+
+    Open to every signed-in person who may write to ARB governance (the raiser assesses their own
+    request); deciding it and issuing the notice stay with the board approvers.
+    """
     from app.models.architecture_decision import (
         ArchitectureChangeRequest, ChangeImpactAssessment,
         DecisionCapabilityLink, ArchitectureDecision
     )
-    cr = ArchitectureChangeRequest.query.get_or_404(cr_id)
+    from app.models.unified_capability import UnifiedCapability
+
+    cr = ArchitectureChangeRequest.query.filter_by(id=cr_id).first_or_404()
     data = request.get_json() or {}
-    capability_ids = list(data.get('capability_ids', []))
+    # Capabilities are unified-capability numbers, the same record the request
+    # itself links to. With none given, the request's own capability is assessed.
+    capability_ids = list(data.get('capability_ids') or [])
+    if not capability_ids and cr.capability_id:
+        capability_ids = [cr.capability_id]
+    if not capability_ids:
+        return jsonify({'error': 'This change request names no capability, so there is nothing to assess.'}), 400
 
     created = []
     for cap_id in capability_ids:
-        links = DecisionCapabilityLink.query.filter_by(capability_id=cap_id).all()
+        capability = UnifiedCapability.query.filter_by(id=cap_id).first()
+        if capability is None:
+            return jsonify({'error': f'No capability with number {cap_id} exists in your organisation.'}), 400
+        # Decisions are linked to the business capability this one was projected from.
+        if capability.source_table != 'business_capability' or not str(capability.source_id or '').isdigit():
+            continue
+        links = DecisionCapabilityLink.query.filter_by(capability_id=int(capability.source_id)).all()
         for link in links:
-            decision = ArchitectureDecision.query.get(link.decision_id)
+            decision = ArchitectureDecision.query.filter_by(id=link.decision_id).first()
             if not decision or decision.status not in ('accepted', 'under_review'):
                 continue
             existing = ChangeImpactAssessment.query.filter_by(
-                change_request_id=cr_id,
-                affected_capability_id=cap_id,
+                change_request_id=cr.id,
+                affected_capability_id=capability.id,
                 affected_decision_id=link.decision_id
             ).first()
             if existing:
                 continue
             impact = ChangeImpactAssessment(
-                change_request_id=cr_id,
-                affected_capability_id=cap_id,
+                change_request_id=cr.id,
+                affected_entity_type='capability',
+                affected_capability_id=capability.id,
                 affected_decision_id=link.decision_id,
                 impact_level=data.get('impact_level', 'medium'),
-                impact_description=data.get('notes', ''),
+                impact_description=data.get('notes') or None,
+                assessed_by_id=current_user.id,
             )
             db.session.add(impact)
-            created.append({'capability_id': cap_id, 'decision_id': link.decision_id})
+            created.append({'capability_id': capability.id, 'decision_id': link.decision_id})
 
-    cr.status = 'assessing'
+    db.session.flush()
+    has_impacts = ChangeImpactAssessment.query.filter_by(change_request_id=cr.id).count() > 0
+    note = None
+    if has_impacts:
+        cr.status = 'assessing'
+    else:
+        note = ('No accepted decision governs this capability yet, so there is no impact to list. '
+                'The request stays open.')
     db.session.commit()
-    return jsonify({'change_request_id': cr_id, 'impacts_created': created}), 200
+    return jsonify({'change_request_id': cr.id, 'impacts_created': created, 'note': note}), 200
 
 
 @arb_bp.route('/api/change-requests/<int:cr_id>/set-disposition', methods=['POST'])
 @login_required
+@require_roles(*ARB_APPROVER_ROLES)
 def set_change_disposition(cr_id):
-    """ARB-006: Set disposition on a change request."""
+    """ARB-006: Set disposition on a change request. The board decides it, never the person who raised it."""
     from app.models.architecture_decision import ArchitectureChangeRequest, VALID_DISPOSITIONS
-    cr = ArchitectureChangeRequest.query.get_or_404(cr_id)
+    cr = ArchitectureChangeRequest.query.filter_by(id=cr_id).first_or_404()
     data = request.get_json() or {}
     disposition = data.get('disposition')
     if not disposition or disposition not in VALID_DISPOSITIONS:
@@ -382,10 +461,11 @@ def set_change_disposition(cr_id):
 
 @arb_bp.route('/api/change-requests/<int:cr_id>/issue-notice', methods=['POST'])
 @login_required
+@require_roles(*ARB_APPROVER_ROLES)
 def issue_change_notice(cr_id):
-    """ARB-006: Issue an Architecture Change Notice for a change request."""
+    """ARB-006: Issue an Architecture Change Notice for a change request. Board approvers only."""
     from app.models.architecture_decision import ArchitectureChangeRequest, ArchitectureChangeNotice
-    cr = ArchitectureChangeRequest.query.get_or_404(cr_id)
+    cr = ArchitectureChangeRequest.query.filter_by(id=cr_id).first_or_404()
     data = request.get_json() or {}
     if not data.get('notice_text'):
         return jsonify({'error': 'notice_text required'}), 400

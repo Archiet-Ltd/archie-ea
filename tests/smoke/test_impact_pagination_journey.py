@@ -11,6 +11,7 @@ ensure reliable test execution while covering the acceptance criteria.
 import pytest
 from playwright.sync_api import expect
 
+from .chat_ask import ask, sign_in_as
 from .conftest import PAGE_TIMEOUT, PASSWORD
 
 pytestmark = [pytest.mark.smoke, pytest.mark.journey]
@@ -457,44 +458,16 @@ def test_cross_org_owners_never_leak(page, live_server, seeded, cross_org_owners
 
 
 def test_ask_impact_list_shows_owner_name(page, live_server, seeded, pagination_graph):
-    """The Ask impact list renders the ApplicationOwner's name for an
-    element that has an ApplicationOwner record. On the old JS
-    the ownerName is derived from row.owner (legacy), which
-    is None for this element, so the owner field shows a missing badge.
-    On the new JS the ownerName is derived from row.owners,
-    which contains the ApplicationOwner's name."""
-    _login(page, live_server, seeded["emails"]["cto"])
+    """The chat's answer card for what breaks renders the ApplicationOwner's name for an
+    element that has an ApplicationOwner record, not the legacy owner field (which is
+    empty for this element)."""
+    sign_in_as(page, live_server, seeded, "cto")
 
     root_name = pagination_graph["root_name"]
     owner_name = pagination_graph["owner_name"]
 
-    # Navigate to the Ask page.
-    page.goto(live_server + "/intelligence/ask", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
-    page.wait_for_timeout(2000)
-
-    # Click the impact question to expand it.
-    impact_button = page.locator("#ask-question-impact")
-    impact_button.click()
-    page.wait_for_timeout(1000)
-
-    # Type the root element name in the picker input.
-    picker_input = page.locator("#ask-picker-input")
-    picker_input.fill(root_name)
-    page.wait_for_timeout(2000)
-
-    # Click the search result.
-    search_results = page.locator("#ask-picker-listbox [role=option]")
-    expect(search_results.first).to_be_visible()
-    search_results.first.click()
-    # Wait for the impact analysis to complete.
-    expect(page.locator("#ask-results")).to_contain_text(owner_name, timeout=PAGE_TIMEOUT)
-
-    # Check the rendered owner name in the Ask results.
-    # On the old JS the ownerName is null (legacy owner is
-    # None), so the owner field shows a "missing" badge. On the new JS
-    # the ownerName is "Alice Owner", so the owner field
-    # shows the name.
-    page_text = page.locator("#ask-results").inner_text()
-    assert owner_name in page_text, (
-        "Owner name '%s' not found in Ask impact list" % owner_name
-    )
+    answer = ask(page, live_server, "What breaks if %s fails" % root_name)
+    expect(answer).to_contain_text(owner_name, timeout=PAGE_TIMEOUT)
+    owned = answer.locator("[data-slot='card']").filter(has_text=owner_name)
+    assert owned.count() >= 1
+    assert owner_name in owned.first.get_by_label("Owner: %s" % owner_name).inner_text()

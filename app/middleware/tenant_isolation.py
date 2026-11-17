@@ -24,6 +24,9 @@ from app.models.mixins.core import TenantMixin
 logger = logging.getLogger(__name__)
 
 
+_TENANT_CONTEXT_KEY = "archie_tenant_context_held"
+
+
 def set_database_tenant_context(connection, organization_id):
     """Set the trigger-visible tenant for this transaction only.
 
@@ -38,14 +41,27 @@ def set_database_tenant_context(connection, organization_id):
     platform scope.
     """
 
-    if _platform_scope_active():
-        connection.execute(text("SELECT set_config('archie.platform_scope', 'on', true)"))
-    if organization_id is None:
+    platform = _platform_scope_active()
+    # The setting lasts for the whole transaction, so asserting it again on every
+    # statement and every flush (hundreds of round trips while the sample company
+    # loads) changes nothing. Skip it only when this same transaction already holds
+    # exactly this setting and no savepoint is open: a savepoint that rolls back
+    # takes a setting made inside it with it.
+    transaction = connection.get_transaction()
+    cacheable = transaction is not None and connection.get_nested_transaction() is None
+    wanted = (platform, organization_id)
+    held = connection.info.get(_TENANT_CONTEXT_KEY)
+    if cacheable and held is not None and held[0] is transaction and held[1] == wanted:
         return
-    connection.execute(
-        text("SELECT set_config('archie.organization_id', :organization_id, true)"),
-        {"organization_id": str(organization_id)},
-    )
+    if platform:
+        connection.execute(text("SELECT set_config('archie.platform_scope', 'on', true)"))
+    if organization_id is not None:
+        connection.execute(
+            text("SELECT set_config('archie.organization_id', :organization_id, true)"),
+            {"organization_id": str(organization_id)},
+        )
+    if cacheable:
+        connection.info[_TENANT_CONTEXT_KEY] = (transaction, wanted)
 
 
 def _platform_scope_active() -> bool:

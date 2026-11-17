@@ -112,7 +112,7 @@ def set_user_preference():
     
     Request body:
     {
-        "provider": "openai",  // or "anthropic", "gemini", "deepseek", "huggingface", "none"
+        "provider": "openai",  // or "anthropic", "gemini", "nvidia", "huggingface", "none"
         "model": "gpt-4"       // optional, uses default if not specified
     }
     
@@ -140,7 +140,7 @@ def set_user_preference():
             }), 400
         
         # Validate provider
-        valid_providers = ["none", "openai", "anthropic", "gemini", "deepseek", "huggingface", "azure", "custom", "openrouter"]
+        valid_providers = ["none", "openai", "anthropic", "gemini", "nvidia", "huggingface", "azure", "custom", "openrouter"]
         if provider not in valid_providers:
             return jsonify({
                 "success": False,

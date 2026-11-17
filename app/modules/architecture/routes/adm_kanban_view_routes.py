@@ -21,9 +21,11 @@ from flask import (
     request,
     url_for,
 )
-from flask_login import login_required
+from flask_login import login_required, current_user
 
 from app.decorators import admin_required, audit_log
+from app.middleware.tenant_context import current_org_id
+from app.modules.genome.services.roadmap_links import redirect_to_roadmap
 from app.middleware.tenant_decorators import is_active_org_admin
 from app.models.adm_kanban import create_adm_phases, KanbanCard
 from app.models.archimate_core import ArchiMateElement
@@ -114,13 +116,13 @@ def gap_analysis():
     try:
         gaps = (
             KanbanCard.query
-            .filter_by(arch_element_type="Gap")
+            .filter_by(arch_element_type="Gap", organization_id=current_user.organization_id)
             .order_by(KanbanCard.adm_phase_id, KanbanCard.title)
             .all()
         )
         closers = (
             KanbanCard.query
-            .filter(KanbanCard.closes_gap_id.isnot(None))
+            .filter(KanbanCard.closes_gap_id.isnot(None), KanbanCard.organization_id == current_user.organization_id)
             .order_by(KanbanCard.title)
             .all()
         )
@@ -128,29 +130,47 @@ def gap_analysis():
         for card in closers:
             gap_closers.setdefault(card.closes_gap_id, []).append(card)
 
-        unclosed_count = sum(1 for g in gaps if g.id not in gap_closers)
+        board_unclosed_count = sum(1 for g in gaps if g.id not in gap_closers)
     except Exception as exc:
         current_app.logger.error("Gap analysis query failed: %s", exc)
-        gaps, gap_closers, unclosed_count = [], {}, 0
+        gaps, gap_closers, board_unclosed_count = [], {}, 0
 
-    # Computed portfolio gaps from gap analysis service
+    # The figures are the recorded gaps: the one register the roadmap and the
+    # gaps register count.
+    from app.services.gap_register_service import count_gaps
+
+    organization_id = current_org_id()
+    recorded_count = count_gaps(organization_id)
+    # Open gaps only: a resolved gap needs no work planned, so recorded = covered + no work planned + closed.
+    covered_count = count_gaps(organization_id, has_work_package=True, closed=False)
+    unplanned_count = count_gaps(organization_id, has_work_package=False, closed=False)
+    closed_count = count_gaps(organization_id, closed=True)
+
+    # Portfolio findings listed under the figures (not gap signals; the signal figure is below).
     computed_gaps = {}
-    computed_gap_count = 0
     try:
         from app.modules.solutions_strategic.v2.services.gap_analysis_service import ArchitecturalGapAnalyzer
-        analyzer = ArchitecturalGapAnalyzer()
-        computed_gaps = analyzer.analyze_portfolio_gaps()
-        for category in computed_gaps:
-            if isinstance(computed_gaps[category], list):
-                computed_gap_count += len(computed_gaps[category])
+        computed_gaps = ArchitecturalGapAnalyzer().analyze_portfolio_gaps()
     except Exception as exc:
         current_app.logger.debug("Portfolio gap analysis unavailable: %s", exc)
+
+    # The signal figure is the roadmap's: one computation, shown the same on every screen.
+    computed_gap_count = None
+    try:
+        from app.modules.capabilities.routes.roadmap_routes import compute_gap_signals
+        computed_gap_count = len(compute_gap_signals())
+    except Exception as exc:
+        current_app.logger.warning("Gap signals unavailable: %s", exc)
 
     return render_template(
         "adm_kanban/gap_analysis.html",
         gaps=gaps,
         gap_closers=gap_closers,
-        unclosed_count=unclosed_count,
+        recorded_count=recorded_count,
+        covered_count=covered_count,
+        unclosed_count=unplanned_count,
+        closed_count=closed_count,
+        board_unclosed_count=board_unclosed_count,
         computed_gaps=computed_gaps,
         computed_gap_count=computed_gap_count,
     )
@@ -159,67 +179,15 @@ def gap_analysis():
 @adm_kanban_view_bp.route("/plateau-roadmap")
 @login_required
 def plateau_roadmap():
-    """Plateau Roadmap — group cards by their target Plateau, and show each
-    plateau's critical path computed from the one work package store."""
-    try:
-        plateaus = (
-            KanbanCard.query
-            .filter_by(arch_element_type="Plateau")
-            .order_by(KanbanCard.adm_phase_id, KanbanCard.title)
-            .all()
-        )
-        assigned = (
-            KanbanCard.query
-            .filter(KanbanCard.target_plateau_id.isnot(None))
-            .order_by(KanbanCard.target_plateau_id, KanbanCard.title)
-            .all()
-        )
-        plateau_cards: dict = {}
-        for card in assigned:
-            plateau_cards.setdefault(card.target_plateau_id, []).append(card)
-
-        unassigned_count = (
-            KanbanCard.query
-            .filter(
-                KanbanCard.arch_element_type != "Plateau",
-                KanbanCard.target_plateau_id.is_(None),
-            )
-            .count()
-        )
-    except Exception as exc:
-        current_app.logger.error("Plateau roadmap query failed: %s", exc)
-        plateaus, plateau_cards, unassigned_count = [], {}, 0
-
-    # The critical path panel is computed on its own: a failure in it is
-    # logged and the panel is empty; the plateau cards above still show.
-    try:
-        from app.services import work_package_service
-        from app.utils.tenant import current_organization_id
-
-        critical_paths = work_package_service.critical_paths_for_roadmap(
-            current_organization_id()
-        )
-    except Exception as exc:
-        current_app.logger.error("Plateau roadmap critical path failed: %s", exc)
-        from app import db
-
-        db.session.rollback()
-        critical_paths = []
-
-    return render_template(
-        "adm_kanban/plateau_roadmap.html",
-        plateaus=plateaus,
-        plateau_cards=plateau_cards,
-        unassigned_count=unassigned_count,
-        critical_paths=critical_paths,
-    )
+    """The plateau roadmap is the one roadmap, Strategic view (plateaus and the critical path)."""
+    return redirect_to_roadmap("strategic")
 
 
 @adm_kanban_view_bp.route("/roadmap")
 @login_required
 def adm_roadmap_timeline():
-    """ADM Roadmap Timeline — Gantt view of ALL Kanban cards across all boards."""
-    return render_template("adm_kanban/roadmap.html")
+    """The ADM roadmap is the one roadmap, Strategic view."""
+    return redirect_to_roadmap("strategic")
 
 
 @adm_kanban_view_bp.route("/api/elements/search")

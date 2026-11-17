@@ -108,7 +108,7 @@ def test_owner_picker_is_an_accessible_keyboard_combobox(
 def test_architect_synthesis_names_transformation_posture_without_relabelling_solutions(
     app, programme_fixture, login_as
 ):
-    """Catches a Solution-only dashboard or a solution metric relabelled as enterprise truth."""
+    """Catches a Solution-only answer or a solution metric relabelled as enterprise truth."""
     TransformationProgrammeService.create_programme(
         actor=programme_fixture.actor,
         command_key="room-chief-rollup",
@@ -116,26 +116,24 @@ def test_architect_synthesis_names_transformation_posture_without_relabelling_so
     )
     client = app.test_client()
     login_as(client, programme_fixture.owner_id)
-    response = client.get("/solutions/architect-synthesis")
-    body = response.get_data(as_text=True)
+    response = client.get("/solutions/architect-synthesis/api")
+    body = response.get_json()
 
     assert response.status_code == 200
-    for label in (
-        "Transformation posture",
-        "Non-Solution programmes",
-        "Evidence debt",
-        "Decision ageing",
-        "Cross-domain dependencies",
-        "Delivery confidence",
-        "Outcome variance",
-        "Solution conformance",
-    ):
-        assert label in body
-    assert "Not available in this release" in body
-    assert (
-        "Dependencies are not yet classified by transformation domain; "
-        "a cross-domain count is unavailable."
-    ) in body
+    transformation = body["transformation"]
+    assert transformation["state"] == "available"
+    assert transformation["non_solution_programmes"] == 1
+    assert transformation["programme_count"] == 1
+    # A measure that is not computed carries no value, only the reason.
+    for key in ("decision_ageing", "delivery_confidence", "outcome_variance"):
+        assert transformation[key]["value"] is None
+    assert transformation["cross_domain_dependencies"] == {
+        "reason": (
+            "Dependencies are not yet classified by transformation domain; "
+            "a cross-domain count is unavailable."
+        ),
+        "value": None,
+    }
 
 
 def test_room_renders_canonical_next_action_link_and_central_cards(

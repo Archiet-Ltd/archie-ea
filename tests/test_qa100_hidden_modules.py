@@ -189,24 +189,20 @@ def test_format_currency_filter_uses_org_currency_and_no_invented_zero(app):
         assert default_cfg["code"] in with_code
 
 
-def test_org_currency_code_resolution_prefers_org_setting():
-    """H-04: Organization.settings['currency_code'] is the single source of
-    truth for which currency an org sees — not a hardcoded default."""
+def test_org_currency_code_resolution_reads_reporting_currency(app, db_session, make_org):
+    """H-04 / QA-007: Organization.reporting_currency is the one stored currency an org sees; settings.currency_code is
+    not a source, and the default is the server default (GBP), not a hardcoded value."""
     from config import CurrencyConfig
 
-    class FakeOrg:
-        settings = {"currency_code": "USD"}
+    org = make_org("currency")
+    org.reporting_currency = "USD"
+    org.settings = {"currency_code": "EUR"}  # no longer a source
+    db_session.commit()
+    assert CurrencyConfig.get_org_currency_code(org) == "USD"
+    assert CurrencyConfig.get_org_currency_code(organization_id=org.id) == "USD"
 
-    assert CurrencyConfig.get_org_currency_code(FakeOrg()) == "USD"
-
-    class FakeOrgNoSetting:
-        settings = {}
-
-    assert CurrencyConfig.get_org_currency_code(FakeOrgNoSetting()) == CurrencyConfig.DEFAULT_CURRENCY
+    fresh = make_org("currency")  # never given a reporting currency: the server default applies
+    fresh.settings = {"currency_code": "USD"}
+    db_session.commit()
+    assert CurrencyConfig.get_org_currency_code(organization_id=fresh.id) == CurrencyConfig.DEFAULT_CURRENCY == "GBP"
     assert CurrencyConfig.get_org_currency_code(None) == CurrencyConfig.DEFAULT_CURRENCY
-
-    class FakeOrgUnsupported:
-        settings = {"currency_code": "NOTREAL"}
-
-    # An invalid stored code must not be trusted verbatim — falls back safely.
-    assert CurrencyConfig.get_org_currency_code(FakeOrgUnsupported()) == CurrencyConfig.DEFAULT_CURRENCY

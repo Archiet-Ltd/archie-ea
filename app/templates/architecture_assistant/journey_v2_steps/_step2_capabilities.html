@@ -91,7 +91,7 @@
                                       :class="cap.confidence >= 0.85 ? 'bg-success/10 text-success-emphasis border border-success/20'
                                             : cap.confidence >= 0.7  ? 'bg-warning/10 text-warning-emphasis border border-warning/20'
                                             : 'bg-muted text-muted-foreground border border-border'"
-                                      x-text="Math.round((cap.confidence || 0) * 100) + '% match'"></span>
+                                      x-text="Platform.figure.percent(cap.confidence, 100) + ' match'"></span>
                             </div>
                             <p class="text-xs text-muted-foreground truncate mt-0.5" x-text="cap.domain || cap.description || ''"></p>
                         </div>

@@ -168,6 +168,10 @@ def _point_at(conn, source, source_id, audit_id):
 @with_appcontext
 def backfill_audit_trail(dry_run, organization_id):
     """Copy archimate, ARB and rationalisation audit history into soc2_audit_log."""
+    from app.commands.deploy_scope import require_platform_scope
+    from app.extensions import db as _scope_db
+
+    require_platform_scope(_scope_db.session.connection(), "backfill-audit-trail")
     from app.extensions import db
     from app.models.audit_log import mirror_source_row
 

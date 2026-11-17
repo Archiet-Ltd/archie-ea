@@ -107,7 +107,7 @@ def test_risk_register_touches_journey(live_server, browser):
     # The unlinked risk says so, and its action opens the link picker.
     register()
     loose = page.locator("[data-risk-row]", has_text="%s loose risk" % noun)
-    expect(loose.locator("[data-risk-unlinked]")).to_contain_text("Not linked to any application, solution or programme yet")
+    expect(loose.locator("[data-risk-unlinked]")).to_contain_text("Not linked to any application, capability, solution or programme yet")
     expect(loose.locator("[data-risk-touches]")).to_have_count(0)
     expect(loose).not_to_contain_text("Reaches —")
     assert "mirror" not in loose.inner_text()

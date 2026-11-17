@@ -13,6 +13,9 @@
  *   - Mapping        : openMappingForApp(id, name, type)
  *   - Export         : exportCSV()
  */
+// Filters a link sets that the filter bar has no control for; Clear removes them too.
+const APP_LIST_LINK_FILTERS = ['has_owner', 'no_domain', 'no_owner', 'no_capability', 'no_vendor'];
+
 function appPortfolio() {
   return {
     // ── State ──────────────────────────────────────────────────────────────
@@ -131,11 +134,12 @@ function appPortfolio() {
       this.filters.domain           = '';
       this.filters.capability_level = '';
       this.filters.process_level    = '';
-      this._navigate(1);
+      this._navigate(1, null, APP_LIST_LINK_FILTERS);
     },
 
     hasActiveFilters() {
-      return Object.values(this.filters).some(v => v !== '');
+      const params = new URLSearchParams(window.location.search);
+      return Object.values(this.filters).some(v => v !== '') || APP_LIST_LINK_FILTERS.some(k => params.has(k));
     },
 
     // ARCH-104: stat-tile click-to-filter. Sets the lifecycle status filter
@@ -176,8 +180,9 @@ function appPortfolio() {
       this._navigate(1, parseInt(size, 10));
     },
 
-    _navigate(page, pageSize = null) {
+    _navigate(page, pageSize = null, drop = []) {
       const params = new URLSearchParams(window.location.search);
+      drop.forEach(k => params.delete(k));
       params.set('page', page);
       if (pageSize) params.set('page_size', pageSize);
 
@@ -525,6 +530,22 @@ function appPortfolio() {
     openMappingForApp(id, name, mappingType) {
       const normalizedType = mappingType || 'capability';
 
+      // Mapping capabilities to this application is the dialog's application-to-targets
+      // direction: the person picks capabilities for the named application. The other kinds
+      // below open the targets-to-applications direction.
+      if (normalizedType === 'capability' && typeof window.openUnifiedMappingModalReverse === 'function') {
+        if (typeof window.initUnifiedMappingModal === 'function') {
+          window.initUnifiedMappingModal({ context: 'capability', apiEndpoint: '/capability-map/api' });
+        }
+        window.openUnifiedMappingModalReverse({
+          context: 'capability',
+          appId: id,
+          appName: name,
+          onSaveCallback: () => window.location.reload(),
+        });
+        return;
+      }
+
       // Delegate to the unified mapping modal if registered
       if (typeof window.openUnifiedMappingModal === 'function') {
         if (typeof window.initUnifiedMappingModal === 'function') {
@@ -562,6 +583,25 @@ function appPortfolio() {
       const url = routes[normalizedType] || `/applications/${id}`;
       window.location.href = url;
     },
+
+    // ── Single delete ──────────────────────────────────────────────────────
+    // The row menu's Delete asks first, then posts to the same delete route
+    // the old inline form did (CSRF token from the page's meta tag).
+    async deleteApplication(url, name) {
+      const ok = await Platform.modal.confirm('Delete ' + name + '? This cannot be undone.');
+      if (!ok) return;
+      const meta = document.querySelector('meta[name=csrf-token]');
+      const form = document.createElement('form');
+      form.method = 'POST';
+      form.action = url;
+      const token = document.createElement('input');
+      token.type = 'hidden';
+      token.name = 'csrf_token';
+      token.value = meta ? meta.content : '';
+      form.appendChild(token);
+      document.body.appendChild(form);
+      form.submit();
+    },
   };
 }
 
@@ -573,6 +613,19 @@ function applicationCreateForm() {
   return {
     submitting: false,
     errorMsg: '',
+
+    // A chat answer that named an application not yet in the model links here with
+    // ?add_name=<name> (the existing form, prefilled, never a second "add" dialog).
+    init() {
+      try {
+        const addName = new URLSearchParams(window.location.search).get('add_name');
+        if (addName) {
+          this.form.name = addName.slice(0, 255);
+          this.scheduleCheck();
+          this.$nextTick(() => Platform.modal.open('modal-create'));
+        }
+      } catch (e) { /* swallow-ok: the prefill is a convenience; the form still opens empty */ }
+    },
     // ARCH-041/ARCH-042: per-field errors keyed by form field name, rendered
     // next to the corresponding input with aria-invalid + aria-describedby,
     // instead of a single opaque banner (or, worse, the raw HTTP status

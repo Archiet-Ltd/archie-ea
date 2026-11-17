@@ -1,0 +1,116 @@
+{
+  "applications-first": {
+    "checks": [
+      {
+        "at_least": 2,
+        "check": "the applications list holds at least two applications",
+        "measured": 25,
+        "passed": true
+      },
+      {
+        "at_least": 1,
+        "check": "the Connect GitHub page was shown",
+        "measured": 1,
+        "passed": true
+      }
+    ],
+    "clip_sha256": "a030a0e0a7c9c84bfc880feafd86b29e0dafb66e296421f565bc0bf60fcb3bf4",
+    "seconds": 24.3
+  },
+  "canvases-open": {
+    "checks": [
+      {
+        "at_least": 5,
+        "check": "at least five boxes of the open canvas are filled from the model",
+        "measured": 76,
+        "passed": true
+      },
+      {
+        "at_least": 1,
+        "check": "no box of the open canvas is empty",
+        "measured": 1,
+        "passed": true
+      }
+    ],
+    "clip_sha256": "9d4670667fef6bbf7e3357c6db9c19353fb09ce9f4f9bb34faeabe62baff7421",
+    "seconds": 17.3
+  },
+  "chat-citation": {
+    "checks": [
+      {
+        "at_least": 1,
+        "check": "an answer names its record",
+        "measured": 1,
+        "passed": true
+      },
+      {
+        "at_least": 1,
+        "check": "the record the citation opens lists at least one relationship",
+        "measured": 20,
+        "passed": true
+      }
+    ],
+    "clip_sha256": "829def7a3e9c70fb257968e407dd9b2d219fe7cadd805299c540656ff4982ca8",
+    "seconds": 20.9
+  },
+  "compliance-controls": {
+    "checks": [
+      {
+        "at_least": 2,
+        "check": "the controls of the opened framework are listed (at least two)",
+        "measured": 2,
+        "passed": true
+      },
+      {
+        "at_least": 1,
+        "check": "no framework says its controls are missing",
+        "measured": 1,
+        "passed": true
+      }
+    ],
+    "clip_sha256": "db83bd1e87860c202f9d341ccf74d76ba9dd578e60dbcbc0bed020ff50cbce9c",
+    "seconds": 13.5
+  },
+  "connectors-github": {
+    "checks": [
+      {
+        "at_least": 1,
+        "check": "the Connect GitHub page is open",
+        "measured": 1,
+        "passed": true
+      },
+      {
+        "at_least": 1,
+        "check": "the token field is shown",
+        "measured": 1,
+        "passed": true
+      }
+    ],
+    "clip_sha256": "8483f3c7e29b665a14449d43e7653ca6881ca0816d73c99995f113c68913f871",
+    "seconds": 17.7
+  },
+  "model-from-github": {
+    "checks": [
+      {
+        "at_least": 2,
+        "check": "the canvas holds at least two elements",
+        "measured": 15,
+        "passed": true
+      },
+      {
+        "at_least": 1,
+        "check": "the canvas holds at least one relationship",
+        "measured": 14,
+        "passed": true
+      },
+      {
+        "at_least": 1,
+        "check": "an application read from GitHub was opened",
+        "measured": 4,
+        "passed": true
+      }
+    ],
+    "clip_sha256": "5d49838a1f15b9ef3e4ba0bea1712a404a003d8a83a9cf9ea8b6d2cf1818920f",
+    "seconds": 23.4
+  }
+}

@@ -1,24 +1,13 @@
+{# design-block: data-table #}
 {% extends "layouts/admin_base.html" %}
 {% from 'macros/page_shell.html' import page_shell %}
 
-{% block title %}Search Capabilities{% endblock %}
-
-{% block breadcrumb %}
-{% from 'components/breadcrumb_nav.html' import breadcrumb_nav %}
-{{ breadcrumb_nav(items=[
-    {'text': 'Home', 'href': url_for('main.index'), 'icon': 'home'},
-    {'text': 'Business Layer', 'href': url_for('archimate_crud.dashboard') + '#business'},
-    {'text': 'Capabilities', 'href': url_for('capability_map.index')},
-    {'text': 'Search Capabilities', 'current': true}
-]) }}
-{% endblock %}
-
-{% block content %}
+{% block title %}Search Capabilities{% endblock %}{% block content %}
 <div class="mx-auto px-4 py-6">
     <!-- Header -->
     <div class="mb-8">
         {% macro _ps_actions() %}
-<div class="flex space-x-4">
+<div class="flex flex-wrap gap-3">
                 <a href="{{ url_for('maturity_management.frameworks_overview') }}" 
                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
                     ← Back to Dashboard
@@ -80,7 +69,7 @@
                     
                     <div class="flex items-end">
                         <button type="submit" 
-                                class="w-full inline-flex items-center justify-center gap-2 rounded-md bg-primary text-primary-foreground px-4 py-2 text-sm font-medium hover:bg-primary/90 transition-colors" aria-label="Submit">
+                                class="w-full inline-flex items-center justify-center gap-2 rounded-md bg-primary text-primary-foreground px-4 py-2 text-sm font-medium hover:bg-primary/90 transition-colors">
                             Search
                         </button>
                     </div>

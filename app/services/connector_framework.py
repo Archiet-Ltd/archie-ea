@@ -26,6 +26,7 @@ Credentials live only in the per-organisation store
 configuration rows hold settings, never secrets.
 """
 
+from app.services.change_source import records_changes_as
 import json
 import logging
 from abc import ABC, abstractmethod
@@ -694,6 +695,17 @@ CONNECTOR_TYPE_LABELS = {
     "lucidchart": "Lucidchart",
 }
 
+# Connector types whose organisation may hold several connections of the one
+# type, each with its own access. Their access is kept under a credential type
+# of the connection's own (``<type>:<vault_slot>``, the slot being a non-secret
+# value in the connection's settings), never under the type-wide name, so one
+# connection's access is read, replaced and deleted without touching another's.
+MULTI_CONNECTION_CREDENTIAL_TYPES = frozenset({"mcp_source"})
+
+# Connector types that have a connection page of their own instead of the
+# shared connectors form.
+OWN_PAGE_CONNECTOR_TYPES = frozenset({"mcp_source"})
+
 # Concrete connector implementations available for sync (outside credential
 # storage, which lives in the per-organisation vault).
 _CONNECTOR_CLASSES: dict = {}
@@ -791,12 +803,37 @@ def _load_org_connector(org_id: int, connector_id=None, connector_type=None):
     return query.first()
 
 
-def _connector_credential_mask(org_id: int, connector_type: str):
+def connection_credential_type(connector_type: str, config) -> str | None:
+    """The credential type holding one connection's own access, or None.
+
+    Only for a type in ``MULTI_CONNECTION_CREDENTIAL_TYPES``: ``<type>:<vault_slot>``,
+    the slot read from the connection's settings. None when the connection has
+    no slot, so nothing is read, masked or deleted by accident.
+    """
+    slot = (config or {}).get("vault_slot") if isinstance(config, dict) else None
+    if connector_type not in MULTI_CONNECTION_CREDENTIAL_TYPES or not slot:
+        return None
+    return f"{connector_type}:{slot}"
+
+
+def _connector_credential_mask(org_id: int, connector_type: str, config=None):
     """Masked proof that this organisation stores a credential for the
-    connector type, across every credential type the change paths use."""
+    connector type, across every credential type the change paths use.
+
+    For a multi-connection type the proof is about the connection's own
+    access (its ``config`` names the slot), not any access of the type."""
     if not connector_type:
         return None
     from app.models.connector_config import OrgConnectorCredential
+
+    if connector_type in MULTI_CONNECTION_CREDENTIAL_TYPES:
+        own = connection_credential_type(connector_type, config)
+        if own is None:
+            return None
+        row = OrgConnectorCredential.query.filter_by(
+            organization_id=org_id, connector_type=connector_type, credential_type=own
+        ).first()
+        return "******" if row is not None else None
 
     row = (
         OrgConnectorCredential.query.filter_by(
@@ -813,12 +850,13 @@ def _connector_view(cfg: ConnectorConfig, org_id: int) -> dict:
     schedule, health (status) and last synchronisation, so the page has a
     single source per connector from the framework.
     """
-    latest_sync = (
-        SyncLog.query.filter_by(connector_id=cfg.id)
-        .order_by(SyncLog.started_at.desc())
-        .first()
-    )
+    from app.services.connector_schedule import _recent_logs, describe_last_read
+
+    logs = _recent_logs(cfg.id)
+    latest_sync = logs[0] if logs else None
+
     return {
+        "read_schedule": describe_last_read(cfg, logs),
         "id": cfg.id,
         "name": cfg.name,
         "connector_type": cfg.connector_type,
@@ -829,7 +867,8 @@ def _connector_view(cfg: ConnectorConfig, org_id: int) -> dict:
         "sync_schedule": cfg.sync_schedule,
         "config": cfg.public_config(),
         "credential_ref": f"vault:{org_id}:{cfg.connector_type}",
-        "credential_masked": _connector_credential_mask(org_id, cfg.connector_type),
+        "credential_masked": _connector_credential_mask(org_id, cfg.connector_type, cfg.config),
+        "credential_stored": bool(_connector_credential_mask(org_id, cfg.connector_type, cfg.config)),
         "last_sync": cfg.last_sync,
         "last_sync_status": latest_sync.status if latest_sync else None,
         "description": cfg.description,
@@ -863,13 +902,17 @@ def _proposal_connector_view(approval, org_id: int) -> dict:
         "health": "pending_review",
         "sync_mode": None,
         "sync_schedule": None,
+        "read_schedule": None,
         # Masked for the same reason _connector_view uses public_config(): a
         # secret mistakenly typed into the configuration box (H1) must not
         # reach a pending-approval listing in plain text, even while the
         # proposal is still waiting for a decision.
         "config": _mask_sensitive(payload.get("config") or {}),
         "credential_ref": f"vault:{org_id}:{connector_type}" if connector_type else None,
-        "credential_masked": _connector_credential_mask(org_id, connector_type),
+        "credential_masked": _connector_credential_mask(org_id, connector_type, payload.get("config")),
+        "credential_stored": bool(
+            _connector_credential_mask(org_id, connector_type, payload.get("config"))
+        ),
         "last_sync": None,
         "last_sync_status": None,
         "description": approval.summary,
@@ -935,6 +978,14 @@ def propose_connector_change(
     )
 
     resolved = scope_connector_change_to_org(org_id=org_id)
+    if action == CONNECTOR_ACTION_SYNC:
+        # One open request to read a connection at a time, whoever asks (the Sync button, the
+        # hourly re-read or the API): the approver is asked once, not once per asker.
+        from app.services.connector_schedule import pending_sync_proposal
+
+        open_request = pending_sync_proposal(resolved, (payload or {}).get("connector_id"))
+        if open_request is not None:
+            return open_request
     approval = create_approval_record(
         organization_id=resolved,
         operation_type=action,
@@ -1025,6 +1076,10 @@ def apply_connector_change(
         return cfg
 
     if action == CONNECTOR_ACTION_UPDATE:
+        if connector_type in MULTI_CONNECTION_CREDENTIAL_TYPES and not payload.get("connector_id"):
+            raise ConnectorWriteRefused(
+                "Changing or removing a connection of this type needs the connection's own id."
+            )
         cfg = _load_org_connector(
             resolved,
             connector_id=payload.get("connector_id"),
@@ -1087,6 +1142,10 @@ def apply_connector_change(
         return cfg
 
     if action == CONNECTOR_ACTION_DELETE:
+        if connector_type in MULTI_CONNECTION_CREDENTIAL_TYPES and not payload.get("connector_id"):
+            raise ConnectorWriteRefused(
+                "Changing or removing a connection of this type needs the connection's own id."
+            )
         cfg = _load_org_connector(
             resolved,
             connector_id=payload.get("connector_id"),
@@ -1102,9 +1161,24 @@ def apply_connector_change(
         # Remove every credential of the deleted connector (all credential
         # types — the ''credentials'' blob, legacy ''client_secret'' rows,
         # whatever else the connector used) from the per-organisation vault.
-        OrgConnectorCredential.query.filter_by(
-            organization_id=resolved, connector_type=connector_type
-        ).delete()
+        if connector_type in MULTI_CONNECTION_CREDENTIAL_TYPES:
+            # Only this connection's own access, live and staged: another
+            # connection of the same type keeps its access.
+            own = connection_credential_type(connector_type, cfg.config)
+            if own is not None:
+                column = OrgConnectorCredential.credential_type
+                OrgConnectorCredential.query.filter(
+                    OrgConnectorCredential.organization_id == resolved,
+                    OrgConnectorCredential.connector_type == connector_type,
+                    db.or_(
+                        column == own,
+                        db.and_(column.startswith("pending:"), column.endswith(f":{own}", autoescape=True)),
+                    ),
+                ).delete(synchronize_session=False)
+        else:
+            OrgConnectorCredential.query.filter_by(
+                organization_id=resolved, connector_type=connector_type
+            ).delete()
         db.session.delete(cfg)
         db.session.flush()
         return cfg
@@ -1181,12 +1255,12 @@ def propose_or_apply_connector_change(
     return {"applied": True, "connector_id": getattr(cfg, "id", None)}
 
 
-def _orphan_sync_log(connector_id: str):
+def _orphan_sync_log(connector_id: str, sync_type: str = "manual"):
     """A SyncLog row for a connector run, created before the run so a
     failure still leaves a record the page can report."""
     sync_log = SyncLog(
         connector_id=connector_id,
-        sync_type="manual",
+        sync_type=sync_type,
         status="running",
     )
     db.session.add(sync_log)
@@ -1246,12 +1320,89 @@ def run_coroutine_sync(coro):
         events._set_running_loop(outer)
 
 
+APPROVED_READ_WAIT_SECONDS = 15
+READ_WAIT_STEP_SECONDS = 0.5
+
+
+def propose_connector_sync(*, org_id: int, cfg, actor_user_id: int | None = None):
+    """Queue a sync of one connector as an approval proposal in its organisation's queue.
+
+    The one place the proposal's wording and payload are made: the Sync button and the
+    scheduled re-read both ask this way."""
+    return propose_connector_change(
+        org_id=org_id,
+        actor_user_id=actor_user_id,
+        action=CONNECTOR_ACTION_SYNC,
+        connector_type=cfg.connector_type,
+        summary=f"Run sync for connector '{cfg.name}'",
+        payload={"connector_id": cfg.id, "connector_type": cfg.connector_type},
+    )
+
+
+@records_changes_as("connector")
 def run_connector_sync(
     *,
     org_id: int,
     connector_id: str,
     approval=None,
     delegated: bool = False,
+    sync_type: str = "manual",
+    scope: dict | None = None,
+) -> dict:
+    """Run one connector sync, unless that connector is already being read.
+
+    A manual Sync, a scheduled re-read and an approved sync all pass through here, and each
+    takes the same per-connector advisory lock (held on its own connection, so it is visible
+    to every other session before anything is committed). A second read of the same
+    connector while the first holds the lock is refused with ``busy`` set, not queued."""
+    import time
+
+    from app.jobs.tenant_safe_job import job_lock
+
+    # An approved sync has already used up its approval, so it waits a little for a read
+    # under way to finish instead of being refused; every other caller is refused at once.
+    give_up_at = time.monotonic() + (APPROVED_READ_WAIT_SECONDS if approval is not None else 0)
+    while True:
+        with job_lock(f"connector_read:{connector_id}", required=False) as acquired:
+            if acquired:
+                result = _run_connector_sync_locked(
+                    org_id=org_id,
+                    connector_id=connector_id,
+                    approval=approval,
+                    delegated=delegated,
+                    sync_type=sync_type,
+                    scope=scope,
+                )
+                # The read's record is committed while the claim is still held, so a second
+                # reader cannot start in the gap between the end of this read and the
+                # caller's commit.
+                db.session.commit()
+                return result
+        if time.monotonic() >= give_up_at:
+            if approval is not None:
+                # The approval cannot be handed back once it is claimed, and the read under
+                # way reads the same connection, so it answers the approved request.
+                return {
+                    "success": True,
+                    "busy": True,
+                    "message": "This connection was already being read, so that read answers the approved request.",
+                }
+            return {
+                "success": False,
+                "busy": True,
+                "error": "This connection is already being read. Try again when that read has finished.",
+            }
+        time.sleep(READ_WAIT_STEP_SECONDS)
+
+
+def _run_connector_sync_locked(
+    *,
+    org_id: int,
+    connector_id: str,
+    approval=None,
+    delegated: bool = False,
+    sync_type: str = "manual",
+    scope: dict | None = None,
 ) -> dict:
     """Run one connector sync and record health, last synchronisation and
     the identifier crosswalk links for every element touched.
@@ -1285,7 +1436,7 @@ def run_connector_sync(
 
     assert_connector_permitted(cfg.connector_type)
 
-    sync_log = _orphan_sync_log(cfg.id)
+    sync_log = _orphan_sync_log(cfg.id, sync_type)
 
     try:
         connector = build_connector(cfg, resolved)
@@ -1295,6 +1446,10 @@ def run_connector_sync(
         sync_log.completed_at = datetime.utcnow()
         db.session.flush()
         return {"success": False, "error": str(exc)}
+
+    if scope:
+        # A read narrowed to part of the source (for GitHub: the repositories a person chose).
+        connector.scope = dict(scope)
 
     try:
         call = connector.batch_sync()
@@ -1397,17 +1552,64 @@ def _credential_field_map(connector_type: str, org_id: int, config: dict) -> dic
 
     if connector_type == "github":
         # The GitHub organisation to read and, for GitHub Enterprise Server, its
-        # API address come from the configuration; the token (read-only scopes)
-        # from the vault, under either save path's key.
+        # API address come from the configuration; the bearer the reader sends
+        # comes from the one token provider (app/connectors/github_app.py), which
+        # mints a fresh installation token when the organisation installed the
+        # GitHub App and falls back to the pasted personal token otherwise -- one
+        # read path regardless of how the organisation connected.
+        from app.connectors.github_app import resolve_api_token
+
         return {
             "organization": config.get("organization", ""),
             "base_url": config.get("base_url", ""),
-            "api_token": _secret("api_token"),
+            "api_token": resolve_api_token(org_id),
         }
+
+    if connector_type in MULTI_CONNECTION_CREDENTIAL_TYPES:
+        # The access of this connection alone, from its own slot.
+        own = connection_credential_type(connector_type, config)
+        if own is None:
+            return {}
+        raw = vault.retrieve(org_id, connector_type, own)
+        if not raw:
+            return {}
+        try:
+            value = json.loads(raw)
+        except (json.JSONDecodeError, TypeError):
+            return {}
+        return value if isinstance(value, dict) else {}
 
     # No field map for this connector type: fall back to the generic
     # credentials blob the connectors page itself writes, unchanged.
     return vault.retrieve_credentials(org_id, connector_type) or {}
+
+
+def ensure_application_row(org_id: int, element, name: str, description: str | None = None, *, flush: bool = True):
+    """The organisation's inventory row (``ApplicationComponent``) for an
+    element a connector has already made, creating it when there is none.
+
+    The row is made with ``archimate_element_id`` set, so the flush listener
+    makes no second element. An element of another organisation is refused.
+    Called twice for one element it returns the one row.
+    """
+    from app.models.application_portfolio import ApplicationComponent
+
+    if element is None or getattr(element, "organization_id", None) != org_id:
+        raise ConnectorWriteRefused("The element does not belong to this organisation.")
+    row = ApplicationComponent.query.filter_by(
+        organization_id=org_id, archimate_element_id=element.id
+    ).first()
+    if row is None:
+        row = ApplicationComponent(
+            organization_id=org_id,
+            name=name,
+            description=description,
+            archimate_element_id=element.id,
+        )
+        db.session.add(row)
+        if flush:
+            db.session.flush()
+    return row
 
 
 def build_connector(cfg: ConnectorConfig, org_id: int):

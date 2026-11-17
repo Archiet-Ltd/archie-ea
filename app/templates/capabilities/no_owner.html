@@ -1,6 +1,11 @@
+{# shadcn-reference: example:tasks@e55b60b #}
+{# design-block: data-table #}
 {% extends 'layouts/admin_base.html' %}
 {% from "components/page_header.html" import page_header %}
 {% from "components/empty_state.html" import empty_state %}
+{% from "components/table.html" import table, table_header, table_body, table_row, table_head, table_cell, table_empty_state %}
+{% from "components/input.html" import input %}
+{% from "components/button.html" import button %}
 
 {% block title %}Capabilities with no owner{% endblock %}
 
@@ -21,65 +26,77 @@
   {% else %}
   <div data-slot="card" class="rounded-lg border border-border bg-card overflow-hidden">
     <div class="overflow-x-auto">
-      <table class="dense-table w-full text-sm">
-        <thead>
-          <tr class="border-b border-border bg-muted/40 text-left">
-            <th class="px-4 py-3 font-medium text-muted-foreground">Capability</th>
-            <th class="px-4 py-3 font-medium text-muted-foreground">Code</th>
-            <th class="px-4 py-3 font-medium text-muted-foreground">Assign an owner</th>
+      {% call table() %}
+        {% call table_header() %}
+          <tr>
+            {% call table_head() %}Capability{% endcall %}
+            {% call table_head() %}Code{% endcall %}
+            {% call table_head() %}Assign an owner{% endcall %}
           </tr>
-        </thead>
-        <tbody>
+        {% endcall %}
+        {% call table_body() %}
           {% for cap in capabilities %}
-          <tr class="border-b border-border last:border-b-0" data-testid="no-owner-row" data-capability-id="{{ cap.id }}">
-            <td class="px-4 py-3 text-foreground">{{ cap.name }}</td>
-            <td class="px-4 py-3 text-muted-foreground">{{ cap.code or '—' }}</td>
-            <td class="px-4 py-3"
-                x-data="{
-                  term: '', results: [], selected: null, saving: false, saved: false,
-                  runSearch() {
-                    const q = this.term.trim();
-                    if (!q) { this.results = []; return; }
-                    Platform.fetch.get('{{ url_for('organization.stakeholder_search') }}', { q: q })
-                      .then(data => { this.results = (data.results || []).filter(r => r.type === 'user'); })
-                      .catch(() => { this.results = []; });
-                  },
-                  choose(r) { this.selected = r; this.term = r.name; this.results = []; },
-                  assign() {
-                    if (!this.selected) return;
-                    this.saving = true;
-                    Platform.fetch.post('{{ url_for('capability_map.api_set_capability_owner', capability_id=cap.id) }}', { user_id: this.selected.id })
-                      .then(() => { this.saved = true; })
-                      .finally(() => { this.saving = false; });
-                  }
-                }">
-              <div class="relative inline-block w-64">
-                <input type="text" x-model="term" @input.debounce.300ms="runSearch()"
-                       x-show="!saved"
-                       placeholder="Search people..."
-                       data-testid="capability-owner-search-input"
-                       class="w-full rounded-md border border-border bg-background px-3 py-2 text-sm">
-                <div class="absolute z-10 mt-1 w-full max-h-48 overflow-y-auto rounded-md border border-border bg-card divide-y divide-border"
-                     x-show="results.length > 0" x-cloak>
-                  <template x-for="r in results" :key="r.id">
-                    <button type="button" @click="choose(r)" data-testid="capability-owner-search-result"
-                            class="w-full flex items-center justify-between gap-2 px-3 py-2 text-left text-sm hover:bg-accent transition-colors">
-                      <span x-text="r.name"></span>
-                      <span class="text-xs text-muted-foreground" x-text="r.sublabel"></span>
-                    </button>
-                  </template>
+          {% call table_row(attrs_dict={'data-testid': 'no-owner-row', 'data-capability-id': cap.id}) %}
+            {% call table_cell() %}<span class="text-foreground">{{ cap.name }}</span>{% endcall %}
+            {% call table_cell() %}<span class="text-muted-foreground">{{ cap.code or '—' }}</span>{% endcall %}
+            {% call table_cell() %}
+              <div x-data="{
+                term: '', results: [], selected: null, saving: false, saved: false,
+                runSearch() {
+                  const q = this.term.trim();
+                  if (!q) { this.results = []; return; }
+                  Platform.fetch.get('{{ url_for('organization.stakeholder_search') }}', { q: q })
+                    .then(data => { this.results = (data.results || []).filter(r => r.type === 'user'); })
+                    .catch(() => { this.results = []; });
+                },
+                choose(r) { this.selected = r; this.term = r.name; this.results = []; },
+                assign() {
+                  if (!this.selected) return;
+                  this.saving = true;
+                  Platform.fetch.post('{{ url_for('capability_map.api_set_capability_owner', capability_id=cap.id) }}', { user_id: this.selected.id })
+                    .then(() => { this.saved = true; })
+                    .finally(() => { this.saving = false; });
+                }
+              }" class="flex items-center gap-2">
+                <div class="relative inline-block w-64" x-show="!saved">
+                  {{ input(
+                      placeholder='Search people...',
+                      attrs_dict={
+                        'x-model': 'term',
+                        '@input.debounce.300ms': 'runSearch()',
+                        'data-testid': 'capability-owner-search-input'
+                      }
+                  ) }}
+                  <div class="absolute z-10 mt-1 w-full max-h-48 overflow-y-auto rounded-md border border-border bg-card divide-y divide-border"
+                       x-show="results.length > 0" x-cloak>
+                    <template x-for="r in results" :key="r.id">
+                      <button type="button" @click="choose(r)" data-testid="capability-owner-search-result"
+                              class="w-full flex items-center justify-between gap-2 px-3 py-2 text-left text-sm hover:bg-accent transition-colors">
+                        <span x-text="r.name"></span>
+                        <span class="text-xs text-muted-foreground" x-text="r.sublabel"></span>
+                      </button>
+                    </template>
+                  </div>
                 </div>
+                <span x-show="!saved">
+                  {{ button(
+                      text='Set owner',
+                      variant='outline',
+                      size='sm',
+                      attrs_dict={
+                        '@click': 'assign()',
+                        ':disabled': '!selected || saving',
+                        'data-testid': 'set-capability-owner-button'
+                      }
+                  ) }}
+                </span>
+                <span x-show="saved" data-testid="capability-owner-saved" class="text-sm text-success">Owner set</span>
               </div>
-              <button type="button" @click="assign()" :disabled="!selected || saving"
-                      x-show="!saved"
-                      data-testid="set-capability-owner-button"
-                      class="ml-2 rounded-md border border-border px-3 py-2 text-sm font-medium hover:bg-muted transition-colors disabled:opacity-50">Set owner</button>
-              <span x-show="saved" data-testid="capability-owner-saved" class="text-sm text-success">Owner set</span>
-            </td>
-          </tr>
+            {% endcall %}
+          {% endcall %}
           {% endfor %}
-        </tbody>
-      </table>
+        {% endcall %}
+      {% endcall %}
     </div>
   </div>
   {% endif %}

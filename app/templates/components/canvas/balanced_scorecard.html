@@ -1,0 +1,25 @@
+{# Vendored from flask-basecoat, branch feat/canvases-capability-map, commit 2b02744, flask_basecoat/templates/basecoat/canvas/ balanced-scorecard.html, reduced to its perspectives and bottom strip. #}
+{# Balanced Scorecard, C2. After Kaplan and Norton (HBR, 1996): Vision and Strategy in the middle, the four perspectives around it (Financial above, Learning and Growth below, Internal Business Processes and Customer at the sides). Arrows run from Learning and Growth up through Internal Business Processes and Customer to Financial: the cause-and-effect chain. Each perspective lists its objectives; Measures, Targets and Initiatives sit in a strip underneath. #}
+{% import 'components/canvas/_frame.html' as f with context %}
+{% import 'components/canvas/_ui.html' as ui with context %}
+{% set SPEC = {
+  'form': 'C2', 'name': 'Balanced scorecard', 'grid': 'grid-cols-12 grid-rows-[auto_auto_auto_auto_auto_auto_auto]', 'width': 'min-w-270',
+  'hint': 'Scroll sideways on a narrow screen to see all four perspectives. Arrows show cause and effect: learning drives internal processes, which drive customer results, which drive financial results.',
+  'credit': 'Balanced Scorecard after Robert S. Kaplan and David P. Norton, Harvard Business Review, 1996.',
+  'boxes': [
+    {'key': 'financial', 'title': 'Financial', 'icon': 'banknote', 'question': 'To succeed financially, how should we appear to our shareholders?', 'empty': 'No financial objectives yet. Add the goals that show financial success.', 'area': 'col-span-6 col-start-4 row-start-1'},
+    {'key': 'internal', 'title': 'Internal Business Processes', 'icon': 'settings', 'question': 'To satisfy our shareholders and customers, what business processes must we excel at?', 'empty': 'No process objectives yet. Add the goals for the processes you must excel at.', 'area': 'col-span-4 col-start-1 row-start-3'},
+    {'key': 'vision', 'title': 'Vision', 'icon': 'target', 'question': 'What do we want to become?', 'empty': 'No vision yet. Add the goal that states what you want to become.', 'area': 'col-span-4 col-start-5 row-start-3'},
+    {'key': 'customer', 'title': 'Customer', 'icon': 'users', 'question': 'To achieve our vision, how should we appear to our customers?', 'empty': 'No customer objectives yet. Add the goals for how customers see you.', 'area': 'col-span-4 col-start-9 row-start-3'},
+    {'key': 'strategy', 'title': 'Strategy', 'icon': 'compass', 'question': 'How will we get there?', 'empty': 'No strategy yet. Add the courses of action that set the direction.', 'area': 'col-span-4 col-start-5 row-start-4'},
+    {'key': 'learning', 'title': 'Learning and Growth', 'icon': 'book-open', 'question': 'To achieve our vision, how will we sustain our ability to change and improve?', 'empty': 'No learning objectives yet. Add the goals for sustaining your ability to improve.', 'area': 'col-span-6 col-start-4 row-start-6'},
+    {'key': 'measures', 'title': 'Measures', 'icon': 'ruler', 'question': 'How will we know?', 'empty': 'No measures yet. Add the metrics that track the objectives.', 'area': 'col-span-4 col-start-1 row-start-7'},
+    {'key': 'targets', 'title': 'Targets', 'icon': 'flag', 'question': 'What value do we want?', 'empty': 'No targets yet. Add the outcomes with a baseline and a target.', 'area': 'col-span-4 col-start-5 row-start-7'},
+    {'key': 'initiatives', 'title': 'Initiatives', 'icon': 'rocket', 'question': 'What will we do?', 'empty': 'No initiatives yet. Add the work packages that move the targets.', 'area': 'col-span-4 col-start-9 row-start-7'},
+  ]} %}
+{% macro balanced_scorecard(data, id='balanced-scorecard') -%}
+{% call f.grid_canvas(SPEC, data, id) %}
+      <div class="col-span-6 col-start-4 row-start-2 flex items-center justify-center text-muted-foreground" aria-hidden="true">{{ ui.lucide('arrow-up', 'size-6') }}</div>
+      <div class="col-span-6 col-start-4 row-start-5 flex items-center justify-center text-muted-foreground" aria-hidden="true">{{ ui.lucide('arrow-up', 'size-6') }}</div>
+{% endcall %}
+{%- endmacro %}

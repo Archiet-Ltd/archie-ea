@@ -1590,6 +1590,10 @@ def merge_work_package_stores(dry_run, verify):
     constraints reconcile-schema cannot add exist, and records plateau and gap
     links as ArchiMate relationships. Never drops a source row or table."""
     conn = db.session.connection()
+    # Under forced row-level security an unscoped read returns nothing: a merge
+    # would copy nothing and --verify would pass on an empty read.
+    from app.commands.deploy_scope import require_platform_scope
+    require_platform_scope(conn, "merge-work-package-stores")
 
     if verify:
         counts = unmerged_counts(conn)

@@ -6,7 +6,7 @@ separate; these tests check arguments, commit order, failure and existing-user p
 import copy
 import runpy
 import sys
-from contextlib import nullcontext
+from contextlib import contextmanager, nullcontext
 from pathlib import Path
 from types import ModuleType, SimpleNamespace
 
@@ -17,6 +17,8 @@ ROOT = Path(__file__).resolve().parents[1]
 
 @pytest.fixture
 def provisioning(monkeypatch):
+    import app  # noqa: F401 - the real package is loaded first, so the stand-ins below replace only its parts
+
     rows, committed, logged_in = [], [], []
 
     class Query:
@@ -34,6 +36,7 @@ def provisioning(monkeypatch):
         kind = 'user'
         query = Query('user')
         role = None
+        DEFAULT_PERSONA_LENS = 'cto'
 
         def __init__(self, **kwargs):
             super().__init__(**kwargs)
@@ -95,6 +98,16 @@ def provisioning(monkeypatch):
             self.rollbacks += 1
             rows[:] = copy.deepcopy(committed)
 
+        @contextmanager
+        def begin_nested(self):
+            """A savepoint: what was added inside it is kept unless it raises."""
+            before = copy.deepcopy(rows)
+            try:
+                yield self
+            except Exception:
+                rows[:] = before
+                raise
+
     session = Session()
 
     class OrgRole:
@@ -137,11 +150,18 @@ def provisioning(monkeypatch):
     modules = {
         'manage': dict(app=SimpleNamespace(app_context=nullcontext), db=db),
         'config': dict(Config=SimpleNamespace(ADMIN_EMAIL='new-admin@example.com', ADMIN_PASSWORD='fixture-only')),
-        'app.models': dict(User=User, Organization=Organization, Role=Role),
+        'app.models': dict(User=User, Organization=Organization, Role=Role, __path__=[]),
+        'app.models.user': dict(password_hash_is_current=lambda stored: True),
         'app.models.organization': dict(Organization=Organization),
         'app.models.org_role': dict(OrgRole=OrgRole),
         'app.extensions': dict(db=db),
         'app.services': dict(session_registry=SessionRegistry),
+        # The default agent charters are written under their own tests; here only the owner's records matter.
+        'app.modules.organization': dict(__path__=[]),
+        'app.modules.organization.public_signals': dict(PLACEHOLDER_ENDING=' workspace'),
+        'app.commands': dict(__path__=[]),
+        'app.commands.seed_agent_charters': dict(ensure_charters=lambda org_id: None),
+        'app.jobs.tenant_safe_job': dict(platform_scope=lambda reason: nullcontext()),
         'app.flask_email': dict(send_email=lambda *args, **kwargs: pytest.fail('No email expected')),
         # The address is free: no invitation-only account holds it.
         'app.modules.account.services.invitation_service': dict(

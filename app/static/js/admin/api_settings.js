@@ -1,5 +1,5 @@
 ﻿/**
- * Admin API Settings
+ * Admin AI settings
  * Extracted from app/templates/admin/api_settings.html
  */
 let APP_CONFIG = window.__APP_CONFIG__ || {};

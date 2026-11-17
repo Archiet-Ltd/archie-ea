@@ -2,6 +2,10 @@
 {% extends 'layouts/admin_base.html' %}
 {% block title %}Connected assistants{% endblock %}
 {% from 'components/page_header.html' import page_header %}
+{% from 'components/card.html' import card, card_content with context %}
+{% from 'components/button.html' import button %}
+{% from 'components/input.html' import input %}
+{% from 'components/table.html' import table, table_header, table_body, table_row, table_head, table_cell, table_empty_state with context %}
 
 {% block content %}
 <div class="max-w-5xl mx-auto">
@@ -20,49 +24,49 @@
     {% endfor %}
   {% endwith %}
 
-  <div class="rounded-lg border border-border bg-card text-card-foreground">
+  {% call card() %}
+  {% call card_content(class='p-0') %}
     {% if grants %}
-    <table class="dense-table w-full text-sm" data-testid="connected-assistants-table">
-      <thead>
-        <tr class="border-b text-left text-muted-foreground">
-          <th class="px-6 py-3 font-medium" scope="col">Assistant</th>
-          <th class="px-6 py-3 font-medium" scope="col">Access</th>
-          <th class="px-6 py-3 font-medium" scope="col">Connected</th>
-          <th class="px-6 py-3 font-medium" scope="col">Last used</th>
-          {% if not admin_view %}<th class="px-6 py-3 font-medium" scope="col"><span class="sr-only">Actions</span></th>{% endif %}
-        </tr>
-      </thead>
-      <tbody>
+    {% call table(attrs_dict={'data-testid': 'connected-assistants-table'}) %}
+      {% call table_header() %}
+        {% call table_row() %}
+          {% call table_head() %}Assistant{% endcall %}
+          {% call table_head() %}Access{% endcall %}
+          {% call table_head() %}Connected{% endcall %}
+          {% call table_head() %}Last used{% endcall %}
+          {% if not admin_view %}{% call table_head() %}<span class="sr-only">Actions</span>{% endcall %}{% endif %}
+        {% endcall %}
+      {% endcall %}
+      {% call table_body() %}
         {% for grant in grants %}
-        <tr class="border-b last:border-0" data-testid="connected-assistant-row">
-          <td class="px-6 py-4 font-medium">{{ grant.client_name|truncate(60, True, '…') }}</td>
-          <td class="px-6 py-4 text-muted-foreground">{{ 'Read your architecture data' if 'mcp:read' in (grant.scope or '') else (grant.scope or '—') }}</td>
-          <td class="px-6 py-4 text-muted-foreground">{{ grant.connected_at.strftime('%d %b %Y') if grant.connected_at else '—' }}</td>
-          <td class="px-6 py-4 text-muted-foreground">{{ grant.last_used_at.strftime('%d %b %Y %H:%M') if grant.last_used_at else '—' }}</td>
+        {% call table_row(attrs_dict={'data-testid': 'connected-assistant-row'}) %}
+          {% call table_cell(class='font-medium') %}{{ grant.client_name|truncate(60, True, '...') }}{% endcall %}
+          {% call table_cell(class='text-muted-foreground') %}{{ 'Read your architecture data' if 'mcp:read' in (grant.scope or '') else (grant.scope or '--') }}{% endcall %}
+          {% call table_cell(class='text-muted-foreground') %}{{ grant.connected_at.strftime('%d %b %Y') if grant.connected_at else '--' }}{% endcall %}
+          {% call table_cell(class='text-muted-foreground') %}{{ grant.last_used_at.strftime('%d %b %Y %H:%M') if grant.last_used_at else '--' }}{% endcall %}
           {% if not admin_view %}
-          <td class="px-6 py-4 text-right">
+          {% call table_cell(class='text-right') %}
             <form method="post" action="{% if 'connected_assistants.revoke' in flask.current_app.view_functions %}{{ url_for('connected_assistants.revoke', grant_id=grant.grant_id) }}{% endif %}">
-              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-              <button type="submit" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">Disconnect</button>
+              {{ input(type='hidden', name='csrf_token', value=csrf_token()) }}
+              {{ button(type='submit', variant='outline', size='sm', text='Disconnect') }}
             </form>
-          </td>
+          {% endcall %}
           {% endif %}
-        </tr>
+        {% endcall %}
         {% endfor %}
-      </tbody>
-    </table>
+      {% endcall %}
+    {% endcall %}
     {% else %}
     <p class="p-6 text-sm text-muted-foreground" data-testid="connected-assistants-empty">No assistants are connected.</p>
     {% endif %}
-  </div>
+  {% endcall %}
+  {% endcall %}
 
   {% if grants %}
   <form method="post" class="mt-6 flex justify-end"
         action="{% if admin_view %}{% if 'connected_assistants.admin_revoke' in flask.current_app.view_functions %}{{ url_for('connected_assistants.admin_revoke', user_id=subject.id) }}{% endif %}{% else %}{% if 'connected_assistants.revoke_all' in flask.current_app.view_functions %}{{ url_for('connected_assistants.revoke_all') }}{% endif %}{% endif %}">
-    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-    <button type="submit" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
-      {% if admin_view %}Disconnect every assistant{% else %}Disconnect all{% endif %}
-    </button>
+    {{ input(type='hidden', name='csrf_token', value=csrf_token()) }}
+    {{ button(type='submit', text=('Disconnect every assistant' if admin_view else 'Disconnect all')) }}
   </form>
   {% endif %}
 </div>

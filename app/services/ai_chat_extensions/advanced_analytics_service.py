@@ -118,7 +118,6 @@ class AdvancedAnalyticsService:
             "score_grade": self._score_to_grade(overall_score),
             "component_scores": scores,
             "score_weights": self.HEALTH_WEIGHTS,
-            "trend": self._calculate_health_trend(scope),
             "top_issues": issues[:5],
             "recommendations": recommendations,
             "portfolio_summary": {
@@ -813,10 +812,6 @@ class AdvancedAnalyticsService:
                 )
                 recs.append(rec)
         return recs
-
-    def _calculate_health_trend(self, scope: str) -> Dict[str, Any]:
-        """Calculate health score trend."""
-        return {"direction": "unknown", "change": "No historical data", "period": "N/A"}
 
     def _compare_to_benchmark(self, score: float) -> Dict[str, Any]:
         """Compare score to industry benchmark."""

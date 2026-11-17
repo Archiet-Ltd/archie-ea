@@ -20,7 +20,10 @@ __all__ = ["CostFact", "ExchangeRate"]
 # at a call site.
 ELEMENT_APPLICATION = "application"
 ELEMENT_CAPABILITY = "capability"
-ELEMENT_TYPES = frozenset({ELEMENT_APPLICATION, ELEMENT_CAPABILITY})
+ELEMENT_RISK = "risk"
+# A node or system software, by its architecture element id.
+ELEMENT_TECHNOLOGY = "technology"
+ELEMENT_TYPES = frozenset({ELEMENT_APPLICATION, ELEMENT_CAPABILITY, ELEMENT_RISK, ELEMENT_TECHNOLOGY})
 
 KIND_ACTUAL = "actual"
 KIND_BUDGET = "budget"

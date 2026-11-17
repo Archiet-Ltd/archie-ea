@@ -20,6 +20,14 @@ from app import db
 
 logger = logging.getLogger(__name__)
 
+
+class EmbeddingsUnavailable(ValueError):
+    """No embedding may be made: no key for the organisation, or the platform key is at its ceiling.
+
+    A ValueError, so every caller that already handles an embedding failure handles this one; the
+    message is plain enough to show to a person.
+    """
+
 # CRITICAL FIX: Lazy PyTorch import to prevent startup failures
 torch = None
 TORCH_AVAILABLE = False
@@ -225,6 +233,8 @@ class VectorEmbeddingService:
             # Fallback to local model only if enabled
             if model != "sentence-transformers" and self.enable_local_embeddings:
                 return self.embed_text(text, "sentence-transformers")
+            elif isinstance(e, EmbeddingsUnavailable):
+                raise
             elif model == "sentence-transformers":
                 # If sentence-transformers failed and it's the requested model, raise error
                 raise
@@ -238,7 +248,6 @@ class VectorEmbeddingService:
         """Embed text using OpenAI API"""
         try:
             # Get API configuration
-            from app.models.models import APISettings
             from app.services.llm_service import LLMService
 
             # Ensure clean transaction state before query
@@ -247,14 +256,16 @@ class VectorEmbeddingService:
             except Exception:
                 db.session.rollback()
 
-            try:
-                settings = APISettings.query.filter_by(provider="openai", enabled=True).first()
-            except Exception as db_error:
-                self.logger.error(f"Database error getting API settings: {db_error}")
-                raise ValueError("Failed to access API settings due to database error")
-
-            if not settings or not settings.has_key():
-                raise ValueError("OpenAI API key not configured")
+            resolved = LLMService.resolve_key("openai")
+            if resolved.paused:
+                raise EmbeddingsUnavailable(
+                    "Embeddings are unavailable for now: the platform's AI allowance is used up and this "
+                    "organisation has no OpenAI key of its own."
+                )
+            if not resolved.key:
+                raise EmbeddingsUnavailable(
+                    "Embeddings are unavailable: no OpenAI key is configured for this organisation."
+                )
 
             LLMService._guard_provider_call(
                 "openai",
@@ -265,12 +276,16 @@ class VectorEmbeddingService:
             # Use OpenAI API for embeddings
             import openai
 
-            client = openai.OpenAI(api_key=settings.api_key)
+            client = openai.OpenAI(api_key=resolved.key)
 
             response = client.embeddings.create(
                 model=model_config["model"], input=text, encoding_format="float"
             )
 
+            LLMService.record_platform_call(
+                resolved, model_config["model"], getattr(response, "usage", None),
+                prompt_chars=len(text or ""),
+            )
             return response.data[0].embedding
 
         except ImportError:

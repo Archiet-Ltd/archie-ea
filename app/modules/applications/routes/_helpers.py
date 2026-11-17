@@ -4,6 +4,7 @@ import logging
 from collections import defaultdict
 
 from flask import render_template
+from flask_login import current_user
 from werkzeug.exceptions import NotFound
 
 from app import db
@@ -337,6 +338,32 @@ def _cleanup_application_relationships(app_id):
     _cascade_delete_application(app_id)
 
 
+def _elements_still_referenced(element_ids):
+    """``{element_id: ["2 principles", ...]}`` for the elements some other row still points at.
+
+    Reads every foreign key into ``archimate_elements`` from the model metadata, so a table added
+    later is covered without touching this. The element's own relationships are removed with it and
+    database-cascaded rows are part of the element, so neither counts.
+    """
+    from app.models.archimate_core import ArchiMateElement
+
+    found = {}
+    for table in db.metadata.tables.values():
+        for fk in table.foreign_keys:
+            if fk.column.table.name != ArchiMateElement.__table__.name or fk.column.name != "id":
+                continue
+            if table.name == "archimate_relationships" or (fk.ondelete or "").upper() == "CASCADE":
+                continue
+            column = fk.parent
+            rows = db.session.execute(
+                db.select(column, db.func.count()).where(column.in_(element_ids)).group_by(column)
+            ).all()
+            for referenced_id, count in rows:
+                label = table.name.replace("_", " ")
+                found.setdefault(referenced_id, []).append(f"{count} in {label}")
+    return found
+
+
 def _delete_mirror_archimate_element(element_id):
     """Delete the ArchiMateElement that mirrors a deleted application.
 
@@ -349,38 +376,66 @@ def _delete_mirror_archimate_element(element_id):
     Deliberately narrow: only the element the application itself points at, and
     only the ArchiMate relationships in which that element is an endpoint (those
     relationships describe the deleted application, so they cannot survive it).
-    Nothing else that references the element is touched — if some other row
-    (a diagram node, a parent link) still holds a foreign key, the delete fails
-    inside its SAVEPOINT and is *reported* rather than cascaded through.
+    Nothing else that references the element is touched. An element that any other row
+    still refers to (a principle, a risk assessment, a diagram node, a parent link) is
+    not removed and nothing is unlinked: it is *reported* with a plain reason saying what
+    refers to it. Rows that exist only as part of the element (database-cascaded) do not count.
+
+    ``element_id`` may also be a list of ids, which are removed together in one savepoint.
 
     Returns ``{"elements_deleted": int, "relationships_deleted": int,
-    "errors": [str]}``. Never raises.
+    "errors": [str], "blocked": {element_id: [str]}}``. Never raises.
     """
-    result = {"elements_deleted": 0, "relationships_deleted": 0, "errors": []}
-    if not element_id:
+    result = {"elements_deleted": 0, "relationships_deleted": 0, "errors": [], "blocked": {}}
+    element_ids = list(element_id) if isinstance(element_id, (list, tuple, set, frozenset)) else [element_id]
+    element_ids = [i for i in element_ids if i]
+    if not element_ids:
         return result
 
     from app.models.archimate_core import ArchiMateElement, ArchiMateRelationship
 
+    try:
+        result["blocked"] = _elements_still_referenced(element_ids)
+    except Exception:
+        logger.warning("Could not check what refers to ArchiMate element(s) %s", element_ids, exc_info=True)
+        result["errors"].append("ArchiMate element(s) could not be checked for references, so none were removed")
+        return result
+    if result["blocked"]:
+        for blocked_id, reasons in result["blocked"].items():
+            result["errors"].append(
+                f"ArchiMate element {blocked_id} was kept because it is still used by {', '.join(reasons)}"
+            )
+        element_ids = [i for i in element_ids if i not in result["blocked"]]
+        if not element_ids:
+            return result
+
     _sp = db.session.begin_nested()
     try:
-        # ORM bulk delete: tenant-filtered by do_orm_execute inside a request.
-        result["relationships_deleted"] = ArchiMateRelationship.query.filter(
+        # Delete through the session, not a bulk statement: the session fires the audit listeners, so
+        # every removed element and relationship gets its delete row in the audit log.
+        # Tenant-filtered by do_orm_execute inside a request.
+        relationships = ArchiMateRelationship.query.filter(
             db.or_(
-                ArchiMateRelationship.source_id == element_id,
-                ArchiMateRelationship.target_id == element_id,
+                ArchiMateRelationship.source_id.in_(element_ids),
+                ArchiMateRelationship.target_id.in_(element_ids),
             )
-        ).delete(synchronize_session=False)
-        result["elements_deleted"] = ArchiMateElement.query.filter(
-            ArchiMateElement.id == element_id
-        ).delete(synchronize_session=False)
+        ).all()
+        for relationship in relationships:
+            db.session.delete(relationship)
+        db.session.flush()
+        result["relationships_deleted"] = len(relationships)
+        elements = ArchiMateElement.query.filter(ArchiMateElement.id.in_(element_ids)).all()
+        for element in elements:
+            db.session.delete(element)
+        db.session.flush()
+        result["elements_deleted"] = len(elements)
         _sp.commit()
     except Exception as exc:
         _sp.rollback()
         result["relationships_deleted"] = 0
         result["elements_deleted"] = 0
         result["errors"].append(
-            f"ArchiMate element {element_id} could not be removed "
+            f"ArchiMate element(s) {element_ids} could not be removed "
             f"({exc.__class__.__name__}); it is still referenced elsewhere"
         )
         logger.warning(
@@ -463,6 +518,7 @@ def _vendors_impl(
 ):
     """Shared vendor list implementation with filtering, pagination, and stats."""
     from app.models.vendor import application_vendor_products
+    from app.services.cost_visibility import COSTS_WITHHELD, costs_visible
     from sqlalchemy import func
 
     # Limit per_page to reasonable values
@@ -541,7 +597,7 @@ def _vendors_impl(
             v.apqc_process_count = 0
 
     # Calculate statistics in a single aggregate query (3 counts → 1 query)
-    from sqlalchemy import case, and_
+    from sqlalchemy import case
     stats_row = db.session.query(
         db.func.count(VendorOrganization.id).label("total"),
         db.func.count(case(
@@ -579,54 +635,12 @@ def _vendors_impl(
         .all()
     )
 
-    from datetime import datetime, timedelta
-
-    try:
-        now = datetime.utcnow()
-        ninety_days = now + timedelta(days=90)
-
-        # DEF-050, Capgemini dry-run: this summed
-        # VendorOrganization.contract_value_annual / read
-        # VendorOrganization.contract_status/contract_end_date — fields
-        # nothing writes to. The real "Add Contract" flow
-        # (app/modules/procurement) creates a VendorContract row (vendor_id
-        # FK, annual_cost, status, end_date), a completely different table.
-        # So "Portfolio ACV" stayed "—" no matter how many real, active
-        # contracts existed. Sum from VendorContract instead.
-        from app.models.application_portfolio import VendorContract
-
-        acv_row = db.session.query(
-            db.func.sum(VendorContract.annual_cost).label("total_acv"),
-            db.func.count(
-                db.case(
-                    (
-                        and_(
-                            VendorContract.end_date >= now,
-                            VendorContract.end_date <= ninety_days,
-                        ),
-                        VendorContract.id,
-                    )
-                )
-            ).label("renewals_due"),
-        ).filter(
-            VendorContract.status == "active",
-            VendorContract.vendor_id.isnot(None),
-        ).one()
-
-        total_acv = float(acv_row.total_acv or 0)
-        renewals_due = int(acv_row.renewals_due or 0)
-    except Exception:
-        total_acv = 0
-        renewals_due = 0
-
     stats = {
         "total": total_vendors,
         "active": active_vendors,
         "strategic": strategic_vendors,
         "total_products": total_products,
         "domain_distribution": {d[0] or "other": d[1] for d in domain_distribution},
-        "total_acv": total_acv,
-        "renewals_due": renewals_due,
     }
 
     # Populate the Type filter from the vendor types actually stored, so the
@@ -648,9 +662,31 @@ def _vendors_impl(
         {"value": vt, "label": vt} for vt in vendor_type_options
     ]
 
+    from app.services import vendor_register
+
+    page = vendor_register.list_context()
+    register_rows, system_counts = page["register_rows"], page["system_counts"]
+
+    # One footer for each listed vendor, built from batched lookups for the whole page.
+    vendor_footers = {}
+    try:
+        from app.services import result_footer_service
+
+        footer_org = vendor_register._org(None)
+        if footer_org is not None and register_rows:
+            vendor_footers = result_footer_service.vendor_footers(footer_org, register_rows)
+    except Exception:  # noqa: BLE001 - the rows are shown without a footer rather than not at all
+        db.session.rollback()
+        logging.getLogger(__name__).exception("Vendor result footers could not be read")
+
+    costs_withheld = not costs_visible(current_user)
     return render_template(
         "vendors/list.html",
         vendors=vendors,
+        register_rows=register_rows,
+        vendor_footers=vendor_footers,
+        system_counts=system_counts,
+        linked_suppliers=page["linked_suppliers"],
         stats=stats,
         vendor_type_filter_options=vendor_type_filter_options,
         vendor_type_filter=vendor_type_filter,
@@ -663,6 +699,8 @@ def _vendors_impl(
         get_domain_label=get_domain_label,
         get_domain_color_classes=get_domain_color_classes,
         VENDOR_DOMAINS=VENDOR_DOMAINS,
+        costs_withheld=costs_withheld,
+        costs_withheld_sentence=COSTS_WITHHELD,
     )
 
 

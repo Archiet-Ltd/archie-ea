@@ -135,6 +135,8 @@ else:
     from .regulatory_framework import *  # noqa - FrameworkAdoption (tenant-hybrid framework catalogue)
     from .regulatory_change import *  # noqa - RegulatoryChange, RegulatoryChangeImpact (regulatory change tracker)
     from .cost_fact import *  # noqa - CostFact, ExchangeRate (one cost fact store)
+    from .price_plan import *  # noqa - PricePlan (one price store)
+    from .finance_fact import *  # noqa - FinanceFact (one money store)
     from .change_feed_offset import *  # noqa - ChangeFeedOffset (change feed consumer position)
     from .graph_projection_snapshot import *  # noqa - GraphProjectionSnapshot (per-organisation graph projection copy)
     from .cost_intelligence import *  # noqa - CapabilityCostAllocation, VendorContract, SLA (Cost intelligence)
@@ -144,6 +146,8 @@ else:
     from .integration_metadata import *  # noqa - ApplicationInterfaceMetadata, SystemDependency (Integration Architecture)
     from .miscellaneous import *  # noqa
     from .models import *  # noqa
+    from .llm_spend_ledger import LlmSpendLedger  # noqa - the platform's answer spend per provider per month
+    from .rate_limit import RateLimitRule, RateLimitCounter, RateLimitViolation  # noqa - allow and deny lists, shared limit counters, refusals
 
     # EA Intelligence Enhancement Models
     from .motivation import *  # noqa - Driver, Goal models (Strategy-to-Implementation traceability)
@@ -159,6 +163,7 @@ else:
     # Restore vendor models for vendor activation functionality
     from .vendor.vendor_organization import *  # noqa - Contains junction tables needed by other models
     from .vendor_analysis import *  # noqa
+    from .saved_scenario import SavedScenario  # noqa - scenarios saved from the simulation screen
     from .vendor_stack_hierarchy import *  # noqa
 
     # North Star Persona MVP Models (ADR-0009, ADR-0010, ADR-0011)
@@ -367,6 +372,9 @@ else:
     # H1: Risk <-> Application/Solution/Programme links
     from .risk_entity_link import RiskEntityLink  # noqa: F401
 
+    # Open FAIR factors entered for a risk (the money result is a cost fact)
+    from .risk_loss_assessment import RiskLossAssessment  # noqa: F401
+
     # R1-B30: stored answers with a permanent address
     from .answer_record import AnswerRecord  # noqa: F401
 
@@ -389,7 +397,7 @@ else:
     from .rate_card import RateCard  # noqa: F401
 
     # SA-009: TOGAF ADM deliverable checklists per phase
-    from .adm_deliverable import ADMDeliverable, ADMDeliverableCheck  # noqa: F401
+    from .adm_deliverable import ADMDeliverable  # noqa: F401
 
     # RRT-001: Requirement templates with 16 seeded architecture-layer templates
     from .requirement_template import RequirementTemplate  # noqa: F401
@@ -494,9 +502,19 @@ else:
     from .public_visitor_event import PublicVisitorEvent  # noqa: F401
     from .pending_invitation import PendingInvitation  # noqa: F401
     from .account_token import AccountToken  # noqa: F401
+    from .sign_in_identity import SignInIdentity  # noqa: F401
 
     # Stored model-health / drift report per organisation.
     from .drift_report import DriftReport  # noqa: F401
+
+    # Every relationship written under a declared source records its origin as it is written.
+    from app.services.relationship_origin import register as _register_relationship_origin
+
+    _register_relationship_origin()
+
+    # Cited public signals per organisation. Imported at boot so create_all()/reconcile-schema
+    # know about the table; before this the tests that read it ran on a database without it.
+    from .organization_signal import OrganizationSignal  # noqa: F401
 
     # The one audit store. Imported at boot so its integrity-chain and
     # copy-from-other-audit-stores hooks are registered before any insert.
@@ -506,3 +524,6 @@ else:
     # the generic trigger (flask apply-entity-history-trigger). Imported at
     # boot so create_all()/reconcile-schema know about the table.
     from .entity_history import EntityHistory  # noqa: F401
+
+    # Rule rows of the DMN decision tables, one row per numbered rule.
+    from .decision_rule import DecisionRule  # noqa: F401

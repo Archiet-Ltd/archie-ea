@@ -1,6 +1,7 @@
 """Risk service for TPM-013 — risk heat map CRUD and grid data."""
 from app.services.archimate_backbone import sync_archimate_element
 from app import db
+from app.services import result_footer_service
 from app.models.risk import Risk, RiskStatus
 from app.models.risk_entity_link import ENTITY_TYPES, RiskEntityLink
 from app.models.risk_score_history import SCORE_KINDS, RiskScoreHistory
@@ -16,13 +17,14 @@ def get_heat_map_data(solution_id=None):
     q = Risk.query
     if solution_id is not None:
         q = q.filter_by(solution_id=solution_id)
-    all_risks = q.all()
+    all_risks = q.order_by(Risk.id).all()
 
     # Build 5×5 grid indexed [likelihood 1-5][impact 1-5]
     grid = {item: {i: [] for i in range(1, 6)} for item in range(1, 6)}
     for risk in all_risks:
-        item = max(1, min(5, risk.likelihood))
-        i = max(1, min(5, risk.impact))
+        _kind, likelihood, impact = risk._score_basis  # the cell is the pair the score and band come from
+        item = max(1, min(5, int(likelihood or 1)))
+        i = max(1, min(5, int(impact or 1)))
         grid[item][i].append(risk.to_dict())
 
     # Convert to list-of-lists (row 0 = likelihood 5 at top)
@@ -39,8 +41,43 @@ def get_heat_map_data(solution_id=None):
     }
 
 
-def create_risk(solution_id, title, description, likelihood, impact, owner, mitigation_plan):
-    """Create and persist a new Risk. Returns the saved Risk instance."""
+def get_risk(organization_id, risk_id):
+    """One risk of one organisation, or None. Names the organisation in the statement, so a caller
+    with no request (the chat's worker, a command) is fenced the same as a request."""
+    return db.session.execute(
+        db.select(Risk).where(Risk.id == risk_id, Risk.organization_id == organization_id)
+    ).scalar_one_or_none()
+
+
+def _own_organization(organization_id):
+    if organization_id is not None:
+        return organization_id
+    from app.middleware.tenant_context import current_org_id
+    return current_org_id()
+
+
+def create_risk(solution_id, title, description, likelihood, impact, owner, mitigation_plan,
+                links=(), organization_id=None):
+    """Create and persist a new Risk with what it touches, in one transaction.
+
+    ``links`` is a list of ``(entity_type, entity_id)`` pairs (or dicts with those keys). A target
+    outside the organisation raises ``ValueError`` and nothing is written. Returns the saved Risk.
+    """
+    organization_id = _own_organization(organization_id)
+    pairs = []
+    for link in links or ():
+        if isinstance(link, dict):
+            link = (link.get("entity_type"), link.get("entity_id"))
+        pairs.append(tuple(link))
+    for entity_type, entity_id in pairs:
+        if entity_type not in ENTITY_TYPES:
+            raise ValueError(f"entity_type must be one of {ENTITY_TYPES}, got {entity_type!r}")
+        try:
+            int(entity_id)
+        except (TypeError, ValueError):
+            raise ValueError(f"{entity_type} needs a numeric entity_id")
+    if solution_id is not None:
+        pairs.append(("solution", solution_id))
     risk = Risk(
         solution_id=solution_id,
         title=title,
@@ -51,9 +88,19 @@ def create_risk(solution_id, title, description, likelihood, impact, owner, miti
         mitigation_plan=mitigation_plan,
         status=RiskStatus.OPEN,
     )
-    db.session.add(risk)
-    sync_archimate_element(risk)
-    db.session.commit()
+    if organization_id is not None:
+        risk.organization_id = organization_id
+    try:
+        db.session.add(risk)
+        db.session.flush()
+        for entity_type, entity_id in pairs:
+            add_risk_link(risk.id, entity_type, int(entity_id), organization_id=organization_id,
+                          commit=False)
+        sync_archimate_element(risk)
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+        raise
     return risk
 
 
@@ -83,8 +130,26 @@ def update_risk(risk_id, **fields):
             if key in ("likelihood", "impact"):
                 value = int(value)
             setattr(risk, key, value)
+    sync_archimate_element(risk)
+    _rename_mirror(risk)
     db.session.commit()
     return risk
+
+
+def _rename_mirror(risk):
+    """Keep the risk's Assessment element carrying the risk's current title, so a search by the new
+    title finds it and the old title no longer does. Fenced to the risk's own organisation."""
+    if risk.archimate_element_id is None or risk.organization_id is None or not risk.title:
+        return
+    from app.models import ArchiMateElement
+    from app.services.archimate_backbone import fit_name
+
+    element = db.session.execute(
+        db.select(ArchiMateElement).where(ArchiMateElement.id == risk.archimate_element_id,
+                                          ArchiMateElement.organization_id == risk.organization_id)
+    ).scalar_one_or_none()
+    if element is not None:
+        element.name = fit_name(risk.title)
 
 
 def delete_risk(risk_id):
@@ -103,7 +168,15 @@ def list_risk_links(risk_id):
     return RiskEntityLink.query.filter_by(risk_id=risk_id).order_by(RiskEntityLink.id).all()
 
 
-def _load_linkable_entity(entity_type, entity_id):
+def _in_organisation(model, entity_id, organization_id):
+    """One row by id, with the organisation named in the statement when the model carries one."""
+    query = model.query.filter_by(id=entity_id)
+    if organization_id is not None and hasattr(model, "organization_id"):
+        query = query.filter(model.organization_id == organization_id)
+    return query.first()
+
+
+def _load_linkable_entity(entity_type, entity_id, organization_id=None):
     """Load an Application/Solution/Programme/Constraint row, tenant-scoped.
 
     Returns ``None`` both when ``entity_id`` does not exist at all and when
@@ -118,24 +191,135 @@ def _load_linkable_entity(entity_type, entity_id):
     """
     if entity_type == "application":
         from app.models.application_portfolio import ApplicationComponent
-        return ApplicationComponent.query.filter_by(id=entity_id).first()
+        return _in_organisation(ApplicationComponent, entity_id, organization_id)
     if entity_type == "solution":
         from app.models.solution_models import Solution
-        return Solution.query.filter_by(id=entity_id).first()
+        return _in_organisation(Solution, entity_id, organization_id)
     if entity_type == "programme":
         from app.models.strategic import StrategicInitiative
-        return StrategicInitiative.query.filter_by(id=entity_id).first()
+        return _in_organisation(StrategicInitiative, entity_id, organization_id)
     if entity_type == "constraint":
         from app.models.solution_architect_models import SolutionConstraint
-        return SolutionConstraint.query.filter_by(id=entity_id).first()
+        return _in_organisation(SolutionConstraint, entity_id, organization_id)
+    if entity_type == "capability":
+        from app.models.business_capabilities import BusinessCapability
+        return _in_organisation(BusinessCapability, entity_id, organization_id)
+    if entity_type == "archimate_element":
+        from app.models import ArchiMateElement
+        return _in_organisation(ArchiMateElement, entity_id, organization_id)
     return None
 
 
-def add_risk_link(risk_id, entity_type, entity_id):
+def element_type_word(element_type):
+    """An ArchiMate type as a person reads it: ``BusinessActor`` becomes ``Business actor``."""
+    import re
+    words = re.sub(r"(?<=[a-z])(?=[A-Z])", " ", element_type or "").strip()
+    return (words[:1].upper() + words[1:].lower()) if words else None
+
+
+#: What a risk's Assessment element has to each thing the risk touches. Association is valid between
+#: any two elements, so one rule serves every kind of target.
+LINK_RELATIONSHIP = "association"
+
+#: Provenance of a relationship the mapping drew itself (the model's "derived" kind).
+PROJECTED_SOURCE_KIND = "derived"
+
+
+def _link_target_element(link, organization_id):
+    """The ArchiMate element a link points at (for a record, the element that record mirrors, created
+    when the record has none), or None when the record is gone or is not mirrored."""
+    from app.models import ArchiMateElement
+    from app.services.archimate_backbone import ensure_archimate_element
+
+    if link.entity_type == "archimate_element":
+        return db.session.execute(
+            db.select(ArchiMateElement).where(ArchiMateElement.id == link.entity_id,
+                                              ArchiMateElement.organization_id == organization_id)
+        ).scalar_one_or_none()
+    record = _load_linkable_entity(link.entity_type, link.entity_id, organization_id)
+    if record is None:
+        return None
+    return ensure_archimate_element(record)
+
+
+def _mirror_relationships(source_id, target_id, organization_id):
+    from app.models.archimate_core import ArchiMateRelationship
+
+    return db.session.execute(
+        db.select(ArchiMateRelationship).where(
+            ArchiMateRelationship.organization_id == organization_id,
+            ArchiMateRelationship.type == LINK_RELATIONSHIP,
+            ArchiMateRelationship.source_id == source_id,
+            ArchiMateRelationship.target_id == target_id,
+        )
+    ).scalars().all()
+
+
+def project_link_on_model(risk, link, organization_id):
+    """Draw a link on the model: an association from the risk's Assessment element to the target's.
+
+    The link row stays the one record of what a risk touches; this is its projection, written with it
+    and removed with it. Returns the relationship, or None when the target has no element to draw to.
+    """
+    from app.models import ArchiMateElement
+    from app.modules.architecture.services.archimate_relationship_service import (
+        ArchiMateRelationshipService,
+    )
+    from app.services.archimate_backbone import ensure_archimate_element
+
+    source = ensure_archimate_element(risk)
+    target = _link_target_element(link, organization_id)
+    if source is None or target is None or source.id == target.id:
+        return None
+    existing = _mirror_relationships(source.id, target.id, organization_id)
+    if existing:
+        return existing[0]
+    source = db.session.get(ArchiMateElement, source.id)
+    relationship = ArchiMateRelationshipService.create_relationship(
+        source, target, LINK_RELATIONSHIP,
+        architecture_id=source.architecture_id or target.architecture_id,
+        organization_id=organization_id, rollback=False,
+    )
+    if relationship is not None:
+        # Drawn by the mapping, not by a person: only a relationship carrying this mark is taken
+        # off again when the mapping goes.
+        relationship.source_kind = PROJECTED_SOURCE_KIND
+    return relationship
+
+
+def unproject_link_from_model(risk, link, organization_id):
+    """Take a link's association off the model, unless another of the risk's links still reaches the
+    same element."""
+    if risk.archimate_element_id is None:
+        return 0
+    target = _link_target_element(link, organization_id)
+    if target is None:
+        return 0
+    for other in RiskEntityLink.query.filter(RiskEntityLink.risk_id == risk.id,
+                                             RiskEntityLink.id != link.id).all():
+        other_target = _link_target_element(other, organization_id)
+        if other_target is not None and other_target.id == target.id:
+            return 0
+    removed = [r for r in _mirror_relationships(risk.archimate_element_id, target.id, organization_id)
+               if r.source_kind == PROJECTED_SOURCE_KIND]
+    for relationship in removed:
+        db.session.delete(relationship)
+    return len(removed)
+
+
+def add_risk_link(risk_id, entity_type, entity_id, organization_id=None, commit=True):
+    """Link a risk to one record. A caller with no request (the demo seed) names the organisation and the
+    record must belong to it; ``commit=False`` leaves the transaction to that caller."""
     if entity_type not in ENTITY_TYPES:
         raise ValueError(f"entity_type must be one of {ENTITY_TYPES}, got {entity_type!r}")
-    Risk.query.get_or_404(risk_id)  # 404s cleanly if the risk does not exist
-    if _load_linkable_entity(entity_type, entity_id) is None:
+    organization_id = _own_organization(organization_id)
+    if organization_id is not None:
+        if get_risk(organization_id, risk_id) is None:
+            raise ValueError(f"risk {risk_id} was not found in this organisation")
+    else:
+        Risk.query.get_or_404(risk_id)  # 404s cleanly if the risk does not exist
+    target = _load_linkable_entity(entity_type, entity_id, organization_id)
+    if target is None:
         # Covers both "no such row" and "that row belongs to another
         # organisation" -- refused identically, so a caller learns nothing
         # about what exists outside its own tenant.
@@ -148,27 +332,204 @@ def add_risk_link(risk_id, entity_type, entity_id):
     if existing:
         return existing
     link = RiskEntityLink(risk_id=risk_id, entity_type=entity_type, entity_id=int(entity_id))
+    if organization_id is not None:
+        link.organization_id = organization_id
     db.session.add(link)
-    db.session.commit()
+    db.session.flush()
+    if organization_id is not None:
+        project_link_on_model(get_risk(organization_id, risk_id), link, organization_id)
+    if commit:
+        db.session.commit()
     return link
 
 
 def remove_risk_link(risk_id, link_id):
     link = RiskEntityLink.query.filter_by(id=link_id, risk_id=risk_id).first_or_404()
+    if link.organization_id is not None:
+        risk = get_risk(link.organization_id, risk_id)
+        if risk is not None:
+            unproject_link_from_model(risk, link, link.organization_id)
     db.session.delete(link)
     db.session.commit()
 
 
-def risks_linked_to(entity_type, entity_id):
+def project_all_links(organization_id=None, dry_run=False):
+    """Give every existing link its association on the model, once. Returns ``(links seen, drawn)``.
+
+    Idempotent: a link whose association exists is left alone, so a second run draws nothing.
+    """
+    from app.models.archimate_core import ArchiMateRelationship
+
+    query = db.select(RiskEntityLink).order_by(RiskEntityLink.id)
+    if organization_id is not None:
+        query = query.where(RiskEntityLink.organization_id == organization_id)
+    seen = drawn = 0
+    planned = set()
+    for link in db.session.execute(query).scalars().all():
+        if link.organization_id is None:
+            continue
+        risk = get_risk(link.organization_id, link.risk_id)
+        if risk is None:
+            continue
+        seen += 1
+        before = db.session.scalar(
+            db.select(db.func.count()).select_from(ArchiMateRelationship).where(
+                ArchiMateRelationship.organization_id == link.organization_id,
+                ArchiMateRelationship.type == LINK_RELATIONSHIP))
+        if dry_run:
+            target = _link_target_element(link, link.organization_id)
+            mirror_id = risk.archimate_element_id
+            if (target is not None and target.id != mirror_id
+                    and (risk.id, target.id) not in planned
+                    and (mirror_id is None
+                         or not _mirror_relationships(mirror_id, target.id, link.organization_id))):
+                planned.add((risk.id, target.id))
+                drawn += 1
+            continue
+        project_link_on_model(risk, link, link.organization_id)
+        after = db.session.scalar(
+            db.select(db.func.count()).select_from(ArchiMateRelationship).where(
+                ArchiMateRelationship.organization_id == link.organization_id,
+                ArchiMateRelationship.type == LINK_RELATIONSHIP))
+        drawn += 1 if after > before else 0
+    if not dry_run:
+        db.session.commit()
+    return seen, drawn
+
+
+def risks_linked_to(entity_type, entity_id, organization_id=None):
     """The Risk rows linked to one Application/Solution/Programme, as ORM
     objects -- the shared query behind links_for_entity's dicts and any
     other reader (e.g. the solution risk tab's GET list) that needs the rows
-    themselves rather than their serialised form."""
-    links = RiskEntityLink.query.filter_by(entity_type=entity_type, entity_id=entity_id).all()
-    if not links:
-        return []
-    risk_ids = [link.risk_id for link in links]
-    return Risk.query.filter(Risk.id.in_(risk_ids)).order_by(Risk.id).all()
+    themselves rather than their serialised form. ``organization_id`` names the
+    organisation in the statement for a caller with no request."""
+    link_query = db.select(RiskEntityLink.risk_id).where(
+        RiskEntityLink.entity_type == entity_type, RiskEntityLink.entity_id == entity_id)
+    risk_query = db.select(Risk).where(Risk.id.in_(link_query)).order_by(Risk.id)
+    if organization_id is not None:
+        link_query = link_query.where(RiskEntityLink.organization_id == organization_id)
+        risk_query = db.select(Risk).where(
+            Risk.id.in_(link_query), Risk.organization_id == organization_id).order_by(Risk.id)
+    return list(db.session.execute(risk_query).scalars().all())
+
+
+def risk_ids_touching_elements(organization_id, element_ids):
+    """Which risks touch which ArchiMate elements: ``{risk_id: [element_id, ...]}``.
+
+    A risk touches an element when a link points at the record that element mirrors (an application,
+    a capability, a solution or a programme) or at the element itself. The risk's own Assessment
+    mirror is not a touch and is never returned here.
+    """
+    from app.models.application_portfolio import ApplicationComponent
+    from app.models.business_capabilities import BusinessCapability
+    from app.models.solution_models import Solution
+    from app.models.strategic import StrategicInitiative
+
+    wanted = {int(e) for e in element_ids or ()}
+    if not wanted or organization_id is None:
+        return {}
+    found = {}
+
+    def note(risk_id, element_id):
+        bucket = found.setdefault(risk_id, [])
+        if element_id not in bucket:
+            bucket.append(element_id)
+
+    for link_type, model in (("application", ApplicationComponent), ("capability", BusinessCapability),
+                             ("solution", Solution), ("programme", StrategicInitiative)):
+        mirror = getattr(model, "archimate_element_id", None)
+        if mirror is None:
+            continue
+        mirrored = {
+            record_id: element_id for record_id, element_id in db.session.execute(
+                db.select(model.id, mirror).where(model.organization_id == organization_id,
+                                                  mirror.in_(sorted(wanted)))
+            ).all()
+        }
+        if not mirrored:
+            continue
+        for risk_id, record_id in db.session.execute(
+            db.select(RiskEntityLink.risk_id, RiskEntityLink.entity_id).where(
+                RiskEntityLink.organization_id == organization_id,
+                RiskEntityLink.entity_type == link_type,
+                RiskEntityLink.entity_id.in_(sorted(mirrored)),
+            ).order_by(RiskEntityLink.id)
+        ).all():
+            note(risk_id, mirrored[record_id])
+    for risk_id, element_id in db.session.execute(
+        db.select(RiskEntityLink.risk_id, RiskEntityLink.entity_id).where(
+            RiskEntityLink.organization_id == organization_id,
+            RiskEntityLink.entity_type == "archimate_element",
+            RiskEntityLink.entity_id.in_(sorted(wanted)),
+        ).order_by(RiskEntityLink.id)
+    ).all():
+        note(risk_id, element_id)
+    owned = set(db.session.execute(
+        db.select(Risk.id).where(Risk.organization_id == organization_id, Risk.id.in_(list(found) or [-1]))
+    ).scalars().all())
+    return {risk_id: elements for risk_id, elements in found.items() if risk_id in owned}
+
+
+def solution_risk_sources(solution_id):
+    """Every risk a solution lists, as ``(canonical, legacy)``.
+
+    ``canonical`` are the register's Risk rows linked to the solution;
+    ``legacy`` are the superseded solution_risks rows the merge backfill has
+    not yet retired (a retired row is excluded: its replacement is already in
+    ``canonical``). The solution's risk list and its heat map both read this,
+    so they cannot disagree about which risks the solution has.
+    """
+    from app.models.solution_lifecycle_models import SolutionRisk
+
+    canonical = risks_linked_to("solution", solution_id)
+    legacy = (
+        SolutionRisk.query.filter_by(solution_id=solution_id)
+        .filter(SolutionRisk.retired_into_risk_id.is_(None))
+        .all()
+    )
+    return canonical, legacy
+
+
+# Score bands for a probability x impact cell. Same thresholds as
+# Risk.risk_level, so a cell and the badge on a risk in it use one scale.
+RISK_BANDS = (
+    ("critical", "Critical", 15),
+    ("high", "High", 9),
+    ("medium", "Medium", 5),
+    ("low", "Low", 1),
+)
+
+
+def risk_band(score):
+    """The band key for a probability x impact score."""
+    for key, _label, floor in RISK_BANDS:
+        if score >= floor:
+            return key
+    return "low"
+
+
+def probability_impact_grid(placements):
+    """The cells of the five by five risk matrix, the shape ``components/risk_matrix.html`` draws.
+
+    ``placements`` is (probability, impact, title) for each risk. Five rows, impact 5 down to 1, each of five
+    cells, probability 1 to 5, each a dict of likelihood, impact, count, band and titles.
+    """
+    cells = {}
+    for likelihood, impact, title in placements:
+        cells.setdefault((likelihood, impact), []).append(title)
+    return [[{"likelihood": lk, "impact": im, "count": len(cells.get((lk, im), [])),
+              "band": risk_band(lk * im), "titles": cells.get((lk, im), [])}
+             for lk in range(1, 6)] for im in range(5, 0, -1)]
+
+
+def register_matrix():
+    """The risk matrix for every risk in the register, in the shape ``probability_impact_grid`` gives. The risks are
+    placed by ``get_heat_map_data``, the one place a risk's cell is worked out."""
+    placements = []
+    for row_number, row in enumerate(get_heat_map_data()["grid"]):  # row 0 is likelihood 5
+        for column_number, cell in enumerate(row):  # column 0 is impact 1
+            placements.extend((5 - row_number, column_number + 1, risk["title"]) for risk in cell)
+    return probability_impact_grid(placements)
 
 
 def links_for_entity(entity_type, entity_id):
@@ -240,8 +601,138 @@ def _plural(count, word):
     return "%d %s%s" % (count, word, "" if count == 1 else "s")
 
 
-def ranked_risks():
-    """Every risk of the caller's organisation, ranked by exposure.
+_LINK_KINDS = ("capability", "solution", "programme")
+
+
+def _link_url(kind, entity_id):
+    """Where a linked capability, solution or programme opens, or None when the screen that
+    owns it is not registered."""
+    from flask import current_app, url_for
+
+    endpoint, argument = {
+        "capability": ("enterprise_crud.capability_fact_sheet", "capability_id"),
+        "solution": ("solution_design.view_solution", "solution_id"),
+        "programme": ("solution_design.programme_cockpit", "initiative_id"),
+    }[kind]
+    if endpoint not in current_app.view_functions:
+        return None
+    return url_for(endpoint, **{argument: entity_id})
+
+
+def _other_links_by_risk(org_id):
+    """For each risk, the capabilities, solutions and programmes it is linked to, as touches.
+
+    A link whose target no longer exists, or belongs to another organisation, is left out:
+    a risk is shown linked only to something a reader can open.
+    """
+    from app.models.business_capabilities import BusinessCapability
+    from app.models.solution_models import Solution
+    from app.models.strategic import StrategicInitiative
+
+    rows = db.session.execute(
+        db.select(RiskEntityLink.risk_id, RiskEntityLink.entity_type, RiskEntityLink.entity_id).where(
+            RiskEntityLink.organization_id == org_id, RiskEntityLink.entity_type.in_(_LINK_KINDS)
+        ).order_by(RiskEntityLink.id)
+    ).all()
+    models = {"capability": BusinessCapability, "solution": Solution, "programme": StrategicInitiative}
+    named = {}
+    mirrors = {}   # (kind, id) -> the ArchiMate element that mirrors the linked record, if it has one
+    for kind, model in models.items():
+        ids = sorted({entity_id for _, k, entity_id in rows if k == kind})
+        if ids:
+            columns = [model.id, model.name]
+            if hasattr(model, "archimate_element_id"):
+                columns.append(model.archimate_element_id)
+            for found in db.session.execute(db.select(*columns).where(model.organization_id == org_id, model.id.in_(ids))).all():
+                named.setdefault(kind, {})[found[0]] = found[1]
+                if len(found) > 2 and found[2] is not None:
+                    mirrors[(kind, found[0])] = found[2]
+    out = {}
+    for risk_id, kind, entity_id in rows:
+        name = named.get(kind, {}).get(entity_id)
+        if name is not None:
+            out.setdefault(risk_id, []).append({
+                "name": name, "kind": kind, "id": entity_id, "element_id": None,
+                "url": _link_url(kind, entity_id), "mirror_element_id": mirrors.get((kind, entity_id)),
+            })
+    return out
+def _touch_link(touch):
+    if touch["kind"] in _LINK_KINDS:
+        return touch.get("url")
+    if touch["kind"] == "application":
+        return result_footer_service.page_link("unified_applications.application_fact_sheet", id=touch["id"])
+    return result_footer_service.page_link("archimate.element_impact_graph_page", element_id=touch["element_id"])
+
+
+_LINK_KINDS = ("capability", "solution", "programme")
+
+
+def _link_url(kind, entity_id):
+    """Where a linked capability, solution or programme opens, or None when the screen that
+    owns it is not registered."""
+    from flask import current_app, url_for
+
+    endpoint, argument = {
+        "capability": ("enterprise_crud.capability_fact_sheet", "capability_id"),
+        "solution": ("solution_design.view_solution", "solution_id"),
+        "programme": ("solution_design.programme_cockpit", "initiative_id"),
+    }[kind]
+    if endpoint not in current_app.view_functions:
+        return None
+    return url_for(endpoint, **{argument: entity_id})
+
+
+def _other_links_by_risk(org_id):
+    """For each risk, the capabilities, solutions and programmes it is linked to, as touches.
+
+    A link whose target no longer exists, or belongs to another organisation, is left out:
+    a risk is shown linked only to something a reader can open.
+    """
+    from app.models.business_capabilities import BusinessCapability
+    from app.models.solution_models import Solution
+    from app.models.strategic import StrategicInitiative
+
+    rows = db.session.execute(
+        db.select(RiskEntityLink.risk_id, RiskEntityLink.entity_type, RiskEntityLink.entity_id).where(
+            RiskEntityLink.organization_id == org_id, RiskEntityLink.entity_type.in_(_LINK_KINDS)
+        ).order_by(RiskEntityLink.id)
+    ).all()
+    models = {"capability": BusinessCapability, "solution": Solution, "programme": StrategicInitiative}
+    named = {}
+    mirrors = {}   # (kind, id) -> the ArchiMate element that mirrors the linked record, if it has one
+    for kind, model in models.items():
+        ids = sorted({entity_id for _, k, entity_id in rows if k == kind})
+        if ids:
+            columns = [model.id, model.name]
+            if hasattr(model, "archimate_element_id"):
+                columns.append(model.archimate_element_id)
+            for found in db.session.execute(db.select(*columns).where(model.organization_id == org_id, model.id.in_(ids))).all():
+                named.setdefault(kind, {})[found[0]] = found[1]
+                if len(found) > 2 and found[2] is not None:
+                    mirrors[(kind, found[0])] = found[2]
+    out = {}
+    for risk_id, kind, entity_id in rows:
+        name = named.get(kind, {}).get(entity_id)
+        if name is not None:
+            out.setdefault(risk_id, []).append({
+                "name": name, "kind": kind, "id": entity_id, "element_id": None,
+                "url": _link_url(kind, entity_id), "mirror_element_id": mirrors.get((kind, entity_id)),
+            })
+    return out
+
+
+def footers_by_risk(organization_id=None):
+    """Each risk's footer as the register shows it, by risk id: the one confidence a risk has.
+
+    Every screen that lists a risk beside its own footer (the prioritised actions, the recommendations)
+    takes the footer from here, so a risk reads the same confidence, with the same reason, wherever it
+    is shown.
+    """
+    return {row["risk_id"]: row["footer"] for row in ranked_risks(organization_id)["rows"]}
+
+
+def ranked_risks(organization_id=None):
+    """Every risk of the caller's organisation (or of ``organization_id``), ranked by exposure.
 
     Exposure is how many elements the risk reaches, read from
     ``IntelligenceQueryService.set_impact`` (the one blast-radius answer) in
@@ -259,7 +750,7 @@ def ranked_risks():
         IntelligenceQueryService,
     )
 
-    org_id = current_org_id()
+    org_id = organization_id if organization_id is not None else current_org_id()
     if org_id is None:
         return {"rows": [], "total": 0, "rule": RANKING_RULE}
     risks = db.session.execute(
@@ -288,6 +779,29 @@ def ranked_risks():
     for risk_id, component_id in links:
         if component_id in components:
             apps_by_risk.setdefault(risk_id, []).append(component_id)
+    others_by_risk = _other_links_by_risk(org_id)
+    # An element linked directly: it is both where the risk starts reaching from and something it touches.
+    from app.models import ArchiMateElement
+    element_links = db.session.execute(
+        db.select(RiskEntityLink.risk_id, RiskEntityLink.entity_id).where(
+            RiskEntityLink.organization_id == org_id, RiskEntityLink.entity_type == "archimate_element"
+        ).order_by(RiskEntityLink.id)
+    ).all()
+    linked_element_names = {}
+    linked_element_types = {}
+    if element_links:
+        element_rows = db.session.execute(
+            db.select(ArchiMateElement.id, ArchiMateElement.name, ArchiMateElement.type).where(
+                ArchiMateElement.organization_id == org_id,
+                ArchiMateElement.id.in_(sorted({e for _, e in element_links})),
+            )
+        ).all()
+        linked_element_names = {row[0]: row[1] for row in element_rows}
+        linked_element_types = {row[0]: element_type_word(row[2]) for row in element_rows}
+    elements_by_risk = {}
+    for risk_id, element_id in element_links:
+        if element_id in linked_element_names and element_id not in elements_by_risk.setdefault(risk_id, []):
+            elements_by_risk[risk_id].append(element_id)
 
     seeds_by_risk = {}
     unlinked_apps = set()   # risks with an application whose element pointer is empty
@@ -300,6 +814,9 @@ def ranked_risks():
             if element_id is None:
                 unlinked_apps.add(risk.id)
             elif element_id not in seeds:
+                seeds.append(element_id)
+        for element_id in elements_by_risk.get(risk.id, []):
+            if element_id != risk.archimate_element_id and element_id not in seeds:
                 seeds.append(element_id)
         seeds_by_risk[risk.id] = seeds
 
@@ -348,13 +865,21 @@ def ranked_risks():
             {"name": components[c][0], "kind": "application", "id": c, "element_id": components[c][1]}
             for c in sorted(apps_by_risk.get(risk.id, []))
         ]
+        touches += [{"name": linked_element_names[e], "kind": "element", "id": e, "element_id": e,
+                     "type_word": linked_element_types.get(e)}
+                    for e in elements_by_risk.get(risk.id, []) if e != risk.archimate_element_id]
         app_elements = {t["element_id"] for t in touches}
         # The risk's own mirrored element is never listed: it is the risk itself,
         # not something the risk touches (its page has no relationships to show).
         if risk.archimate_element_id is not None:
             app_elements.add(risk.archimate_element_id)
+        # A linked capability, solution or programme is listed once, as the link: the element that
+        # mirrors it is not listed again as something the risk reaches.
+        app_elements.update(
+            t["mirror_element_id"] for t in others_by_risk.get(risk.id, []) if t.get("mirror_element_id") is not None)
         nearest = sorted(reached, key=lambda e: (reached[e], names.get(e, ""), e))
         named = [e for e in nearest if e in names and e not in app_elements]
+        touches += others_by_risk.get(risk.id, [])
         touches += [{"name": names[e], "kind": "element", "id": e, "element_id": e}
                     for e in named[:_TOUCHES_SHOWN]]
         # The ranking sentence states the reach figure only when the elements
@@ -363,7 +888,7 @@ def ranked_risks():
         figure_matches = exposure is not None and len(named) == exposure
         entries.append({
             "risk": risk, "exposure": exposure, "why": why, "touches": touches,
-            "score": risk.risk_score, "reached_total": len(named),
+            "score": risk._effective_score, "reached_total": len(named),
             "figure_matches": figure_matches,
         })
 
@@ -375,27 +900,153 @@ def ranked_risks():
         e["risk"].id,
     ))
     total = len(entries)
+    known = result_footer_service.element_facts(
+        org_id, {t["element_id"] for e in entries for t in e["touches"]})
     rows = []
     for position, entry in enumerate(entries, start=1):
         risk = entry["risk"]
-        scores = "likelihood %d of 5, impact %d of 5" % (risk.likelihood, risk.impact)
+        score_word, scores = risk.score_word, risk.score_pair_text
+        _kind, likelihood, impact = risk._score_basis
         if entry["exposure"] is not None and entry["figure_matches"]:
             reason = "Ranked %d of %d: reaches %s, %s" % (
                 position, total, _plural(entry["exposure"], "element"), scores)
         elif entry["exposure"] is not None:
             reason = "Ranked %d of %d by how far it reaches, then by score (%s)" % (position, total, scores)
+        elif entry["why"] == "no_links" and entry["touches"]:
+            reason = "Ranked %d of %d: how far it reaches is not recorded, ranked by its %s of %d (%s)" % (
+                position, total, score_word, entry["score"], scores)
         elif entry["why"] == "no_links":
-            reason = "Ranked %d of %d: no linked elements recorded, ranked by its recorded score of %d (%s)" % (
-                position, total, entry["score"], scores)
+            reason = "Ranked %d of %d: no linked elements recorded, ranked by its %s of %d (%s)" % (
+                position, total, score_word, entry["score"], scores)
         else:
             reason = ("Ranked %d of %d: how far it reaches could not be worked out, "
-                      "ranked by its recorded score of %d (%s)") % (position, total, entry["score"], scores)
+                      "ranked by its %s of %d (%s)") % (position, total, score_word, entry["score"], scores)
         rows.append({
             "rank": position, "risk_id": risk.id, "title": risk.title,
             "status": risk.status.value, "risk_level": risk.risk_level,
-            "likelihood": risk.likelihood, "impact": risk.impact, "risk_score": entry["score"],
-            "exposure": entry["exposure"], "reason": reason, "touches": entry["touches"],
+            "likelihood": likelihood, "impact": impact, "risk_score": entry["score"],
+            "score_text": risk.score_text, "exposure": entry["exposure"], "reason": reason, "touches": entry["touches"],
             "reached_total": entry["reached_total"],
             "worked_out": entry["why"] != "not_computed",
+            "footer": result_footer_service.risk_footer(
+                risk, entry["touches"], entry["why"], known,
+                None,  # the score is the risk's own: its title already links to the risk
+                _touch_link, score_line="%s: %s" % (risk.score_word.capitalize(), risk.score_pair_text)),
         })
     return {"rows": rows, "total": total, "rule": RANKING_RULE}
+
+
+def level_counts():
+    """How many of the organisation's open risks sit at each level.
+
+    The register's headline figures and the risk assessment both read this: a closed or
+    mitigated risk is not current exposure, so only open risks are counted.
+    """
+    from app.middleware.tenant_context import current_org_id
+
+    org_id = current_org_id()
+    counts = {"critical": 0, "high": 0, "medium": 0, "low": 0, "open": 0}
+    if org_id is None:
+        return counts
+    for risk in db.session.execute(
+        db.select(Risk).where(Risk.organization_id == org_id, Risk.status == RiskStatus.OPEN)
+    ).scalars():
+        counts[risk.risk_level] += 1
+        counts["open"] += 1
+    return counts
+
+
+def capability_owner_names(unified_capability_ids, org_id):
+    """The owner's name for each unified capability that has one recorded, from the owner record.
+
+    A capability with no owner recorded is absent from the answer (never a stand-in name), so the
+    risk assessment and the capability map's lenses name the same owner for the same capability.
+    """
+    from app.models.application_owner import ApplicationOwner
+
+    ids = sorted(set(unified_capability_ids))
+    if not ids:
+        return {}
+    by_unified = ApplicationOwner.get_display_rows_for_elements_batch("capability", ids, org_id)
+    names = {}
+    for unified_id in ids:
+        named = [o["user_name"] for o in by_unified.get(unified_id, []) if o["user_name"] != "\u2014"]
+        if named:
+            names[unified_id] = named[0]
+    return names
+
+
+def risk_assessment():
+    """Every risk in the register with the capabilities it threatens, and the open-risk counts.
+
+    A risk threatens a capability when it is linked to it directly, or to an application
+    that is mapped to it. A capability's owner is read from the owner record (recorded
+    against the unified capability the business capability is projected into); none
+    recorded is None, never a stand-in name.
+    """
+    from app.middleware.tenant_context import current_org_id
+    from app.models.application_capability import ApplicationCapabilityMapping
+    from app.models.business_capabilities import BusinessCapability
+    from app.models.unified_capability import UnifiedCapability
+
+    org_id = current_org_id()
+    if org_id is None:
+        return {"rows": [], "counts": level_counts()}
+    risks = db.session.execute(
+        db.select(Risk).where(Risk.organization_id == org_id).order_by(Risk.id)
+    ).scalars().all()
+    links = db.session.execute(
+        db.select(RiskEntityLink.risk_id, RiskEntityLink.entity_type, RiskEntityLink.entity_id).where(
+            RiskEntityLink.organization_id == org_id, RiskEntityLink.entity_type.in_(("capability", "application"))
+        ).order_by(RiskEntityLink.id)
+    ).all()
+    app_ids = sorted({entity_id for _, kind, entity_id in links if kind == "application"})
+    caps_of_app = {}
+    if app_ids:
+        for app_id, cap_id in db.session.execute(
+            db.select(
+                ApplicationCapabilityMapping.application_component_id,
+                ApplicationCapabilityMapping.business_capability_id,
+            ).where(
+                ApplicationCapabilityMapping.organization_id == org_id,
+                ApplicationCapabilityMapping.application_component_id.in_(app_ids),
+            ).order_by(ApplicationCapabilityMapping.id)
+        ).all():
+            caps_of_app.setdefault(app_id, []).append(cap_id)
+    caps_of_risk = {}
+    for risk_id, kind, entity_id in links:
+        for cap_id in ([entity_id] if kind == "capability" else caps_of_app.get(entity_id, [])):
+            if cap_id not in caps_of_risk.setdefault(risk_id, []):
+                caps_of_risk[risk_id].append(cap_id)
+    cap_ids = sorted({c for ids in caps_of_risk.values() for c in ids})
+    names, owners = {}, {}
+    if cap_ids:
+        names = dict(db.session.execute(
+            db.select(BusinessCapability.id, BusinessCapability.name).where(
+                BusinessCapability.organization_id == org_id, BusinessCapability.id.in_(cap_ids))
+        ).all())
+        projected = {
+            int(source_id): unified_id
+            for unified_id, source_id in db.session.execute(
+                db.select(UnifiedCapability.id, UnifiedCapability.source_id).where(
+                    UnifiedCapability.organization_id == org_id,
+                    UnifiedCapability.source_table == "business_capability",
+                    UnifiedCapability.source_id.in_([str(c) for c in names]),
+                )
+            ).all()
+        }
+        by_unified = capability_owner_names(projected.values(), org_id)
+        for cap_id, unified_id in projected.items():
+            owners[cap_id] = by_unified.get(unified_id)
+    rows = []
+    for risk in risks:
+        rows.append({
+            "risk_id": risk.id, "title": risk.title, "risk_level": risk.risk_level,
+            "risk_score": risk._effective_score, "score_text": risk.score_text, "status": risk.status.value,
+            "capabilities": [
+                {"id": c, "name": names[c], "owner": owners.get(c), "url": _link_url("capability", c)}
+                for c in caps_of_risk.get(risk.id, []) if c in names
+            ],
+        })
+    rows.sort(key=lambda r: (-r["risk_score"], r["title"].lower(), r["risk_id"]))  # the score each row shows
+    return {"rows": rows, "counts": level_counts()}

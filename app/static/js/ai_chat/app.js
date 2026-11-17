@@ -29,6 +29,46 @@
     const fetch = ArchieChat.transport.apiFetch;
 
     const messagesContainer = document.getElementById('messages-container');
+
+    /* "Work them out now" on an answer that has no indirect connections yet: work them
+       out, then ask the same question again and draw the answer in place of the old one
+       (without saving a second turn to the conversation). */
+    if (messagesContainer) {
+        messagesContainer.addEventListener('click', async (event) => {
+            const button = event.target.closest('[data-recompute-button]');
+            if (!button) return;
+            const holder = button.closest('[data-answer-cards]');
+            const notice = button.parentElement;
+            const say = (text) => {
+                let line = notice.querySelector('[data-recompute-line]');
+                if (!line) {
+                    line = document.createElement('p');
+                    line.setAttribute('data-recompute-line', '');
+                    line.setAttribute('role', 'status');
+                    line.className = 'mt-2 text-sm text-muted-foreground';
+                    notice.appendChild(line);
+                }
+                line.textContent = text;
+            };
+            button.disabled = true;
+            say('Working them out…');
+            try {
+                await ArchieChat.transport.recomputeConnections();
+                const again = await ArchieChat.transport.askEstate(holder.getAttribute('data-question') || '', { remember: false, part: holder.getAttribute('data-part'), elementId: Number(holder.getAttribute('data-element-id')) || undefined });
+                if (again.found && window.DOMPurify) {
+                    const fresh = document.createElement('div');
+                    fresh.innerHTML = ArchieChat.render.sanitiseAnswerHtml(again.html);
+                    holder.replaceWith(fresh.firstElementChild);
+                    if (window.lucide) lucide.createIcons();
+                }
+            } catch (err) {
+                button.disabled = false;
+                say(err && err.status === 409
+                    ? 'They are already being worked out. Try again in a moment.'
+                    : 'We could not work them out just now.');
+            }
+        });
+    }
     const chatForm = document.getElementById('chat-form');
     const userInput = document.getElementById('user-input');
     const domainSelector = document.getElementById('domain-selector');
@@ -45,7 +85,7 @@
        sees — assigning state.currentDomain here is visible to render.js. */
     const state = ArchieChat.state;
     const {
-        getColorClass, appendMessage, appendSystemMessage, appendError,
+        getColorClass, appendMessage, appendSystemMessage, appendError, appendAnswerCards,
         beginStreamedMessage, updateStreamedMessage, finaliseStreamedMessage
     } = ArchieChat.render;
     const {
@@ -254,9 +294,8 @@
         const iconElement = document.getElementById('domain-icon');
         iconElement.innerHTML = `<i data-lucide="${config.icon}" class="h-5 w-5"></i>`;
 
-        // Update colors using safe class mapping
-        const bgClass = getColorClass(config.color || 'primary', 'bg');
-        iconElement.className = `flex h-9 w-9 items-center justify-center rounded-lg ${bgClass} text-primary-foreground transition-all duration-300`; // token-migration-ok
+        // The icon is read by assistive technology only; showing it put a coloured tile on its own row above the toolbar.
+        iconElement.className = 'sr-only';
 
         // Re-initialize lucide icons
         lucide.createIcons();
@@ -285,6 +324,14 @@
        it is also an accessibility defect: the chat could not be submitted from
        the keyboard at all. */
     userInput.addEventListener('keydown', handleEnter);
+    /* Escape clears what has been typed. */
+    userInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && userInput.value) {
+            e.preventDefault();
+            userInput.value = '';
+            userInput.style.height = 'auto';
+        }
+    });
 
     /* Send and Stop swap places while a turn is in flight. Salvaged from
        ai_chat.js, the 169 KB file no template loads: #stop-btn has been in the
@@ -307,9 +354,18 @@
         _submitTurn().finally(() => _setSendingUI(false));
     });
 
+    /* A first-question card names the element it asks about by id. The id travels with the question it
+       was set for, so a question the person edited, or typed, is answered by name as before. */
+    const _askedElement = new Map();
+
     async function _submitTurn() {
         const message = userInput.value.trim();
         if (!message) return;
+        if (userInput.dataset.elementId && userInput.dataset.elementQuestion === message) {
+            _askedElement.set(message, Number(userInput.dataset.elementId));
+        }
+        delete userInput.dataset.elementId;
+        delete userInput.dataset.elementQuestion;
         _setSendingUI(true);
 
         // Clear input
@@ -339,7 +395,7 @@
     /* The network half of a turn, separated from _submitTurn so the error
        card's Retry can run it again without echoing the user's message into
        the transcript a second time. */
-    async function _deliverTurn(message, timestamp) {
+    async function _deliverTurn(message, timestamp, retry, failedTurnId) {
         // Show loading indicator
         const loadingId = 'loading-' + Date.now();
         const loadingDiv = document.createElement('div');
@@ -356,16 +412,48 @@
                     <div class="w-2 h-2 bg-primary rounded-full animate-bounce" style="animation-delay: 150ms"></div>
                     <div class="w-2 h-2 bg-primary rounded-full animate-bounce" style="animation-delay: 300ms"></div>
                 </div>
-                <span class="text-muted-foreground">Thinking...</span>
+                <span class="text-muted-foreground" role="status" data-testid="chat-waiting-note">Thinking...</span>
             </div>
         `;
         messagesContainer.appendChild(loadingDiv);
         messagesContainer.scrollTop = messagesContainer.scrollHeight;
         lucide.createIcons();
+        // After ten seconds say what is happening, in plain words.
+        setTimeout(function () {
+            const note = document.querySelector('#' + loadingId + ' [data-testid="chat-waiting-note"]');
+            if (note) note.textContent = 'Still working: asking the AI. This usually takes under a minute.';
+        }, 10000);
+
+        // A question that names something in the organisation's records is answered
+        // from those records, as cited cards, before any model is asked.
+        const _sentAt = performance.now();
+        try {
+            const estate = await ArchieChat.transport.askEstate(message, { elementId: _askedElement.get(message) });
+            if (estate.found) {
+                // The answer is kept in the conversation like any other: remember the
+                // thread it went to and refresh the history rail.
+                if (estate.thread_id) {
+                    window.__threadId = estate.thread_id;
+                    try { sessionStorage.setItem('archie_chat_thread_id', estate.thread_id); } catch (e) { /* swallow-ok: private-browsing storage denial; the server-saved thread and current page still work, only reload restoration is unavailable */ }
+                    if (window.loadSessionList) window.loadSessionList();
+                }
+                { const _l = document.getElementById(loadingId); if (_l) _l.remove(); }
+                appendAnswerCards(estate.html);
+                return;
+            }
+        } catch (_estateErr) { // swallow-ok: optional lookup; the question goes on to the AI without it
+            /* The records lookup is an extra step before the AI, not the answer. When it fails the question
+               goes on to the AI exactly as if the lookup had found nothing; the turn does not end here. */
+        }
 
         const startTime = performance.now();
-        // Shared payload. thread_id keeps multi-turn chats in one conversation.
-        const _payload = JSON.stringify({
+        // A Retry says only that it is one: the server reads what the failed turn recorded from its own
+        // record and leaves those changes alone.
+        const _isRetry = !!retry;
+        // thread_id keeps multi-turn chats in one conversation. waited_seconds is read when each request is
+        // built, so the plain request that follows a dropped stream carries the time already spent and does
+        // not start a second minute.
+        const _buildPayload = () => JSON.stringify({
             message: message,
             domain: state.currentDomain,
             element_id: selectedElementIdInput.value || null,
@@ -373,11 +461,19 @@
             persona: state.currentPersona || null,
             model: document.getElementById('model-selector')?.value || null,
             thread_id: window.__threadId || null,
+            // Since the send: the stored-answer lookup, and any stream that dropped, took part of the minute.
+            waited_seconds: (performance.now() - _sentAt) / 1000,
+            retry: _isRetry,
+            // The turn that failed, so the server reads back only that turn's own changes.
+            failed_turn_id: _isRetry ? (failedTurnId || null) : null,
         });
+        const _payload = _buildPayload();
 
         // Stream the reply token-by-token (like ChatGPT). If streaming can't be
         // established, fall through to the non-streaming request below.
-        try { if (await streamAiReply(_payload, loadingId, startTime, timestamp)) return; }
+        /* A slash command is run by the server before any model is asked, on the non-streaming endpoint;
+           the streaming endpoint hands every message to the model. */
+        try { if (!message.startsWith('/') && await streamAiReply(_payload, loadingId, startTime, timestamp)) return; }
         catch (_streamErr) {
             /* A user-initiated stop is not a transport failure: re-issuing the
                turn against the non-streaming endpoint would be the opposite of
@@ -400,7 +496,7 @@
                    compounding the wait. */
                 const _l = document.getElementById(loadingId);
                 if (_l) _l.remove();
-                appendError(_streamErr.message, () => _retryTurn(message, timestamp));
+                appendFailure('timeout', () => _retryTurn(message, timestamp));
                 return;
             }
             if (_streamErr && _streamErr.isConfigFault) {
@@ -415,6 +511,9 @@
                 // so a toast on top of the inline error below was a third
                 // surface for one fault. Keep the inline message (it carries
                 // the admin-link remedy in context); drop the toast.
+                // A configuration fault is not transient: the server's sentence names the
+                // remedy and the settings link is the way out; a Retry could only reproduce it.
+                _streamErr.message = configFaultSentence();
                 appendError(_streamErr.message, null, { adminLink: true });
                 return;
             }
@@ -422,16 +521,20 @@
         }
 
         try {
-            const response = await ArchieChat.transport.sendMessage(_payload);
+            const response = await ArchieChat.transport.sendMessage(_buildPayload());
 
+            if (response.status === 401 || response.redirected) {
+                { const _l = document.getElementById(loadingId); if (_l) _l.remove(); }
+                appendFailure('signed_out', null);
+                return;
+            }
             const data = await response.json();
             // Remember the conversation this turn was saved to, and refresh the
             // history rail so a brand-new chat appears immediately.
             if (data.thread_id) {
-                const _wasNew = data.thread_id !== window.__threadId;
                 window.__threadId = data.thread_id;
                 try { sessionStorage.setItem('archie_chat_thread_id', data.thread_id); } catch (e) { /* swallow-ok: private-browsing storage denial; the server-saved thread and current page still work, only reload restoration is unavailable */ }
-                if (_wasNew && window.loadSessionList) window.loadSessionList();
+                if (window.loadSessionList) window.loadSessionList();
             }
             const endTime = performance.now();
             const processingTime = Math.round(endTime - startTime);
@@ -473,6 +576,8 @@
                     errorTitle = 'Timeout Error';
                 } else if (data.error_type === 'rate_limit') {
                     errorTitle = 'Rate Limit';
+                } else if (data.error_type === 'credit_exhausted') {
+                    errorTitle = 'Credit Exhausted';
                 } else if (data.error_type === 'model_error') {
                     errorTitle = 'Model Error';
                 } else if (!response.ok) {
@@ -505,10 +610,12 @@
                     // surfaces (banner + toast + inline) say one thing. The
                     // inline message stays; it carries the admin-link remedy
                     // in context, which the banner and a toast both lack.
+                    errorMessage = configFaultSentence();
                     appendError(errorMessage || fullError, null, { adminLink: true });
                 } else {
                     Platform.toast.error(fullError);
-                    appendError(fullError, () => _retryTurn(message, timestamp));
+                    const _code = data.reason_code || failureCodeForStatus(response.status, data.error_type);
+                    appendFailure(_code, failureRetryable(_code) ? () => _retryTurn(message, timestamp, data.turn_id) : null, recordedNote(data.pending_approvals));
                 }
             } else {
                 // Add AI response to history
@@ -526,13 +633,14 @@
                     sources: data.sources,
                     /* The fallback must show the same footer as the streamed
                        path. It carries no tool_start/tool_result events — there
-                       is no stream to carry them — so the trail is empty and the
-                       evidence strip reports "context only" rather than
-                       inventing lookups it cannot see. actions_taken does come
-                       back on this path, so receipts and next-artifact are the
+                       is no stream to carry them — so the trail is built from
+                       actions_taken, the lookups that did run, and reports "context
+                       only" only when none did. Receipts and next-artifact are the
                        same either way. */
-                    trail: [],
-                    contextUsed: true,
+                    trail: (data.actions_taken || []).map(function (a) {
+                        return { tool: a.tool, args: a.arguments, result: { success: true, result: a.result, message: a.message } };
+                    }),
+                    contextUsed: !(data.actions_taken || []).length,
                     actions: data.actions_taken || [],
                     pendingApprovals: data.pending_approvals || [],
                     /* agent_result.error survives internally even when the
@@ -541,9 +649,14 @@
                        that field surfaced, so this reads as a failure the
                        same way the streamed path does rather than as an
                        ordinary answer that happens to mention Admin
-                       -> API Settings. */
+                       -> AI settings. */
+                    answeredBy: data.answered_by || null,
+                    paused: !!data.paused,
+                    genomeHtml: (data.genome_answer && data.genome_answer.html) || null,
                     error: data.agent_error || null
                 });
+
+                showAnsweredBy({ answeredBy: data.answered_by, error: data.agent_error, paused: !!data.paused });
 
                 // Genome extraction — fires after every AI response when ?mode=genome
                 if (window._genomePanelInstance) {
@@ -553,14 +666,81 @@
 
         } catch (error) {
             { const _l = document.getElementById(loadingId); if (_l) _l.remove(); }
-            appendError(`Network error: ${error.message}`, () => _retryTurn(message, timestamp));
+            appendFailure(error && error.reasonCode, () => _retryTurn(message, timestamp));
         }
     }
 
-    function _retryTurn(message, timestamp) {
-        _setSendingUI(true);
-        _deliverTurn(message, timestamp).finally(() => _setSendingUI(false));
+    // The chat frame runs from where it starts to the bottom edge of the window, so the composer sits on
+    // that edge whatever sits above the frame (a banner, the sample-company line). The class height is the
+    // fallback until this runs.
+    function fitChatFrame() {
+        const frame = document.getElementById('chat-frame');
+        if (!frame) return;
+        const top = frame.getBoundingClientRect().top;
+        frame.style.height = Math.max(448, window.innerHeight - top) + 'px';
     }
+    fitChatFrame();
+    window.addEventListener('resize', fitChatFrame);
+    window.addEventListener('load', fitChatFrame);
+
+    // The line under the composer names the provider and model that answered
+    // this turn; a turn nobody answered names none.
+    function showAnsweredBy(meta) {
+        const el = document.getElementById('chat-model-name');
+        if (!el) return;
+        const by = meta && !meta.error ? meta.answeredBy : null;
+        if (meta && meta.paused) {
+            // A paused turn keeps the line saying answers are paused.
+            el.textContent = 'none, answers are paused';
+        } else if (by && by.model) {
+            const provider = by.label ? by.label + ' · ' : by.provider ? String(by.provider).replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()) + ' · ' : '';
+            el.textContent = provider + by.model;
+        } else {
+            el.textContent = 'no model answered';
+        }
+    }
+
+    /* The sentence for a missing AI provider is the server's, the one the page was given: a state has one
+       sentence. An administrator gets the settings link after it (from appendError). */
+    function configFaultSentence() {
+        return window.chatNotSetUpSentence || '';
+    }
+
+    /* What a failed turn already recorded and nobody has applied yet, in plain words for the failure card.
+       Each change is named by the plain sentence the server writes from the approval's own label table; Retry does not record it again. */
+    function recordedNote(pending) {
+        const list = (pending || []).map(a => String(a.plain || String(a.tool || '').replace(/_/g, ' '))
+            .replace(/\.$/, '')).filter(Boolean);
+        return list.length
+            ? ' Recorded, not applied yet, and not recorded again on Retry: ' + list.join('; ') + '.'
+            : '';
+    }
+
+    /* The words for why a turn could not be answered. The sentences are the server's table
+       (failure_messages.py), handed to the page once; the browser only picks one by its code. */
+    function failureTable() { return window.chatFailureTable || { reasons: {}, no_retry: [], saved: [] }; }
+    function failureSentence(code) { return code ? (failureTable().reasons[code] || '') : ''; }
+    function failureRetryable(code) { return failureTable().no_retry.indexOf(code) === -1; }
+    function failureCodeForStatus(status, errorType) {
+        if (status === 401) return 'signed_out';
+        if (status === 403) return 'role_not_allowed';
+        if (status === 413) return 'too_large';
+        if (status === 408 || status === 504 || errorType === 'timeout') return 'timeout';
+        if (status === 502 || status === 503 || errorType === 'connection' || errorType === 'auth') return 'provider_unreachable';
+        return 'unknown';
+    }
+    /* A failure card that names the reason and, unless asking again cannot help, carries Retry. */
+    function appendFailure(code, onRetry, note) {
+        const text = failureSentence(code) || failureSentence('unknown');
+        return appendError(text + (note || ''), failureRetryable(code) ? onRetry : null);
+    }
+
+    function _retryTurn(message, timestamp, failedTurnId) {
+        _setSendingUI(true);
+        _deliverTurn(message, timestamp, true, failedTurnId).finally(() => _setSendingUI(false));
+    }
+    /* A reopened chat's failure card asks again from outside this module. */
+    ArchieChat.retryTurn = function (message) { _retryTurn(message, new Date().toISOString()); };
 
     // Stream an AI reply via SSE. Renders tokens live into a bubble; returns true
     // when it rendered a reply (caller then stops), throws/returns false to let
@@ -615,6 +795,20 @@
                 },
                 onDone: async (result) => {
                     dropLoading();
+                    if ((result.error && !result.paused) || result.retryable) {
+                        dropBubble();
+                        /* A failed turn is a failure card with Retry, not a bubble in the assistant's voice. */
+                        let _msg = '';
+                        try { _msg = JSON.parse(payload).message; } catch (_) { /* swallow-ok: the payload is built here from JSON.stringify; if it cannot be read the failure card still shows, without a Retry that re-asks */ }
+                        const _made = (result.actions || []).filter(a => a.mutates);
+                        const _madeNote = _made.length
+                            ? ' Already done, and not repeated on Retry: ' + _made.map(a => a.message || a.tool).join('; ') + '.'
+                            : '';
+                        appendError((failureSentence(result.reasonCode) || result.text || 'The assistant is busy right now. Wait a minute, then press Retry.') + _madeNote + recordedNote(result.pendingApprovals),
+                            _msg && !result.notSetUp && failureRetryable(result.reasonCode) ? () => _retryTurn(_msg, timestamp, result.turnId) : null,
+                            result.notSetUp ? { adminLink: true } : { ownKeyLink: true });
+                        return;
+                    }
                     if (!wrap) wrap = beginStreamedMessage();
                     const meta = {
                         domain: result.domain || state.currentDomain,
@@ -624,9 +818,13 @@
                         trail: _trail,
                         actions: result.actions || [],
                         pendingApprovals: result.pendingApprovals || [],
+                        answeredBy: result.answeredBy || null,
+                        genomeHtml: result.genomeHtml || null,
                         // No tool ran, but the domain snapshot was in the prompt:
                         // that is "context only", not "ungrounded".
                         contextUsed: _trail.length === 0,
+                        // The platform's pause is built from nothing; the footer says so.
+                        paused: !!result.paused,
                         // The server's own "couldn't be completed" text,
                         // persisted and streamed back rather than thrown away
                         // — see transport.js's done handling. Non-null here
@@ -634,8 +832,12 @@
                         error: result.error || null
                     };
                     state.chatHistory.push({ role: 'ai', content: result.text, timestamp, metadata: meta });
+                    showAnsweredBy(meta);
                     finaliseStreamedMessage(wrap, result.text, meta);
                     wrap = null;   // finalised in place; nothing left to drop
+                    /* The reply is saved by now: the history rail counts it. It was refreshed only when the
+                       thread was new, and before the reply existed, so a later turn left the old count. */
+                    if (window.loadSessionList) window.loadSessionList();
                     // Genome panel extraction is an optional side-panel enrichment;
                     // the chat turn above already completed and must not be undone by this failing.
                     if (window._genomePanelInstance) { try { await window._genomePanelInstance.extractAfterMessage(state.chatHistory); } catch (_) { /* swallow-ok: optional side-panel enrichment run after the answer is already on screen; an error toast here would read as the answer having failed when it did not */ } }
@@ -696,12 +898,27 @@
     // =========================================================================
     // CSP-safe event delegation — handles all dynamically-injected data-action buttons
     // =========================================================================
+    document.addEventListener('keydown', (event) => {
+        const offered = event.target.closest && event.target.closest('[data-run-command]');
+        if (offered && (event.key === 'Enter' || event.key === ' ')) {
+            event.preventDefault();
+            runQuickQuery(offered.dataset.runCommand);
+        }
+    });
+
     document.addEventListener('click', (event) => {
         // --- quick-query (sidebar NL query suggestions) ---
         const quickQueryButton = event.target.closest('[data-quick-query]');
         if (quickQueryButton) {
             event.preventDefault();
             runQuickQuery(quickQueryButton.dataset.quickQuery);
+            return;
+        }
+
+        const offered = event.target.closest('[data-run-command]');
+        if (offered) {
+            event.preventDefault();
+            runQuickQuery(offered.dataset.runCommand);
             return;
         }
 
@@ -844,6 +1061,11 @@
             </div>
         `;
 
+        /* The Query panel lives in the Chat options sheet, a modal whose backdrop sits above
+           everything else on the page; a panel opened from one of its results would sit under
+           that backdrop and take no click. The person's attention has moved to the entity, so
+           the sheet closes and the panel stands alone. */
+        window.dispatchEvent(new CustomEvent('close-drawer-chat-options'));
         document.body.appendChild(modal);
         lucide.createIcons();
     }
@@ -940,16 +1162,14 @@
 
     function openCreateSolutionModal() { openCreateSolutionModalWithMessage(''); }
     function openCreateSolutionModalWithMessage(message) {
-        let modal = document.getElementById('ai-chat-create-solution-modal');
-        if (modal) modal.classList.remove('hidden');
+        if (window.Platform && Platform.modal) Platform.modal.open('ai-chat-create-solution-modal');
         const briefEl = document.getElementById('ai-chat-solution-brief');
         if (briefEl && typeof message === 'string' && message.trim()) briefEl.value = message.trim();
         const titleEl = document.getElementById('ai-chat-solution-title');
         if (titleEl) titleEl.focus();
     }
     function closeCreateSolutionModal() {
-        let modal = document.getElementById('ai-chat-create-solution-modal');
-        if (modal) modal.classList.add('hidden');
+        if (window.Platform && Platform.modal) Platform.modal.close('ai-chat-create-solution-modal');
     }
 
     // Wire the button
@@ -1078,6 +1298,13 @@ Would you like me to provide more details about the extracted elements or help y
         const contextType = urlParams.get('context_type');
         const deepLinkDomain = urlParams.get('domain');
 
+        // A question typed on the dashboard arrives in ?q= and waits in the box to be sent.
+        const incomingQuestion = urlParams.get('q');
+        if (incomingQuestion && userInput && !userInput.value) {
+            userInput.value = incomingQuestion.slice(0, 2000);
+            userInput.focus();
+        }
+
         if (deepLinkContext === 'application' && deepLinkId && !isNaN(parseInt(deepLinkId))) {
             const appId = parseInt(deepLinkId);
             selectedElementIdInput.value = appId;
@@ -1187,6 +1414,18 @@ Would you like me to provide more details about the extracted elements or help y
   var render = window.ArchieChat.render;
   function esc(s) { var d = document.createElement('div'); d.textContent = (s == null ? '' : String(s)); return d.innerHTML; }
 
+  // The search box above the list narrows it by title; an empty box shows every chat.
+  function filterSessionList() {
+    var box = document.getElementById('chat-history-search');
+    var q = box ? box.value.trim().toLowerCase() : '';
+    document.querySelectorAll('#session-list .js-thr').forEach(function (row) {
+      row.classList.toggle('hidden', q !== '' && row.textContent.toLowerCase().indexOf(q) === -1);
+    });
+  }
+  document.addEventListener('input', function (e) {
+    if (e.target && e.target.id === 'chat-history-search') filterSessionList();
+  });
+
   window.loadSessionList = async function () {
     var c = document.getElementById('session-list');
     if (!c) return;
@@ -1208,19 +1447,20 @@ Would you like me to provide more details about the extracted elements or help y
         var active = (x.id === window.__threadId) ? ' bg-accent' : '';
         // An unparsable timestamp renders as an em dash, never as a blank that
         // would read as "this conversation has no date".
-        var d = '—'; try { d = new Date(x.updated_at || x.created_at).toLocaleDateString(); } catch (e) { /* swallow-ok: date formatting of one row; the em dash above already tells the user the date is unknown */ }
-        return '<div class="js-thr group relative flex items-center rounded-lg border border-border hover:bg-accent/50 transition-colors' + active + '" data-id="' + esc(x.id) + '">' +
+        var d = '—'; try { d = new Date(x.updated_at || x.created_at).toLocaleDateString(undefined, { day: 'numeric', month: 'short' }); } catch (e) { /* swallow-ok: date formatting of one row; the em dash above already tells the user the date is unknown */ }
+        return '<div class="js-thr group relative flex items-center rounded-lg border border-border hover:bg-accent/50 transition-colors' + active + '" data-thread-id="' + esc(x.id) + '">' +
           '<button type="button" class="js-thr-open flex-1 text-left p-3 min-w-0">' +
-          '<div class="font-medium text-xs truncate">' + esc(x.title || 'New chat') + '</div>' +
-          '<div class="text-xs text-muted-foreground mt-1">' + esc(d) + (x.message_count ? ' · ' + x.message_count + ' messages' : '') + '</div></button>' +
+          '<div class="font-medium text-sm truncate">' + esc(x.title || 'New chat') + '</div>' +
+          '<div class="text-xs text-muted-foreground mt-1">' + esc(d) + (x.message_count ? ' · ' + x.message_count + (x.message_count === 1 ? ' message' : ' messages') : '') + '</div></button>' +
           '<button type="button" class="js-thr-del opacity-0 group-hover:opacity-100 shrink-0 p-2 text-muted-foreground hover:text-destructive" title="Delete conversation" aria-label="Delete conversation"><i data-lucide="trash-2" class="h-3.5 w-3.5"></i></button></div>';
       }).join('');
       c.querySelectorAll('.js-thr').forEach(function (row) {
-        var id = row.getAttribute('data-id');
+        var id = row.getAttribute('data-thread-id');
         var o = row.querySelector('.js-thr-open'); if (o) o.addEventListener('click', function () { window.loadSession(id); });
         var del = row.querySelector('.js-thr-del'); if (del) del.addEventListener('click', function (e) { e.stopPropagation(); window.deleteConversation(id); });
       });
       if (window.lucide) lucide.createIcons();
+      filterSessionList();
     } catch (e) {
       c.innerHTML = '<p class="text-xs text-destructive text-center py-4">Couldn\'t load conversations.</p>';
     }
@@ -1248,11 +1488,25 @@ Would you like me to provide more details about the extracted elements or help y
          had already switched, so the next message continued a thread the user
          could not see. A guard that can be false for a module this file depends
          on is not a safety net, it is the bug. */
+      var savedFailures = ((window.chatFailureTable || {}).saved) || [];
+      var lastAsked = '';
       msgs.forEach(function (m) {
+        if (m.role === 'user') lastAsked = m.content;
+        /* A turn that ended in a failure was saved as the assistant's reply. It reads as the failure
+           it was, and its Retry asks the question above it again. */
+        if (m.role === 'assistant' && savedFailures.indexOf(String(m.content || '').trim()) !== -1) {
+          var asked = lastAsked;
+          render.appendError(m.content, asked ? function () { window.ArchieChat.retryTurn(asked); } : null);
+          return;
+        }
         render.appendMessage(
           m.role === 'assistant' ? 'ai' : m.role,
           m.content,
-          { domain: window.ArchieChat.state.currentDomain || 'general' }
+          {
+            domain: window.ArchieChat.state.currentDomain || 'general',
+            restored: true,
+            fromRecords: m.role === 'assistant' && m.model === 'records'
+          }
         );
       });
       window.loadSessionList();

@@ -269,11 +269,11 @@ function rationalizationDashboard() {
                                 pointRadius: []
                             };
                         }
-                        const tco = app.total_cost_of_ownership || 0;
-                        const radius = Math.max(4, Math.min(20, 4 + (tco / 50000)));
+                        const tco = Platform.figure.num(app.total_cost_of_ownership);
+                        const radius = Number.isNaN(tco) ? 4 : Math.max(4, Math.min(20, 4 + (tco / 50000)));
                         grouped[action].data.push({
-                            x: app.business_value_score || 0,
-                            y: app.technical_health_score || 0,
+                            x: Platform.figure.chartValue(app.business_value_score),
+                            y: Platform.figure.chartValue(app.technical_health_score),
                             app_id: app.app_id,
                             app_name: app.app_name,
                             overall: app.overall_health_score,

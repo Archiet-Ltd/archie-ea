@@ -1,0 +1,38 @@
+{
+ "hits": {
+  "total": {
+   "value": 2
+  },
+  "hits": [
+   {
+    "_id": "0001234567-26-000012:nwf-20260630x10q.htm",
+    "_source": {
+     "display_names": [
+      "Northwind Freight Inc. (NWF) (CIK 0001234567)"
+     ],
+     "file_description": "Quarterly report",
+     "file_date": "2026-08-05",
+     "form": "10-Q",
+     "root_form": "10-Q",
+     "ciks": [
+      "0001234567"
+     ]
+    }
+   },
+   {
+    "_id": "0009999999-26-000001:other.htm",
+    "_source": {
+     "display_names": [
+      "Unrelated Holdings"
+     ],
+     "file_date": "2026-08-01",
+     "form": "8-K",
+     "root_form": "8-K",
+     "ciks": [
+      "0009999999"
+     ]
+    }
+   }
+  ]
+ }
+}

@@ -101,6 +101,15 @@ def protocol_page(protocol_context):
                         + '\nRequest failures: ' + json.dumps(failed_requests))
 
 
+def _asked(stub, before_records, before_lookups):
+    """The chat requests since the marks, and the catalogue lookups, which are a different scenario."""
+    records = stub.records[before_records:]
+    lookups = stub.lookups[before_lookups:]
+    assert len(lookups) <= 1, 'More than one catalogue lookup for one question: %d' % len(lookups)
+    assert sum(r['scenario'] == 'catalogue_lookup' for r in records) == len(lookups), records
+    return [r for r in records if r['scenario'] != 'catalogue_lookup']
+
+
 def _csrf(page):
     return {'X-CSRFToken': page.locator('meta[name="csrf-token"]').get_attribute('content') or ''}
 
@@ -109,6 +118,7 @@ def _csrf(page):
 def test_composer_stream_reply_survives_real_history_reload(protocol_page, live_server, required_protocol, activation):
     page = protocol_page
     before = len(required_protocol.records)
+    before_lookups = len(required_protocol.lookups)
     with page.expect_response(lambda res: res.url.endswith('/ai-chat/models')) as models:
         response = page.goto(live_server + '/ai-chat', wait_until='domcontentloaded')
     assert response.status == 200
@@ -135,7 +145,8 @@ def test_composer_stream_reply_survives_real_history_reload(protocol_page, live_
         assert thread_id, 'Reply was not persisted into a conversation'
         assert any(event.get('type') == 'token' for event in events)
         expect(page.locator('#messages-container')).to_contain_text(CHAT['reply'])
-        records = required_protocol.records[before:]
+        records = _asked(required_protocol, before, before_lookups)
+        answered_total = len(required_protocol.records)
         assert records == [{'scenario': 'chat', 'method': 'POST',
                             'path': '/v1/chat/completions', 'model': MODEL,
                             'stream': True, 'status': 200}], records
@@ -146,7 +157,7 @@ def test_composer_stream_reply_survives_real_history_reload(protocol_page, live_
         messages = history.value.json()['messages']
         assert any(message['role'] == 'assistant' and message['content'] == CHAT['reply'] for message in messages)
         expect(page.locator('#messages-container')).to_contain_text(CHAT['reply'])
-        assert len(required_protocol.records) == before + 1, 'History reload unexpectedly requested new inference'
+        assert len(required_protocol.records) == answered_total, 'History reload unexpectedly requested new inference'
     finally:
         if thread_id:
             deleted = page.request.delete(live_server + '/ai-chat/threads/' + thread_id, headers=_csrf(page))
@@ -191,3 +202,44 @@ def test_application_guide_reply_survives_scoped_history_reload(protocol_page, l
             cleared = page.request.post(live_server + '/ai-chat/guide/history/clear',
                 headers=_csrf(page), data={'page_key': 'applications.detail', 'scope_key': scope})
             assert cleared.status == 200, 'Could not clean up this exact protocol guide scope'
+
+
+def test_chat_question_with_personal_details_leaves_scrubbed_and_still_answers(protocol_page, live_server, required_protocol):
+    """An architect pastes a colleague's email, phone and a password into the chat.
+
+    The answer arrives, and what reached the provider carries none of the three.
+    """
+    page = protocol_page
+    before = len(required_protocol.sent_text)
+    before_lookups = len(required_protocol.lookups)
+    before_records = len(required_protocol.records)
+    page.goto(live_server + '/ai-chat', wait_until='domcontentloaded')
+    page.locator('#user-input').fill(
+        CHAT['prompt'] + ' Ask jane.doe@acme-corp.example or ring +44 20 7946 0958; '
+        'portal password=hunter2hunter2.')
+    thread_id = None
+    try:
+        with page.expect_response(lambda res: res.url.endswith('/ai-chat/message/stream')
+                                  and res.request.method == 'POST') as streamed:
+            page.locator('#send-btn').click()
+        events = [json.loads(line[6:]) for line in streamed.value.text().splitlines()
+                  if line.startswith('data: ') and line != 'data: [DONE]']
+        done = [event for event in events if event.get('type') == 'done']
+        thread_id = done[0].get('thread_id') if done else None
+        expect(page.locator('#messages-container')).to_contain_text(CHAT['reply'])
+        sent = required_protocol.sent_text[before:]
+        assert len(sent) == 1, sent
+        assert CHAT['marker'] in sent[0]
+        _asked(required_protocol, before_records, before_lookups)
+        # The catalogue lookup carries the question to the provider too, so it is held to the same rule.
+        for text in sent + required_protocol.lookups[before_lookups:]:
+            for leaked in ('jane.doe@acme-corp.example', '7946 0958', 'hunter2hunter2'):
+                assert leaked not in text
+        assert '[EMAIL_REDACTED]' in sent[0] and '[PHONE_REDACTED]' in sent[0]
+        assert '[CREDENTIAL_REDACTED]' in sent[0]
+        for text in required_protocol.lookups[before_lookups:]:
+            assert '[EMAIL_REDACTED]' in text and '[PHONE_REDACTED]' in text
+            assert '[CREDENTIAL_REDACTED]' in text
+    finally:
+        if thread_id:
+            page.request.delete(live_server + '/ai-chat/threads/' + thread_id, headers=_csrf(page))

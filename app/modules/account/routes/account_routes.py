@@ -36,6 +36,7 @@ from app.services.rate_limiter import rate_limit
 
 from . import mail_views
 from ..services.account_service import AccountService
+from ..services.held_account import redirect_held_account
 from ..forms.account_forms import (
     ChangeEmailForm,
     ChangePasswordForm,
@@ -70,6 +71,10 @@ def login():
             safe_next_url(buy_intent.next_candidate(consume=True), url_for("dashboard.overview"))
         )
     form = LoginForm()
+    if request.method == "GET":
+        from app.modules.account.oauth_routes import pending_email
+
+        form.email.data = pending_email() or form.email.data
     if form.validate_on_submit():
         # COM-005: Check email-domain SSO config before password auth.
         # If the user's org has SSO configured and enabled, redirect to IdP.
@@ -80,6 +85,8 @@ def login():
 
             _sso_cfg = SSOService().config_for_login(form.email.data, form.password.data)
             if _sso_cfg is not None:
+                # Keep where the person was going (a connector set-up, say) through the identity provider.
+                session["_post_login_next"] = buy_intent.next_candidate() or ""
                 return redirect(
                     url_for("sso.sso_initiate", email=form.email.data)
                 )
@@ -100,7 +107,8 @@ def login():
             # a real session for an administrator account.
             from app.services import mfa_service
 
-            if mfa_service.required_for(user):
+            mfa_service.start_window_if_due(user)
+            if mfa_service.required_for(user) and not mfa_service.may_defer_enrolment(user):
                 session["_mfa_pending_user_id"] = user.id
                 session["_mfa_pending_remember"] = bool(form.remember_me.data)
                 session["_mfa_pending_next"] = buy_intent.next_candidate(consume=True) or ""
@@ -109,8 +117,7 @@ def login():
             # Fix Session Fixation: Regenerate session ID after successful authentication
             # Read before the session is cleared: the chosen plan lives in it.
             _landing = buy_intent.next_candidate(consume=True)
-            session.clear()
-            session.modified = True
+            # The sign-in call resets the session itself (and finishes a pending Google or Microsoft connection first).
             _svc.login(user, form.remember_me.data)
             session.permanent = True
             try:
@@ -152,19 +159,9 @@ def login():
             auth_audit.record_login_failure(form.email.data)
             if not _sso_conflict:
                 flash("Invalid email or password.", "form-error")
-    # Gather configured SSO providers for the login page buttons
-    from app.auth.sso import sso_service
-
-    oidc_providers = []
-    if _sso_enabled():
-        for key in sso_service.available_providers():
-            cfg = sso_service.providers.get(key, {})
-            oidc_providers.append({"key": key, "name": cfg.get("name", key.capitalize())})
-
     return render_template(
         "account/login.html",
         form=form,
-        sso_providers=oidc_providers,
     )
 
 
@@ -195,16 +192,15 @@ def _complete_login_after_mfa(user):
     remember = bool(session.pop("_mfa_pending_remember", False))
     next_url = session.pop("_mfa_pending_next", "") or ""
     session.pop("_mfa_pending_user_id", None)
+    method = session.pop("_mfa_pending_method", None) or "password"
 
-    session.clear()
-    session.modified = True
     _svc.login(user, remember)
     session.permanent = True
     try:
         audit_logger.log_authentication(success=True)
     except Exception as _exc:
         _log.warning("Audit log failed on login success: %s", _exc)
-    _login_entry = auth_audit.record_login_success(user)
+    _login_entry = auth_audit.record_login_success(user, method=method)
     if _login_entry is not None:
         session["_login_audit_id"] = _login_entry.id
     flash("You are now logged in. Welcome back!", "success")
@@ -227,52 +223,50 @@ def mfa_challenge():
     app; one not yet enrolled is shown a fresh secret to scan and must prove
     they captured it correctly before MFA (and the login) is considered
     satisfied.
+
+    Enrolment, the sign-in code and the recovery code are handled by
+    mfa_flow.run_mfa_challenge.
     """
     user = _mfa_pending_user()
     if user is None:
         flash("Your sign-in attempt expired. Please sign in again.", "error")
         return redirect(url_for("account.login"))
 
-    from app.services import mfa_service
+    from app.modules.account.mfa_flow import run_mfa_challenge
 
-    if not user.mfa_enabled:
-        secret = session.get("_mfa_enroll_secret")
-        if not secret:
-            secret = mfa_service.generate_secret()
-            session["_mfa_enroll_secret"] = secret
-        if request.method == "POST":
-            code = request.form.get("code", "")
-            try:
-                mfa_service.enroll(user, secret, code)
-            except mfa_service.MFAError as exc:
-                flash(str(exc), "form-error")
-                return render_template(
-                    "account/mfa_enroll.html",
-                    secret=secret,
-                    provisioning_uri=mfa_service.provisioning_uri(user, secret),
-                )
-            session.pop("_mfa_enroll_secret", None)
-            return _complete_login_after_mfa(user)
-        return render_template(
-            "account/mfa_enroll.html",
-            secret=secret,
-            provisioning_uri=mfa_service.provisioning_uri(user, secret),
-        )
+    return run_mfa_challenge(user, _complete_login_after_mfa)
 
-    if request.method == "POST":
-        code = request.form.get("code", "")
-        if mfa_service.verify_login_code(user, code):
-            return _complete_login_after_mfa(user)
-        flash("That code was not accepted. Try again.", "form-error")
 
-    return render_template("account/mfa_challenge.html")
+@account_bp.route("/mfa-enrol", methods=["GET", "POST"])
+@login_required
+@rate_limit(10, "1m", methods=("POST",))  # SECURITY: brute-force protection on code submits
+def mfa_enrol():
+    """Set up two-factor sign-in from a signed-in session (the first-week
+    notice, an action that needs it, or a closed first week)."""
+    from app.modules.account.mfa_flow import run_signed_in_enrolment
+
+    return run_signed_in_enrolment()
 
 
 @account_bp.route("/register", methods=["GET", "POST"])
-@rate_limit(5, "1m", methods=("POST",))  # SECURITY: Anti-abuse on registration submits only
+@rate_limit(5, "1h", methods=("POST",))  # SECURITY: sign-up is tighter than the generic write limit: 5 POSTs an hour per address
 def register():
     """Register a new user, and send them a confirmation email."""
     return mail_views.register_view()
+
+
+def _company_card():
+    from app.modules.account.services import onboarding_service
+
+    org = getattr(current_user, "organization", None)
+    return onboarding_service.settings_card(org) if org is not None else None
+
+
+# Sign-up after the account: bring the company in, then choose the AI provider.
+from app.modules.admin.connector_routes import connections_access as _connections_access  # noqa: E402
+from app.modules.account.routes import onboarding_views  # noqa: E402
+
+onboarding_views.add_routes(account_bp, _connections_access)
 
 
 @account_bp.route("/logout")
@@ -311,6 +305,7 @@ def manage():
         "account/manage.html",
         user=current_user,
         form=None,
+        company=_company_card(),
         last_login_entry=last_login_entry,
         recent_auth_events=auth_audit.recent_auth_events(current_user.id),
     )
@@ -362,6 +357,7 @@ def save_notification_preferences():
         "solution_updates",
         "assignment_changes",
         "weekly_digest",
+        "alert_email",
         "mention_notifications",
     ]
     prefs = {key: (request.form.get(key) == "on") for key in known_keys}
@@ -393,6 +389,7 @@ def save_preferences():
         "solution_updates",
         "assignment_changes",
         "weekly_digest",
+        "alert_email",
         "mention_notifications",
     ]
     try:
@@ -542,212 +539,10 @@ def decline_invitation(invitation_id):
 @account_bp.before_app_request
 def before_request():
     """Force user to confirm email before accessing login-required routes."""
-    if (
-        current_user.is_authenticated
-        and not current_user.confirmed
-        and request.endpoint[:8] != "account."
-        and request.endpoint != "static"
-    ):
-        return redirect(url_for("account.unconfirmed"))
+    return redirect_held_account()
 
 
 @account_bp.route("/unconfirmed")
 def unconfirmed():
     """Catch users with unconfirmed emails."""
     return mail_views.unconfirmed_view()
-
-
-# =========================================================================
-# SSO / Enterprise Identity Routes (S0-01)
-# Feature-flagged behind FeatureFlag(key='sso_authentication')
-# =========================================================================
-
-
-def _get_sso_oauth():
-    """Lazy-init Authlib OAuth registry (returns None if authlib not installed)."""
-    try:
-        from authlib.integrations.flask_client import OAuth
-    except ImportError:
-        return None
-
-    from flask import current_app
-
-    if not hasattr(current_app, "_sso_oauth"):
-        oauth = OAuth(current_app)
-        providers = current_app.config.get("SSO_PROVIDERS", {})
-        for name, cfg in providers.items():
-            if cfg.get("client_id"):
-                oauth.register(name, **cfg)
-        current_app._sso_oauth = oauth
-
-    return current_app._sso_oauth
-
-
-def _sso_enabled():
-    """Check if SSO feature flag is active."""
-    try:
-        from app.models.feature_flags import FeatureFlag
-
-        flag = FeatureFlag.query.filter_by(key="sso_authentication").first()
-        return flag is not None and flag.is_active
-    except Exception as e:
-        _log.debug("SSO feature flag check failed: %s", e)
-        return False
-
-
-@account_bp.route("/sso/<provider>")
-def sso_login(provider):
-    """Initiate SSO login flow for the given provider."""
-    from flask import abort
-
-    if not _sso_enabled():
-        abort(404)
-
-    oauth = _get_sso_oauth()
-    if oauth is None:
-        flash("SSO is not available. Please install authlib.", "error")
-        return redirect(url_for("account.login"))
-
-    client = oauth.create_client(provider)
-    if client is None:
-        abort(404)
-
-    # Anti-CSRF: generate state parameter
-    import secrets
-
-    state = secrets.token_urlsafe(32)
-    session["sso_state"] = state
-    session["sso_provider"] = provider
-
-    callback_url = url_for("account.sso_callback", provider=provider, _external=True)
-    return client.authorize_redirect(callback_url, state=state)
-
-
-@account_bp.route("/sso/callback/<provider>")
-def sso_callback(provider):
-    """Handle SSO callback from identity provider."""
-    from flask import abort, current_app
-
-    if not _sso_enabled():
-        abort(404)
-
-    # Validate anti-CSRF state parameter
-    expected_state = session.pop("sso_state", None)
-    received_state = request.args.get("state")
-    if not expected_state or expected_state != received_state:
-        flash("SSO authentication failed: invalid state parameter.", "error")
-        return redirect(url_for("account.login"))
-
-    session.pop("sso_provider", None)
-
-    oauth = _get_sso_oauth()
-    if oauth is None:
-        flash("SSO is not available.", "error")
-        return redirect(url_for("account.login"))
-
-    client = oauth.create_client(provider)
-    if client is None:
-        abort(404)
-
-    try:
-        token = client.authorize_access_token()
-        userinfo = token.get("userinfo")
-        if userinfo is None:
-            userinfo = client.userinfo()
-    except Exception as e:
-        current_app.logger.error("SSO callback error for %s: %s", provider, e)
-        flash("SSO authentication failed. Please try again.", "error")
-        return redirect(url_for("account.login"))
-
-    # Extract user identity from OIDC claims. external_id is derived
-    # per-provider: Azure uses a tenant-qualified oid+tid composite rather
-    # than the raw `sub` claim, because `sub` is not guaranteed stable
-    # across apps for the same Azure user (see app/auth/sso.py).
-    from app.auth.sso import (
-        external_id_for,
-        find_linked_user,
-        sso_email_claim_is_trusted_for,
-    )
-
-    external_id = external_id_for(provider, userinfo)
-    email = userinfo.get("email", "")
-    first_name = userinfo.get("given_name", "")
-    last_name = userinfo.get("family_name", "")
-
-    if not external_id or not email:
-        flash("SSO provider did not return required user information.", "error")
-        return redirect(url_for("account.login"))
-
-    # Find or create user by external_id
-    from app import db
-    from app.models.user import User
-
-    # tenant-scoping-ok: pre-auth SSO callback, no org context yet -- scoped
-    # by the (external_id, sso_provider) pair, which is unique per IdP.
-    user = find_linked_user(provider, userinfo, User)
-    if user is None:
-        # No existing subject-based link. Falling back to matching by email
-        # is only safe when the provider's claims prove the signing-in
-        # party actually controls that mailbox (nOAuth fix) -- otherwise an
-        # attacker who controls their own IdP tenant/account could claim
-        # any victim's email and be linked onto their existing account.
-        candidate = User.find_by_email(email)
-        if candidate is not None:
-            if not sso_email_claim_is_trusted_for(provider, userinfo, candidate):
-                flash(
-                    "SSO sign-in could not be completed. If you already have "
-                    "an account under this email, sign in with your password "
-                    "and link SSO from your account settings instead.",
-                    "error",
-                )
-                try:
-                    audit_logger.log_authentication(success=False, method=f"sso:{provider}")
-                except Exception as _exc:
-                    _log.warning("Audit log failed on SSO refusal: %s", _exc)
-                return redirect(url_for("account.login"))
-            candidate.external_id = external_id
-            candidate.sso_provider = provider
-            user = candidate
-        else:
-            # Create new user
-            user = User(
-                email=email,
-                first_name=first_name,
-                last_name=last_name,
-                external_id=external_id,
-                sso_provider=provider,
-                confirmed=True,
-            )
-            db.session.add(user)
-
-    # Commit unconditionally: find_linked_user may have migrated a
-    # pre-fix Azure link's external_id to the new oid+tid composite even
-    # when `user` was already resolved above.
-    db.session.commit()
-
-    # R1-B12 PR 2 (TB-0144/PB-0100): the same MFA gate login() applies to a
-    # password sign-in, applied here too -- an administrator must complete
-    # multi-factor before SSO can finish the login, whether enrolling for
-    # the first time or entering a code from an already-enrolled
-    # authenticator app. Checked before the session-fixation reset inside
-    # login_and_register() below, so an IdP response alone never mints a
-    # real session for an administrator account. There is no "remember me"
-    # checkbox in an SSO flow, matching this route's own unconditional
-    # remember=True below; _mfa_pending_next has no equivalent "next" here
-    # either, matching _complete_login_after_mfa()'s own empty-string
-    # fallback.
-    from app.services import mfa_service
-
-    if mfa_service.required_for(user):
-        session["_mfa_pending_user_id"] = user.id
-        session["_mfa_pending_remember"] = True
-        session["_mfa_pending_next"] = ""
-        return redirect(url_for("account.mfa_challenge"))
-
-    # Establish Flask-Login session (same as password login)
-    from app.services import session_registry
-
-    session_registry.login_and_register(user, remember=True)
-
-    flash("Successfully signed in via SSO.", "success")
-    return redirect(url_for("main.index"))

@@ -51,6 +51,20 @@ class CspNonceExtension(Extension):
 _FINGERPRINTED_RE = re.compile(r"\.[0-9a-f]{8,}\.[^./]+$")
 
 
+def ensure_csp_nonce():
+    """The request's CSP nonce, issued on first use.
+
+    The one place a nonce is made. The template context and the response header both ask for it
+    here, so the page and the header carry the same value whatever order the request hooks ran in
+    (a refusal returned by an early hook never reaches ``generate_csp_nonce``).
+    """
+    from flask import g
+
+    if not getattr(g, "csp_nonce", ""):
+        g.csp_nonce = secrets.token_urlsafe(32)
+    return g.csp_nonce
+
+
 def init_security(app):
     """Register security headers and guardrails."""
 
@@ -60,23 +74,19 @@ def init_security(app):
 
     @app.before_request
     def generate_csp_nonce():
-        """Generate a unique CSP nonce per request for script-src."""
-        from flask import g
-
-        g.csp_nonce = secrets.token_urlsafe(32)
+        """Issue the per-request CSP nonce for script-src."""
+        ensure_csp_nonce()
 
     @app.context_processor
     def inject_csp_nonce():
-        """Expose csp_nonce to all templates (for manual use if needed)."""
-        from flask import g
-
-        return {"csp_nonce": getattr(g, "csp_nonce", "")}
+        """Expose csp_nonce to all templates, issuing it if no hook has yet."""
+        return {"csp_nonce": ensure_csp_nonce()}
 
     @app.after_request
     def add_security_headers(response):
         from flask import g
 
-        nonce = getattr(g, "csp_nonce", "")
+        nonce = ensure_csp_nonce()
 
         # The nonce is applied by CspNonceExtension when a template is compiled,
         # not by rewriting the response body here. Rewriting the body nonce'd
@@ -90,6 +100,12 @@ def init_security(app):
         else:
             response.headers["X-Frame-Options"] = "DENY"
         response.headers["X-XSS-Protection"] = "1; mode=block"
+        from flask import request
+
+        from app.services.crawl_rules import never_indexed
+
+        if never_indexed(request.url_rule):
+            response.headers["X-Robots-Tag"] = "noindex, nofollow"
         response.headers["Referrer-Policy"] = "same-origin"
 
         # ARCH-072: Permissions-Policy and Cross-Origin-Opener-Policy were
@@ -138,20 +154,24 @@ def init_security(app):
         if _app.config.get("CLARITY_PROJECT_ID"):
             _clarity_hosts = " https://www.clarity.ms https://c.bing.com"
 
+        _turnstile_hosts = " https://challenges.cloudflare.com" if (
+            _app.config.get("SIGNUP_TURNSTILE_ENABLED") and _app.config.get("TURNSTILE_SITE_KEY")
+        ) else ""
+
         if _app.debug:
             csp_directives = [
                 "default-src 'self'",
                 "script-src 'self' 'unsafe-inline' 'unsafe-eval' "
                 "https://unpkg.com https://cdn.jsdelivr.net https://cdnjs.cloudflare.com "
                 "https://d3js.org https://cdn.segment.com https://www.google-analytics.com "
-                "https://esm.sh" + _ga4_hosts + _clarity_hosts,
+                "https://esm.sh" + _ga4_hosts + _clarity_hosts + _turnstile_hosts,
                 "style-src 'self' 'unsafe-inline' "
                 "https://unpkg.com https://cdn.jsdelivr.net https://cdnjs.cloudflare.com "
                 "https://fonts.googleapis.com",
                 "font-src 'self' data: https://fonts.googleapis.com https://fonts.gstatic.com https://cdn.jsdelivr.net",
                 "connect-src 'self' https://unpkg.com https://cdn.jsdelivr.net https://cdn.segment.com https://www.google-analytics.com https://esm.sh ws://localhost:* wss://localhost:*" + _ga4_hosts + _clarity_hosts,
                 "img-src 'self' data: blob: https://api.qrserver.com" + _ga4_hosts + _clarity_hosts,
-                "frame-src 'self' https://snack.expo.dev",
+                "frame-src 'self' https://snack.expo.dev" + _turnstile_hosts,
                 "object-src 'none'",
                 "report-uri /api/csp-report",
             ]
@@ -214,7 +234,7 @@ def init_security(app):
                 # CodeMirror loads as ES modules from esm.sh (no eval), so nothing
                 # else on the write surface needs the directive either.
                 f"script-src 'self' 'nonce-{nonce}' 'strict-dynamic' "
-                "https://esm.sh" + _ga4_hosts + _clarity_hosts,  # CodeMirror 6 ES module imports
+                "https://esm.sh" + _ga4_hosts + _clarity_hosts + _turnstile_hosts,  # CodeMirror 6 ES module imports
                 # ARCH-070. The blanket style-src 'unsafe-inline' is gone,
                 # split into the two directives it was conflating:
                 #
@@ -245,7 +265,7 @@ def init_security(app):
                 "font-src 'self' data: https://fonts.googleapis.com https://fonts.gstatic.com",
                 "connect-src 'self' https://esm.sh" + _ga4_hosts + _clarity_hosts,  # CodeMirror 6 ES module imports
                 "img-src 'self' data: blob: https://api.qrserver.com" + _ga4_hosts + _clarity_hosts,
-                "frame-src 'self' https://snack.expo.dev",
+                "frame-src 'self' https://snack.expo.dev" + _turnstile_hosts,
                 "object-src 'none'",
                 "base-uri 'self'",     # stop <base> rewriting every relative URL
                 # ARCH-070 narrow exception: the OAuth consent page
@@ -282,8 +302,8 @@ def init_security(app):
 
                 request_path = _req.path
                 request_versioned = bool(_req.args.get("v"))
-            except RuntimeError:
-                pass
+            except (RuntimeError, UnicodeDecodeError):
+                pass  # no request, or a query string that is not valid text: not a versioned address
 
             if request_path.startswith("/static/"):
                 # Only cache-forever assets whose URL changes when their bytes

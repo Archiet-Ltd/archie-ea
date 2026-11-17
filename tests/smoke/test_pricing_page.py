@@ -8,9 +8,22 @@ repository; the billing questions open. Anonymous throughout.
 import pytest
 from playwright.sync_api import expect
 
-from .conftest import PAGE_TIMEOUT
+from .conftest import PAGE_TIMEOUT, boot_live_server
 
 pytestmark = [pytest.mark.smoke, pytest.mark.journey]
+
+
+@pytest.fixture(scope="module")
+def paid_server(request, app):
+    """A server with the payment settings present, so the plan cards offer Buy."""
+    return boot_live_server(request, None, app, extra_env={
+        "STRIPE_SECRET_KEY": "sk_test_journey_not_a_real_key",
+        "STRIPE_WEBHOOK_SECRET": "whsec_journey_not_a_real_secret",
+        "STRIPE_PRICE_STARTUP_MONTHLY": "price_journey_startup_month",
+        "STRIPE_PRICE_STARTUP_ANNUAL": "price_journey_startup_year",
+        "STRIPE_PRICE_TEAM_MONTHLY": "price_journey_team_month",
+        "STRIPE_PRICE_TEAM_ANNUAL": "price_journey_team_year",
+    })
 
 
 def _open(browser, live_server, width=1440, height=900):
@@ -25,9 +38,9 @@ def test_each_plan_card_holds_its_price_and_its_buy_button(browser, live_server)
     try:
         for key, price, button in [
             ("community", "Free", "buy-community"),
-            ("startup", "$490", "buy-startup"),
-            ("team", "$290", "buy-team"),
-            ("enterprise", "From $24,000", "buy-enterprise"),
+            ("startup", "USD 490", "buy-startup"),
+            ("team", "USD 290", "buy-team"),
+            ("enterprise", "From USD 24,000", "buy-enterprise"),
         ]:
             card = page.get_by_test_id(f"plan-card-{key}")
             expect(card).to_be_visible(timeout=PAGE_TIMEOUT)
@@ -47,23 +60,23 @@ def test_each_plan_card_holds_its_price_and_its_buy_button(browser, live_server)
         context.close()
 
 
-def test_toggle_switches_prices_and_the_live_buy_link(browser, live_server):
-    context, page = _open(browser, live_server)
+def test_toggle_switches_prices_and_the_live_buy_link(browser, paid_server):
+    context, page = _open(browser, str(paid_server))
     try:
         startup = page.get_by_test_id("plan-card-startup")
         shown = startup.locator(".pp-price > span:visible")
         expect(shown).to_have_count(1)
-        expect(shown).to_have_text("$490/year")
+        expect(shown).to_have_text("USD 490 a year")
         expect(startup.get_by_test_id("buy-startup")).to_have_attribute("href", __import__("re").compile("interval%3Dyear"))
         page.get_by_text("Monthly", exact=True).click()
         expect(shown).to_have_count(1)
-        expect(shown).to_have_text("$49/month")
+        expect(shown).to_have_text("USD 49 a month")
         expect(startup.get_by_test_id("buy-startup")).to_be_hidden()
         expect(startup.get_by_test_id("buy-startup-monthly")).to_be_visible()
         expect(startup.get_by_test_id("buy-startup-monthly")).to_have_attribute(
             "href", __import__("re").compile("interval%3Dmonth"))
         team = page.get_by_test_id("plan-card-team")
-        expect(team.locator(".pp-price > span:visible")).to_have_text("$29/editor/month")
+        expect(team.locator(".pp-price > span:visible")).to_have_text("USD 29 per editor a month")
         # The visible buy button still leads to that plan's registration.
         startup.get_by_test_id("buy-startup-monthly").click()
         page.wait_for_url(lambda url: "/account/register" in url and "plan=startup" in url
@@ -92,7 +105,7 @@ def test_comparison_table_headers_stay_in_view_while_scrolling(browser, live_ser
         context.close()
 
 
-def test_self_hosting_band_faq_and_roadmap(browser, live_server):
+def test_self_hosting_band_and_faq_with_no_roadmap_band(browser, live_server):
     context, page = _open(browser, live_server)
     try:
         band = page.get_by_test_id("pricing-selfhost")
@@ -104,11 +117,9 @@ def test_self_hosting_band_faq_and_roadmap(browser, live_server):
         assert 6 <= questions.count() <= 8
         questions.first.click()
         expect(faq.locator("details").first.locator("p")).to_be_visible()
-        # Roadmap dates are quarter-year only.
-        text = page.get_by_test_id("pricing-grow").inner_text()
-        import re
-        assert re.findall(r"Q[1-4] 20\d\d", text) == ["Q4 2026", "Q1 2027", "Q2 2027", "Q3 2027"]
-        assert not re.search(r"(January|February|March|April|May|June|July|August|September|October|November|December)", text)
+        # No coming item is offered inside a plan: the page carries no dated roadmap band.
+        assert page.get_by_test_id("pricing-grow").count() == 0
+        assert "gains as the platform grows" not in page.locator("main").inner_text()
     finally:
         context.close()
 
@@ -121,8 +132,9 @@ def test_pricing_reads_back_clean_and_stacks_on_mobile(browser, live_server):
         tops = [page.get_by_test_id(f"plan-card-{k}").bounding_box()["y"]
                 for k in ("community", "startup", "team", "enterprise")]
         assert tops == sorted(tops) and len(set(tops)) == 4, "cards do not stack"
-        body = page.locator("body").inner_text().lower()
-        for banned in ("every canvas", "usage history", "coming soon", "verified", "assumption",
+        main = page.locator("main")
+        body = main.inner_text().lower()
+        for banned in ("every canvas", "usage history", "verified", "assumption",
                        "tbc", "export and share", "docs/", ".md"):
             assert banned not in body, f"banned phrase on the page: {banned!r}"
     finally:

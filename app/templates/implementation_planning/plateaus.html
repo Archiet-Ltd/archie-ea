@@ -1,18 +1,8 @@
+{# design-block: data-table #}
 {% extends "layouts/admin_base.html" %}
 {% from 'macros/page_shell.html' import page_shell %}
 
-{% block title %}Implementation Plateaus{% endblock %}
-
-{% block breadcrumb %}
-{% from 'components/breadcrumb_nav.html' import breadcrumb_nav %}
-{{ breadcrumb_nav(items=[
-    {'text': 'Home', 'href': url_for('main.index'), 'icon': 'home'},
-    {'text': 'Implementation & Migration'},
-    {'text': 'Plateaus', 'current': true}
-]) }}
-{% endblock %}
-
-{% block content %}
+{% block title %}Implementation Plateaus{% endblock %}{% block content %}
 <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
     {{ page_shell(title='Implementation Plateaus', subtitle='TOGAF architecture plateaus for phased implementation') }}
 
@@ -21,7 +11,7 @@
     {% set planned = plateaus|selectattr('status', 'equalto', 'planned')|list|length %}
     {% set in_progress = plateaus|selectattr('status', 'equalto', 'in_progress')|list|length %}
     {% set completed = plateaus|selectattr('status', 'equalto', 'completed')|list|length %}
-    <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
+    <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         <div data-slot="card" class="rounded-lg border border-border bg-card px-6 py-4">
             <p class="text-xs text-muted-foreground uppercase tracking-wide">Total</p>
             <p class="text-2xl font-bold text-foreground mt-1">{{ total }}</p>

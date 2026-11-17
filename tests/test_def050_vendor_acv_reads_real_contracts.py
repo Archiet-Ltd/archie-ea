@@ -36,7 +36,7 @@ def test_active_contract_is_reflected_in_portfolio_acv(app, db_session, make_org
         db_session.commit()
 
         user = User(email=f"def050-{org.id}@example.com", organization_id=org.id,
-                    enterprise_role="enterprise_architect", confirmed=True)
+                    enterprise_role="portfolio_manager", confirmed=True)
         db_session.add(user)
         db_session.commit()
 
@@ -47,6 +47,10 @@ def test_active_contract_is_reflected_in_portfolio_acv(app, db_session, make_org
             resp = c.get("/applications/vendors")
             assert resp.status_code == 200
             html = resp.get_data(as_text=True)
-            assert "Portfolio ACV" in html
-            # 180000 annual -> $180K per the template's K-scale branch.
-            assert "$180K" in html
+            assert "Annual cost across vendors" in html
+            # 180000 annual, written in full by the page's currency filter (the old K-scale branch is gone).
+            import re
+            text = re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", html))
+            from app.services.application_cost_accessor import get_reporting_currency
+            symbol = {"GBP": "£", "USD": "$", "EUR": "€"}[get_reporting_currency(org.id)]
+            assert re.search(r"Annual cost across vendors: " + re.escape(symbol) + r"180,000(?!\d)", text), text[text.find("Annual cost"):][:200]

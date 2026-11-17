@@ -72,6 +72,8 @@
     }
 
     // Global event delegation for [data-action] elements
+    // Other dispatchers (the mapping modal) step aside when this one is present.
+    window.__dataActionDelegator = true;
     document.addEventListener('click', function(e) {
       const el = e.target.closest('[data-action]');
       if (!el) return;

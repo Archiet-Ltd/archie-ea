@@ -22,9 +22,15 @@ def _section(start_marker: str, end_marker: str = "</section>") -> str:
     return SOURCE[start:end]
 
 
+TABLE_MACROS = (
+    "{% from 'components/table.html' import table, table_header, table_body, table_row,"
+    " table_head, table_cell, table_empty_state %}"
+)
+
+
 def _render(app, fragment, **ctx):
     with app.test_request_context("/"):
-        return render_template_string(fragment, **ctx)
+        return render_template_string(TABLE_MACROS + fragment, **ctx)
 
 
 @pytest.fixture
@@ -51,7 +57,7 @@ def test_measured_zero_risk_counts_stay_zero(app, risk_table):
     cto = {"risk_counts": {"critical": 0, "high": 2, "medium": 0, "low": 0},
            "arb_pipeline": {"pending": 0, "approved": 1, "rejected": 0}}
     html = _render(app, risk_table, cto=cto)
-    assert ">0<" in html.replace(" ", "")
+    assert ">0<" in "".join(html.split())
     assert DASH not in html.split('data-testid="cto-risk-by-impact"', 1)[1].split("</table>", 1)[0]
 
 
