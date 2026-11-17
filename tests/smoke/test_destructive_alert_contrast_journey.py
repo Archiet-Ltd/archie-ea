@@ -17,6 +17,7 @@ import pytest
 from playwright.sync_api import expect
 
 from .conftest import PAGE_TIMEOUT, PASSWORD
+from .test_accessibility_audit import TAGS
 
 pytestmark = [pytest.mark.smoke, pytest.mark.journey]
 
@@ -48,7 +49,7 @@ def _login(page, base, email):
 def _contrast_report(page):
     from axe_playwright_python.sync_playwright import Axe
 
-    report = Axe().run(page, context={"include": [["[data-testid=contrast-alert]"]]}, options={"runOnly": {"type": "rule", "values": ["color-contrast"]}})
+    report = Axe().run(page, context={"include": [["[data-testid=contrast-alert]"]]}, options={"runOnly": {"type": "tag", "values": TAGS}})
     data = report.response if hasattr(report, "response") else report
     return data
 

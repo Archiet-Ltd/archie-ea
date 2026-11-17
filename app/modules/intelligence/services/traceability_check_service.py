@@ -33,6 +33,7 @@ from __future__ import annotations
 from typing import Any, Dict, Iterable, List, Optional, Set, Tuple
 
 from app.extensions import db
+from app.models.archimate_element_types import application_kind_types, is_application_kind
 from app.middleware.tenant_context import current_org_id
 
 TRACE_DEPTH = 4
@@ -257,7 +258,7 @@ def broken_chains(organization_id: Optional[int] = None) -> Dict[str, Any]:
         db.select(ArchiMateElement.id, ArchiMateElement.name, ArchiMateElement.type)
         .where(
             ArchiMateElement.organization_id == org_id,
-            ArchiMateElement.type.in_(("ApplicationComponent", "Capability")),
+            ArchiMateElement.type.in_((*application_kind_types(), "Capability")),
         )
         .order_by(ArchiMateElement.name, ArchiMateElement.id)
     ).all()
@@ -267,7 +268,7 @@ def broken_chains(organization_id: Optional[int] = None) -> Dict[str, Any]:
         answer = TraceabilityCheckService.check(element.id, org_id)
         if answer.get("state") != "checked":
             continue
-        is_component = element.type == "ApplicationComponent"
+        is_component = is_application_kind(element.type)
         block = answer["up"] if is_component else answer["down"]
         if block["complete"]:
             continue
