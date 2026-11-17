@@ -201,7 +201,7 @@ def own_record_questions(org_id):
             0,
             {
                 "question": "Connect GitHub to see who owns what and what breaks",
-                "href": "/admin/connectors/github",
+                "href": onboarding.page_path("m365_connector.github_connect"),
             },
         )
     return cards[:4]

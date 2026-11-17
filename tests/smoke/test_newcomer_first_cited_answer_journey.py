@@ -95,6 +95,17 @@ def _shot(page, name, size):
         page.screenshot(path=os.path.join(SHOTS, "%s-%s.png" % (name, size)), full_page=True)
 
 
+def cards_a_newcomer_is_shown(app, email):
+    """The questions the first screen shows this organisation: what the server offers, less the GitHub
+    card, which the next-step button already carries, at most four."""
+    with app.app_context():
+        from app.models.user import User
+        from app.modules.ai_chat.routes.analytics_routes import own_record_questions
+
+        org_id = User.query.filter_by(email=email).one().organization_id
+        return [q["question"] for q in own_record_questions(org_id) if not q.get("href")][:4]
+
+
 def _record_on_a_canvas(app, email):
     """Record one element in a box the single-box questions do not ask about (a Lean Canvas Problem line), for the
     person's organisation, and place it on its canvas: the card that follows must still lead to that entry."""
@@ -146,6 +157,7 @@ def test_first_card_gives_a_cited_answer_and_connect_github_lands_on_the_connect
             expect(cards.first).to_be_visible(timeout=PAGE_TIMEOUT)
         texts = cards.all_inner_texts()
         assert any("signed up" in t for t in texts), texts
+        expect(cards).to_have_count(len(cards_a_newcomer_is_shown(app, email)))
         assert not any("Canvas" in t for t in texts), texts
         assert not any("Company profile" in t for t in texts), texts
         assert "then general questions" not in page.locator("#portfolio-briefing").inner_text()
@@ -163,7 +175,8 @@ def test_first_card_gives_a_cited_answer_and_connect_github_lands_on_the_connect
         expect(cards.first).to_be_visible(timeout=PAGE_TIMEOUT)
         canvas_card = cards.filter(has_text="Canvas")
         expect(canvas_card.first).to_be_visible(timeout=PAGE_TIMEOUT)
-        canvas_question = canvas_card.first.inner_text().splitlines()[0]
+        expect(cards).to_have_count(len(cards_a_newcomer_is_shown(app, email)))
+        assert len(cards_a_newcomer_is_shown(app, email)) == 2
         _shot(page, "chat-with-canvas", name)
 
         card = cards.filter(has_text="signed up")
@@ -192,8 +205,8 @@ def test_first_card_gives_a_cited_answer_and_connect_github_lands_on_the_connect
 
         # the canvas card's question is answered from what is on the canvas, and links to the canvas
         page.goto(live_server + "/ai-chat", wait_until="networkidle", timeout=PAGE_TIMEOUT)
-        page.fill("#user-input", canvas_question)
-        page.press("#user-input", "Enter")
+        expect(canvas_card.first).to_be_visible(timeout=PAGE_TIMEOUT)
+        canvas_card.first.click()
         try:
             page.wait_for_function(
                 "(entry) => document.querySelector('#messages-container').innerText.includes(entry)", arg=entry, timeout=60000

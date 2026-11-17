@@ -19,6 +19,7 @@ import pytest
 from playwright.sync_api import expect
 
 from .conftest import PAGE_TIMEOUT, boot_live_server
+from .test_newcomer_first_cited_answer_journey import cards_a_newcomer_is_shown
 from .test_sign_up_first_screen_journey import SIZES, _skip_to_the_dashboard
 from .test_signup_brings_the_company_in_journey import (  # noqa: F401  (people is a fixture)
     assert_is_a_startup_cto_not_an_administrator,
@@ -41,6 +42,7 @@ def _open_chat(browser, live_server, people, app, viewport, load_sample=True, lo
         )
     page = context.new_page()
     email, _ = sign_up(page, live_server, people)
+    page.signed_up_email = email
     assert_is_a_startup_cto_not_an_administrator(app, email)  # lens "cto", enterprise_role not platform_admin, not a platform admin
     _skip_to_the_dashboard(page)
     if load_sample:
@@ -186,7 +188,9 @@ def test_a_new_startup_owner_with_nothing_recorded_sees_the_startup_next_step(br
         # answers from a record and cites; no general question and no enterprise portfolio prompt
         cards = briefing.get_by_test_id("first-question-suggestion")
         expect(cards.first).to_be_visible()
-        assert cards.count() >= 1
+        shown = cards_a_newcomer_is_shown(app, page.signed_up_email)
+        assert len(shown) == 1, shown  # a fresh startup holds only its sign-up answers; the canvases start empty
+        expect(cards).to_have_count(len(shown))
         for i in range(cards.count()):
             assert cards.nth(i).inner_text().strip().startswith(("What did we record", "What is on our", "Which ")), cards.nth(i).inner_text()
         assert "monolith" not in briefing.inner_text() and "general questions" not in briefing.inner_text()

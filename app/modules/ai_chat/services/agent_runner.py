@@ -1938,13 +1938,10 @@ class AgentRunner:
             return ""
         blocks = []
         try:
-            from flask import current_app
-
             from app.models.organization import Organization
             from app.modules.account.services import onboarding_service
 
-            with current_app.test_request_context("/"):
-                held = onboarding_service.loaded_at_sign_up(org_id)
+            held = onboarding_service.loaded_at_sign_up(org_id)
             profile = onboarding_service.signup_answers(db.session.get(Organization, org_id))
             if profile:
                 held["profile"] = [{"key": org_id, "name": "Your sign-up answers", "match": "when we signed up", "href": profile["href"], "values": profile["values"]}]

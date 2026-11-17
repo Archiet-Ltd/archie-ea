@@ -158,14 +158,21 @@ def choices(org) -> Dict[str, Any]:
     }
 
 
-COMPANY_PROFILE_PAGE = "/account/manage"
+def page_path(endpoint: str, **values: Any) -> str:
+    """The path of a page by endpoint name, built the same way inside and outside a request (a chat turn
+    streams after its request has ended), so no path is written out by hand."""
+    from flask import current_app, has_request_context, url_for
+
+    if has_request_context():
+        return url_for(endpoint, **values)
+    return current_app.url_map.bind("localhost").build(endpoint, values)
 
 
 def signup_answers(org) -> Optional[Dict[str, Any]]:
     """The answers the sign-up recorded (kind, industry), with the page that shows it,
     or None when nothing is recorded."""
     values = {key: value for key, value in choices(org).items() if key in ("kind", "industry") and value}
-    return {"values": values, "href": COMPANY_PROFILE_PAGE} if values else None
+    return {"values": values, "href": page_path("account.manage")} if values else None
 
 
 def chosen_canvases(org) -> Optional[List[str]]:
@@ -946,8 +953,6 @@ def _fill_boxes(canvas) -> None:
 def loaded_at_sign_up(org_id: int) -> Dict[str, List[Dict[str, Any]]]:
     """What the sign-up choices loaded for this organisation, for the welcome page: each canvas with how many
     entries it holds, and each chosen framework with how many items it lists. Empty lists when nothing was chosen."""
-    from flask import url_for
-
     from app.models.business_model import BusinessModelCanvas
     from app.models.compliance_models import RegulatoryFramework
     from app.models.organization import Organization
@@ -964,7 +969,7 @@ def loaded_at_sign_up(org_id: int) -> Dict[str, List[Dict[str, Any]]]:
         if row is None:
             continue
         filled = sum(len(model_service.entries(row, box)) for box in model_service.element_boxes(row))
-        canvases.append({"key": key, "id": row.id, "name": row.name, "entries": filled, "href": url_for("business_model.detail", canvas_id=row.id)})
+        canvases.append({"key": key, "id": row.id, "name": row.name, "entries": filled, "href": page_path("business_model.detail", canvas_id=row.id)})
     frameworks = []
     labels = dict((k, label) for k, label, _n in FRAMEWORKS)
     for key in chosen["frameworks"]:
@@ -975,7 +980,7 @@ def loaded_at_sign_up(org_id: int) -> Dict[str, List[Dict[str, Any]]]:
         ).first():
             continue
         frameworks.append({
-            "key": key, "name": labels[key], "count": framework.controls.count(), "href": url_for("frameworks.gallery"),
+            "key": key, "name": labels[key], "count": framework.controls.count(), "href": page_path("frameworks.gallery"),
             "unit": "item" if framework.category == "method" else "control",
         })
     return {"canvases": canvases, "frameworks": frameworks}
