@@ -201,7 +201,7 @@ def test_strategic_impact_analysis_trail_is_the_registry_trail(browser, live_ser
         assert trail == expected, (trail, expected)
         assert trail[-1] == title, (trail, title)
 
-        parent = page.get_by_role("navigation", name="Breadcrumb", exact=True).get_by_role("link").nth(1)
+        parent = page.get_by_role("navigation", name="Breadcrumb", exact=True).get_by_role("link").last
         with page.expect_navigation(wait_until="domcontentloaded", timeout=PAGE_TIMEOUT) as nav:
             parent.click()
         assert nav.value.status == 200
