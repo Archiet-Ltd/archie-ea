@@ -169,3 +169,42 @@ def test_impact_analysis_rebuild_shows_analysis_and_links_land_on_content(
         assert "foreign" not in page.inner_text("body")
     finally:
         context.close()
+
+def _trail_texts(page):
+    trail = page.get_by_role("navigation", name="Breadcrumb", exact=True)
+    assert trail.count() == 1
+    return [t.strip() for t in trail.locator("li").all_inner_texts() if t.strip()]
+
+
+@pytest.mark.smoke
+def test_strategic_impact_analysis_trail_is_the_registry_trail(browser, live_server, seeded, app):
+    """As the enterprise architect, the strategic impact analysis page reads the
+    trail the registry gives it, ends in the page's own title, and its parent
+    crumb lands on a page with content."""
+    from app.models.user import User
+    from app.navigation.registry import page_trail
+
+    email = seeded["emails"]["enterprise_architect"]
+    with app.app_context():
+        user = User.query.filter_by(email=email).one()
+        with app.test_request_context("/strategic/impact-analysis"):
+            expected = ["Home"] + [label for label, _ in page_trail(user, "strategic.impact_analysis")]
+
+    context = browser.new_context(ignore_https_errors=True, viewport={"width": 1440, "height": 900})
+    try:
+        page = context.new_page()
+        _login(page, live_server, email)
+        page.goto(live_server + "/strategic/impact-analysis", wait_until="domcontentloaded",
+                  timeout=PAGE_TIMEOUT)
+        trail = _trail_texts(page)
+        title = page.get_by_role("heading", level=1).inner_text().strip()
+        assert trail == expected, (trail, expected)
+        assert trail[-1] == title, (trail, title)
+
+        parent = page.get_by_role("navigation", name="Breadcrumb", exact=True).get_by_role("link").nth(1)
+        with page.expect_navigation(wait_until="domcontentloaded", timeout=PAGE_TIMEOUT) as nav:
+            parent.click()
+        assert nav.value.status == 200
+        assert page.get_by_role("heading", level=1).inner_text().strip()
+    finally:
+        context.close()
