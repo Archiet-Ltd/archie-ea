@@ -464,7 +464,7 @@ document.addEventListener('alpine:init', function() {
                     if (APP_CONFIG.fieldConfigsUrl) {
                         this.fieldConfigsReady = Platform.fetch.get(APP_CONFIG.fieldConfigsUrl, null, { silent: true })
                             .then(function(data) { self.fieldConfigs = data || {}; })
-                            .catch(function() { /* the dialog falls back to name and description */ });
+                            .catch(function() { /* swallow-ok: optional field settings; the dialog falls back to name and description */ });
                     }
                     return;
                 }
