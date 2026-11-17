@@ -125,3 +125,49 @@ def test_the_chief_technology_officer_reads_the_same_node_with_its_figures(brows
         _shot(page, "technology-element-allowed-" + label)
     finally:
         ctx.close()
+
+
+def _application_url(live_server, estate):
+    return "%s/applications/%d?tab=technology" % (live_server, estate["app"])
+
+
+@pytest.mark.parametrize("label,width,height,dark", VIEWS)
+def test_an_architect_sees_the_application_technology_cost_row_without_the_amount(browser, live_server, seeded, estate, label, width, height, dark):
+    ctx, page = _open(browser, live_server, seeded["emails"]["enterprise_architect"], width, height, dark)
+    try:
+        page.goto(_application_url(live_server, estate), wait_until="domcontentloaded")
+        section = page.locator("[data-testid=technology-cost-shares-section]")
+        expect(section).to_be_visible()
+        row = section.locator("[data-testid=app-technology-cost-row]", has_text=estate["node_name"])
+        expect(row).to_be_visible()
+        expect(section.locator("[data-testid=technology-cost-shares-withheld]")).to_have_text(WITHHELD)
+        text = section.inner_text()
+        assert text.count(WITHHELD) == 1, "the sentence is said once, not %d times" % text.count(WITHHELD)
+        assert "Withheld for your role" not in text
+        assert not MONEY.search(text), "an amount reached a person the rule withholds: %s" % MONEY.search(text).group(0)
+        for figure in ("40,000", "40000", "88,888", "88888"):
+            assert figure not in text
+        section.scroll_into_view_if_needed()
+        _shot(page, "application-technology-cost-withheld-" + label)
+        with page.expect_navigation():
+            row.locator("[data-testid=app-technology-cost-link]").click()
+        expect(page.get_by_role("heading", name=estate["node_name"]).first).to_be_visible()
+    finally:
+        ctx.close()
+
+
+@pytest.mark.parametrize("label,width,height,dark", VIEWS)
+def test_the_chief_technology_officer_sees_the_application_technology_cost_figures(browser, live_server, seeded, estate, label, width, height, dark):
+    ctx, page = _open(browser, live_server, seeded["emails"]["cto"], width, height, dark)
+    try:
+        page.goto(_application_url(live_server, estate), wait_until="domcontentloaded")
+        section = page.locator("[data-testid=technology-cost-shares-section]")
+        expect(section).to_be_visible()
+        row = section.locator("[data-testid=app-technology-cost-row]", has_text=estate["node_name"])
+        expect(row.locator("[data-testid=app-technology-cost-share]")).to_contain_text("40,000.00 GBP")
+        assert WITHHELD not in section.inner_text()
+        assert "88,888" not in page.locator("main").inner_text()
+        section.scroll_into_view_if_needed()
+        _shot(page, "application-technology-cost-allowed-" + label)
+    finally:
+        ctx.close()
