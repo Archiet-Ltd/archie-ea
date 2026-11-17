@@ -12,6 +12,7 @@ from flask import current_app, jsonify, request
 from flask_login import current_user, login_required
 
 from app.decorators import audit_log
+from app.models.archimate_element_types import application_kind_types
 from . import unified_ai_chat_bp
 from .chat_views import get_chat_service
 
@@ -236,7 +237,7 @@ def get_first_questions():
         db.session.execute(
             db.select(db.func.count(db.distinct(folded_column(ArchiMateElement.name)))).where(
                 ArchiMateElement.organization_id == org_id,
-                ArchiMateElement.type.in_(("ApplicationComponent", "Application")),
+                ArchiMateElement.type.in_(application_kind_types()),
             )
         ).scalar_one(),
     )
@@ -248,7 +249,7 @@ def get_first_questions():
     named = db.session.execute(
         db.select(ArchiMateElement.id, ArchiMateElement.name).where(
             ArchiMateElement.organization_id == org_id,
-            ArchiMateElement.type.in_(("ApplicationComponent", "Application")),
+            ArchiMateElement.type.in_(application_kind_types()),
             ArchiMateElement.id.in_(list(ends)),
         )
     ).all()

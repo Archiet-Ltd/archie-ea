@@ -4,6 +4,7 @@ import json
 from threading import Lock, Thread
 
 MODEL = 'ci-protocol-stub-v1'
+CATALOGUE_LOOKUP = "Map the user's question onto exactly one of these catalogue entries"
 TOKEN = 'ci-protocol-only-not-a-real-key'
 CHAT = {
     'marker': 'ARCHIE_CI_CHAT_PROTOCOL_V1',
@@ -82,6 +83,7 @@ class AIProtocolStub:
     def __init__(self):
         self._records = []
         self._sent_text = []
+        self._lookups = []
         self._lock = Lock()
         owner = self
 
@@ -141,11 +143,13 @@ class AIProtocolStub:
                 if not isinstance(messages, list) or not messages or not isinstance(messages[-1], dict):
                     self._reject(400, 'A final user message is required.', model=MODEL)
                     return
-                with owner._lock:
-                    owner._sent_text.append(' '.join(
-                        str(m.get('content')) for m in messages if isinstance(m, dict)))
                 last = messages[-1]
                 content = last.get('content')
+                is_lookup = (last.get('role') == 'user' and isinstance(content, str)
+                             and content.startswith(CATALOGUE_LOOKUP) and body.get('stream', False) is False)
+                text = ' '.join(str(m.get('content')) for m in messages if isinstance(m, dict))
+                with owner._lock:
+                    (owner._lookups if is_lookup else owner._sent_text).append(text)
                 refused = [(name, r) for name, r in REFUSALS.items()
                            if isinstance(content, str) and r['marker'] in content]
                 if last.get('role') == 'user' and len(refused) == 1:
@@ -153,6 +157,18 @@ class AIProtocolStub:
                     self._record(refusal['status'], scenario=name, model=MODEL,
                                  stream=bool(body.get('stream', False)))
                     self._json(refusal['status'], refusal['body'])
+                    return
+                if is_lookup:
+                    # The chat first asks which catalogue entry a question fits; the fixture says none
+                    # fits, so the question goes on to the reply being tested. It is not a chat request.
+                    self._record(200, scenario='catalogue_lookup', model=MODEL)
+                    self._json(200, {'id': 'chatcmpl-ci-lookup', 'created': 0, 'model': MODEL,
+                                     'object': 'chat.completion', 'choices': [{
+                                         'index': 0, 'finish_reason': 'stop', 'message': {
+                                             'role': 'assistant',
+                                             'content': '{"entry_id": null, "params": {}}'}}],
+                                     'usage': {'prompt_tokens': 12, 'completion_tokens': 8,
+                                               'total_tokens': 20}})
                     return
                 matches = [(name, scenario) for name, scenario in [
                     ('chat', CHAT), ('guide', GUIDE),
@@ -207,12 +223,23 @@ class AIProtocolStub:
             return list(self._sent_text)
 
     @property
+    def lookups(self):
+        """The text of each catalogue lookup the chat made before answering (not chat requests)."""
+        with self._lock:
+            return list(self._lookups)
+
+    @property
     def records(self):
         with self._lock:
             return [dict(record) for record in self._records]
 
-    def child_environment(self, original):
-        """Return isolated settings; never alter pytest's already-scrubbed env."""
+    def child_environment(self, original, organisation_key_only=False):
+        """Return isolated settings; never alter pytest's already-scrubbed env.
+
+        With ``organisation_key_only`` the platform holds no OpenAI key at all, so the token the
+        organisation's own settings row carries is that organisation's money, called the way a
+        customer's key is; without it the token is also the platform's environment key.
+        """
         env = dict(original)
         providers = ('ANTHROPIC', 'AZURE', 'CLAUDE', 'GEMINI',
                      'GOOGLE', 'HUGGINGFACE', 'NVIDIA', 'OPENAI', 'OPENROUTER')
@@ -221,7 +248,7 @@ class AIProtocolStub:
                 env[provider + '_API_KEY' + suffix] = ''
         env['LLM_API_KEY'] = ''
         env['AZURE_OPENAI_API_KEY'] = ''
-        env.update(OPENAI_API_KEY=TOKEN, OPENAI_BASE_URL=self.base_url,
+        env.update(OPENAI_API_KEY='' if organisation_key_only else TOKEN, OPENAI_BASE_URL=self.base_url,
                    AI_PAGE_GUIDE_ENABLED='true', REQUIRE_AI_APPROVAL='true',
                    PYTHON_DOTENV_DISABLED='1')
         bypass = ','.join(filter(None, [env.get('NO_PROXY'), env.get('no_proxy'),

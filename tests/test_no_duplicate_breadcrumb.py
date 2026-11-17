@@ -132,3 +132,107 @@ def test_every_shell_page_has_one_breadcrumb_trail():
         "navigation registry and drawn via page_trail() by the header macro they "
         f"call: {offenders}"
     )
+
+
+# --- No label twice inside one trail ----------------------------------------
+# The Gaps page passes breadcrumb=[('Changes', ...), ('Gaps', None)] while the sidebar knows only the
+# section "Changes", so the shell drew Home > Changes > Changes > Gaps. The check below renders the trail
+# of every routed page that calls page_shell/page_header, through the real registry, and asserts that no
+# label appears twice and that the trail still ends on the page's own last crumb.
+
+_ROOT = Path(__file__).resolve().parents[1]
+_ARG = {"shell": re.compile(r"breadcrumb\s*=\s*\["), "header": re.compile(r"breadcrumbs\s*=\s*\[")}
+_TITLE = re.compile(r"""\btitle\s*=\s*(['"])(.+?)\1""")
+
+
+def _balanced(text: str, start: int) -> str:
+    """The bracketed literal whose opening bracket is at text[start]."""
+    depth = 0
+    for i in range(start, len(text)):
+        depth += text[i] in "[(" 
+        depth -= text[i] in "])"
+        if depth == 0:
+            return text[start:i + 1]
+    return ""
+
+
+def _page_cases() -> list[tuple[str, str, str, str, str]]:
+    cases = []
+    seen = set()
+    for route in _INVENTORY.get("routes", []):
+        if not (route.get("page") and route.get("templates")) or "GET" not in route.get("methods", []):
+            continue
+        for tpl in route["templates"]:
+            path = _ROOT / tpl
+            if (route["endpoint"], tpl) in seen or not path.exists():
+                continue
+            seen.add((route["endpoint"], tpl))
+            text = path.read_text(encoding="utf-8", errors="ignore")
+            for kind in sorted(set(HEADER_USE.findall(text))):
+                for call in re.finditer(r"page_%s\s*\(" % kind, text):
+                    body = _balanced(text, call.end() - 1)
+                    arg = _ARG[kind].search(body)
+                    literal = _balanced(body, arg.end() - 1) if arg else "[]"
+                    title = _TITLE.search(body)
+                    cases.append((route["endpoint"], route["rule"], kind, literal, title.group(2) if title else ""))
+                    break
+    return sorted(set(cases))
+
+
+def _rendered_trail(endpoint, rule, kind, literal, title):
+    from jinja2 import Environment, FileSystemLoader
+
+    from app.navigation import registry
+
+    env = Environment(loader=FileSystemLoader(TEMPLATES), autoescape=True)
+    env.globals["url_for"] = lambda *a, **kw: "/"
+    env.globals["close_trail"] = registry.close_trail
+    env.globals["page_trail"] = lambda: {"trail": registry.page_trail(None, endpoint), "path": rule}
+    name, arg = ("macros/page_shell.html", "breadcrumb") if kind == "shell" else ("components/page_header.html", "breadcrumbs")
+    html = env.from_string(
+        "{% from '" + name + "' import page_" + kind + " %}"
+        "{{ page_" + kind + "(title=" + repr(title or "Page") + ", " + arg + "=" + literal + ") }}"
+    ).render()
+    nav = re.search(r'<nav[^>]*aria-label="Breadcrumb".*?</nav>', html, re.S)
+    if not nav:
+        return []
+    sm = re.search(r'<ol.*?</ol>', nav.group(0), re.S)
+    items = re.findall(r"<li\b.*?</li>", sm.group(0) if sm else nav.group(0), re.S)
+    texts = [re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", i)).strip() for i in items]
+    return [t for t in texts if t]
+
+
+def _trail_failures() -> list[str]:
+    failures = []
+    for endpoint, rule, kind, literal, title in _page_cases():
+        try:
+            trail = _rendered_trail(endpoint, rule, kind, literal, title)
+        except Exception:  # a literal that needs real request data cannot be rendered here
+            continue
+        names = [t.lower() for t in trail]
+        if len(names) != len(set(names)):
+            failures.append(f"{endpoint}: {' > '.join(trail)}")
+    return failures
+
+
+def test_no_trail_repeats_a_label():
+    failures = _trail_failures()
+    assert failures == [], f"{len(failures)} pages render a label twice in one trail: {failures}"
+
+
+def test_the_gaps_trail_reads_changes_then_gaps():
+    trail = _rendered_trail(
+        "adm_kanban_view.gap_analysis", "/adm/gaps", "shell",
+        "[('Changes', '/changes'), ('Gaps', none)]", "Gap analysis",
+    )
+    assert trail == ["Home", "Changes", "Gaps"]
+
+
+def test_a_trail_keeps_its_section_and_its_own_last_crumb():
+    trail = _rendered_trail(
+        "adm_kanban_view.gap_analysis", "/adm/gaps", "shell",
+        "[('Changes', '/changes'), ('Gaps', none), ('Gap 7', none)]", "Gap 7",
+    )
+    assert trail[0] == "Home" and trail[1] == "Changes"
+    assert trail[-1] == "Gap 7"
+    assert len(trail) == len(set(trail))

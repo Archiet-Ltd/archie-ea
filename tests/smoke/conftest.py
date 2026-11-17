@@ -478,7 +478,7 @@ def boot_live_server(request, ai_protocol_stub, app, extra_env=None):
     env.setdefault("ALLOW_INTERNAL_WEBHOOK_TARGETS", "1")
     _require_explicit_test_database(env)
     if ai_protocol_stub is not None:
-        env = ai_protocol_stub.child_environment(env)
+        env = ai_protocol_stub.child_environment(env, organisation_key_only=True)
     env.setdefault("SECRET_KEY", "smoke-only-not-secret-" + "x" * 16)
     # "smoke", not "testing": config.py's SmokeTestingConfig is identical to
     # TestingConfig except for ADMIN_MFA_BYPASS, which lets the dozens of
