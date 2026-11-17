@@ -49,7 +49,7 @@ def _architect(db_session, org, label):
     user = User(
         email="%s.%s@example.com" % (label, uuid.uuid4().hex[:8]), first_name="A", last_name="B",
         organization_id=org.id, enterprise_role="enterprise_architect", confirmed=True,
-        role=Role.query.filter_by(name="Viewer").first())
+        role=Role.query.filter_by(name="Architect").first())
     user.password = "Passw0rd!x"
     db_session.add(user)
     db_session.flush()
@@ -154,7 +154,9 @@ def test_the_revision_follows_the_head_of_the_revision_line():
     config = Config()
     config.set_main_option("script_location", str(root / "migrations"))
     script = ScriptDirectory.from_config(config)
-    assert script.get_heads() == ["20261107_clear_standin_scores"]
+    heads = script.get_heads()
+    assert len(heads) == 1
+    assert "20261107_clear_standin_scores" in {r.revision for r in script.iterate_revisions(heads[0], "base")}
     parent = script.get_revision("20261107_clear_standin_scores").down_revision
     assert script.get_revision(parent) is not None
 

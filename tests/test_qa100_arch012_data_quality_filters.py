@@ -67,10 +67,11 @@ def _seed(db_session, tenant_ctx, org_id):
         return described.id, undescribed.id, tag
 
 
-def test_has_desc_no_excludes_described_elements(org_client, db_session, tenant_ctx):
-    org, client, _ = org_client
+def test_has_desc_no_excludes_described_elements(org_client, db_session, tenant_ctx, login_as):
+    org, client, user = org_client
     _described_id, undescribed_id, tag = _seed(db_session, tenant_ctx, org.id)
 
+    login_as(client, user)
     resp = client.get("/archimate/api/elements/search?q=ARCH012&has_desc=no&limit=200")
     assert resp.status_code == 200
     data = resp.get_json()
@@ -81,10 +82,11 @@ def test_has_desc_no_excludes_described_elements(org_client, db_session, tenant_
     )
 
 
-def test_has_desc_yes_excludes_undescribed_elements(org_client, db_session, tenant_ctx):
-    org, client, _ = org_client
+def test_has_desc_yes_excludes_undescribed_elements(org_client, db_session, tenant_ctx, login_as):
+    org, client, user = org_client
     described_id, undescribed_id, tag = _seed(db_session, tenant_ctx, org.id)
 
+    login_as(client, user)
     resp = client.get("/archimate/api/elements/search?q=ARCH012&has_desc=yes&limit=200")
     assert resp.status_code == 200
     data = resp.get_json()
@@ -96,15 +98,17 @@ def test_has_desc_yes_excludes_undescribed_elements(org_client, db_session, tena
     )
 
 
-def test_has_rels_no_param_is_read_not_ignored(org_client, db_session, tenant_ctx):
+def test_has_rels_no_param_is_read_not_ignored(org_client, db_session, tenant_ctx, login_as):
     """FAIL-FIRST regression: before the fix, has_rels was accepted in the
     querystring and never referenced in the handler, so has_rels=yes and
     has_rels=no returned byte-identical result sets. Neither element in this
     fixture has any relationship, so has_rels=yes must exclude both."""
-    org, client, _ = org_client
+    org, client, user = org_client
     _described_id, _undescribed_id, tag = _seed(db_session, tenant_ctx, org.id)
 
+    login_as(client, user)
     resp_no = client.get(f"/archimate/api/elements/search?q={tag}&has_rels=no&limit=200")
+    login_as(client, user)
     resp_yes = client.get(f"/archimate/api/elements/search?q={tag}&has_rels=yes&limit=200")
     assert resp_no.status_code == 200 and resp_yes.status_code == 200
     no_ids = {el["id"] for el in resp_no.get_json()["data"]}

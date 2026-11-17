@@ -52,9 +52,10 @@ _NOT_MONEY_WORD = re.compile(
     r"threshold|invest_(business|tech)", re.I)
 
 
-# a part named for a score, a weight or hours holds no money even when its own keys say "cost" (a weight of the
-# cost criterion is a weight), so it is kept whole; a list of records (``capability_scores``) is not such a part
-_KEPT_WHOLE = re.compile(r"score|weight|hours", re.I)
+# a part named for a score, a weight, hours or a distribution holds no money even when its own keys say "cost" (a
+# weight of the cost criterion is a weight; a count of applications per disposition keyed "invest" is a count),
+# so it is kept whole; a list of records (``capability_scores``) is not such a part
+_KEPT_WHOLE = re.compile(r"score|weight|hours|distribution", re.I)
 
 
 def keeps_whole(key: Any, value: Any, extra: Iterable[str] = ()) -> bool:
