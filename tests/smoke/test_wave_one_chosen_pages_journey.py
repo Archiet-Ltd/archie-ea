@@ -233,3 +233,31 @@ def _seed_other(app, email):
         db.session.add(BusinessCapability(name="Other Bank Capability", organization_id=org_id))
         db.session.commit()
         return org_id
+
+
+MODULE_PAGES = ("business-model-canvas", "capability-maturity", "industry-apqc")
+
+
+def test_a_customer_who_chose_banking_and_iso_27001_reads_each_chosen_module_page_and_follows_it_into_the_product(
+    browser, wave_server, people, app
+):
+    """A signed-in person opens the module page of each thing they chose at sign-up (canvas, maturity, industry
+    framework): it is a page of its own, never the waiting list, and the link it offers into the
+    product lands on a page with content."""
+    tag = uuid.uuid4().hex[:6]
+    base = str(wave_server)
+    context, page = new_page(browser)
+    try:
+        email, _started = sign_up(page, base, people)
+        _choose_banking_and_iso_27001(page, base)
+        _seed_linked_data(app, email, tag)
+        for slug in MODULE_PAGES:
+            heading = _opens_with_content(page, base, "/modules/" + slug, minimum=200)
+            assert heading, slug
+            assert "/early-access" not in page.url, "/modules/%s sent the person to %s" % (slug, page.url)
+            shoot(page, "module-" + slug)
+            enter = page.get_by_role("link", name="Open Entelim").first
+            assert enter.count(), "/modules/%s offers no way into the product" % slug
+            _opens_with_content(page, base, enter.get_attribute("href"), minimum=60)
+    finally:
+        context.close()

@@ -1,5 +1,5 @@
 ---
-wave: 3
+wave: 1
 page_family: module
 module_label: "Capability Maturity"
 endpoint: maturity_management.maturity_heatmap
