@@ -13,6 +13,7 @@ from typing import Any, Dict, List, Optional  # dead-code-ok
 from sqlalchemy import text  # dead-code-ok
 
 from app import db
+from app.middleware.tenant_context import current_org_id
 from app.models.roadmap_models import (  # dead-code-ok
     ImplementationGap,
     PlanningDeliverable,
@@ -112,7 +113,11 @@ class RoadmapAutomationEngine:
         ).fetchall()
 
         # Get related gaps
-        gaps = ImplementationGap.query.filter_by(source_capability_id=capability_id).all()
+        gaps = (
+            ImplementationGap.in_organization(current_org_id())
+            .filter(ImplementationGap.source_capability_id == capability_id)
+            .all()
+        )
 
         work_packages = []
 
@@ -140,7 +145,9 @@ class RoadmapAutomationEngine:
 
     def _generate_from_gap(self, gap_id: int, options: GenerationOptions) -> List[Dict[str, Any]]:
         """Generate work packages from implementation gap"""
-        gap = ImplementationGap.query.filter_by(id=gap_id).first_or_404()
+        # A gap has no organisation column: it is read only through the caller's own organisation.
+        gap = ImplementationGap.in_organization(current_org_id()).filter(
+            ImplementationGap.id == gap_id).first_or_404()
 
         work_packages = []
 

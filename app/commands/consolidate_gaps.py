@@ -45,6 +45,7 @@ from flask.cli import with_appcontext
 from sqlalchemy import text
 
 from app import db
+from app.models.roadmap_models import ROADMAP_GAP_OWNER_JOINS, ROADMAP_GAP_OWNER_SQL
 
 
 def _count(conn, sql, **params):
@@ -84,12 +85,10 @@ _MERGE_SOURCES = (
             "COALESCE(s.created_at, now()) AS created_at, "
             "COALESCE(s.updated_at, s.created_at, now()) AS updated_at, "
             "'architecture', false, 'capability_shortfall', "
-            "COALESCE(ac.organization_id, uc.source_org_id, u.organization_id), "
+            + ROADMAP_GAP_OWNER_SQL + ", "
             "CAST(:source_table_val AS varchar), s.id "
             'FROM "roadmap_gaps" s '
-            "LEFT JOIN application_components ac ON ac.id = s.source_application_id "
-            "LEFT JOIN unified_capabilities uc ON uc.id = s.source_capability_id "
-            "LEFT JOIN users u ON u.id = s.created_by "
+            + ROADMAP_GAP_OWNER_JOINS + " "
             "WHERE s.retired_into_id IS NULL "
             "AND NOT EXISTS ("
             "SELECT 1 FROM gaps g WHERE g.source_table = :source_table AND g.source_id = s.id"
