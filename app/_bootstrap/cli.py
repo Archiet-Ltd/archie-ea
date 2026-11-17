@@ -285,6 +285,13 @@ def init_cli(app):
         app.logger.warning(f"Failed to register approval-queue consolidation backfill CLI: {e}")
 
     try:
+        from app.commands.settle_waiting_proposals import init_app as init_settle_waiting_proposals
+        init_settle_waiting_proposals(app)
+        app.logger.info("settle-waiting-proposals CLI command registered")
+    except Exception as e:
+        app.logger.warning(f"Failed to register settle-waiting-proposals CLI: {e}")
+
+    try:
         from app.commands.dedupe_entities import init_app as init_dedupe_entities
         init_dedupe_entities(app)
         app.logger.info("\u2705 Dedupe entities CLI command registered")
