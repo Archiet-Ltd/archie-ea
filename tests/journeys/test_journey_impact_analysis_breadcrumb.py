@@ -61,4 +61,4 @@ def test_impact_analysis_breadcrumb_leaf_matches_the_page_title(app, client):
 
     with app.test_request_context("/strategic/impact-analysis"):
         expected = ["Home"] + [label for label, _ in page_trail(architect, "strategic.impact_analysis")]
-    assert crumbs[:-1] == expected, (crumbs, expected)
+    assert crumbs == expected, (crumbs, expected)
