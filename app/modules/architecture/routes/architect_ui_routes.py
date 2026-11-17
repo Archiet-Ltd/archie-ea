@@ -23,6 +23,7 @@ from flask_login import current_user, login_required
 
 from app import db
 from app.core.auth.decorators import admit_model_changers, require_permission
+from app.modules.architecture.routes.decision_table_routes import model_changers_only
 from app.utils.pagination import safe_int_arg
 from app.models.archimate_element_types import is_application_kind
 # ArchiMateHealthService import removed — architecture_health route deleted
@@ -947,8 +948,14 @@ def traceability_matrix():
         element_check = TraceabilityCheckService.check(element_id, getattr(g, 'current_org_id', None))
     else:
         broken = broken_chains(getattr(g, 'current_org_id', None))
+    verification = None
+    if element_id is None:
+        from app.modules.architecture.services import requirement_verification_service as verification_service
+
+        verification = verification_service.coverage(getattr(g, 'current_org_id', None))
     return render_template(
         "archimate_views/traceability.html",
+        verification=verification,
         element_id=element_id,
         element_check=element_check,
         broken=broken,
@@ -1030,12 +1037,68 @@ def element_traceability(element_id):
     impact_service = ArchiMateImpactService()
     chain = service.get_element_chain(element_id)
     impact_summary = impact_service.get_impact_summary(element_id)
+    verification = None
+    if element.type == "Requirement":
+        from app.modules.architecture.services import requirement_verification_service as verification_service
+
+        org_id = getattr(g, "current_org_id", None)
+        verification = verification_service.requirement_view(element.id, org_id)
+        verification["candidates"] = verification_service.candidate_tests(element.id, org_id)
     return render_template(
         "archimate_views/element_traceability.html",
         element=element,
         chain=chain,
         impact_summary=impact_summary,
+        verification=verification,
     )
+
+
+def _verification_back(requirement_id):
+    return redirect(url_for("architect_ui.element_traceability", element_id=requirement_id))
+
+
+@architect_ui_bp.route("/architecture/requirements/<int:requirement_id>/verified-by", methods=["POST"])
+@login_required
+@model_changers_only
+def link_requirement_test(requirement_id):
+    """Link a test (an Artifact, or a new one by name) to a requirement as verifying it."""
+    from app.modules.architecture.services import requirement_verification_service as verification_service
+
+    try:
+        test = verification_service.link_test(
+            requirement_id,
+            getattr(g, "current_org_id", None),
+            test_id=request.form.get("test_id", type=int),
+            new_test_name=request.form.get("new_test_name", ""),
+        )
+    except verification_service.VerificationError as exc:
+        flash(str(exc), "error")
+        return _verification_back(requirement_id)
+    flash(f"{test.name} now verifies this requirement. Record its result below.", "success")
+    return _verification_back(requirement_id)
+
+
+@architect_ui_bp.route("/architecture/requirements/<int:requirement_id>/test-result", methods=["POST"])
+@login_required
+@model_changers_only
+def record_requirement_test_result(requirement_id):
+    """Record the last result of one of the tests that verify a requirement."""
+    from app.modules.architecture.services import requirement_verification_service as verification_service
+
+    org_id = getattr(g, "current_org_id", None)
+    test_id = request.form.get("test_id", type=int)
+    linked = verification_service.requirement_view(requirement_id, org_id)["tests"]
+    try:
+        if test_id not in {t["id"] for t in linked}:
+            raise verification_service.VerificationError("That test does not verify this requirement.")
+        verification_service.record_result(
+            test_id, org_id, request.form.get("result", ""), commit=request.form.get("commit", "")
+        )
+    except verification_service.VerificationError as exc:
+        flash(str(exc), "error")
+        return _verification_back(requirement_id)
+    flash("Result recorded.", "success")
+    return _verification_back(requirement_id)
 
 
 @architect_ui_bp.route("/api/archimate/traceability/<int:element_id>")

@@ -2287,3 +2287,48 @@ def test_model_changes_are_refused_to_a_read_only_account_and_made_by_a_write_ro
             assert expected[1](after[expected[0]]), (change, after)
     finally:
         context.close()
+
+
+# --- Requirement verification: who may link a test and record its result -------
+
+# Every seeded archetype holds the organisation's Administrator role, so the model-change gate
+# admits all eleven; the refusal of a Viewer is walked in test_requirement_verification_journey.py.
+VERIFICATION_WRITERS = set(ARCHETYPES)
+
+
+@pytest.fixture(scope="module")
+def seeded_requirement(seeded):
+    """A real Requirement in the seeded organisation for the verification write routes."""
+    from app import create_app, db
+    from app.models.archimate_core import ArchiMateElement
+
+    app = create_app("testing")
+    with app.app_context():
+        row = ArchiMateElement(name="Auth-matrix probe requirement", type="Requirement", layer="motivation",
+                               organization_id=seeded["ids"]["org"])
+        db.session.add(row)
+        db.session.commit()
+        row_id = row.id
+    yield row_id
+    with app.app_context():
+        try:
+            ArchiMateElement.query.filter_by(id=row_id, organization_id=seeded["ids"]["org"]).delete(
+                synchronize_session=False)
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
+
+
+@pytest.mark.parametrize("archetype", ARCHETYPES)
+def test_link_a_verifying_test_authorisation(archetype, page, live_server, seeded, seeded_requirement):
+    """POST /architecture/requirements/<id>/verified-by: the model-change gate, observed on the write path."""
+    _login(page, live_server, seeded["emails"][archetype])
+    response = page.request.post(
+        "%s/architecture/requirements/%d/verified-by" % (live_server, seeded_requirement),
+        form={"new_test_name": "", "csrf_token": _csrf_token(page)},
+        max_redirects=0,
+    )
+    if archetype in VERIFICATION_WRITERS:
+        assert response.status != 403, "%s was refused by the gate" % archetype
+    else:
+        assert response.status == 403, "%s reached the link route: got %s" % (archetype, response.status)

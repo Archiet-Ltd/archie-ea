@@ -181,6 +181,61 @@
             {% endif %}
             {% endcall %}
         {% endcall %}
+
+        {% if verification is not none %}
+        {% call ui.card() %}
+            {% call ui.card_header() %}
+                {% call ui.card_title(class='flex items-center gap-2') %}Requirement verification {{ ui.badge(variant='secondary', class='tabular-nums', attrs={'data-testid': 'unverified-count'}, text=verification.unverified|length) }}{% endcall %}
+                {% if verification.total %}
+                {{ ui.card_description(text='Of ' ~ verification.total ~ ' requirements, ' ~ (verification.unverified|length) ~ ' have no test that verifies them and ' ~ (verification.failed|length) ~ ' have a test whose last result failed.') }}
+                {% endif %}
+            {% endcall %}
+            {% call ui.card_content(class='space-y-6') %}
+            {% if not verification.total %}
+            <p class="text-sm text-muted-foreground" data-testid="verification-none">No requirement is recorded yet, so there is nothing to verify. Add requirements in the model composer, then link a test to each from its page.</p>
+            {{ ui.button(text='Open the model composer', href=url_for('archimate.composer_page'), variant='outline') }}
+            {% else %}
+            <section class="space-y-3" data-testid="unverified-requirements">
+                <h3 class="text-base font-semibold">Unverified</h3>
+                {% if verification.unverified %}
+                {% call(row) list_table(rows=verification.unverified, columns=[{'label': 'Requirement', 'sortable': true}, ('', 'w-12')],
+                                        caption='Unverified requirements', testid='unverified-table', row_testid='unverified-row', search_placeholder='Filter requirements...') %}
+                    {% call table_cell(class='max-w-[min(420px,56vw)] truncate font-medium') %}
+                        <a class="hover:underline" href="{{ url_for('architect_ui.element_traceability', element_id=row.id) }}" title="{{ row.name }}">{{ row.name }}</a>
+                    {% endcall %}
+                    {% call table_cell(class='text-right') %}
+                        {% call row_actions(label='Actions for ' ~ row.name) %}
+                            {{ row_action('Link a test', href=url_for('architect_ui.element_traceability', element_id=row.id)) }}
+                        {% endcall %}
+                    {% endcall %}
+                {% endcall %}
+                {% else %}
+                <p class="text-sm text-muted-foreground" data-testid="unverified-none">Every requirement has at least one test that verifies it.</p>
+                {% endif %}
+            </section>
+            <section class="space-y-3" data-testid="failed-requirements">
+                <h3 class="text-base font-semibold">Last failed</h3>
+                {% if verification.failed %}
+                {% call(row) list_table(rows=verification.failed, columns=[{'label': 'Requirement', 'sortable': true}, {'label': 'Failing test', 'class': 'hidden md:table-cell'}, ('', 'w-12')],
+                                        caption='Requirements whose test last failed', testid='failed-table', row_testid='failed-row', search_placeholder='Filter requirements...') %}
+                    {% call table_cell(class='max-w-[min(420px,56vw)] truncate font-medium') %}
+                        <a class="hover:underline" href="{{ url_for('architect_ui.element_traceability', element_id=row.id) }}" title="{{ row.name }}">{{ row.name }}</a>
+                    {% endcall %}
+                    {% call table_cell(class='hidden md:table-cell max-w-[420px] truncate text-muted-foreground') %}{{ row.tests|map(attribute='name')|join(', ') }}{% endcall %}
+                    {% call table_cell(class='text-right') %}
+                        {% call row_actions(label='Actions for ' ~ row.name) %}
+                            {{ row_action('Open the requirement', href=url_for('architect_ui.element_traceability', element_id=row.id)) }}
+                        {% endcall %}
+                    {% endcall %}
+                {% endcall %}
+                {% else %}
+                <p class="text-sm text-muted-foreground" data-testid="failed-none">No test has last failed.</p>
+                {% endif %}
+            </section>
+            {% endif %}
+            {% endcall %}
+        {% endcall %}
+        {% endif %}
     {% endif %}
 </div>
 

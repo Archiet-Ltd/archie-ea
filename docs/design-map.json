@@ -1768,8 +1768,9 @@
    ],
    "confidence": "low",
    "controls": {
-    "button": 1,
-    "form": 1
+    "button": 2,
+    "form": 1,
+    "testid": 2
    },
    "departures": [
     {
@@ -4937,8 +4938,7 @@
    "macros": [
     "components/fact_list.html",
     "components/figures.html",
-    "components/list_table.html",
-    "macros/page_shell.html"
+    "components/list_table.html"
    ],
    "original": "dashboard-01",
    "page_type": "dashboard",
@@ -13428,13 +13428,7 @@
    ],
    "macros": [
     "components/alert.html",
-    "components/badge.html",
-    "components/button.html",
-    "components/card.html",
     "components/empty_state.html",
-    "components/metrics_card.html",
-    "components/select.html",
-    "components/table.html",
     "macros/page_shell.html"
    ],
    "original": "dashboard-01",
@@ -14634,7 +14628,7 @@
     "button": 23,
     "form": 8,
     "link": 28,
-    "table": 6,
+    "table": 5,
     "testid": 12
    },
    "departures": [
@@ -14674,6 +14668,7 @@
     "components/fact_list.html",
     "components/form_field.html",
     "components/input.html",
+    "components/list_table.html",
     "components/page_header.html",
     "components/select.html",
     "components/unified_mapping_modal.html",
@@ -15050,7 +15045,7 @@
     "link": 11,
     "modal": 2,
     "table": 1,
-    "testid": 34
+    "testid": 36
    },
    "departures": [
     {
@@ -18334,7 +18329,7 @@
    ],
    "confidence": "high",
    "controls": {
-    "button": 17,
+    "button": 18,
     "modal": 3,
     "table": 2,
     "testid": 6
@@ -18475,12 +18470,12 @@
    ],
    "confidence": "high",
    "controls": {
-    "button": 17,
+    "button": 20,
     "form": 2,
     "link": 23,
     "modal": 2,
     "table": 1,
-    "testid": 57
+    "testid": 59
    },
    "departures": [
     {
@@ -18976,19 +18971,27 @@
     "item",
     "table",
     "trace",
-    "page-shell"
+    "page-shell",
+    "field",
+    "input",
+    "select"
    ],
    "confidence": "high",
    "controls": {
-    "button": 2,
-    "link": 2,
-    "table": 1
+    "button": 4,
+    "form": 2,
+    "link": 3,
+    "table": 2,
+    "testid": 1
    },
    "departures": [],
    "extends": [
     "layouts/admin_base.html"
    ],
    "extra_macros": [
+    "components/form_field.html",
+    "components/input.html",
+    "components/select.html",
     "components/table.html"
    ],
    "frame": "dashboard-01",
@@ -19001,6 +19004,9 @@
     "components/button.html",
     "components/card.html",
     "components/empty_state.html",
+    "components/form_field.html",
+    "components/input.html",
+    "components/select.html",
     "components/table.html",
     "macros/page_shell.html"
    ],
@@ -19228,10 +19234,10 @@
    ],
    "confidence": "high",
    "controls": {
-    "button": 14,
+    "button": 15,
     "form": 1,
-    "link": 9,
-    "testid": 6
+    "link": 11,
+    "testid": 11
    },
    "departures": [
     {
@@ -19849,8 +19855,8 @@
    "confidence": "high",
    "controls": {
     "button": 13,
-    "link": 3,
-    "testid": 10
+    "link": 4,
+    "testid": 12
    },
    "departures": [
     {
@@ -20190,8 +20196,10 @@
    ],
    "confidence": "high",
    "controls": {
+    "button": 3,
+    "form": 1,
     "link": 1,
-    "table": 1
+    "testid": 1
    },
    "departures": [
     {
@@ -20208,6 +20216,7 @@
     "page-header:Replace"
    ],
    "macros": [
+    "components/list_table.html",
     "components/page_header.html"
    ],
    "original": "example:tasks",
@@ -23576,11 +23585,11 @@
    ],
    "confidence": "high",
    "controls": {
-    "button": 7,
-    "form": 5,
+    "button": 10,
+    "form": 6,
     "link": 4,
-    "modal": 3,
-    "testid": 5
+    "modal": 4,
+    "testid": 6
    },
    "departures": [
     {
@@ -23608,6 +23617,7 @@
    "macros": [
     "components/button.html",
     "components/canvas/index.html",
+    "components/dialog.html",
     "components/empty_state.html",
     "components/input.html",
     "components/modal.html",
@@ -26621,7 +26631,7 @@
     "link": 2,
     "modal": 4,
     "table": 1,
-    "testid": 22
+    "testid": 23
    },
    "departures": [
     {
@@ -39469,7 +39479,9 @@
    ],
    "confidence": "low",
    "controls": {
-    "testid": 6
+    "button": 2,
+    "form": 1,
+    "testid": 8
    },
    "departures": [],
    "extends": [

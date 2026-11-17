@@ -8,6 +8,9 @@
 {% from 'components/card.html' import card, card_header, card_title, card_description, card_content %}
 {% from 'components/table.html' import table, table_header, table_body, table_row, table_head, table_cell, table_empty_state %}
 {% from 'components/empty_state.html' import empty_state %}
+{% from 'components/form_field.html' import form_field, form_group %}
+{% from 'components/select.html' import native_select %}
+{% from 'components/input.html' import hidden_input %}
 
 {% block title %}Traceability: {{ element.name }}{% endblock %}
 
@@ -51,6 +54,97 @@
     ) }}
 
     <div class="p-6 space-y-6">
+        {% if verification is not none %}
+        <!-- Which tests verify this requirement, and what each last did -->
+        <div data-testid="verified-by">
+        {% call card() %}
+            {% call card_header() %}
+                <div class="flex flex-wrap items-center justify-between gap-2">
+                    {% call card_title() %}Verified by{% endcall %}
+                    {% if verification.state == 'failing' %}{% call badge(variant='destructive') %}Last failed{% endcall %}
+                    {% elif verification.state == 'verified' %}{% call badge(variant='success') %}Passing{% endcall %}
+                    {% elif verification.state == 'not_run' %}{% call badge(variant='outline') %}Not run yet{% endcall %}
+                    {% else %}{% call badge(variant='outline') %}Unverified{% endcall %}{% endif %}
+                </div>
+                {% call card_description() %}A test is an artifact linked to this requirement. Its last result, the commit it ran against and when it ran show here.{% endcall %}
+            {% endcall %}
+            {% call card_content() %}
+                {% if verification.tests %}
+                {% call table() %}
+                    {% call table_header() %}
+                    <tr>
+                        {% call table_head() %}Test{% endcall %}
+                        {% call table_head() %}Last result{% endcall %}
+                        {% call table_head(class='hidden md:table-cell') %}Commit{% endcall %}
+                        {% call table_head(class='hidden md:table-cell') %}Ran at{% endcall %}
+                    </tr>
+                    {% endcall %}
+                    {% call table_body() %}
+                        {% for test in verification.tests %}
+                        {% call table_row(attrs_dict={'data-testid': 'verifying-test', 'data-test-id': test.id}) %}
+                            {% call table_cell() %}<a href="{{ url_for('architect_ui.element_traceability', element_id=test.id) }}" class="font-medium text-primary hover:underline">{{ test.name }}</a>
+                                <span class="mt-1 block text-xs font-normal text-muted-foreground md:hidden">{% if test.result %}{{ test.commit or 'No commit recorded' }} · {{ test.run_at[:16]|replace('T', ' ') if test.run_at else '' }} UTC{% else %}Not run yet{% endif %}</span>
+                            {% endcall %}
+                            {% call table_cell() %}
+                                {% if test.result == 'passed' %}{% call badge(variant='success') %}Passed{% endcall %}
+                                {% elif test.result == 'failed' %}{% call badge(variant='destructive') %}Failed{% endcall %}
+                                {% else %}<span class="text-muted-foreground">Not run yet</span>{% endif %}
+                            {% endcall %}
+                            {% call table_cell(class='hidden md:table-cell') %}{% if test.commit %}<code class="text-xs">{{ test.commit }}</code>{% else %}<span class="text-muted-foreground">{{ 'No commit recorded' if test.result else 'Not run yet' }}</span>{% endif %}{% endcall %}
+                            {% call table_cell(class='hidden md:table-cell') %}{% if test.run_at %}<span class="tabular-nums">{{ test.run_at[:16]|replace('T', ' ') }} UTC</span>{% else %}<span class="text-muted-foreground">Not run yet</span>{% endif %}{% endcall %}
+                        {% endcall %}
+                        {% endfor %}
+                    {% endcall %}
+                {% endcall %}
+                {% else %}
+                {{ empty_state(
+                    icon='flask-conical',
+                    title='No test verifies this requirement',
+                    description='Link a test below, then record its result. The requirement stays on the unverified list until you do.',
+                    padding='py-8'
+                ) }}
+                {% endif %}
+
+                {% if can_change_model() %}
+                <div class="mt-6 grid gap-6 md:grid-cols-2">
+                    <form method="post" action="{{ url_for('architect_ui.link_requirement_test', requirement_id=element.id) }}" class="space-y-3" data-testid="link-test-form">
+                        {{ hidden_input(name='csrf_token', value=csrf_token()) }}
+                        <h3 class="text-sm font-semibold">Link a test</h3>
+                        {% call form_group(id='verify-test-id', label='An existing test') %}
+                            {% call native_select(id='verify-test-id', name='test_id', class='w-full') %}
+                                <option value="">Choose a test</option>
+                                {% for candidate in verification.candidates %}<option value="{{ candidate.id }}">{{ candidate.name }}</option>{% endfor %}
+                            {% endcall %}
+                        {% endcall %}
+                        {{ form_field(id='verify-new-test', name='new_test_name', label='Or name a new test', placeholder='e.g. test_checkout_totals') }}
+                        {{ button(text='Link test', type='submit', icon='link', testid='link-test-submit') }}
+                    </form>
+                    {% if verification.tests %}
+                    <form method="post" action="{{ url_for('architect_ui.record_requirement_test_result', requirement_id=element.id) }}" class="space-y-3" data-testid="record-result-form">
+                        {{ hidden_input(name='csrf_token', value=csrf_token()) }}
+                        <h3 class="text-sm font-semibold">Record a result</h3>
+                        {% call form_group(id='result-test-id', label='Test') %}
+                            {% call native_select(id='result-test-id', name='test_id', class='w-full') %}
+                                {% for test in verification.tests %}<option value="{{ test.id }}">{{ test.name }}</option>{% endfor %}
+                            {% endcall %}
+                        {% endcall %}
+                        {% call form_group(id='result-value', label='Result') %}
+                            {% call native_select(id='result-value', name='result', class='w-full') %}
+                                <option value="passed">Passed</option>
+                                <option value="failed">Failed</option>
+                            {% endcall %}
+                        {% endcall %}
+                        {{ form_field(id='result-commit', name='commit', label='Commit', placeholder='e.g. 9fceb02') }}
+                        {{ button(text='Record result', type='submit', icon='check', testid='record-result-submit') }}
+                    </form>
+                    {% endif %}
+                </div>
+                {% endif %}
+            {% endcall %}
+        {% endcall %}
+        </div>
+        {% endif %}
+
         {% if impact_summary and impact_summary.total_affected > 0 %}
         {% call card() %}
             {% call card_header() %}
