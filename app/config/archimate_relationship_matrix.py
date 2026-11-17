@@ -1455,6 +1455,11 @@ for _src in _REALIZING_SOURCES:
 _types = VALID_RELATIONSHIPS.setdefault(("Artifact", "ApplicationComponent"), [])
 if "realization" not in _types:
     _types.append("realization")
+# An artifact realizes a requirement (ArchiMate 3.2 section 6.4: structure elements realize
+# requirements). A test is recorded as an Artifact, so this is the pair a "verifies" link uses.
+_types = VALID_RELATIONSHIPS.setdefault(("Artifact", "Requirement"), [])
+if "realization" not in _types:
+    _types.append("realization")
 _REALIZATION_EXEMPT = frozenset(
     [(_s, _c) for _s in _REALIZING_SOURCES for _c in _REALIZED_COMPONENTS]
     + [("Artifact", "ApplicationComponent")]
