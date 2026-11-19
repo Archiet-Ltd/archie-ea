@@ -145,3 +145,27 @@ def test_moves_that_lead_back_end_on_a_page_that_opens_in_the_link_rewrite_and_t
         with app.test_request_context("/a"), patch("app.release_waves.hook.render_template", return_value="page"):
             reply = enforce()
             assert reply.status_code == 200 and reply.get_data(as_text=True) == "page"
+
+
+def test_every_move_in_the_map_leads_to_an_address_a_route_answers():
+    """Nothing may point at a route that does not exist (lead ruling 2026-11-04): a move whose destination has
+    no route waits in the plan until the page is built. The map's own keys are every route rule, with
+    parameters written <x>, so they are what a destination is checked against."""
+    import json
+    import re
+    from pathlib import Path
+
+    rules = json.loads(Path("app/release_waves/wave_map.json").read_text(encoding="utf8"))["rules"]
+    served = [key.strip("/").split("/") for key in rules
+              if not key.startswith("endpoint:") and any(seg != "<x>" for seg in key.strip("/").split("/"))]
+
+    def answered(address):
+        path = address.split(" (")[0].split("?")[0]
+        if not path.startswith("/"):
+            return False
+        want = re.sub(r"<[^>]*>", "<x>", path).strip("/").split("/")
+        return any(len(have) == len(want) and all(h == w or h == "<x>" for h, w in zip(have, want))
+                   for have in served)
+
+    dangling = sorted(f"{key} -> {entry[3]}" for key, entry in rules.items() if entry[3] and not answered(entry[3]))
+    assert dangling == [], "moves to addresses no route answers:\n" + "\n".join(dangling)
