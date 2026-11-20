@@ -133,10 +133,17 @@ def index():
     tabs = [
         (LENS_LABELS[name], _lens_url(name, **filters), name == lens) for name in LENSES
     ]
+    footer = None
+    if board is not None:
+        from app.services import result_footer_service
+
+        footer = result_footer_service.genome_roadmap_footer(
+            org_id, plateau_count=board["plateau_total"], work_package_count=board["work_package_total"])
     return render_template(
         "genome/roadmap.html",
         board=board,
         plateaus=board["plateaus"] if board else [],
+        footer=footer,
         error=error,
         lens=lens,
         tabs=tabs,
