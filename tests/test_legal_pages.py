@@ -138,8 +138,10 @@ def test_privacy_page_names_every_ai_provider_country_and_the_missing_agreement(
     html = response.get_data(as_text=True)
     text = _page_text(client, "/privacy")
     assert 'id="sub-processors"' in html and 'id="ai-features"' in html
-    for name in ("OpenRouter", "NVIDIA", "DeepSeek", "United States", "People's Republic of China"):
+    for name in ("OpenRouter", "NVIDIA", "United States"):
         assert name in text, name
+    for name in ("DeepSeek", "People's Republic of China"):
+        assert name not in text, name
     assert "no data processing agreement" in text.lower()
     assert "train" in text
     assert "No data from your organisation's model is sent to a third party" not in text
@@ -154,6 +156,7 @@ def test_data_agreement_no_longer_promises_a_safeguard_for_ai_providers(flag_on)
     assert "Each sub-processor is bound by written terms" not in text
     assert "on request" not in text.split("6. Sub-processors")[1].split("7.")[0].split("AI model providers are named")[0]
     assert "This does not apply to the AI features" in text
+    assert "People's Republic of China" not in text
     assert 'href="/privacy#sub-processors"' in client.get("/data-processing-agreement").get_data(as_text=True)
 
 
