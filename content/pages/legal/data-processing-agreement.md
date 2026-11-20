@@ -95,9 +95,8 @@ Clauses.
 
 **This does not apply to the AI features.** When your users use them, content that can include
 personal data is sent to the AI model providers in the [sub-processor list](/privacy#sub-processors),
-in the United States and the People's Republic of China, without an adequacy regulation or a
-safeguard of the kind above. If you do not want that, do not use the AI features with personal data,
-or ask an administrator to turn them off.
+in the United States, without an adequacy regulation or a safeguard of the kind above. If you do not
+want that, do not use the AI features with personal data, or ask an administrator to turn them off.
 
 ## 8. Helping you meet your obligations
 
