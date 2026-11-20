@@ -78,16 +78,19 @@ def test_a_buyer_finds_which_ai_providers_get_their_content(page, legal_server):
     agreement = page.locator("article.public-page-content")
     expect(agreement).to_contain_text("This does not apply to the AI features")
     expect(agreement).not_to_contain_text("Each sub-processor is bound by written terms")
+    expect(agreement).not_to_contain_text("People's Republic of China")
 
     agreement.get_by_role("link", name="sub-processor list").first.click()
     page.wait_for_url(legal_server + "/privacy#sub-processors", timeout=PAGE_TIMEOUT)
     heading = page.locator("h2#sub-processors")
     expect(heading).to_be_visible()
     rows = heading.locator("xpath=following-sibling::table[1]//tbody/tr")
-    assert rows.count() == 3
+    assert rows.count() == 2
     table = rows.first.locator("xpath=ancestor::table").inner_text()
-    for needle in ("OpenRouter", "NVIDIA", "DeepSeek", "United States", "People's Republic of China"):
+    for needle in ("OpenRouter", "NVIDIA", "United States"):
         assert needle in table, needle
+    for needle in ("DeepSeek", "People's Republic of China"):
+        assert needle not in table, needle
     privacy = page.locator("article.public-page-content").inner_text().lower()
     assert "no data processing agreement" in privacy
     assert "train" in privacy
