@@ -64,9 +64,7 @@ is sent. Names are not.
 
 On the hosted service the providers are OpenRouter, which passes the request on to the company that
 runs the chosen model, and NVIDIA. Both process data in the United States, and the companies behind
-the models OpenRouter routes to may process it in other countries. Until we finish moving off it,
-the AI chat also still uses DeepSeek, which processes and stores data in the People's Republic of
-China.
+the models OpenRouter routes to may process it in other countries.
 
 These are free services. We have no data processing agreement with any of these providers, and we
 cannot promise what they do with what they receive. Their terms may let them keep prompts and use
@@ -87,11 +85,10 @@ providers are listed on request through [contact](/contact).
 |---|---|---|
 | OpenRouter, and the model companies it routes to | United States, and the countries where the chosen model company runs | None. Prompts may be kept and used for training |
 | NVIDIA | United States | None. Prompts may be kept and used for training |
-| DeepSeek (Hangzhou DeepSeek Artificial Intelligence Co., Ltd.), until the AI chat moves off it | People's Republic of China | None. Prompts may be kept and used for training |
 
-All three receive the question and the parts of your organisation's model needed to answer it.
+Both receive the question and the parts of your organisation's model needed to answer it.
 
-Last updated 24 October 2026.
+Last updated 20 November 2026.
 
 ## If you self-host
 

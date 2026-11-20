@@ -65,7 +65,7 @@ _MERGE_SOURCES = (
             'SELECT count(*) FROM "roadmap_gaps" WHERE retired_into_id IS NULL'
         ),
         "insert_sql": (
-            "WITH inserted AS ("
+            "WITH inserted AS ("  # nosec B608 - query built from module constants with bound params, no user input
             "INSERT INTO gaps (name, description, gap_type, severity, priority, "
             "resolution_status, current_state_ref, target_state_ref, created_at, "
             "updated_at, context, auto_generated, gap_kind, organization_id, "
@@ -85,10 +85,10 @@ _MERGE_SOURCES = (
             "COALESCE(s.created_at, now()) AS created_at, "
             "COALESCE(s.updated_at, s.created_at, now()) AS updated_at, "
             "'architecture', false, 'capability_shortfall', "
-            + ROADMAP_GAP_OWNER_SQL + ", "
+            + ROADMAP_GAP_OWNER_SQL + ", "  # nosec B608 - query built from module constants with bound params, no user input
             "CAST(:source_table_val AS varchar), s.id "
             'FROM "roadmap_gaps" s '
-            + ROADMAP_GAP_OWNER_JOINS + " "
+            + ROADMAP_GAP_OWNER_JOINS + " "  # nosec B608 - query built from module constants with bound params, no user input
             "WHERE s.retired_into_id IS NULL "
             "AND NOT EXISTS ("
             "SELECT 1 FROM gaps g WHERE g.source_table = :source_table AND g.source_id = s.id"
