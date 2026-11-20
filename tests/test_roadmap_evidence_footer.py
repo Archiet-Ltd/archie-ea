@@ -10,8 +10,6 @@ The footer on both pages must be driven by this organisation's real recorded
 plateaus, work packages and gaps -- never placeholder text.
 """
 
-import re
-
 import pytest
 
 pytestmark = pytest.mark.usefixtures("db_session")
@@ -47,9 +45,10 @@ def _seed(db_session, org, *, plateaus=2, work_packages=3, gaps=10):
 
 
 def _footer_section(html, testid):
-    """The markup inside the named ``data-testid`` container, or '' if absent."""
-    m = re.search(r'data-testid="%s"[^>]*>(.*?)</div>\s*(?:</div>\s*)*$' % re.escape(testid), html, re.S)
-    # Looser: grab from the testid to the next sibling top-level close; good enough to assert presence/absence.
+    """The markup from the named ``data-testid`` marker onward, or '' if absent.
+
+    Good enough to assert presence/absence of nested testids and text within it; not a real
+    HTML-boundary parse."""
     start = html.find('data-testid="%s"' % testid)
     if start == -1:
         return ""
