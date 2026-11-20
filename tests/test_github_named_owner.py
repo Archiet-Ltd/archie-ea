@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import json
+import uuid
+from datetime import datetime, timezone
 
 import pytest
 
@@ -78,6 +80,55 @@ def test_a_member_match_wins_over_the_named_person(db_session, make_org):
     assert github.apply_commit_history(org.id, element, component, summary) is True
 
     assert named(db_session, component) == [(None, ada.id, "github_connector")]
+
+
+def test_a_members_secondary_verified_email_matches_them_by_their_github_handle(db_session, make_org):
+    """A code owner named only by GitHub handle (``@anioko``, not an e-mail) is matched to an
+    organisation member whose commits all use an e-mail that is not that member's primary
+    org e-mail, when that other e-mail was verified on their account by linking a sign-in
+    provider (Continue with Google/Microsoft). Before the fix this names nobody: the commit
+    e-mail matches no ``User.email``, so the account looks like it belongs to no one here."""
+    from app.connectors import github
+    from app.models.sign_in_identity import SignInIdentity
+
+    org = make_org("gh-named-secondary-email")
+    ada = make_user(db_session, org, "Ada", "Obi")
+    secondary_email = f"ada.personal-{uuid.uuid4().hex[:8]}@example.net"
+    now = datetime.now(timezone.utc)
+    db_session.add(SignInIdentity(
+        user_id=ada.id, provider="google", issuer="https://accounts.google.com",
+        subject="g-" + uuid.uuid4().hex, email_at_link=secondary_email, created_at=now, last_used_at=now,
+    ))
+    db_session.flush()
+    element, component = make_application(db_session, org)
+    with_code_owners(element, ["@ada-obi"])
+    summary = github.summarise_commits(org.id, REPOSITORY, commits_by(("ada-obi", secondary_email, 5)))
+
+    assert github.apply_commit_history(org.id, element, component, summary) is True
+
+    assert named(db_session, component) == [(None, ada.id, "github_connector")]
+
+
+def test_a_members_secondary_verified_email_matches_them_when_codeowners_names_an_email(db_session, make_org):
+    """CODEOWNERS can name a person by e-mail address directly (not a GitHub handle). That e-mail
+    is matched to a member by their primary org e-mail or by any additional e-mail verified on
+    their account via a linked sign-in provider — not primary e-mail alone."""
+    from app.connectors import github
+    from app.models.sign_in_identity import SignInIdentity
+
+    org = make_org("gh-codeowner-email-secondary")
+    ada = make_user(db_session, org, "Ada", "Obi")
+    secondary_email = f"ada.personal-{uuid.uuid4().hex[:8]}@example.net"
+    now = datetime.now(timezone.utc)
+    db_session.add(SignInIdentity(
+        user_id=ada.id, provider="microsoft", issuer="https://login.microsoftonline.com/common/v2.0",
+        subject="m-" + uuid.uuid4().hex, email_at_link=secondary_email, created_at=now, last_used_at=now,
+    ))
+    db_session.flush()
+
+    match = github._person_in_org(org.id, [secondary_email])
+
+    assert match is not None and match.id == ada.id
 
 
 def test_one_code_owner_wins_over_a_commit_leader(db_session, make_org):
