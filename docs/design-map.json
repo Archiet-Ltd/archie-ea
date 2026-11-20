@@ -1981,6 +1981,7 @@
    "components": [
     "alert",
     "badge",
+    "board",
     "breadcrumb",
     "button",
     "card",
@@ -1988,10 +1989,10 @@
     "page-header",
     "page-shell",
     "progress",
-    "toggle-group",
+    "provenance",
     "select",
     "sheet",
-    "board"
+    "toggle-group"
    ],
    "confidence": "high",
    "controls": {

@@ -81,7 +81,7 @@
         {% call card_title(class='tabular-nums') %}<span data-testid="rdm-recorded-gaps" x-text="gapsLoading ? '—' : gapsError ? '!' : (recordedGaps === null ? '—' : recordedGaps)">{{ recorded_gaps }}</span>{% endcall %}
       {% endcall %}
       {% call card_footer(direction='col') %}
-        <p class="text-sm text-muted-foreground" data-testid="rdm-gap-signals">Capability Gaps Detected: <span x-text="signalCount"></span> signals from capability coverage, not yet recorded.</p>
+        <p class="text-sm text-muted-foreground" data-testid="rdm-gap-signals">Capability coverage signals (not recorded as gaps): <span x-text="signalCount"></span>. A different count from the recorded gaps above — see "Capability gap signals" below.</p>
       {% endcall %}
     {% endcall %}
     {% call card() %}

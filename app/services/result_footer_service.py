@@ -736,17 +736,16 @@ def plateau_footer(plateau, now: Optional[datetime] = None) -> Dict[str, Any]:
     return build_footer(facts, now)
 
 
-def roadmap_summary_footer(organization_id: int, capability_count: int, domain_count: int,
-                           plateau_count: Optional[int] = None, work_package_count: Optional[int] = None,
-                           gap_count: Optional[int] = None, now: Optional[datetime] = None) -> Dict[str, Any]:
-    """Footer for the roadmap's headline counts. The capability and domain counts are the ones the cards show
-    (passed in, so footer and card cannot disagree); gaps, plateaus and work packages are counted for this
-    organisation. Each is dated by the newest record behind it. When plateau_count or work_package_count are
-    passed in, they are used directly so the footer and the tiles cannot disagree (one count per figure)."""
+def _roadmap_core_facts(organization_id: int, plateau_count: Optional[int] = None,
+                        work_package_count: Optional[int] = None, gap_count: Optional[int] = None) -> List[Dict[str, Any]]:
+    """The Gaps, Plateaus and Work packages facts every roadmap footer carries: one count and one
+    newest-date query per concept. Shared by the capability roadmap's footer and the transformation
+    roadmap's (``/genome/roadmap/``) footer so the two pages' evidence lines are built from the same
+    three queries rather than two copies of them. When a count is passed in it is used directly, so the
+    footer and the page's own tiles cannot disagree."""
     from app import db
     from app.models.implementation_migration import GAP_KIND_PLATEAU_TRANSITION, Gap, Plateau
     from app.services.gap_register_service import count_gaps
-    from app.models.unified_capability import BusinessDomain, UnifiedCapability
     from app.models.unified_work_package import UnifiedWorkPackage
 
     def named(label, count, subject, endpoint, newest):
@@ -768,16 +767,46 @@ def roadmap_summary_footer(organization_id: int, capability_count: int, domain_c
     gaps_newest = db.session.execute(db.select(db.func.max(Gap.updated_at)).where(
         Gap.organization_id == organization_id, Gap.gap_kind != GAP_KIND_PLATEAU_TRANSITION)).scalar()
     gap_count_fact = named("Gaps", count_gaps(organization_id) if gap_count is None else gap_count, "Gaps", "enterprise.gap_analysis", gaps_newest)
+    return [
+        gap_count_fact,
+        counted(Plateau, "Plateaus", "Plateaus", "implementation_planning.plateaus_list", count=plateau_count),
+        counted(UnifiedWorkPackage, "Work packages", "Work packages", "implementation_planning.work_packages_list",
+                count=work_package_count),
+    ]
+
+
+def roadmap_summary_footer(organization_id: int, capability_count: int, domain_count: int,
+                           plateau_count: Optional[int] = None, work_package_count: Optional[int] = None,
+                           gap_count: Optional[int] = None, now: Optional[datetime] = None) -> Dict[str, Any]:
+    """Footer for the capability roadmap's headline counts. The capability and domain counts are the ones
+    the cards show (passed in, so footer and card cannot disagree); gaps, plateaus and work packages come
+    from ``_roadmap_core_facts``, shared with the transformation roadmap's footer."""
+    from app import db
+    from app.models.unified_capability import BusinessDomain, UnifiedCapability
+
+    def named(label, count, subject, endpoint, newest):
+        return fact("%s: %s" % (label, count if count else "none recorded"),
+                    href=page_link(endpoint) if count else None, source_kind="derived", subject=subject,
+                    as_of=newest, missing=not count)
+
     capabilities_newest = db.session.execute(db.select(db.func.max(UnifiedCapability.updated_at))).scalar()
     domains_newest = db.session.execute(db.select(db.func.max(BusinessDomain.updated_at))).scalar()
     return build_footer([
         named("Capabilities", capability_count, "Capabilities", "capability_map.index", capabilities_newest),
         named("Domains", domain_count, "Domains", "capability_map.index", domains_newest),
-        gap_count_fact,
-        counted(Plateau, "Plateaus", "Plateaus", "implementation_planning.plateaus_list", count=plateau_count),
-        counted(UnifiedWorkPackage, "Work packages", "Work packages", "implementation_planning.work_packages_list",
-                count=work_package_count),
-    ], now)
+    ] + _roadmap_core_facts(organization_id, plateau_count=plateau_count,
+                           work_package_count=work_package_count, gap_count=gap_count), now)
+
+
+def genome_roadmap_footer(organization_id: int, plateau_count: Optional[int] = None,
+                          work_package_count: Optional[int] = None, gap_count: Optional[int] = None,
+                          now: Optional[datetime] = None) -> Dict[str, Any]:
+    """Footer for the transformation roadmap (``/genome/roadmap/``): the same Gaps, Plateaus and Work
+    packages facts the capability roadmap's footer shows, built from this organisation's real recorded
+    data rather than the board's current lens or filter, so the evidence line does not change as a reader
+    switches tabs."""
+    return build_footer(_roadmap_core_facts(organization_id, plateau_count=plateau_count,
+                                            work_package_count=work_package_count, gap_count=gap_count), now)
 
 
 def plateaus_for(organization_id: int):

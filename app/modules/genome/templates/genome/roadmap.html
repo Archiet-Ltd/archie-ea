@@ -6,6 +6,7 @@
 {% from 'components/card.html' import card, card_header, card_title, card_description, card_content %}
 {% from 'components/badge.html' import badge %}
 {% from 'components/button.html' import button %}
+{% from 'components/provenance.html' import result_footer %}
 {% block title %}Roadmap{% endblock %}
 
 {% block content %}
@@ -29,6 +30,10 @@
         <span class="font-medium text-foreground">{{ board.lens_label }} view.</span> {{ board.lens_help }}
         {% if board.filtered and clear_url %}<a href="{{ clear_url }}" class="text-primary hover:underline" data-testid="roadmap-clear-filter">Show the whole enterprise</a>{% endif %}
     </p>
+
+    {% if footer %}
+    <div data-testid="roadmap-summary-footer">{{ result_footer(footer) }}</div>
+    {% endif %}
 
     {% if board.card_count %}
     <p class="text-sm text-muted-foreground" data-testid="roadmap-totals">
