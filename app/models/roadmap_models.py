@@ -412,7 +412,7 @@ class RoadmapGap(db.Model):
         if organization_id is None:
             return cls.query.filter(db.false())
         owned = db.text(
-            "SELECT s.id FROM roadmap_gaps s " + ROADMAP_GAP_OWNER_JOINS
+            "SELECT s.id FROM roadmap_gaps s " + ROADMAP_GAP_OWNER_JOINS  # nosec B608 - query built from module constants with bound params, no user input
             + " WHERE " + ROADMAP_GAP_OWNER_SQL + " = :organization_id"
         ).bindparams(organization_id=organization_id)
         return cls.query.filter(cls.id.in_(owned))
