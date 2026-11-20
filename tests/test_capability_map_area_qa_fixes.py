@@ -89,7 +89,7 @@ def test_gap_surfaces_use_distinct_labels():
     health = (root / "strategic" / "capability_health.html").read_text(encoding="utf-8")
     register = (root / "enterprise" / "gap_analysis.html").read_text(encoding="utf-8")
 
-    assert "Capability Gaps Detected" in roadmap
+    assert "Capability coverage signals" in roadmap
     # The signal count is shown once, on the roadmap; capability health shows the recorded gaps only.
     assert "Capability Gap Signals" not in health
     assert "Recorded gaps" in health

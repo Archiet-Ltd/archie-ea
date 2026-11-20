@@ -45,7 +45,7 @@ def test_business_architect_creates_gap_plateau_and_work_package(browser, live_s
         expect(page.locator("h1")).to_contain_text("Enterprise Capability Roadmap")
 
         # The metrics row shows zeros initially
-        expect(page.locator("text=Capability Gaps Detected")).to_be_visible(timeout=PAGE_TIMEOUT)
+        expect(page.locator("text=Capability coverage signals")).to_be_visible(timeout=PAGE_TIMEOUT)
 
         # Create a plateau via API
         status, plateau = api(page, "POST", "/capability-map/api/roadmap/plateaus",
