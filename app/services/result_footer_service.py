@@ -278,7 +278,7 @@ def render_footer(footer: Dict[str, Any]) -> str:
     from flask import render_template_string
     from markupsafe import Markup
 
-    return Markup(render_template_string(
+    return Markup(render_template_string(  # nosec B704 - static autoescaped template literal, no user data
         "{% from 'components/provenance.html' import result_footer %}{{ result_footer(footer) }}", footer=footer))
 
 
