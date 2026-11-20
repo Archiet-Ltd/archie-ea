@@ -24,15 +24,29 @@ that every rule names; otherwise none. The owning team is the one team that has
 admin access to the repository; zero or several teams means no owning team. Both
 are recorded as facts. A person is written to the one owner record
 (``ApplicationOwner``, primary) only when exactly one code owner is an e-mail
-address that belongs to exactly one user of the organisation; a team or a
-GitHub handle is never turned into a person. A primary owner a person recorded
-is never overwritten: the connector queues an ``owner_proposal`` in the approval
-queue instead. When no code owner names a person, the commits of the last 90 days are counted
-by author e-mail: an author whose e-mail belongs to exactly one user of the
-organisation is a candidate, and a candidate with more than half of the members'
-commits becomes the primary owner, with the count and the commit range kept as the
-source. Otherwise the candidates (up to three) are kept as suggestions for a person
-to choose from. Unowned repositories stay unowned.
+address that belongs to exactly one user of the organisation; a team is never
+turned into a person. "Belongs to" means the user's primary e-mail
+(``User.email``) or any additional e-mail verified when they linked a sign-in
+provider (``SignInIdentity.email_at_link`` — see ``_members_by_email``), not
+primary e-mail alone, since a person's commits often carry an e-mail that
+differs from the one their organisation account uses. A GitHub handle named
+as code owner is turned into a person the same way, through that handle's own
+commits (``handle_owner``): the handle becomes a member when the e-mail on its
+commits in the window "belongs to" exactly one member by that same rule.
+A primary owner a person recorded is never overwritten: the connector queues
+an ``owner_proposal`` in the approval queue instead. When no code owner names
+a person, the commits of the last 90 days are counted by author e-mail: an
+author whose e-mail belongs to exactly one user of the organisation (by the
+same primary-or-verified rule) is a candidate, and a candidate with more than
+half of the members' commits becomes the primary owner, with the count and
+the commit range kept as the source. Otherwise the candidates (up to three)
+are kept as suggestions for a person to choose from. Unowned repositories
+stay unowned.
+
+A connected GitHub login (linking a member's account directly to the GitHub
+account that makes the commits, rather than inferring it from commit
+e-mails) is not something this codebase currently records anywhere — see the
+note on ``_members_by_email``.
 
 Unmatched repositories become proposals in the approval queue (one per
 repository, never repeated once decided), each with a classification decided by
@@ -276,17 +290,48 @@ def _is_bot(item: Any) -> bool:
             or str(account.get("type") or "").strip().lower() == "bot")
 
 
+def _members_by_email(org_id, emails) -> Dict[str, List[int]]:
+    """Every member of this organisation known by one of these e-mails: by the member's primary
+    e-mail (``User.email``) or by any additional e-mail verified when they linked a sign-in
+    provider (``SignInIdentity.email_at_link`` — recorded for Google/Microsoft "Continue with"
+    sign-in, not git-specific, but it is the one place this codebase already keeps a verified
+    e-mail of a member beyond their primary one). Returns e-mail (lowercase) -> member ids;
+    an e-mail naming more than one member is still returned, so a caller can tell an ambiguous
+    match from a clean one rather than one being silently preferred."""
+    from app.models.sign_in_identity import SignInIdentity
+    from app.models.user import User
+
+    wanted = {str(e or "").strip().lower() for e in emails}
+    wanted.discard("")
+    if not wanted:
+        return {}
+    members: Dict[str, List[int]] = {}
+    for user in db.session.execute(
+        db.select(User).where(db.func.lower(User.email).in_(wanted)).where(User.organization_id == org_id)
+    ).scalars():
+        members.setdefault(user.email.lower(), []).append(user.id)
+    for user_id, email in db.session.execute(
+        db.select(SignInIdentity.user_id, SignInIdentity.email_at_link)
+        .join(User, User.id == SignInIdentity.user_id)
+        .where(db.func.lower(SignInIdentity.email_at_link).in_(wanted))
+        .where(User.organization_id == org_id)
+    ).all():
+        ids = members.setdefault(email.lower(), [])
+        if user_id not in ids:
+            ids.append(user_id)
+    return members
+
+
 def summarise_commits(org_id, repository: str, commits: List[dict]) -> Dict[str, Any]:
     """Who of this organisation made the recent commits of a repository.
 
     ``commits`` is a page of GitHub commit records. An author counts only when the e-mail
-    on the commit belongs to exactly one user of the organisation; a handle, a team or an
-    address nobody here has is never turned into a person. Returns the repository, the
-    commit range read, the number of commits made by members and the candidates, most
-    commits first, as ``{"user_id", "commits"}``.
+    on the commit belongs to exactly one user of the organisation — by their primary e-mail
+    or by any additional e-mail verified when they linked a sign-in provider (see
+    ``_members_by_email``); a handle, a team or an address nobody here has is never turned
+    into a person. Returns the repository, the commit range read, the number of commits
+    made by members and the candidates, most commits first, as ``{"user_id", "commits"}``.
     """
-    from app.models.user import User
-
     by_email: Dict[str, int] = {}
     by_login: Dict[str, Dict[str, int]] = {}
     login_shown: Dict[str, str] = {}
@@ -313,12 +358,7 @@ def summarise_commits(org_id, repository: str, commits: List[dict]) -> Dict[str,
             stamps.append((str(author["date"]), str(item["sha"])[:7]))
         if email:
             by_email[email] = by_email.get(email, 0) + 1
-    members: Dict[str, List[int]] = {}
-    if by_email:
-        for user in db.session.execute(
-            db.select(User).where(db.func.lower(User.email).in_(list(by_email))).where(User.organization_id == org_id)
-        ).scalars():
-            members.setdefault(user.email.lower(), []).append(user.id)
+    members = _members_by_email(org_id, by_email)
     counts: Dict[int, int] = {}
     for email, ids in members.items():
         if len(ids) == 1:
@@ -751,17 +791,14 @@ def _element_for_repository(org_id, repository, path=None):
 
 
 def _person_in_org(org_id, owners: List[str]):
-    """The one user of the organisation named by an e-mail code owner, else None."""
+    """The one user of the organisation named by an e-mail code owner — by their primary e-mail
+    or by any additional e-mail verified when they linked a sign-in provider (see
+    ``_members_by_email``) — else None."""
     from app.models.user import User
 
     emails = {o.lower() for o in owners or [] if not o.startswith("@") and "@" in o}
-    found = {}
-    for email in emails:
-        for user in db.session.execute(
-            db.select(User).where(db.func.lower(User.email) == email).where(User.organization_id == org_id)
-        ).scalars():
-            found[user.id] = user
-    return next(iter(found.values())) if len(found) == 1 else None
+    found = {uid for ids in _members_by_email(org_id, emails).values() for uid in ids}
+    return db.session.get(User, next(iter(found))) if len(found) == 1 else None
 
 
 def proposal_blocker(approval) -> Optional[str]:
