@@ -6,9 +6,6 @@ expiring organisation token. The token is issued by a client-credentials
 grant to a service user; connector tokens (mcp:*) never open these routes,
 and api:* tokens never open /mcp.
 
-Everything here fails on main, where no /api/v1 route accepts a token and
-the token endpoint has no client-credentials grant.
-
 Scope model: a token carries one namespace. ``mcp:*`` scopes belong to the
 connector; ``api:*`` scopes belong to the REST API. A token with any scope
 from the other family is refused on each. The organisation always comes
@@ -333,6 +330,55 @@ class TestFirstFamilyRouteAccess:
         status, body = _api_get(app, f"/api/v1/elements/{el_b.id}", token_b)
         assert status == 200, body
         assert body["data"]["id"] == el_b.id
+
+    def test_real_client_credentials_grant_org_isolation(self, app, client, db_session, make_org):
+        """REQ-ENT-ORGSCOPE-01: two independently-registered service clients,
+        each obtaining its api:read token through the real client-credentials
+        grant (not the direct-insert ``_mint_api_token`` shortcut the other
+        tests in this class use), never see each other's elements. The
+        existing cross-org checks above prove the organisation predicate is
+        correct against a synthetic token; this proves the SAME holds for a
+        token exactly as an external client would obtain one end to end."""
+        org_a = make_org("e2e-org-a")
+        org_b = make_org("e2e-org-b")
+        el_a = _make_element(db_session, org_a.id, "e2e-alpha")
+        el_b = _make_element(db_session, org_b.id, "e2e-bravo")
+        svc_a = _make_service_user(db_session, org_a, "e2e-a@example.com")
+        svc_b = _make_service_user(db_session, org_b, "e2e-b@example.com")
+        oc_a = _register_service_client(db_session, svc_a)
+        oc_b = _register_service_client(db_session, svc_b)
+
+        def _grant(oc):
+            status, body = _token_exchange(client, {
+                "grant_type": "client_credentials",
+                "client_id": oc.client_id,
+                "client_secret": SERVICE_CLIENT_SECRET,
+                "scope": API_SCOPE,
+                "resource": _api_resource_value(app),
+            })
+            assert status == 200, body
+            return body["access_token"]
+
+        token_a = _grant(oc_a)
+        token_b = _grant(oc_b)
+
+        status, body = _api_get(app, "/api/v1/elements", token_a)
+        assert status == 200, body
+        names = _element_names(body)
+        assert "E-e2e-alpha" in names
+        assert "E-e2e-bravo" not in names, "org A's real-grant token saw org B's element"
+
+        status, body = _api_get(app, f"/api/v1/elements/{el_b.id}", token_a)
+        assert status == 404, body
+
+        status, body = _api_get(app, "/api/v1/elements", token_b)
+        assert status == 200, body
+        names = _element_names(body)
+        assert "E-e2e-bravo" in names
+        assert "E-e2e-alpha" not in names, "org B's real-grant token saw org A's element"
+
+        status, body = _api_get(app, f"/api/v1/elements/{el_a.id}", token_b)
+        assert status == 404, body
 
     def test_mcp_read_token_refused_on_rest_route(self, app, client, db_session, make_org):
         _org_a, _org_b, el_a, _el_b, _token = self._seed(db_session, make_org)
