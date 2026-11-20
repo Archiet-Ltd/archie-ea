@@ -293,6 +293,16 @@ def test_motivation_repository_shell_is_accessible_and_responsive(page, live_ser
     assert state["overflow"] == 0, "Motivation repository overflows by %dpx at %dpx" % (
         state["overflow"], page.viewport_size["width"]
     )
+    # REQ 2763 / WP 2895: the orphaned-stakeholders card only appears on the
+    # Motivation tab, and shows a measured count rather than being stuck on
+    # its loading skeleton.
+    card = page.locator('[data-testid="orphaned-stakeholders-card"]')
+    assert card.count() == 1
+    page.wait_for_function(
+        "document.querySelector('[data-testid=\"orphaned-stakeholders-card\"] p.text-2xl')"
+        ".textContent.trim() !== ''",
+        timeout=PAGE_TIMEOUT,
+    )
     errors = [e for e in (page.console_errors + page.page_errors) if "favicon" not in e.lower()]
     assert not errors, "Motivation repository raised JavaScript errors: %s" % errors[:5]
 
