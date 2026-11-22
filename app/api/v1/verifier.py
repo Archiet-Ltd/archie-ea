@@ -89,7 +89,7 @@ def _requirement_json(element):
 def post_requirement():
     """ENT-V-1: store a verifier-posted requirement as a Proposed Requirement in
     org 68, awaiting a person's confirmation."""
-    from app.models.models import ArchiMateElement
+    from app.services.archimate_backbone import create_backbone_element
 
     data = request.get_json(silent=True) or {}
     sentence = (data.get("ears_sentence") or data.get("sentence") or "").strip()
@@ -99,38 +99,34 @@ def post_requirement():
             {"name": "a requirement name or EARS sentence is required"}
         )
 
-    # Keep the structured EARS parts on the element's properties for the page.
-    properties = {
-        "ears_sentence": sentence or None,
-        "ears_pattern": data.get("pattern"),
-        "stakeholder": data.get("stakeholder"),
-        "screen": data.get("screen"),
-        "test": data.get("test"),
-        "source_element": data.get("source_element"),
-    }
+    # Capture the structured EARS parts in the description (readable text) rather
+    # than an untyped properties blob.
+    description_parts = [sentence or data.get("description") or name]
+    for label, key in (
+        ("Pattern", "pattern"),
+        ("Stakeholder", "stakeholder"),
+        ("Screen", "screen"),
+        ("Test", "test"),
+        ("Source element", "source_element"),
+    ):
+        value = data.get(key)
+        if value:
+            description_parts.append(f"{label}: {value}")
 
-    element = ArchiMateElement(
-        name=name[:500],
-        type="Requirement",
+    # Reuse the one canonical element writer (archimate_backbone) so the
+    # organisation, layer and provenance are set in one place, then set the
+    # ENT-V-specific typed columns on the returned element.
+    element = create_backbone_element(
+        element_type="Requirement",
         layer="motivation",
-        description=sentence or data.get("description"),
-        status="Proposed",
-        source_kind="assistant",
-        source_ref=str(data.get("source_ref") or g.api_key.label),
-        source_label=g.api_key.label,
+        name=name[:500],
+        description="\n".join(description_parts),
+        organization_id=g.current_org_id,
     )
-    # properties is a JSON-in-Text column on this model.
-    try:
-        import json as _json
-
-        element.properties = _json.dumps({k: v for k, v in properties.items() if v is not None})
-    except Exception:  # pragma: no cover - never block a create on metadata
-        pass
-
-    # organization_id is auto-stamped to g.current_org_id (68) by the tenant
-    # before_flush listener; set it explicitly too (defence in depth).
-    element.organization_id = g.current_org_id
-    db.session.add(element)
+    element.status = "Proposed"
+    element.source_kind = "assistant"
+    element.source_ref = str(data.get("source_ref") or g.api_key.label)
+    element.source_label = g.api_key.label
     db.session.commit()
 
     logger.info("verifier posted Proposed requirement id=%s org=%s", element.id, g.current_org_id)
