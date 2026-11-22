@@ -188,3 +188,121 @@ def test_api_key_cannot_confirm(client, db_session, make_org, app):
     from app.models.models import ArchiMateElement
 
     assert db_session.get(ArchiMateElement, req_id).status == "Proposed"
+
+
+def _issue_builder(db_session, org_id):
+    return _issue(db_session, org_id, scopes="builder:claim", label="test-builder")
+
+
+def _post_requirement(client, secret, sentence="The system shall ship."):
+    r = client.post(
+        "/api/v1/verifier/requirements", json={"ears_sentence": sentence}, headers=_auth(secret)
+    )
+    return r.get_json()["data"]["id"]
+
+
+def _confirm_as_person(client, db_session, login_as, org_id, req_id):
+    import uuid
+
+    from app.models.user import User
+
+    user = User(
+        email=f"po-{uuid.uuid4().hex[:8]}@example.com",
+        first_name="Product",
+        last_name="Owner",
+        organization_id=org_id,
+        enterprise_role="viewer",
+        confirmed=True,
+    )
+    db_session.add(user)
+    db_session.commit()
+    login_as(client, user)
+    rc = client.post(f"/enterprise/requirements/{req_id}/confirm", json={"decision": "confirm"})
+    assert rc.status_code == 200, rc.get_data(as_text=True)
+
+
+def test_builder_claims_and_delivers(client, db_session, make_org, app, login_as):
+    """ENT-V-3/4: a builder claims a Confirmed requirement and reports a delivery."""
+    org = make_org("ifiok")
+    app.config["IFIOK_VERIFIER_ORG_ID"] = org.id
+    _, vsecret = _issue(db_session, org.id)
+    req_id = _post_requirement(client, vsecret)
+    _confirm_as_person(client, db_session, login_as, org.id, req_id)
+
+    _, bsecret = _issue_builder(db_session, org.id)
+    rc = client.post(
+        "/api/v1/verifier/work-packages",
+        json={"requirement_element_id": req_id},
+        headers=_auth(bsecret),
+    )
+    assert rc.status_code == 201, rc.get_data(as_text=True)
+    task_id = rc.get_json()["data"]["task_id"]
+    assert rc.get_json()["data"]["status"] == "Claimed"
+
+    rd = client.post(
+        f"/api/v1/verifier/work-packages/{task_id}/deliver",
+        json={"commit": "abc1234", "result_line": "1 passed"},
+        headers=_auth(bsecret),
+    )
+    assert rd.status_code == 200, rd.get_data(as_text=True)
+    assert rd.get_json()["data"]["status"] == "Delivered, awaiting verification"
+
+
+def test_cannot_claim_unconfirmed_requirement(client, db_session, make_org, app):
+    org = make_org("ifiok")
+    app.config["IFIOK_VERIFIER_ORG_ID"] = org.id
+    _, vsecret = _issue(db_session, org.id)
+    req_id = _post_requirement(client, vsecret)  # still Proposed
+    _, bsecret = _issue_builder(db_session, org.id)
+    rc = client.post(
+        "/api/v1/verifier/work-packages",
+        json={"requirement_element_id": req_id},
+        headers=_auth(bsecret),
+    )
+    assert rc.status_code == 409
+
+
+def test_builder_key_cannot_set_verdict(client, db_session, make_org, app):
+    """ENT-V-5: only the verifier scope may set a verdict; a builder key -> 403."""
+    org = make_org("ifiok")
+    app.config["IFIOK_VERIFIER_ORG_ID"] = org.id
+    _, bsecret = _issue_builder(db_session, org.id)
+    rc = client.post(
+        "/api/v1/verifier/verdicts",
+        json={"requirement_element_id": 1, "status": "Verified"},
+        headers=_auth(bsecret),
+    )
+    assert rc.status_code == 403
+
+
+def test_failed_verdict_reopens_task(client, db_session, make_org, app, login_as):
+    """ENT-V-6: a Failed verdict reopens the builder's task with the unmet parts."""
+    org = make_org("ifiok")
+    app.config["IFIOK_VERIFIER_ORG_ID"] = org.id
+    _, vsecret = _issue(db_session, org.id)
+    req_id = _post_requirement(client, vsecret)
+    _confirm_as_person(client, db_session, login_as, org.id, req_id)
+
+    _, bsecret = _issue_builder(db_session, org.id)
+    rc = client.post(
+        "/api/v1/verifier/work-packages",
+        json={"requirement_element_id": req_id},
+        headers=_auth(bsecret),
+    )
+    task_id = rc.get_json()["data"]["task_id"]
+    client.post(
+        f"/api/v1/verifier/work-packages/{task_id}/deliver",
+        json={"commit": "abc"},
+        headers=_auth(bsecret),
+    )
+
+    client.post(
+        "/api/v1/verifier/verdicts",
+        json={"requirement_element_id": req_id, "status": "Failed", "unmet_parts": ["criterion x"]},
+        headers=_auth(vsecret),
+    )
+    from app.models.requirement_task import RequirementTask
+
+    task = db_session.get(RequirementTask, task_id)
+    assert task.status == "Reopened, awaiting delivery"
+    assert task.unmet_parts == ["criterion x"]

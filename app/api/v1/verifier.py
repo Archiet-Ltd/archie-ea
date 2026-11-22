@@ -14,6 +14,7 @@ key's; there is deliberately no confirm route on this blueprint.
 """
 
 import logging
+from datetime import datetime
 
 from flask import Blueprint, g, request
 
@@ -31,6 +32,7 @@ logger = logging.getLogger(__name__)
 
 IFIOK_ORG_ID = 68
 VERIFIER_SCOPE = "verifier:write"
+BUILDER_SCOPE = "builder:claim"
 
 verifier_bp = Blueprint("verifier", __name__)
 
@@ -189,6 +191,21 @@ def post_verdict():
     )
     verdict.organization_id = g.current_org_id
     db.session.add(verdict)
+
+    # ENT-V-6: a Failed verdict reopens the requirement's task to its builder,
+    # with the unmet parts, so the builder sees what to fix.
+    if status == Verdict.FAILED:
+        from app.models.requirement_task import RequirementTask
+
+        task = (
+            RequirementTask.query.filter_by(requirement_element_id=element.id)
+            .order_by(RequirementTask.id.desc())
+            .first()
+        )
+        if task is not None:
+            task.status = RequirementTask.REOPENED
+            task.unmet_parts = data.get("unmet_parts")
+
     db.session.commit()
 
     logger.info(
@@ -200,4 +217,84 @@ def post_verdict():
             "requirement": _requirement_json(element),
         },
         status_code=201,
+    )
+
+
+@verifier_bp.route("/work-packages", methods=["POST"])
+@api_key_auth
+@require_scope(BUILDER_SCOPE)
+@require_verifier_org
+def claim_work_package():
+    """ENT-V-3: a builder identity claims a Confirmed requirement, creating a task
+    that shows its holder and the time claimed."""
+    from app.models.models import ArchiMateElement
+    from app.models.requirement_task import RequirementTask
+
+    data = request.get_json(silent=True) or {}
+    req_id = data.get("requirement_element_id")
+    if not req_id:
+        return validation_error_response({"requirement_element_id": "required"})
+
+    element = ArchiMateElement.query.filter_by(id=req_id, type="Requirement").first()
+    if element is None:
+        return not_found_response("Requirement")
+    if element.status != "Confirmed":
+        return error_response(
+            f"Only a Confirmed requirement can be claimed (this one is {element.status}).",
+            status_code=409,
+        )
+
+    now = datetime.utcnow()
+    task = RequirementTask(
+        requirement_element_id=element.id,
+        holder=g.api_key.label,
+        status=RequirementTask.CLAIMED,
+        claimed_at=now,
+    )
+    task.organization_id = g.current_org_id
+    db.session.add(task)
+    db.session.commit()
+    logger.info("builder %s claimed requirement %s (task %s)", g.api_key.label, element.id, task.id)
+    return success_response(
+        {
+            "task_id": task.id,
+            "requirement_element_id": element.id,
+            "holder": task.holder,
+            "status": task.status,
+            "claimed_at": task.claimed_at.isoformat() + "Z",
+        },
+        status_code=201,
+    )
+
+
+@verifier_bp.route("/work-packages/<int:task_id>/deliver", methods=["POST"])
+@api_key_auth
+@require_scope(BUILDER_SCOPE)
+@require_verifier_org
+def deliver_work_package(task_id):
+    """ENT-V-4: a builder reports a delivery; the task then shows
+    'Delivered, awaiting verification', never Done."""
+    from app.models.requirement_task import RequirementTask
+
+    task = RequirementTask.query.filter_by(id=task_id).first()
+    if task is None:
+        return not_found_response("Task")
+
+    data = request.get_json(silent=True) or {}
+    now = datetime.utcnow()
+    task.status = RequirementTask.DELIVERED
+    task.delivered_at = now
+    task.commit = data.get("commit")
+    task.files = data.get("files")
+    task.test = data.get("test")
+    task.command = data.get("command")
+    task.result_line = data.get("result_line")
+    db.session.commit()
+    logger.info("builder %s delivered task %s", g.api_key.label, task.id)
+    return success_response(
+        {
+            "task_id": task.id,
+            "status": task.status,  # "Delivered, awaiting verification"
+            "delivered_at": task.delivered_at.isoformat() + "Z",
+        }
     )
