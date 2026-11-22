@@ -783,6 +783,57 @@ def delete_compliance_violation(violation_id):
 
 
 # ============================================================================
+# REQUIREMENT CONFIRMATION (ENT-V-2)
+# ============================================================================
+
+
+@enterprise_crud_bp.route("/requirements/<int:element_id>/confirm", methods=["POST"])
+@login_required
+def confirm_requirement(element_id):
+    """ENT-V-2: a person confirms or rejects a Proposed requirement.
+
+    Sets the requirement's status to Confirmed or Rejected and records who and
+    when. This route is session-only (@login_required), so an API key can never
+    confirm (Section 36: only a person confirms a requirement). The tenant filter
+    scopes the lookup to the signed-in person's organisation, so a person can only
+    confirm requirements in their own organisation.
+    """
+    from datetime import datetime
+
+    from app.models.models import ArchiMateElement
+
+    body = request.get_json(silent=True) or request.form
+    decision = str((body.get("decision") if body else "") or "").strip().lower()
+    if decision not in ("confirm", "reject"):
+        return jsonify({"success": False, "error": "decision must be 'confirm' or 'reject'"}), 400
+
+    element = ArchiMateElement.query.filter_by(id=element_id, type="Requirement").first()
+    if element is None:
+        return jsonify({"success": False, "error": "Requirement not found"}), 404
+    if element.status != "Proposed":
+        return (
+            jsonify(
+                {
+                    "success": False,
+                    "error": f"Only a Proposed requirement can be confirmed or rejected "
+                    f"(this one is {element.status}).",
+                }
+            ),
+            409,
+        )
+
+    now = datetime.utcnow()
+    element.status = "Confirmed" if decision == "confirm" else "Rejected"
+    element.last_reviewed_date = now
+    element.reviewer_notes = f"{element.status} by user {current_user.id} at {now.isoformat()}Z"
+    db.session.commit()
+    logger.info("requirement %s %s by user %s", element.id, element.status, current_user.id)
+    return jsonify(
+        {"success": True, "data": {"id": element.id, "status": element.status}}
+    )
+
+
+# ============================================================================
 # SEARCH & REPORTING OPERATIONS
 # ============================================================================
 
