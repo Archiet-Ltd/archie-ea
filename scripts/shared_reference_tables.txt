@@ -1,3 +1,4 @@
 # Tables that are shared reference data on purpose, excluded from the protection requirement.
 # One table per line with a reason after the hash, e.g.  apqc_process  # shared catalogue, seeded only by commands
 # A line with no reason fails the unfenced-tables gate.
+verifier_api_keys  # inbound auth credential, bound to one org via an explicit organization_id column; deliberately NOT TenantMixin so a key resolves before any tenant context exists (see app/models/verifier_api_key.py and app/auth/api_key.py)

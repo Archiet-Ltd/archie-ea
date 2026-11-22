@@ -70,6 +70,28 @@ def register_cli_commands(app):
         tests = unittest.TestLoader().discover("tests")
         unittest.TextTestRunner(verbosity=2).run(tests)
 
+    @app.cli.command("issue-verifier-key")
+    def issue_verifier_key():
+        """Issue the verifier API key (ENT-V) for the Ifiok organisation.
+
+        Prints the secret EXACTLY ONCE, to the operator running this command. The
+        secret is never stored (only its SHA-256 hash) and cannot be recovered;
+        give it to the verifier over a secure channel and do not log or paste it.
+        The organisation is IFIOK_VERIFIER_ORG_ID (default 68).
+        """
+        import click
+        from flask import current_app
+
+        from app.models.verifier_api_key import VerifierApiKey
+
+        org_id = current_app.config.get("IFIOK_VERIFIER_ORG_ID", 68)
+        key, secret = VerifierApiKey.issue(organization_id=org_id, label="ifiok-verifier")
+        db.session.add(key)
+        db.session.commit()
+        click.echo(f"Issued verifier key id={key.id} org={org_id} scope='verifier:write'.")
+        click.echo("SECRET (shown once; store it securely, it cannot be recovered):")
+        click.echo(secret)
+
     @app.cli.command()
     def init_db():
         """

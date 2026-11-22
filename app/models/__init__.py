@@ -99,6 +99,9 @@ else:
     # had no chat history tables at all and /ai-chat/threads 500'd.
     from .conversation import ConversationMessageRecord, ConversationThreadRecord  # noqa
     from .external_identity_crosswalk import ExternalIdentityCrosswalk  # noqa: F401
+    from .verifier_api_key import VerifierApiKey  # noqa: F401 - verifier_api_keys (ENT-V inbound key)
+    from .verdict import Verdict  # noqa: F401 - verdicts (ENT-V-6; Entelim's test-result/verdict store)
+    from .requirement_task import RequirementTask  # noqa: F401 - requirement_tasks (ENT-V-3/4 builder claim/deliver)
     from .consulting_partner import *  # noqa
     from .capability_archimate_mapping import *  # noqa
     from .copilot_insight import *  # noqa

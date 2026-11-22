@@ -600,6 +600,18 @@ def _register_always_on_apis(app, csrf):
     app.register_blueprint(api_v1_bp)
     app.logger.info("[BLUEPRINT] API v1 registered at /api/v1")
 
+    # Verifier write-path API (ENT-V): a CSRF-exempt, API-key-authenticated
+    # blueprint. It carries no session cookie, so there is no token to ride;
+    # every route is guarded by @api_key_auth + @require_scope + @require_org and
+    # is scoped to one organisation. Justified in
+    # app/_bootstrap/csrf_coverage.py BLUEPRINT_OPT_OUT["verifier"].
+    from app.api.v1.verifier import verifier_bp
+    from app.extensions import csrf as _csrf
+
+    _csrf.exempt(verifier_bp)
+    app.register_blueprint(verifier_bp, url_prefix="/api/v1/verifier")
+    app.logger.info("[BLUEPRINT] Verifier write-path registered at /api/v1/verifier")
+
     # Bearer-token identity resolution for the MCP endpoint (flask-login
     # request_loader). Registered unconditionally — it checks MCP_ENABLED
     # itself and is a no-op while the flag is off — so the mechanism exists

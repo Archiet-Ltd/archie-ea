@@ -110,6 +110,13 @@ VIEW_OPT_OUT = {
 # justification, or it belongs in VIEW_OPT_OUT instead of here.
 BLUEPRINT_OPT_OUT = {
     "health": "Unauthenticated monitoring probes (liveness/readiness), no session to ride.",
+    "verifier": (
+        "Verifier write-path (ENT-V) — authenticated by an Authorization: Bearer "
+        "VerifierApiKey header, never a session cookie, so there is no session to "
+        "carry a CSRF token. Every route is guarded by @api_key_auth + "
+        "@require_scope('verifier:write') + @require_org and scoped to one "
+        "organisation; see app/api/v1/verifier.py and app/auth/api_key.py."
+    ),
 }
 
 
