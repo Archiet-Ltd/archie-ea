@@ -124,3 +124,67 @@ def test_verdict_flow_and_verified_flag(client, db_session, make_org, app):
     )
     assert verified.status_code == 201
     assert verified.get_json()["data"]["requirement"]["verified"] is True
+
+
+def test_person_confirms_requirement(client, db_session, make_org, app, login_as):
+    """ENT-V-2: a signed-in person flips a Proposed requirement to Confirmed."""
+    import uuid
+
+    from app.models.user import User
+
+    org = make_org("ifiok")
+    app.config["IFIOK_VERIFIER_ORG_ID"] = org.id
+    _, secret = _issue(db_session, org.id)
+
+    r = client.post(
+        "/api/v1/verifier/requirements",
+        json={"ears_sentence": "The system shall be confirmable."},
+        headers=_auth(secret),
+    )
+    req_id = r.get_json()["data"]["id"]
+
+    user = User(
+        email=f"po-{uuid.uuid4().hex[:8]}@example.com",
+        first_name="Product",
+        last_name="Owner",
+        organization_id=org.id,
+        enterprise_role="viewer",
+        confirmed=True,
+    )
+    db_session.add(user)
+    db_session.commit()
+    login_as(client, user)
+
+    rc = client.post(
+        f"/enterprise/requirements/{req_id}/confirm", json={"decision": "confirm"}
+    )
+    assert rc.status_code == 200, rc.get_data(as_text=True)
+    assert rc.get_json()["data"]["status"] == "Confirmed"
+
+    from app.models.models import ArchiMateElement
+
+    assert db_session.get(ArchiMateElement, req_id).status == "Confirmed"
+
+
+def test_api_key_cannot_confirm(client, db_session, make_org, app):
+    """ENT-V-2: no key can confirm — the confirm route is session-only, so a
+    Bearer key gets 401 (and the requirement stays Proposed)."""
+    org = make_org("ifiok")
+    app.config["IFIOK_VERIFIER_ORG_ID"] = org.id
+    _, secret = _issue(db_session, org.id)
+    r = client.post(
+        "/api/v1/verifier/requirements",
+        json={"ears_sentence": "The system shall stay proposed."},
+        headers=_auth(secret),
+    )
+    req_id = r.get_json()["data"]["id"]
+
+    rc = client.post(
+        f"/enterprise/requirements/{req_id}/confirm",
+        json={"decision": "confirm"},
+        headers=_auth(secret),
+    )
+    assert rc.status_code in (401, 403)
+    from app.models.models import ArchiMateElement
+
+    assert db_session.get(ArchiMateElement, req_id).status == "Proposed"
