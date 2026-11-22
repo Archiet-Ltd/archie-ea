@@ -105,3 +105,23 @@ def require_org(organization_id):
         return wrapper
 
     return decorator
+
+
+def require_verifier_org(f):
+    """Hard-reject a key not bound to the configured verifier organisation.
+
+    Defence in depth over the key's own org binding (ENT-V-8: the verifier key
+    writes only in org 68). The expected org is ``IFIOK_VERIFIER_ORG_ID`` in app
+    config, defaulting to 68, so tests can point it at a throwaway org.
+    """
+
+    @wraps(f)
+    def wrapper(*args, **kwargs):
+        from flask import current_app
+
+        expected = current_app.config.get("IFIOK_VERIFIER_ORG_ID", 68)
+        if getattr(g, "current_org_id", None) != expected:
+            return _forbidden("This API key is not scoped to the verifier organisation")
+        return f(*args, **kwargs)
+
+    return wrapper

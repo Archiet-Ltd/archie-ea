@@ -18,7 +18,7 @@ import logging
 from flask import Blueprint, g, request
 
 from app._bootstrap.build_info import get_build_id
-from app.auth.api_key import api_key_auth, require_org, require_scope
+from app.auth.api_key import api_key_auth, require_scope, require_verifier_org
 from app.extensions import db
 from app.utils.api_response import (
     error_response,
@@ -83,7 +83,7 @@ def _requirement_json(element):
 @verifier_bp.route("/requirements", methods=["POST"])
 @api_key_auth
 @require_scope(VERIFIER_SCOPE)
-@require_org(IFIOK_ORG_ID)
+@require_verifier_org
 def post_requirement():
     """ENT-V-1: store a verifier-posted requirement as a Proposed Requirement in
     org 68, awaiting a person's confirmation."""
@@ -127,18 +127,18 @@ def post_requirement():
 
     # organization_id is auto-stamped to g.current_org_id (68) by the tenant
     # before_flush listener; set it explicitly too (defence in depth).
-    element.organization_id = IFIOK_ORG_ID
+    element.organization_id = g.current_org_id
     db.session.add(element)
     db.session.commit()
 
-    logger.info("verifier posted Proposed requirement id=%s org=%s", element.id, IFIOK_ORG_ID)
+    logger.info("verifier posted Proposed requirement id=%s org=%s", element.id, g.current_org_id)
     return success_response(_requirement_json(element), status_code=201)
 
 
 @verifier_bp.route("/requirements", methods=["GET"])
 @api_key_auth
 @require_scope(VERIFIER_SCOPE)
-@require_org(IFIOK_ORG_ID)
+@require_verifier_org
 def list_requirements():
     """List org-68 Requirement elements with status + verified flag (ENT-V-7)."""
     from app.models.models import ArchiMateElement
@@ -155,7 +155,7 @@ def list_requirements():
 @verifier_bp.route("/verdicts", methods=["POST"])
 @api_key_auth
 @require_scope(VERIFIER_SCOPE)
-@require_org(IFIOK_ORG_ID)
+@require_verifier_org
 def post_verdict():
     """ENT-V-6: record the verifier's verdict (Verified|Failed) on a requirement,
     with the served commit, command, result line and unmet parts."""
@@ -187,7 +187,7 @@ def post_verdict():
         unmet_parts=data.get("unmet_parts"),
         recorded_by=g.api_key.label,
     )
-    verdict.organization_id = IFIOK_ORG_ID
+    verdict.organization_id = g.current_org_id
     db.session.add(verdict)
     db.session.commit()
 
