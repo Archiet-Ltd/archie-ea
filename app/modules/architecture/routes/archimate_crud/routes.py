@@ -2680,6 +2680,19 @@ def delete_element(layer, element_type, element_id):
         )
 
 
+@archimate_crud.route("/api/motivation/orphaned-stakeholders", methods=["GET"])
+@login_required
+def orphaned_stakeholders():
+    """REQ 2763 / WP 2895: confirmed stakeholders with no relationship to a
+    Driver, Goal, or Capability. Read by the motivation page's summary card."""
+    from app.services.motivation_integrity_service import find_orphaned_stakeholders
+
+    org_id = current_org_id()
+    if org_id is None:
+        return jsonify({"count": None, "orphaned": []})
+    return jsonify(find_orphaned_stakeholders(org_id))
+
+
 @archimate_crud.route("/api/archimate/validate", methods=["POST"])
 @login_required
 def validate_archimate_model():

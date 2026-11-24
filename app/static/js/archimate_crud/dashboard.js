@@ -93,6 +93,11 @@ document.addEventListener('alpine:init', function() {
             showValidationPanel: false,
             validationResults: null,
 
+            // REQ 2763 / WP 2895: confirmed stakeholders with no relationship
+            // to a Driver, Goal, or Capability. Only meaningful on the
+            // motivation tab; loaded there the same way layerCounts loads.
+            orphanedStakeholders: null,
+
             // ARCH-016: viewpoint filter
             viewpointKey: 'basic',
             availableViewpoints: {},
@@ -295,6 +300,25 @@ document.addEventListener('alpine:init', function() {
                 return issues === 0
                     ? { value: 'Clear', hint: 'Latest validation found no issues' }
                     : { value: issues, hint: 'Issues in the latest validation run' };
+            },
+
+            get orphanedStakeholdersPending() {
+                return this.activeTab === 'motivation' && this.orphanedStakeholders === null;
+            },
+
+            get orphanedStakeholdersValue() {
+                if (this.activeTab !== 'motivation') return '—';
+                if (!this.orphanedStakeholders) return '—';
+                return typeof this.orphanedStakeholders.count === 'number' ? this.orphanedStakeholders.count : '—';
+            },
+
+            get orphanedStakeholdersHint() {
+                if (this.activeTab !== 'motivation') return 'Shown on the Motivation tab';
+                if (!this.orphanedStakeholders) return 'Orphaned-stakeholder check unavailable';
+                if (typeof this.orphanedStakeholders.count !== 'number') return 'Orphaned-stakeholder check unavailable';
+                return this.orphanedStakeholders.count === 0
+                    ? 'Every confirmed stakeholder links to a driver, goal, or capability'
+                    : 'Confirmed stakeholders with no driver, goal, or capability link';
             },
 
             get sourceCounts() {
@@ -516,6 +540,9 @@ document.addEventListener('alpine:init', function() {
                 window.addEventListener('popstate', this.popstateHandler);
                 this.loadElements(false);
                 this.loadAllLayerCounts();
+                if (this.activeTab === 'motivation') {
+                    this.loadOrphanedStakeholders();
+                }
                 this.loadViewpoints().then(function() {
                     let viewpoint = self.availableViewpoints[self.viewpointKey];
                     // Basic/All Elements has no type filter. Reloading the same
@@ -601,6 +628,26 @@ document.addEventListener('alpine:init', function() {
                 this.selectedIds = [];
                 this.selectAll = false;
                 this.loadElements();
+                if (layerKey === 'motivation' && this.orphanedStakeholders === null) {
+                    this.loadOrphanedStakeholders();
+                }
+            },
+
+            // REQ 2763 / WP 2895.
+            async loadOrphanedStakeholders() {
+                let self = this;
+                try {
+                    let data = await Platform.fetch.get(
+                        '/architecture/api/motivation/orphaned-stakeholders',
+                        null,
+                        { silent: true }
+                    );
+                    self.orphanedStakeholders = data && typeof data.count === 'number'
+                        ? data
+                        : { count: null, orphaned: [] };
+                } catch (err) {
+                    self.orphanedStakeholders = { count: null, orphaned: [] };
+                }
             },
 
             async loadElements(syncState) {

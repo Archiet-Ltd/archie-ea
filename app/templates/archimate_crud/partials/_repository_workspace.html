@@ -80,6 +80,12 @@
     {{ repository_metric('Connected', "relationshipMetrics.known ? relationshipMetrics.connected : '—'", "relationshipHint", 'git-branch', 'elementsPending') }}
     {{ repository_metric('Documentation', "pageCount ? documentationPercent + '%' : '—'", "documentationHint", 'file-text', 'elementsPending') }}
     {{ repository_metric('Validation posture', "validationSummary.value", "validationSummary.hint", 'shield-check') }}
+    {% if selected_layer.key == 'motivation' %}
+    {# REQ 2763 / WP 2895: confirmed stakeholders with no relationship to a
+       Driver, Goal, or Capability — same repository_metric card pattern as
+       the four above, not a new component. #}
+    {{ repository_metric('Orphaned stakeholders', 'orphanedStakeholdersValue', 'orphanedStakeholdersHint', 'user-x', 'orphanedStakeholdersPending', 'orphaned-stakeholders-card') }}
+    {% endif %}
 </section>
 
 <section class="overflow-hidden rounded-lg border border-border bg-card" aria-label="Architecture elements" data-testid="architecture-data-card">
