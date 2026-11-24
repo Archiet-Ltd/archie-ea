@@ -30,6 +30,14 @@ def init_cli(app):
     except Exception as e:
         app.logger.warning(f"⚠️  Failed to register traceability report CLI command: {e}")
 
+    # Requirement-quality / EARS report CLI command (report mode only)
+    try:
+        from app.commands.requirement_quality_report_command import init_app as init_req_quality
+        init_req_quality(app)
+        app.logger.info("✅ Requirement-quality report CLI command registered")
+    except Exception as e:
+        app.logger.warning(f"⚠️  Failed to register requirement-quality report CLI command: {e}")
+
     # Lucidchart import CLI command
     try:
         from app.commands.lucid_import_commands import register_lucid_import_commands
